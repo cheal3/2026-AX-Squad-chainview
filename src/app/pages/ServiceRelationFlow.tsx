@@ -14,25 +14,28 @@ import {
 import "@xyflow/react/dist/style.css";
 import { Activity, Focus, GitBranch, Search } from "lucide-react";
 import { usePortalData } from "../PortalDataStore";
-import { codeLabels } from "../mockData";
 
 type ServiceNodeData = {
   label: string;
   code: string;
   category: string;
   selected: boolean;
+  laneLabel: string;
 };
 
 const NODE_WIDTH = 220;
 const NODE_HEIGHT = 96;
 const X_SPACING = 560;
 const Y_SPACING = 240;
+const DEPENDENCY_COLOR = "#f60";
+const DEPENDENT_COLOR = "#2563eb";
 
 export function ServiceRelationFlow() {
   const { services, relations } = usePortalData();
   const [focusedServiceId, setFocusedServiceId] = useState<number>(
     services[0]?.serviceId ?? 0
   );
+  const [depth, setDepth] = useState(2);
   const [query, setQuery] = useState("");
   const [flowInstance, setFlowInstance] =
     useState<ReactFlowInstance<ServiceNodeData> | null>(null);
@@ -61,20 +64,48 @@ export function ServiceRelationFlow() {
   const { visibleServiceIds, laneByServiceId } = useMemo(() => {
     const visible = new Set<number>([focusedServiceId]);
     const laneMap = new Map<number, number>([[focusedServiceId, 0]]);
+    let dependencyFrontier = [focusedServiceId];
+    let dependentFrontier = [focusedServiceId];
 
-    relations.forEach((relation) => {
-      if (relation.sourceServiceId === focusedServiceId) {
-        visible.add(relation.targetServiceId);
-        laneMap.set(relation.targetServiceId, 1);
-      }
-      if (relation.targetServiceId === focusedServiceId) {
-        visible.add(relation.sourceServiceId);
-        laneMap.set(relation.sourceServiceId, -1);
-      }
-    });
+    for (let level = 1; level <= depth; level += 1) {
+      const nextDependencies = new Set<number>();
+      const nextDependents = new Set<number>();
+
+      dependencyFrontier.forEach((serviceId) => {
+        relations.forEach((relation) => {
+          if (relation.sourceServiceId === serviceId) {
+            nextDependencies.add(relation.targetServiceId);
+          }
+        });
+      });
+
+      dependentFrontier.forEach((serviceId) => {
+        relations.forEach((relation) => {
+          if (relation.targetServiceId === serviceId) {
+            nextDependents.add(relation.sourceServiceId);
+          }
+        });
+      });
+
+      dependencyFrontier = Array.from(nextDependencies).filter(
+        (serviceId) => !visible.has(serviceId)
+      );
+      dependencyFrontier.forEach((serviceId) => {
+        visible.add(serviceId);
+        laneMap.set(serviceId, level);
+      });
+
+      dependentFrontier = Array.from(nextDependents).filter(
+        (serviceId) => !visible.has(serviceId)
+      );
+      dependentFrontier.forEach((serviceId) => {
+        visible.add(serviceId);
+        laneMap.set(serviceId, -level);
+      });
+    }
 
     return { visibleServiceIds: visible, laneByServiceId: laneMap };
-  }, [focusedServiceId, relations]);
+  }, [depth, focusedServiceId, relations]);
 
   const nodes = useMemo<Node<ServiceNodeData>[]>(() => {
     const visibleServices = services.filter((service) =>
@@ -108,6 +139,7 @@ export function ServiceRelationFlow() {
             code: service.serviceCode,
             category: service.categoryPath.join(" / "),
             selected: focusedServiceId === service.serviceId,
+            laneLabel: getLaneLabel(lane),
           },
         };
       });
@@ -130,21 +162,14 @@ export function ServiceRelationFlow() {
             relation.targetServiceId === focusedServiceId)
       )
       .map((relation) => {
-        const source = services.find(
-          (service) => service.serviceId === relation.sourceServiceId
-        );
-        const target = services.find(
-          (service) => service.serviceId === relation.targetServiceId
-        );
-        const isFocused =
-          focusedServiceId === relation.sourceServiceId ||
-          focusedServiceId === relation.targetServiceId;
+        const dependencyEdge = relation.sourceServiceId === focusedServiceId;
+        const stroke = dependencyEdge ? DEPENDENCY_COLOR : DEPENDENT_COLOR;
 
         return {
           id: String(relation.relationId),
           source: String(relation.sourceServiceId),
           target: String(relation.targetServiceId),
-          animated: isFocused && relation.relationStatusCode === "ACTIVE",
+          animated: relation.relationStatusCode === "ACTIVE",
           label: "",
           type:
             relation.sourceServiceId === relation.targetServiceId
@@ -152,26 +177,12 @@ export function ServiceRelationFlow() {
               : "smoothstep",
           markerEnd: {
             type: MarkerType.ArrowClosed,
-            color: relation.mandatoryYn === "Y" ? "#f60" : "#64748b",
+            color: stroke,
           },
           style: {
-            stroke: relation.mandatoryYn === "Y" ? "#f60" : "#64748b",
-            strokeWidth: relation.mandatoryYn === "Y" ? 2.5 : 1.8,
-          },
-          labelStyle: {
-            fill: "#334155",
-            fontSize: 12,
-            fontWeight: 600,
-          },
-          labelBgStyle: {
-            fill: "#fff",
-            fillOpacity: 0.94,
-          },
-          labelBgPadding: [8, 4] as [number, number],
-          labelBgBorderRadius: 6,
-          data: {
-            sourceName: source?.serviceName,
-            targetName: target?.serviceName,
+            stroke,
+            strokeWidth: relation.mandatoryYn === "Y" ? 3 : 2,
+            opacity: relation.mandatoryYn === "Y" ? 0.9 : 0.62,
           },
         };
       });
@@ -194,6 +205,14 @@ export function ServiceRelationFlow() {
     setFocusedServiceId(serviceId);
     setQuery("");
   };
+
+  const laneLabels = useMemo(() => {
+    const labels: { lane: number; label: string }[] = [];
+    for (let lane = -depth; lane <= depth; lane += 1) {
+      labels.push({ lane, label: getLaneLabel(lane) });
+    }
+    return labels;
+  }, [depth]);
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -261,7 +280,39 @@ export function ServiceRelationFlow() {
       <section className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         <div className="relative h-[680px]">
           <div className="absolute left-4 top-4 z-10 rounded-lg border border-gray-200 bg-white/95 px-3 py-2 text-sm text-gray-600 shadow-sm">
-            직접 연결된 의존/종속 관계만 표시
+            기준 노드 직접 관계만 선으로 표시
+          </div>
+          <div className="absolute right-4 top-4 z-10 flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-white/95 px-3 py-2 shadow-sm">
+            <span className="text-sm font-medium text-gray-700">Depth</span>
+            {[1, 2, 3, 4].map((item) => (
+              <button
+                key={item}
+                onClick={() => setDepth(item)}
+                className={`rounded-lg px-3 py-1.5 text-sm ${
+                  depth === item
+                    ? "bg-[#f60] text-white"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                {item}
+              </button>
+            ))}
+          </div>
+          <div className="absolute inset-y-0 left-1/2 top-0 z-0 flex -translate-x-1/2 pointer-events-none">
+            {laneLabels.map((item) => (
+              <div
+                key={item.lane}
+                className={`flex w-[560px] justify-center border-x border-gray-200/70 pt-16 text-xs font-semibold ${
+                  item.lane === 0
+                    ? "bg-orange-50/55 text-[#f60]"
+                    : item.lane < 0
+                      ? "bg-blue-50/40 text-blue-700"
+                      : "bg-orange-50/30 text-orange-700"
+                }`}
+              >
+                {item.label}
+              </div>
+            ))}
           </div>
           <ReactFlow
             nodes={nodes}
@@ -277,6 +328,7 @@ export function ServiceRelationFlow() {
             onNodeClick={(_, node) => selectService(Number(node.id))}
             minZoom={0.25}
             maxZoom={1.6}
+            className="relative z-[1]"
           >
             <Background gap={24} size={1.2} color="#dbe4f0" />
             <MiniMap
@@ -349,9 +401,22 @@ function ServiceNode({ data }: { data: ServiceNodeData }) {
       <div className="mt-2 text-xs text-gray-500 leading-relaxed">
         {data.category}
       </div>
+      <div className="mt-3 inline-flex rounded-full bg-gray-100 px-2 py-1 text-[11px] font-medium text-gray-600">
+        {data.laneLabel}
+      </div>
       <Handle type="source" position={Position.Right} />
     </div>
   );
+}
+
+function getLaneLabel(lane: number) {
+  if (lane === 0) {
+    return "기준";
+  }
+  if (lane > 0) {
+    return `의존 ${lane} depth`;
+  }
+  return `종속 ${Math.abs(lane)} depth`;
 }
 
 function SummaryCard({
