@@ -1,86 +1,97 @@
-import { Server, Settings, Network, AlertTriangle, UserX } from "lucide-react";
+import { Server, Settings, Network, AlertTriangle, UserCheck } from "lucide-react";
+import {
+  codeLabels,
+  incidentImpacts,
+  incidents,
+  serviceOwners,
+  serviceRelations,
+  services,
+  servers,
+} from "../mockData";
 
 export function Dashboard() {
+  const activeRelations = serviceRelations.filter(
+    (relation) => relation.relationStatusCode === "ACTIVE"
+  );
+  const openIncidents = incidents.filter(
+    (incident) => incident.incidentStatusCode !== "RESOLVED"
+  );
+  const ownerAssignedCount = new Set(
+    serviceOwners.map((owner) => owner.serviceId)
+  ).size;
+
   const kpiCards = [
     {
       title: "서버 수",
-      value: "248",
+      value: servers.length.toString(),
       icon: Server,
       color: "bg-blue-500",
-      trend: "+12 이번 달",
+      detail: "운영 1 · 스테이징 1",
     },
     {
       title: "서비스 수",
-      value: "156",
+      value: services.length.toString(),
       icon: Settings,
       color: "bg-green-500",
-      trend: "+8 이번 달",
+      detail: "정상 2",
     },
     {
       title: "활성 연계",
-      value: "1,247",
+      value: activeRelations.length.toString(),
       icon: Network,
-      color: "bg-purple-500",
-      trend: "+43 이번 주",
+      color: "bg-sky-500",
+      detail: "REST API 2",
     },
     {
       title: "진행 장애",
-      value: "3",
+      value: openIncidents.length.toString(),
       icon: AlertTriangle,
       color: "bg-red-500",
-      trend: "긴급 1건",
+      detail: "영향 서비스 2",
     },
     {
-      title: "담당 미지정",
-      value: "17",
-      icon: UserX,
-      color: "bg-orange-500",
-      trend: "조치 필요",
+      title: "담당 지정",
+      value: `${ownerAssignedCount}/${services.length}`,
+      icon: UserCheck,
+      color: "bg-emerald-500",
+      detail: "정 담당 기준",
     },
   ];
 
   const recentActivities = [
     {
       id: 1,
-      type: "서버 추가",
-      description: "PRD-WEB-015 서버가 등록되었습니다",
-      time: "5분 전",
-      user: "김철수",
+      type: "서버 등록",
+      description: "server-test-name111 서버가 스테이징 환경에 등록되었습니다.",
+      time: "2026-05-17 10:10",
+      user: "8913812",
     },
     {
       id: 2,
-      type: "장애 발생",
-      description: "결제 서비스 응답 지연 발생",
-      time: "23분 전",
-      user: "시스템",
+      type: "서비스 수정",
+      description: "111 서비스의 배포 서버가 server-test-name111로 지정되었습니다.",
+      time: "2026-05-17 10:15",
+      user: "8913812",
     },
     {
       id: 3,
-      type: "서비스 수정",
-      description: "회원 인증 서비스 담당자 변경",
-      time: "1시간 전",
-      user: "박영희",
+      type: "관계 등록",
+      description: "111 -> 테스트서비스 REST API 필수 관계가 활성화되었습니다.",
+      time: "2026-05-17 10:20",
+      user: "8913812",
     },
     {
       id: 4,
-      type: "연계 추가",
-      description: "주문 → 재고 서비스 연계 등록",
-      time: "2시간 전",
-      user: "이민수",
-    },
-    {
-      id: 5,
-      type: "서버 제거",
-      description: "DEV-DB-003 서버가 삭제되었습니다",
-      time: "3시간 전",
-      user: "최지훈",
+      type: "장애 등록",
+      description: "테스트서비스 장애 기준 영향 서비스가 2건 계산되었습니다.",
+      time: "2026-05-17 10:30",
+      user: "8913812",
     },
   ];
 
   return (
     <div className="space-y-6">
-      {/* KPI 카드 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6">
         {kpiCards.map((card) => {
           const Icon = card.icon;
           return (
@@ -98,19 +109,17 @@ export function Dashboard() {
                 <p className="text-3xl font-semibold text-gray-900">
                   {card.value}
                 </p>
-                <p className="text-xs text-gray-500">{card.trend}</p>
+                <p className="text-xs text-gray-500">{card.detail}</p>
               </div>
             </div>
           );
         })}
       </div>
 
-      {/* 최근 활동 및 통계 */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* 최근 활동 */}
-        <div className="lg:col-span-2 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <section className="lg:col-span-2 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">
-            최근 활동
+            최근 등록/수정 이력
           </h3>
           <div className="space-y-3">
             {recentActivities.map((activity) => (
@@ -118,46 +127,43 @@ export function Dashboard() {
                 key={activity.id}
                 className="flex items-start gap-4 p-3 hover:bg-gray-50 rounded-lg transition-colors"
               >
-                <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
+                <div className="w-2 h-2 bg-blue-500 rounded-full mt-2" />
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="flex flex-wrap items-center gap-2 mb-1">
                     <span className="text-sm font-medium text-gray-900">
                       {activity.type}
                     </span>
                     <span className="text-xs text-gray-500">
-                      · {activity.time}
+                      {activity.time}
                     </span>
                   </div>
                   <p className="text-sm text-gray-600">
                     {activity.description}
                   </p>
                   <p className="text-xs text-gray-500 mt-1">
-                    작업자: {activity.user}
+                    X-User-Id: {activity.user}
                   </p>
                 </div>
               </div>
             ))}
           </div>
-        </div>
+        </section>
 
-        {/* 상태 요약 */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <section className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">
-            상태 요약
+            데이터 상태 요약
           </h3>
           <div className="space-y-4">
             <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-gray-600">서버 가동률</span>
+                <span className="text-sm text-gray-600">서버 정상</span>
                 <span className="text-sm font-semibold text-gray-900">
-                  98.7%
+                  {servers.filter((server) => server.statusCode === "NORMAL").length}/
+                  {servers.length}
                 </span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2">
-                <div
-                  className="bg-green-500 h-2 rounded-full"
-                  style={{ width: "98.7%" }}
-                ></div>
+                <div className="bg-green-500 h-2 rounded-full w-full" />
               </div>
             </div>
 
@@ -165,53 +171,43 @@ export function Dashboard() {
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm text-gray-600">서비스 정상</span>
                 <span className="text-sm font-semibold text-gray-900">
-                  153/156
+                  {services.filter((service) => service.statusCode === "NORMAL").length}/
+                  {services.length}
                 </span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2">
-                <div
-                  className="bg-blue-500 h-2 rounded-full"
-                  style={{ width: "98%" }}
-                ></div>
+                <div className="bg-blue-500 h-2 rounded-full w-full" />
               </div>
             </div>
 
             <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-gray-600">연계 정상</span>
+                <span className="text-sm text-gray-600">관계 활성</span>
                 <span className="text-sm font-semibold text-gray-900">
-                  1,244/1,247
+                  {activeRelations.length}/{serviceRelations.length}
                 </span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2">
-                <div
-                  className="bg-purple-500 h-2 rounded-full"
-                  style={{ width: "99.7%" }}
-                ></div>
+                <div className="bg-sky-500 h-2 rounded-full w-full" />
               </div>
             </div>
 
             <div className="pt-4 border-t border-gray-200">
               <h4 className="text-sm font-medium text-gray-900 mb-3">
-                긴급 알림
+                진행 중 장애
               </h4>
-              <div className="space-y-2">
-                <div className="p-3 bg-red-50 rounded-lg border border-red-200">
-                  <p className="text-sm font-medium text-red-900">
-                    결제 서비스 장애
-                  </p>
-                  <p className="text-xs text-red-700 mt-1">23분 전 발생</p>
-                </div>
-                <div className="p-3 bg-orange-50 rounded-lg border border-orange-200">
-                  <p className="text-sm font-medium text-orange-900">
-                    담당자 미지정 17건
-                  </p>
-                  <p className="text-xs text-orange-700 mt-1">조치 필요</p>
-                </div>
+              <div className="p-3 bg-red-50 rounded-lg border border-red-200">
+                <p className="text-sm font-medium text-red-900">
+                  {incidents[0].title}
+                </p>
+                <p className="text-xs text-red-700 mt-1">
+                  {codeLabels.severity[incidents[0].severityCode]} · 영향{" "}
+                  {incidentImpacts.length}건
+                </p>
               </div>
             </div>
           </div>
-        </div>
+        </section>
       </div>
     </div>
   );
