@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Background,
   Controls,
@@ -219,22 +219,22 @@ export function ServiceRelationFlow() {
   const selectService = (serviceId: number) => {
     setFocusedServiceId(serviceId);
     setQuery("");
-    centerFocusedNode();
   };
 
   const changeDepth = (nextDepth: number) => {
     setDepth(nextDepth);
-    centerFocusedNode();
   };
 
-  const centerFocusedNode = () => {
-    window.setTimeout(() => {
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
       flowInstance?.setCenter(NODE_WIDTH / 2, NODE_HEIGHT / 2, {
         zoom: 0.9,
         duration: 650,
       });
-    }, 40);
-  };
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [depth, flowInstance, focusedServiceId, nodes]);
 
   return (
     <div className="space-y-6">
@@ -343,10 +343,6 @@ export function ServiceRelationFlow() {
           color: #0f172a;
           padding: 14px 16px;
           width: ${NODE_WIDTH}px;
-        }
-
-        .react-flow__node {
-          transition: transform 620ms cubic-bezier(0.22, 1, 0.36, 1);
         }
 
         .react-flow__edge-path {

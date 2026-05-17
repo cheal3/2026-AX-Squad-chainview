@@ -387,9 +387,54 @@ const generatedServiceRelations = generatedServices
     } satisfies ServiceRelationRecord;
   });
 
+const denseRelationHubs = [0, 5, 12, 25, 40, 63];
+const denseServiceRelations = denseRelationHubs.flatMap((hubIndex, hubOrder) => {
+  const hub = generatedServices[hubIndex];
+  const relationTypeCodes: RelationTypeCode[] = ["REST", "MQ", "FILE", "SOAP"];
+  const outgoingOffsets = [1, 2, 3, 11, 18];
+  const incomingOffsets = [4, 8, 13, 21, 34];
+
+  const outgoing = outgoingOffsets.map((offset, offsetIndex) => {
+    const target = generatedServices[(hubIndex + offset) % generatedServices.length];
+    return {
+      relationId: 1000 + hubOrder * 20 + offsetIndex,
+      sourceServiceId: hub.serviceId,
+      targetServiceId: target.serviceId,
+      relationTypeCode:
+        relationTypeCodes[(hubOrder + offsetIndex) % relationTypeCodes.length],
+      mandatoryYn: offsetIndex % 2 === 0 ? "Y" : "N",
+      relationStatusCode: "ACTIVE",
+      description: `허브 테스트 관계 ${hub.serviceCode} -> ${target.serviceCode}`,
+      createdAt: "2026-05-17 11:30",
+      updatedAt: "2026-05-17 11:30",
+    } satisfies ServiceRelationRecord;
+  });
+
+  const incoming = incomingOffsets.map((offset, offsetIndex) => {
+    const source = generatedServices[
+      (hubIndex + offset) % generatedServices.length
+    ];
+    return {
+      relationId: 1000 + hubOrder * 20 + outgoingOffsets.length + offsetIndex,
+      sourceServiceId: source.serviceId,
+      targetServiceId: hub.serviceId,
+      relationTypeCode:
+        relationTypeCodes[(hubOrder + offsetIndex + 1) % relationTypeCodes.length],
+      mandatoryYn: offsetIndex % 3 === 0 ? "Y" : "N",
+      relationStatusCode: "ACTIVE",
+      description: `허브 테스트 관계 ${source.serviceCode} -> ${hub.serviceCode}`,
+      createdAt: "2026-05-17 11:35",
+      updatedAt: "2026-05-17 11:35",
+    } satisfies ServiceRelationRecord;
+  });
+
+  return [...outgoing, ...incoming];
+});
+
 export const serviceRelations: ServiceRelationRecord[] = [
   ...baseServiceRelations,
   ...generatedServiceRelations,
+  ...denseServiceRelations,
 ];
 
 export const techStacks: TechStackRecord[] = [
