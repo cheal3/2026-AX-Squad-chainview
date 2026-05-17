@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
 import { Search, Plus, Trash2, Edit2 } from "lucide-react";
+import { useServiceRelations } from "../ServiceRelationStore";
 import {
   codeLabels,
   getServiceById,
-  serviceRelations,
   services,
   type RelationStatusCode,
   type RelationTypeCode,
@@ -13,9 +13,18 @@ export function ServiceRelations() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState("전체");
   const [showForm, setShowForm] = useState(false);
+  const { relations, addRelation, removeRelation } = useServiceRelations();
+  const [sourceServiceId, setSourceServiceId] = useState(services[0].serviceId);
+  const [targetServiceId, setTargetServiceId] = useState(services[1]?.serviceId ?? services[0].serviceId);
+  const [relationTypeCode, setRelationTypeCode] = useState<RelationTypeCode>("REST");
+  const [mandatoryYn, setMandatoryYn] = useState<"Y" | "N">("Y");
+  const [relationStatusCode, setRelationStatusCode] =
+    useState<RelationStatusCode>("ACTIVE");
+  const [description, setDescription] = useState("");
+  const [message, setMessage] = useState("");
 
   const filteredRelations = useMemo(() => {
-    return serviceRelations.filter((relation) => {
+    return relations.filter((relation) => {
       const source = getServiceById(relation.sourceServiceId);
       const target = getServiceById(relation.targetServiceId);
       const haystack = [
@@ -33,7 +42,23 @@ export function ServiceRelations() {
         codeLabels.relationType[relation.relationTypeCode] === filterType;
       return matchesSearch && matchesType;
     });
-  }, [filterType, searchTerm]);
+  }, [filterType, relations, searchTerm]);
+
+  const handleAddRelation = () => {
+    const result = addRelation({
+      sourceServiceId,
+      targetServiceId,
+      relationTypeCode,
+      mandatoryYn,
+      relationStatusCode,
+      description: description.trim() || "-",
+    });
+    setMessage(result.message);
+    if (result.ok) {
+      setDescription("");
+      setShowForm(false);
+    }
+  };
 
   const getStatusColor = (status: RelationStatusCode) => {
     switch (status) {
@@ -123,10 +148,13 @@ export function ServiceRelations() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 출발 서비스 *
               </label>
-              <select className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option>선택하세요</option>
+              <select
+                value={sourceServiceId}
+                onChange={(event) => setSourceServiceId(Number(event.target.value))}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
                 {services.map((service) => (
-                  <option key={service.serviceId}>
+                  <option key={service.serviceId} value={service.serviceId}>
                     #{service.serviceId} {service.serviceName}
                   </option>
                 ))}
@@ -137,10 +165,13 @@ export function ServiceRelations() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 대상 서비스 *
               </label>
-              <select className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option>선택하세요</option>
+              <select
+                value={targetServiceId}
+                onChange={(event) => setTargetServiceId(Number(event.target.value))}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
                 {services.map((service) => (
-                  <option key={service.serviceId}>
+                  <option key={service.serviceId} value={service.serviceId}>
                     #{service.serviceId} {service.serviceName}
                   </option>
                 ))}
@@ -151,12 +182,18 @@ export function ServiceRelations() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 관계 유형 *
               </label>
-              <select className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option>REST API</option>
-                <option>SOAP</option>
-                <option>Message Queue</option>
-                <option>File Transfer</option>
-                <option>기타</option>
+              <select
+                value={relationTypeCode}
+                onChange={(event) =>
+                  setRelationTypeCode(event.target.value as RelationTypeCode)
+                }
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {Object.entries(codeLabels.relationType).map(([code, label]) => (
+                  <option key={code} value={code}>
+                    {label}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -164,9 +201,15 @@ export function ServiceRelations() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 필수 여부 *
               </label>
-              <select className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option>필수</option>
-                <option>선택</option>
+              <select
+                value={mandatoryYn}
+                onChange={(event) =>
+                  setMandatoryYn(event.target.value as "Y" | "N")
+                }
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="Y">필수</option>
+                <option value="N">선택</option>
               </select>
             </div>
 
@@ -174,10 +217,18 @@ export function ServiceRelations() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 상태 *
               </label>
-              <select className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option>활성</option>
-                <option>비활성</option>
-                <option>폐기 예정</option>
+              <select
+                value={relationStatusCode}
+                onChange={(event) =>
+                  setRelationStatusCode(event.target.value as RelationStatusCode)
+                }
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {Object.entries(codeLabels.relationStatus).map(([code, label]) => (
+                  <option key={code} value={code}>
+                    {label}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -187,6 +238,8 @@ export function ServiceRelations() {
               </label>
               <textarea
                 rows={3}
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
                 placeholder="연계 설명"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
@@ -194,7 +247,10 @@ export function ServiceRelations() {
           </div>
 
           <div className="flex gap-3 mt-4">
-            <button className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+            <button
+              onClick={handleAddRelation}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
               등록
             </button>
             <button
@@ -203,6 +259,7 @@ export function ServiceRelations() {
             >
               취소
             </button>
+            {message && <span className="self-center text-sm text-gray-600">{message}</span>}
           </div>
         </section>
       )}
@@ -296,10 +353,16 @@ export function ServiceRelations() {
                         <button className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
                           <Edit2 size={16} />
                         </button>
-                        <button className="px-3 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
+                        <button
+                          onClick={() => removeRelation(relation.relationId)}
+                          className="px-3 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                        >
                           삭제
                         </button>
-                        <button className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                        <button
+                          onClick={() => removeRelation(relation.relationId)}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        >
                           <Trash2 size={16} />
                         </button>
                       </div>
@@ -316,20 +379,20 @@ export function ServiceRelations() {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
           <div className="text-sm text-gray-600 mb-1">총 관계</div>
           <div className="text-2xl font-semibold text-gray-900">
-            {serviceRelations.length}
+            {relations.length}
           </div>
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
           <div className="text-sm text-gray-600 mb-1">필수 관계</div>
           <div className="text-2xl font-semibold text-green-600">
-            {serviceRelations.filter((relation) => relation.mandatoryYn === "Y").length}
+            {relations.filter((relation) => relation.mandatoryYn === "Y").length}
           </div>
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
           <div className="text-sm text-gray-600 mb-1">활성 관계</div>
           <div className="text-2xl font-semibold text-blue-600">
             {
-              serviceRelations.filter(
+              relations.filter(
                 (relation) => relation.relationStatusCode === "ACTIVE"
               ).length
             }
@@ -339,7 +402,7 @@ export function ServiceRelations() {
           <div className="text-sm text-gray-600 mb-1">REST API</div>
           <div className="text-2xl font-semibold text-gray-900">
             {
-              serviceRelations.filter(
+              relations.filter(
                 (relation) => relation.relationTypeCode === "REST"
               ).length
             }
