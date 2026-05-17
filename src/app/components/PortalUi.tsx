@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
-import { X } from "lucide-react";
+import { ChevronDown, X } from "lucide-react";
 
 export function Modal({
   open,
@@ -91,10 +91,44 @@ export function Select({
       <span className="mb-2 block text-sm font-medium text-gray-700">
         {label}
       </span>
+      <span className="relative block">
+        <select
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className="w-full appearance-none rounded-lg border border-gray-300 bg-white py-2 pl-4 pr-10 focus:outline-none focus:ring-2 focus:ring-[#f60]"
+        >
+          {Object.entries(options).map(([code, labelText]) => (
+            <option key={code} value={code}>
+              {labelText}
+            </option>
+          ))}
+        </select>
+        <ChevronDown
+          size={16}
+          className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+        />
+      </span>
+    </label>
+  );
+}
+
+export function SelectBox({
+  value,
+  onChange,
+  options,
+  className = "",
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  options: Record<string, string>;
+  className?: string;
+}) {
+  return (
+    <span className={`relative block ${className}`}>
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#f60]"
+        className="w-full appearance-none rounded-lg border border-gray-300 bg-white py-2 pl-3 pr-10 focus:outline-none focus:ring-2 focus:ring-[#f60]"
       >
         {Object.entries(options).map(([code, labelText]) => (
           <option key={code} value={code}>
@@ -102,7 +136,11 @@ export function Select({
           </option>
         ))}
       </select>
-    </label>
+      <ChevronDown
+        size={16}
+        className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+      />
+    </span>
   );
 }
 

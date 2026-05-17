@@ -31,6 +31,7 @@ import {
   Input,
   Modal,
   Select,
+  SelectBox,
   toOptions,
 } from "../components/PortalUi";
 
@@ -63,6 +64,43 @@ const techOptions = [
   "Redis",
   "Kafka",
 ];
+
+type RelationDraft = {
+  targetServiceId: number;
+  direction: "OUT" | "IN";
+  relationTypeCode: RelationTypeCode;
+  mandatoryYn: "Y" | "N";
+  description: string;
+};
+
+type ServiceFormInput = {
+  serverId: number;
+  categoryPath: string[];
+  serviceCode: string;
+  serviceName: string;
+  serviceTypeCode: ServiceTypeCode;
+  statusCode: ServiceStatusCode;
+  endpointUrl: string;
+  deployPath: string;
+  portInfo: string;
+  deploymentStatusCode: "RUNNING";
+  instanceCount: number;
+  description: string;
+  relationDraft?: RelationDraft;
+};
+
+function toRelationInput(currentServiceId: number, draft: RelationDraft) {
+  return {
+    sourceServiceId:
+      draft.direction === "OUT" ? currentServiceId : draft.targetServiceId,
+    targetServiceId:
+      draft.direction === "OUT" ? draft.targetServiceId : currentServiceId,
+    relationTypeCode: draft.relationTypeCode,
+    mandatoryYn: draft.mandatoryYn,
+    relationStatusCode: "ACTIVE" as const,
+    description: draft.description,
+  };
+}
 
 export function ServicePortal() {
   const {
@@ -172,42 +210,27 @@ export function ServicePortal() {
               className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-[#f60]"
             />
           </label>
-          <select
+          <SelectBox
             value={serverFilter}
-            onChange={(event) => setServerFilter(event.target.value)}
-            className="rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#f60]"
-          >
-            <option value="ALL">전체 서버</option>
-            {servers.map((server) => (
-              <option key={server.serverId} value={server.serverId}>
-                {server.serverName}
-              </option>
-            ))}
-          </select>
-          <select
+            onChange={setServerFilter}
+            options={{
+              ALL: "전체 서버",
+              ...servers.reduce<Record<string, string>>((acc, server) => {
+                acc[String(server.serverId)] = server.serverName;
+                return acc;
+              }, {}),
+            }}
+          />
+          <SelectBox
             value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value)}
-            className="rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#f60]"
-          >
-            <option value="ALL">전체 상태</option>
-            {Object.entries(codeLabels.serviceStatus).map(([code, label]) => (
-              <option key={code} value={code}>
-                {label}
-              </option>
-            ))}
-          </select>
-          <select
+            onChange={setStatusFilter}
+            options={{ ALL: "전체 상태", ...codeLabels.serviceStatus }}
+          />
+          <SelectBox
             value={typeFilter}
-            onChange={(event) => setTypeFilter(event.target.value)}
-            className="rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#f60]"
-          >
-            <option value="ALL">전체 유형</option>
-            {Object.entries(codeLabels.serviceType).map(([code, label]) => (
-              <option key={code} value={code}>
-                {label}
-              </option>
-            ))}
-          </select>
+            onChange={setTypeFilter}
+            options={{ ALL: "전체 유형", ...codeLabels.serviceType }}
+          />
         </div>
 
         <div className="overflow-auto">
@@ -236,7 +259,7 @@ export function ServicePortal() {
                         {service.serviceCode}
                       </div>
                     </td>
-                    <td className="px-5 py-4 text-sm text-gray-700">
+                    <td className="whitespace-nowrap px-5 py-4 text-sm text-gray-700">
                       {service.categoryPath.join(" / ")}
                     </td>
                     <td className="px-5 py-4 text-sm text-gray-700">
@@ -297,10 +320,15 @@ export function ServicePortal() {
       >
         <ServiceForm
           servers={servers}
+          services={services}
           submitLabel="등록"
           onCancel={() => setShowCreate(false)}
           onSubmit={(input) => {
-            addService(input);
+            const { relationDraft, ...serviceInput } = input;
+            const service = addService(serviceInput);
+            if (relationDraft) {
+              addRelation(toRelationInput(service.serviceId, relationDraft));
+            }
             setShowCreate(false);
             setMessage("서비스가 등록되었습니다.");
           }}
@@ -316,11 +344,16 @@ export function ServicePortal() {
         {editService && (
           <ServiceForm
             servers={servers}
+            services={services}
             initialValue={editService}
             submitLabel="저장"
             onCancel={() => setEditServiceId(null)}
             onSubmit={(input) => {
-              updateService(editService.serviceId, input);
+              const { relationDraft, ...serviceInput } = input;
+              updateService(editService.serviceId, serviceInput);
+              if (relationDraft) {
+                addRelation(toRelationInput(editService.serviceId, relationDraft));
+              }
               setEditServiceId(null);
               setMessage("서비스 정보가 수정되었습니다.");
             }}
@@ -381,28 +414,17 @@ export function ServicePortal() {
 
 function ServiceForm({
   servers,
+  services,
   initialValue,
   submitLabel,
   onSubmit,
   onCancel,
 }: {
   servers: ServerRecord[];
+  services: ServiceRecord[];
   initialValue?: ServiceRecord;
   submitLabel: string;
-  onSubmit: (input: {
-    serverId: number;
-    categoryPath: string[];
-    serviceCode: string;
-    serviceName: string;
-    serviceTypeCode: ServiceTypeCode;
-    statusCode: ServiceStatusCode;
-    endpointUrl: string;
-    deployPath: string;
-    portInfo: string;
-    deploymentStatusCode: "RUNNING";
-    instanceCount: number;
-    description: string;
-  }) => void;
+  onSubmit: (input: ServiceFormInput) => void;
   onCancel: () => void;
 }) {
   const [serverId, setServerId] = useState(
@@ -441,6 +463,20 @@ function ServiceForm({
   const [description, setDescription] = useState(
     initialValue?.description ?? ""
   );
+  const relationTargets = services.filter(
+    (service) => service.serviceId !== initialValue?.serviceId
+  );
+  const [useRelation, setUseRelation] = useState(false);
+  const [relationTargetId, setRelationTargetId] = useState(
+    relationTargets[0]?.serviceId ?? 0
+  );
+  const [relationDirection, setRelationDirection] = useState<"OUT" | "IN">(
+    "OUT"
+  );
+  const [relationTypeCode, setRelationTypeCode] =
+    useState<RelationTypeCode>("REST");
+  const [mandatoryYn, setMandatoryYn] = useState<"Y" | "N">("Y");
+  const [relationDescription, setRelationDescription] = useState("");
 
   return (
     <div className="space-y-8">
@@ -471,33 +507,35 @@ function ServiceForm({
       </FormSection>
 
       <FormSection title="서비스 분류">
-        <Select
-          label="1단계"
-          value={level1}
-          onChange={(value) => {
-            setLevel1(value);
-            setLevel2(categoryLevel2[value][0]);
-          }}
-          options={toOptions(categoryLevel1)}
-        />
-        <Select
-          label="2단계"
-          value={level2}
-          onChange={setLevel2}
-          options={toOptions(categoryLevel2[level1] ?? [])}
-        />
-        <Select
-          label="3단계"
-          value={level3}
-          onChange={setLevel3}
-          options={toOptions(categoryLevel3)}
-        />
-        <Input
-          label="4단계"
-          value={level4}
-          onChange={setLevel4}
-          placeholder="예: SSO"
-        />
+        <div className="grid grid-cols-1 gap-3 xl:grid-cols-4">
+          <Select
+            label="1단계"
+            value={level1}
+            onChange={(value) => {
+              setLevel1(value);
+              setLevel2(categoryLevel2[value][0]);
+            }}
+            options={toOptions(categoryLevel1)}
+          />
+          <Select
+            label="2단계"
+            value={level2}
+            onChange={setLevel2}
+            options={toOptions(categoryLevel2[level1] ?? [])}
+          />
+          <Select
+            label="3단계"
+            value={level3}
+            onChange={setLevel3}
+            options={toOptions(categoryLevel3)}
+          />
+          <Input
+            label="4단계"
+            value={level4}
+            onChange={setLevel4}
+            placeholder="예: SSO"
+          />
+        </div>
       </FormSection>
 
       <FormSection title="배포 정보">
@@ -518,6 +556,65 @@ function ServiceForm({
         <Input label="설명" value={description} onChange={setDescription} />
       </FormSection>
 
+      <FormSection title="의존/종속 관계">
+        <label className="flex items-center gap-3 rounded-lg border border-gray-200 px-4 py-3 text-sm text-gray-700">
+          <input
+            type="checkbox"
+            checked={useRelation}
+            onChange={(event) => setUseRelation(event.target.checked)}
+            className="h-4 w-4 accent-[#f60]"
+          />
+          저장하면서 현재 서비스 기준 관계도 함께 등록
+        </label>
+        {useRelation && (
+          <div className="space-y-4 rounded-lg border border-orange-100 bg-orange-50/40 p-4">
+            <Select
+              label="관계 방향"
+              value={relationDirection}
+              onChange={(value) => setRelationDirection(value as "OUT" | "IN")}
+              options={{
+                OUT: "현재 서비스가 대상 서비스에 의존",
+                IN: "대상 서비스가 현재 서비스에 의존",
+              }}
+            />
+            <Select
+              label="대상 서비스"
+              value={String(relationTargetId)}
+              onChange={(value) => setRelationTargetId(Number(value))}
+              options={relationTargets.reduce<Record<string, string>>(
+                (acc, service) => {
+                  acc[String(service.serviceId)] = `${service.serviceName} (${service.serviceCode})`;
+                  return acc;
+                },
+                {}
+              )}
+            />
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Select
+                label="관계 유형"
+                value={relationTypeCode}
+                onChange={(value) =>
+                  setRelationTypeCode(value as RelationTypeCode)
+                }
+                options={codeLabels.relationType}
+              />
+              <Select
+                label="필수 여부"
+                value={mandatoryYn}
+                onChange={(value) => setMandatoryYn(value as "Y" | "N")}
+                options={{ Y: "필수", N: "선택" }}
+              />
+            </div>
+            <Input
+              label="설명"
+              value={relationDescription}
+              onChange={setRelationDescription}
+              placeholder="예: 현재 서비스가 대상 서비스 REST API 호출"
+            />
+          </div>
+        )}
+      </FormSection>
+
       <FormActions
         submitLabel={submitLabel}
         disabled={!serverId || !serviceCode || !serviceName}
@@ -536,6 +633,16 @@ function ServiceForm({
             deploymentStatusCode: "RUNNING",
             instanceCount,
             description,
+            relationDraft:
+              useRelation && relationTargetId
+                ? {
+                    targetServiceId: relationTargetId,
+                    direction: relationDirection,
+                    relationTypeCode,
+                    mandatoryYn,
+                    description: relationDescription.trim() || "-",
+                  }
+                : undefined,
           })
         }
       />
@@ -622,15 +729,12 @@ function ServiceDetail({
               ))}
             </div>
             <div className="flex gap-2">
-              <select
+              <SelectBox
                 value={groupName}
-                onChange={(event) => setGroupName(event.target.value)}
-                className="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#f60]"
-              >
-                {groupOptions.map((group) => (
-                  <option key={group}>{group}</option>
-                ))}
-              </select>
+                onChange={setGroupName}
+                options={toOptions(groupOptions)}
+                className="min-w-0 flex-1"
+              />
               <button
                 onClick={() => onAddGroup(groupName)}
                 className="rounded-lg bg-[#f60] px-3 py-2 text-white"
@@ -649,15 +753,12 @@ function ServiceDetail({
               ))}
             </div>
             <div className="flex gap-2">
-              <select
+              <SelectBox
                 value={techName}
-                onChange={(event) => setTechName(event.target.value)}
-                className="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#f60]"
-              >
-                {techOptions.map((tech) => (
-                  <option key={tech}>{tech}</option>
-                ))}
-              </select>
+                onChange={setTechName}
+                options={toOptions(techOptions)}
+                className="min-w-0 flex-1"
+              />
               <button
                 onClick={() => onAddTech(techName)}
                 className="rounded-lg bg-[#f60] px-3 py-2 text-white"
@@ -737,6 +838,9 @@ function RelationManager({
   const [targetServiceId, setTargetServiceId] = useState(
     targetOptions[0]?.serviceId ?? 0
   );
+  const [relationDirection, setRelationDirection] = useState<"OUT" | "IN">(
+    "OUT"
+  );
   const [relationTypeCode, setRelationTypeCode] =
     useState<RelationTypeCode>("REST");
   const [mandatoryYn, setMandatoryYn] = useState<"Y" | "N">("Y");
@@ -755,7 +859,16 @@ function RelationManager({
       </div>
 
       <div className="rounded-lg border border-gray-200 p-4">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_160px_140px]">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_1fr]">
+          <Select
+            label="관계 방향"
+            value={relationDirection}
+            onChange={(value) => setRelationDirection(value as "OUT" | "IN")}
+            options={{
+              OUT: "현재 서비스가 대상 서비스에 의존",
+              IN: "대상 서비스가 현재 서비스에 의존",
+            }}
+          />
           <Select
             label="대상 서비스"
             value={String(normalizedTarget)}
@@ -765,6 +878,8 @@ function RelationManager({
               return acc;
             }, {})}
           />
+        </div>
+        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-[1fr_160px]">
           <Select
             label="관계 유형"
             value={relationTypeCode}
@@ -792,8 +907,14 @@ function RelationManager({
               return;
             }
             const ok = onAddRelation({
-              sourceServiceId: service.serviceId,
-              targetServiceId: normalizedTarget,
+              sourceServiceId:
+                relationDirection === "OUT"
+                  ? service.serviceId
+                  : normalizedTarget,
+              targetServiceId:
+                relationDirection === "OUT"
+                  ? normalizedTarget
+                  : service.serviceId,
               relationTypeCode,
               mandatoryYn,
               relationStatusCode: "ACTIVE",

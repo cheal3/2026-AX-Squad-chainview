@@ -9,7 +9,7 @@ import {
   type ServerRecord,
   type ServerStatusCode,
 } from "../mockData";
-import { Info, Input, Modal, Select } from "../components/PortalUi";
+import { Info, Input, Modal, Select, SelectBox } from "../components/PortalUi";
 
 export function ServerPortal() {
   const { servers, services, addServer, updateServer, deleteServer } =
@@ -95,30 +95,16 @@ export function ServerPortal() {
               className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-[#f60]"
             />
           </label>
-          <select
+          <SelectBox
             value={envFilter}
-            onChange={(event) => setEnvFilter(event.target.value)}
-            className="rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#f60]"
-          >
-            <option value="ALL">전체 환경</option>
-            {Object.entries(codeLabels.envType).map(([code, label]) => (
-              <option key={code} value={code}>
-                {label}
-              </option>
-            ))}
-          </select>
-          <select
+            onChange={setEnvFilter}
+            options={{ ALL: "전체 환경", ...codeLabels.envType }}
+          />
+          <SelectBox
             value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value)}
-            className="rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#f60]"
-          >
-            <option value="ALL">전체 상태</option>
-            {Object.entries(codeLabels.serverStatus).map(([code, label]) => (
-              <option key={code} value={code}>
-                {label}
-              </option>
-            ))}
-          </select>
+            onChange={setStatusFilter}
+            options={{ ALL: "전체 상태", ...codeLabels.serverStatus }}
+          />
         </div>
 
         <div className="overflow-auto">

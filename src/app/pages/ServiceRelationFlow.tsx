@@ -11,7 +11,7 @@ import {
   type Node,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { Activity, Focus, GitBranch } from "lucide-react";
+import { Activity, Focus, GitBranch, Search } from "lucide-react";
 import { usePortalData } from "../PortalDataStore";
 import { codeLabels } from "../mockData";
 
@@ -27,41 +27,86 @@ export function ServiceRelationFlow() {
   const [focusedServiceId, setFocusedServiceId] = useState<number>(
     services[0]?.serviceId ?? 0
   );
+  const [depth, setDepth] = useState(1);
+  const [query, setQuery] = useState("");
   const focusedService =
     services.find((service) => service.serviceId === focusedServiceId) ??
     services[0];
+  const filteredServices = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    if (!normalized) {
+      return services.slice(0, 8);
+    }
+    return services
+      .filter((service) =>
+        [
+          service.serviceName,
+          service.serviceCode,
+          service.categoryPath.join(" "),
+        ]
+          .join(" ")
+          .toLowerCase()
+          .includes(normalized)
+      )
+      .slice(0, 12);
+  }, [query, services]);
 
-  const visibleServiceIds = useMemo(() => {
-    const connected = new Set<number>([focusedServiceId]);
-    relations.forEach((relation) => {
-      if (relation.sourceServiceId === focusedServiceId) {
-        connected.add(relation.targetServiceId);
-      }
-      if (relation.targetServiceId === focusedServiceId) {
-        connected.add(relation.sourceServiceId);
-      }
-    });
-    return connected;
-  }, [focusedServiceId, relations]);
+  const { visibleServiceIds, depthByServiceId } = useMemo(() => {
+    const visible = new Set<number>([focusedServiceId]);
+    const levelMap = new Map<number, number>([[focusedServiceId, 0]]);
+    let frontier = [focusedServiceId];
+
+    for (let level = 1; level <= depth; level += 1) {
+      const next = new Set<number>();
+
+      frontier.forEach((serviceId) => {
+        relations.forEach((relation) => {
+          if (relation.sourceServiceId === serviceId) {
+            next.add(relation.targetServiceId);
+          }
+          if (relation.targetServiceId === serviceId) {
+            next.add(relation.sourceServiceId);
+          }
+        });
+      });
+
+      frontier = Array.from(next).filter((serviceId) => !visible.has(serviceId));
+      frontier.forEach((serviceId) => {
+        visible.add(serviceId);
+        levelMap.set(serviceId, level);
+      });
+    }
+
+    return { visibleServiceIds: visible, depthByServiceId: levelMap };
+  }, [depth, focusedServiceId, relations]);
 
   const nodes = useMemo<Node<ServiceNodeData>[]>(() => {
     return services
       .filter((service) => visibleServiceIds.has(service.serviceId))
-      .map((service, index) => ({
-        id: String(service.serviceId),
-        type: "serviceNode",
-        position: {
-          x: 120 + (index % 3) * 320,
-          y: 90 + Math.floor(index / 3) * 210,
-        },
-        data: {
-          label: service.serviceName,
-          code: service.serviceCode,
-          category: service.categoryPath.join(" / "),
-          selected: focusedServiceId === service.serviceId,
-        },
-      }));
-  }, [focusedServiceId, visibleServiceIds]);
+      .map((service, index) => {
+        const serviceDepth = depthByServiceId.get(service.serviceId) ?? 0;
+        const peersBefore = services
+          .filter((item) => visibleServiceIds.has(item.serviceId))
+          .slice(0, index)
+          .filter((item) => depthByServiceId.get(item.serviceId) === serviceDepth)
+          .length;
+
+        return {
+          id: String(service.serviceId),
+          type: "serviceNode",
+          position: {
+            x: 80 + serviceDepth * 340,
+            y: 80 + peersBefore * 170,
+          },
+          data: {
+            label: service.serviceName,
+            code: service.serviceCode,
+            category: service.categoryPath.join(" / "),
+            selected: focusedServiceId === service.serviceId,
+          },
+        };
+      });
+  }, [depthByServiceId, focusedServiceId, services, visibleServiceIds]);
 
   const nodeTypes = useMemo(
     () => ({
@@ -124,13 +169,12 @@ export function ServiceRelationFlow() {
   const mandatoryCount = relations.filter(
     (relation) => relation.mandatoryYn === "Y"
   ).length;
-  const focusedRelationCount = focusedService
-    ? relations.filter(
-        (relation) =>
-          relation.sourceServiceId === focusedService.serviceId ||
-          relation.targetServiceId === focusedService.serviceId
-      ).length
-    : 0;
+  const focusedRelationCount = edges.length;
+
+  const selectService = (serviceId: number) => {
+    setFocusedServiceId(serviceId);
+    setQuery("");
+  };
 
   return (
     <div className="space-y-6">
@@ -146,20 +190,50 @@ export function ServiceRelationFlow() {
             </p>
           </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <select
-              value={focusedServiceId}
-              onChange={(event) =>
-                setFocusedServiceId(Number(event.target.value))
-              }
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#f60]"
-            >
-              {services.map((service) => (
-                <option key={service.serviceId} value={service.serviceId}>
-                  {service.serviceName} 기준
-                </option>
+          <div className="w-full max-w-xl space-y-3">
+            <label className="relative block">
+              <Search
+                size={18}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+              />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="서비스명 또는 코드 검색"
+                className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-[#f60]"
+              />
+            </label>
+            <div className="max-h-32 overflow-auto rounded-lg border border-gray-200 bg-white">
+              {filteredServices.map((service) => (
+                <button
+                  key={service.serviceId}
+                  onClick={() => selectService(service.serviceId)}
+                  className={`block w-full px-4 py-2 text-left text-sm hover:bg-orange-50 ${
+                    service.serviceId === focusedServiceId
+                      ? "bg-orange-50 font-semibold text-[#f60]"
+                      : "text-gray-700"
+                  }`}
+                >
+                  {service.serviceName} · {service.serviceCode}
+                </button>
               ))}
-            </select>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-medium text-gray-700">Depth</span>
+              {[1, 2, 3, 4].map((item) => (
+                <button
+                  key={item}
+                  onClick={() => setDepth(item)}
+                  className={`rounded-lg px-3 py-1.5 text-sm ${
+                    depth === item
+                      ? "bg-[#f60] text-white"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  }`}
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -176,6 +250,7 @@ export function ServiceRelationFlow() {
             nodes={nodes}
             edges={edges}
             nodeTypes={nodeTypes}
+            onNodeClick={(_, node) => selectService(Number(node.id))}
             fitView
             fitViewOptions={{ padding: 0.25 }}
             minZoom={0.4}
