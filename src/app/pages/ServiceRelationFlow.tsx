@@ -23,6 +23,11 @@ type ServiceNodeData = {
   laneLabel: string;
 };
 
+type LaneNodeData = {
+  label: string;
+  lane: number;
+};
+
 const NODE_WIDTH = 220;
 const NODE_HEIGHT = 96;
 const X_SPACING = 560;
@@ -30,12 +35,30 @@ const Y_SPACING = 240;
 const DEPENDENCY_COLOR = "#f60";
 const DEPENDENT_COLOR = "#2563eb";
 
+function relationConnectsAdjacentLanes(
+  relation: { sourceServiceId: number; targetServiceId: number },
+  laneByServiceId: Map<number, number>
+) {
+  const sourceLane = laneByServiceId.get(relation.sourceServiceId);
+  const targetLane = laneByServiceId.get(relation.targetServiceId);
+
+  if (sourceLane === undefined || targetLane === undefined) {
+    return false;
+  }
+
+  return (
+    (sourceLane >= 0 && targetLane === sourceLane + 1) ||
+    (targetLane <= 0 && sourceLane === targetLane - 1)
+  );
+}
+
 export function ServiceRelationFlow() {
   const { services, relations } = usePortalData();
   const [focusedServiceId, setFocusedServiceId] = useState<number>(
     services[0]?.serviceId ?? 0
   );
   const [depth, setDepth] = useState(2);
+  const [renderDepth, setRenderDepth] = useState(2);
   const [query, setQuery] = useState("");
   const [flowInstance, setFlowInstance] =
     useState<ReactFlowInstance<ServiceNodeData> | null>(null);
@@ -67,7 +90,7 @@ export function ServiceRelationFlow() {
     let dependencyFrontier = [focusedServiceId];
     let dependentFrontier = [focusedServiceId];
 
-    for (let level = 1; level <= depth; level += 1) {
+    for (let level = 1; level <= renderDepth; level += 1) {
       const nextDependencies = new Set<number>();
       const nextDependents = new Set<number>();
 
@@ -105,9 +128,32 @@ export function ServiceRelationFlow() {
     }
 
     return { visibleServiceIds: visible, laneByServiceId: laneMap };
-  }, [depth, focusedServiceId, relations]);
+  }, [focusedServiceId, relations, renderDepth]);
 
-  const nodes = useMemo<Node<ServiceNodeData>[]>(() => {
+  const laneNodes = useMemo<Node<LaneNodeData>[]>(() => {
+    const nodes: Node<LaneNodeData>[] = [];
+    for (let lane = -depth; lane <= depth; lane += 1) {
+      nodes.push({
+        id: `lane-${lane}`,
+        type: "laneNode",
+        position: {
+          x: lane * X_SPACING - (X_SPACING - NODE_WIDTH) / 2,
+          y: -1800,
+        },
+        data: {
+          label: getLaneLabel(lane),
+          lane,
+        },
+        draggable: false,
+        selectable: false,
+        focusable: false,
+        zIndex: -10,
+      });
+    }
+    return nodes;
+  }, [depth]);
+
+  const serviceNodes = useMemo<Node<ServiceNodeData>[]>(() => {
     const visibleServices = services.filter((service) =>
       visibleServiceIds.has(service.serviceId)
     );
@@ -145,8 +191,14 @@ export function ServiceRelationFlow() {
       });
   }, [focusedServiceId, laneByServiceId, services, visibleServiceIds]);
 
+  const nodes = useMemo(
+    () => [...laneNodes, ...serviceNodes],
+    [laneNodes, serviceNodes]
+  );
+
   const nodeTypes = useMemo(
     () => ({
+      laneNode: LaneNode,
       serviceNode: ServiceNode,
     }),
     []
@@ -158,11 +210,12 @@ export function ServiceRelationFlow() {
         (relation) =>
           visibleServiceIds.has(relation.sourceServiceId) &&
           visibleServiceIds.has(relation.targetServiceId) &&
-          (relation.sourceServiceId === focusedServiceId ||
-            relation.targetServiceId === focusedServiceId)
+          relationConnectsAdjacentLanes(relation, laneByServiceId)
       )
       .map((relation) => {
-        const dependencyEdge = relation.sourceServiceId === focusedServiceId;
+        const sourceLane = laneByServiceId.get(relation.sourceServiceId) ?? 0;
+        const targetLane = laneByServiceId.get(relation.targetServiceId) ?? 0;
+        const dependencyEdge = sourceLane >= 0 && targetLane > sourceLane;
         const stroke = dependencyEdge ? DEPENDENCY_COLOR : DEPENDENT_COLOR;
 
         return {
@@ -187,9 +240,8 @@ export function ServiceRelationFlow() {
         };
       });
   }, [
-    focusedServiceId,
+    laneByServiceId,
     relations,
-    services,
     visibleServiceIds,
   ]);
 
@@ -206,13 +258,18 @@ export function ServiceRelationFlow() {
     setQuery("");
   };
 
-  const laneLabels = useMemo(() => {
-    const labels: { lane: number; label: string }[] = [];
-    for (let lane = -depth; lane <= depth; lane += 1) {
-      labels.push({ lane, label: getLaneLabel(lane) });
-    }
-    return labels;
-  }, [depth]);
+  useEffect(() => {
+    setRenderDepth(0);
+    const timers = Array.from({ length: depth }, (_, index) =>
+      window.setTimeout(() => {
+        setRenderDepth(index + 1);
+      }, 260 + index * 420)
+    );
+
+    return () => {
+      timers.forEach((timer) => window.clearTimeout(timer));
+    };
+  }, [depth, focusedServiceId]);
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -298,22 +355,6 @@ export function ServiceRelationFlow() {
               </button>
             ))}
           </div>
-          <div className="absolute inset-y-0 left-1/2 top-0 z-0 flex -translate-x-1/2 pointer-events-none">
-            {laneLabels.map((item) => (
-              <div
-                key={item.lane}
-                className={`flex w-[560px] justify-center border-x border-gray-200/70 pt-16 text-xs font-semibold ${
-                  item.lane === 0
-                    ? "bg-orange-50/55 text-[#f60]"
-                    : item.lane < 0
-                      ? "bg-blue-50/40 text-blue-700"
-                      : "bg-orange-50/30 text-orange-700"
-                }`}
-              >
-                {item.label}
-              </div>
-            ))}
-          </div>
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -352,6 +393,47 @@ export function ServiceRelationFlow() {
           color: #0f172a;
           padding: 14px 16px;
           width: ${NODE_WIDTH}px;
+        }
+
+        .chainview-lane-node {
+          width: ${X_SPACING}px;
+          height: 3600px;
+          border-left: 1px solid rgba(148, 163, 184, 0.35);
+          border-right: 1px solid rgba(148, 163, 184, 0.35);
+          display: flex;
+          justify-content: center;
+          align-items: flex-start;
+          padding-top: 28px;
+          pointer-events: none;
+        }
+
+        .chainview-lane-center {
+          background: rgba(255, 102, 0, 0.12);
+          color: #f60;
+        }
+
+        .chainview-lane-dependency {
+          background: rgba(255, 102, 0, 0.06);
+          color: #c2410c;
+        }
+
+        .chainview-lane-dependent {
+          background: rgba(37, 99, 235, 0.07);
+          color: #1d4ed8;
+        }
+
+        .chainview-lane-label {
+          border-radius: 999px;
+          background: rgba(255, 255, 255, 0.86);
+          border: 1px solid rgba(148, 163, 184, 0.3);
+          padding: 6px 12px;
+          font-size: 12px;
+          font-weight: 700;
+          box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+        }
+
+        .react-flow__node-laneNode {
+          z-index: -10 !important;
         }
 
         .react-flow__edge-path {
@@ -405,6 +487,22 @@ function ServiceNode({ data }: { data: ServiceNodeData }) {
         {data.laneLabel}
       </div>
       <Handle type="source" position={Position.Right} />
+    </div>
+  );
+}
+
+function LaneNode({ data }: { data: LaneNodeData }) {
+  return (
+    <div
+      className={`chainview-lane-node ${
+        data.lane === 0
+          ? "chainview-lane-center"
+          : data.lane < 0
+            ? "chainview-lane-dependent"
+            : "chainview-lane-dependency"
+      }`}
+    >
+      <div className="chainview-lane-label">{data.label}</div>
     </div>
   );
 }
