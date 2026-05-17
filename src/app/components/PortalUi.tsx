@@ -20,9 +20,13 @@ export function Modal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4"
+      onMouseDown={onClose}
+    >
       <div
         className={`w-full ${maxWidth} max-h-[90vh] overflow-hidden rounded-lg bg-white shadow-2xl`}
+        onMouseDown={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
           <h4 className="text-lg font-semibold text-gray-900">{title}</h4>

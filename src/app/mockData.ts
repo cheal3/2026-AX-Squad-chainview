@@ -179,7 +179,7 @@ export interface IncidentImpactRecord {
   directYn: "Y" | "N";
 }
 
-export const servers: ServerRecord[] = [
+const baseServers: ServerRecord[] = [
   {
     serverId: 2,
     serverName: "server-test-name111",
@@ -208,7 +208,44 @@ export const servers: ServerRecord[] = [
   },
 ];
 
-export const services: ServiceRecord[] = [
+const generatedServers = Array.from({ length: 120 }, (_, index) => {
+  const serverId = index + 3;
+  const envCodes: EnvCode[] = ["PROD", "STAGE", "DEV"];
+  const osCodes: OsTypeCode[] = ["LINUX", "WINDOWS", "UNIX", "ETC"];
+  const statusCodes: ServerStatusCode[] = [
+    "NORMAL",
+    "NORMAL",
+    "NORMAL",
+    "MAINTENANCE",
+    "INCIDENT",
+    "INACTIVE",
+  ];
+  const envCode = envCodes[index % envCodes.length];
+  const osTypeCode = osCodes[index % osCodes.length];
+
+  return {
+    serverId,
+    serverName: `${envCode.toLowerCase()}-chainview-${String(serverId).padStart(3, "0")}`,
+    hostName: `${envCode.toLowerCase()}-cv-${String(serverId).padStart(3, "0")}.internal`,
+    ipAddress: `10.${20 + (index % 30)}.${Math.floor(index / 20) + 1}.${(index % 240) + 10}`,
+    envCode,
+    osTypeCode,
+    osVersion:
+      osTypeCode === "WINDOWS"
+        ? "Windows Server 2022"
+        : osTypeCode === "UNIX"
+          ? "AIX 7.3"
+          : "Rocky Linux 9",
+    statusCode: statusCodes[index % statusCodes.length],
+    description: `${codeLabels.envType[envCode]} 테스트용 ChainView 서버 ${serverId}`,
+    createdAt: `2026-05-17 ${String(8 + (index % 10)).padStart(2, "0")}:00`,
+    updatedAt: `2026-05-17 ${String(9 + (index % 10)).padStart(2, "0")}:30`,
+  } satisfies ServerRecord;
+});
+
+export const servers: ServerRecord[] = [...baseServers, ...generatedServers];
+
+const baseServices: ServiceRecord[] = [
   {
     serviceId: 2,
     categoryPath: ["채널계", "대고객 채널", "홈페이지"],
@@ -249,7 +286,64 @@ export const services: ServiceRecord[] = [
   },
 ];
 
-export const serviceRelations: ServiceRelationRecord[] = [
+const generatedServices = Array.from({ length: 160 }, (_, index) => {
+  const serviceId = index + 3;
+  const categories = [
+    ["기간계/업무계", "계약", "조회"],
+    ["기간계/업무계", "고객", "인증"],
+    ["채널계", "모바일", "홈페이지"],
+    ["공동 플랫폼", "공통 API", "정산"],
+    ["데이터 분석계", "리포팅", "조회"],
+    ["대외 채널", "제휴", "외부 연계"],
+  ];
+  const serviceTypeCodes: ServiceTypeCode[] = ["WEB", "API", "BATCH", "EXTERNAL"];
+  const statusCodes: ServiceStatusCode[] = [
+    "NORMAL",
+    "NORMAL",
+    "NORMAL",
+    "MAINTENANCE",
+    "IMPACTED",
+    "INACTIVE",
+  ];
+  const deploymentCodes: DeploymentStatusCode[] = [
+    "RUNNING",
+    "RUNNING",
+    "RUNNING",
+    "MAINTENANCE",
+    "STOPPED",
+  ];
+  const category = categories[index % categories.length];
+  const serviceTypeCode = serviceTypeCodes[index % serviceTypeCodes.length];
+  const serverId = (index % generatedServers.length) + 3;
+
+  return {
+    serviceId,
+    categoryPath: [...category, `업무-${String(serviceId).padStart(3, "0")}`],
+    serviceCode: `CV-SVC-${String(serviceId).padStart(3, "0")}`,
+    serviceName: `ChainView 테스트 서비스 ${String(serviceId).padStart(3, "0")}`,
+    serviceTypeCode,
+    importanceCode: index % 9 === 0 ? "HIGH" : "NORMAL",
+    statusCode: statusCodes[index % statusCodes.length],
+    description: `대량 목록과 관계도 검증을 위한 테스트 서비스 ${serviceId}`,
+    endpointUrl:
+      serviceTypeCode === "BATCH"
+        ? ""
+        : `https://svc-${String(serviceId).padStart(3, "0")}.chainview.example.com`,
+    serverId,
+    deployPath: `/opt/apps/chainview/service-${String(serviceId).padStart(3, "0")}`,
+    portInfo: String(8000 + (index % 90)),
+    deploymentStatusCode: deploymentCodes[index % deploymentCodes.length],
+    instanceCount: (index % 4) + 1,
+    createdBy: "8913812",
+    updatedBy: "8913812",
+    createdAt: `2026-05-17 ${String(8 + (index % 10)).padStart(2, "0")}:10`,
+    updatedAt: `2026-05-17 ${String(9 + (index % 10)).padStart(2, "0")}:40`,
+  } satisfies ServiceRecord;
+});
+
+export const services: ServiceRecord[] = [...baseServices, ...generatedServices];
+
+const baseServiceRelations: ServiceRelationRecord[] = [
   {
     relationId: 2,
     sourceServiceId: 2,
@@ -272,6 +366,30 @@ export const serviceRelations: ServiceRelationRecord[] = [
     createdAt: "2026-05-17 10:00",
     updatedAt: "2026-05-17 10:00",
   },
+];
+
+const generatedServiceRelations = generatedServices
+  .slice(0, 90)
+  .map((service, index) => {
+    const target = generatedServices[(index + 7) % generatedServices.length];
+    const relationTypeCodes: RelationTypeCode[] = ["REST", "MQ", "FILE", "SOAP"];
+
+    return {
+      relationId: index + 3,
+      sourceServiceId: service.serviceId,
+      targetServiceId: target.serviceId,
+      relationTypeCode: relationTypeCodes[index % relationTypeCodes.length],
+      mandatoryYn: index % 4 === 0 ? "N" : "Y",
+      relationStatusCode: index % 11 === 0 ? "DEPRECATED" : "ACTIVE",
+      description: `테스트 관계 ${service.serviceCode} -> ${target.serviceCode}`,
+      createdAt: "2026-05-17 11:00",
+      updatedAt: "2026-05-17 11:00",
+    } satisfies ServiceRelationRecord;
+  });
+
+export const serviceRelations: ServiceRelationRecord[] = [
+  ...baseServiceRelations,
+  ...generatedServiceRelations,
 ];
 
 export const techStacks: TechStackRecord[] = [
