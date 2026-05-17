@@ -1,24 +1,26 @@
 import { Server, Settings, Network, AlertTriangle, UserCheck } from "lucide-react";
+import { usePortalData } from "../PortalDataStore";
 import {
   codeLabels,
   incidentImpacts,
-  incidents,
-  serviceOwners,
-  serviceRelations,
-  services,
-  servers,
 } from "../mockData";
 
 export function Dashboard() {
-  const activeRelations = serviceRelations.filter(
+  const { servers, services, relations, owners, incidents } = usePortalData();
+  const activeRelations = relations.filter(
     (relation) => relation.relationStatusCode === "ACTIVE"
   );
   const openIncidents = incidents.filter(
     (incident) => incident.incidentStatusCode !== "RESOLVED"
   );
   const ownerAssignedCount = new Set(
-    serviceOwners.map((owner) => owner.serviceId)
+    owners.map((owner) => owner.serviceId)
   ).size;
+  const categoryCounts = services.reduce<Record<string, number>>((acc, service) => {
+    const category = service.categoryPath[0] ?? "미분류";
+    acc[category] = (acc[category] ?? 0) + 1;
+    return acc;
+  }, {});
 
   const kpiCards = [
     {
@@ -40,7 +42,7 @@ export function Dashboard() {
       value: activeRelations.length.toString(),
       icon: Network,
       color: "bg-sky-500",
-      detail: "REST API 2",
+      detail: `REST API ${activeRelations.length}`,
     },
     {
       title: "진행 장애",
@@ -116,6 +118,25 @@ export function Dashboard() {
         })}
       </div>
 
+      <section className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">
+          서비스 분류별 현황
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
+          {Object.entries(categoryCounts).map(([category, count]) => (
+            <div
+              key={category}
+              className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3"
+            >
+              <div className="text-sm font-semibold text-gray-900">
+                {category}
+              </div>
+              <div className="text-xs text-gray-500 mt-1">서비스 {count}개</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <section className="lg:col-span-2 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">
@@ -184,7 +205,7 @@ export function Dashboard() {
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm text-gray-600">관계 활성</span>
                 <span className="text-sm font-semibold text-gray-900">
-                  {activeRelations.length}/{serviceRelations.length}
+                  {activeRelations.length}/{relations.length}
                 </span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2">

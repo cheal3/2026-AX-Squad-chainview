@@ -12,8 +12,8 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { Activity, Focus, GitBranch } from "lucide-react";
-import { useServiceRelations } from "../ServiceRelationStore";
-import { codeLabels, getServiceById, services } from "../mockData";
+import { usePortalData } from "../PortalDataStore";
+import { codeLabels } from "../mockData";
 
 type ServiceNodeData = {
   label: string;
@@ -23,7 +23,7 @@ type ServiceNodeData = {
 };
 
 export function ServiceRelationFlow() {
-  const { relations } = useServiceRelations();
+  const { services, relations } = usePortalData();
   const [focusedServiceId, setFocusedServiceId] = useState<number | "ALL">(
     "ALL"
   );
@@ -80,8 +80,12 @@ export function ServiceRelationFlow() {
           visibleServiceIds.has(relation.targetServiceId)
       )
       .map((relation) => {
-        const source = getServiceById(relation.sourceServiceId);
-        const target = getServiceById(relation.targetServiceId);
+        const source = services.find(
+          (service) => service.serviceId === relation.sourceServiceId
+        );
+        const target = services.find(
+          (service) => service.serviceId === relation.targetServiceId
+        );
         const isFocused =
           focusedServiceId === "ALL" ||
           focusedServiceId === relation.sourceServiceId ||
@@ -115,7 +119,7 @@ export function ServiceRelationFlow() {
           },
         };
       });
-  }, [focusedServiceId, relations, visibleServiceIds]);
+  }, [focusedServiceId, relations, services, visibleServiceIds]);
 
   const activeCount = relations.filter(
     (relation) => relation.relationStatusCode === "ACTIVE"

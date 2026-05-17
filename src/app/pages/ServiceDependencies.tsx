@@ -1,15 +1,14 @@
 import { useMemo, useState } from "react";
 import { ArrowRight, Link2, Plus, Trash2 } from "lucide-react";
-import { useServiceRelations } from "../ServiceRelationStore";
+import { usePortalData } from "../PortalDataStore";
 import {
   codeLabels,
-  getServiceById,
-  services,
   type RelationTypeCode,
+  type ServiceRelationRecord,
 } from "../mockData";
 
 export function ServiceDependencies() {
-  const { relations, addRelation, removeRelation } = useServiceRelations();
+  const { services, relations, addRelation, removeRelation } = usePortalData();
   const [currentServiceId, setCurrentServiceId] = useState(
     services[0]?.serviceId ?? 0
   );
@@ -134,7 +133,10 @@ export function ServiceDependencies() {
                 현재 서비스
               </label>
               <input
-                value={getServiceById(currentServiceId)?.serviceName ?? ""}
+                value={
+                  services.find((service) => service.serviceId === currentServiceId)
+                    ?.serviceName ?? ""
+                }
                 readOnly
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700"
               />
@@ -225,6 +227,7 @@ export function ServiceDependencies() {
         <RelationTable
           title="이 서비스가 의존하는 대상"
           emptyText="아직 현재 서비스 기준으로 추가된 대상 서비스가 없습니다."
+          services={services}
           relations={outgoingRelations}
           relationSide="target"
           onRemove={removeRelation}
@@ -232,6 +235,7 @@ export function ServiceDependencies() {
         <RelationTable
           title="이 서비스를 의존하는 출발 서비스"
           emptyText="현재 서비스를 대상으로 호출하는 서비스가 없습니다."
+          services={services}
           relations={incomingRelations}
           relationSide="source"
           onRemove={removeRelation}
@@ -244,13 +248,15 @@ export function ServiceDependencies() {
 function RelationTable({
   title,
   emptyText,
+  services,
   relations,
   relationSide,
   onRemove,
 }: {
   title: string;
   emptyText: string;
-  relations: ReturnType<typeof useServiceRelations>["relations"];
+  services: ReturnType<typeof usePortalData>["services"];
+  relations: ServiceRelationRecord[];
   relationSide: "source" | "target";
   onRemove: (relationId: number) => void;
 }) {
@@ -289,8 +295,12 @@ function RelationTable({
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {relations.map((relation) => {
-                const source = getServiceById(relation.sourceServiceId);
-                const target = getServiceById(relation.targetServiceId);
+                const source = services.find(
+                  (service) => service.serviceId === relation.sourceServiceId
+                );
+                const target = services.find(
+                  (service) => service.serviceId === relation.targetServiceId
+                );
                 const focusService =
                   relationSide === "target" ? target : source;
 

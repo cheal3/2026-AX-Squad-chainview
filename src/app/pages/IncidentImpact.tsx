@@ -1,15 +1,14 @@
 import { AlertCircle, Clock, Route, TrendingUp } from "lucide-react";
+import { usePortalData } from "../PortalDataStore";
 import {
   codeLabels,
-  getServiceById,
   incidentImpacts,
-  incidents,
-  serviceRelations,
   type IncidentStatusCode,
   type SeverityCode,
 } from "../mockData";
 
 export function IncidentImpact() {
+  const { incidents, relations, services } = usePortalData();
   const getSeverityColor = (severity: SeverityCode) => {
     switch (severity) {
       case "CRITICAL":
@@ -37,7 +36,7 @@ export function IncidentImpact() {
   const openIncidents = incidents.filter(
     (incident) => incident.incidentStatusCode === "OPEN"
   );
-  const mandatoryRelations = serviceRelations.filter(
+  const mandatoryRelations = relations.filter(
     (relation) => relation.mandatoryYn === "Y"
   );
 
@@ -104,7 +103,7 @@ export function IncidentImpact() {
         <div className="space-y-3">
           {incidents.map((incident) => {
             const targetService = incident.serviceId
-              ? getServiceById(incident.serviceId)
+              ? services.find((service) => service.serviceId === incident.serviceId)
               : undefined;
             return (
               <div
@@ -184,7 +183,9 @@ export function IncidentImpact() {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {incidentImpacts.map((impact) => {
-                const impactedService = getServiceById(impact.impactedServiceId);
+                const impactedService = services.find(
+                  (service) => service.serviceId === impact.impactedServiceId
+                );
                 return (
                   <tr key={impact.impactId} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">

@@ -1,11 +1,11 @@
 import { RouterProvider } from "react-router";
 import { router } from "./routes";
-import { ServiceRelationProvider } from "./ServiceRelationStore";
+import { PortalDataProvider } from "./PortalDataStore";
 
 export default function App() {
   return (
-    <ServiceRelationProvider>
+    <PortalDataProvider>
       <RouterProvider router={router} />
-    </ServiceRelationProvider>
+    </PortalDataProvider>
   );
 }

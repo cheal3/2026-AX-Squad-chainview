@@ -314,7 +314,7 @@ export const serviceOwners: ServiceOwnerRecord[] = [
     serviceOwnerId: 1,
     serviceId: 2,
     ownerTypeCode: "USER",
-    ownerName: "시스템관리자",
+    ownerName: "채널서비스그룹",
     responsibilityCode: "MAIN",
   },
   {
