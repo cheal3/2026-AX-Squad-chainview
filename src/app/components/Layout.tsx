@@ -3,12 +3,12 @@ import type { ComponentType } from "react";
 import {
   AlertTriangle,
   Bell,
-  GitBranch,
   LayoutDashboard,
   LogOut,
   Monitor,
   Network,
   Server,
+  SquareStack,
   User,
 } from "lucide-react";
 
@@ -20,16 +20,16 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   { path: "/dashboard", label: "대시보드", icon: LayoutDashboard },
-  { path: "/servers", label: "서버·서비스", icon: Server },
-  { path: "/dependencies", label: "서비스 간 종속 관계", icon: GitBranch },
+  { path: "/servers", label: "서버", icon: Server },
+  { path: "/services", label: "서비스", icon: SquareStack },
   { path: "/relations", label: "서비스 관계도", icon: Network },
   { path: "/incidents", label: "장애 영향", icon: AlertTriangle },
 ];
 
 const pageTitles = [
   { path: "/dashboard", label: "서비스 대시보드" },
-  { path: "/servers", label: "서버·서비스 등록" },
-  { path: "/dependencies", label: "서비스 간 종속 관계" },
+  { path: "/servers", label: "서버 관리" },
+  { path: "/services", label: "서비스 관리" },
   { path: "/relations", label: "서비스 관계도" },
   { path: "/incidents", label: "장애 영향" },
 ];
