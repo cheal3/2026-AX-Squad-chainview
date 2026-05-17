@@ -9,6 +9,7 @@ import {
   ReactFlow,
   type Edge,
   type Node,
+  type ReactFlowInstance,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { Activity, Focus, GitBranch, Search } from "lucide-react";
@@ -22,6 +23,11 @@ type ServiceNodeData = {
   selected: boolean;
 };
 
+const NODE_WIDTH = 220;
+const NODE_HEIGHT = 96;
+const X_SPACING = 440;
+const Y_SPACING = 210;
+
 export function ServiceRelationFlow() {
   const { services, relations } = usePortalData();
   const [focusedServiceId, setFocusedServiceId] = useState<number>(
@@ -29,6 +35,8 @@ export function ServiceRelationFlow() {
   );
   const [depth, setDepth] = useState(1);
   const [query, setQuery] = useState("");
+  const [flowInstance, setFlowInstance] =
+    useState<ReactFlowInstance<ServiceNodeData> | null>(null);
   const focusedService =
     services.find((service) => service.serviceId === focusedServiceId) ??
     services[0];
@@ -51,52 +59,78 @@ export function ServiceRelationFlow() {
       .slice(0, 12);
   }, [query, services]);
 
-  const { visibleServiceIds, depthByServiceId } = useMemo(() => {
+  const { visibleServiceIds, laneByServiceId } = useMemo(() => {
     const visible = new Set<number>([focusedServiceId]);
-    const levelMap = new Map<number, number>([[focusedServiceId, 0]]);
-    let frontier = [focusedServiceId];
+    const laneMap = new Map<number, number>([[focusedServiceId, 0]]);
+    let dependencyFrontier = [focusedServiceId];
+    let dependentFrontier = [focusedServiceId];
 
     for (let level = 1; level <= depth; level += 1) {
-      const next = new Set<number>();
+      const nextDependencies = new Set<number>();
+      const nextDependents = new Set<number>();
 
-      frontier.forEach((serviceId) => {
+      dependencyFrontier.forEach((serviceId) => {
         relations.forEach((relation) => {
           if (relation.sourceServiceId === serviceId) {
-            next.add(relation.targetServiceId);
-          }
-          if (relation.targetServiceId === serviceId) {
-            next.add(relation.sourceServiceId);
+            nextDependencies.add(relation.targetServiceId);
           }
         });
       });
 
-      frontier = Array.from(next).filter((serviceId) => !visible.has(serviceId));
-      frontier.forEach((serviceId) => {
+      dependentFrontier.forEach((serviceId) => {
+        relations.forEach((relation) => {
+          if (relation.targetServiceId === serviceId) {
+            nextDependents.add(relation.sourceServiceId);
+          }
+        });
+      });
+
+      dependencyFrontier = Array.from(nextDependencies).filter(
+        (serviceId) => !visible.has(serviceId)
+      );
+      dependencyFrontier.forEach((serviceId) => {
         visible.add(serviceId);
-        levelMap.set(serviceId, level);
+        laneMap.set(serviceId, level);
+      });
+
+      dependentFrontier = Array.from(nextDependents).filter(
+        (serviceId) => !visible.has(serviceId)
+      );
+      dependentFrontier.forEach((serviceId) => {
+        visible.add(serviceId);
+        laneMap.set(serviceId, -level);
       });
     }
 
-    return { visibleServiceIds: visible, depthByServiceId: levelMap };
+    return { visibleServiceIds: visible, laneByServiceId: laneMap };
   }, [depth, focusedServiceId, relations]);
 
   const nodes = useMemo<Node<ServiceNodeData>[]>(() => {
-    return services
-      .filter((service) => visibleServiceIds.has(service.serviceId))
-      .map((service, index) => {
-        const serviceDepth = depthByServiceId.get(service.serviceId) ?? 0;
-        const peersBefore = services
-          .filter((item) => visibleServiceIds.has(item.serviceId))
-          .slice(0, index)
-          .filter((item) => depthByServiceId.get(item.serviceId) === serviceDepth)
-          .length;
+    const visibleServices = services.filter((service) =>
+      visibleServiceIds.has(service.serviceId)
+    );
+    const laneCounts = visibleServices.reduce<Map<number, number>>(
+      (acc, service) => {
+        const lane = laneByServiceId.get(service.serviceId) ?? 0;
+        acc.set(lane, (acc.get(lane) ?? 0) + 1);
+        return acc;
+      },
+      new Map()
+    );
+    const laneSeen = new Map<number, number>();
+
+    return visibleServices.map((service) => {
+        const lane = laneByServiceId.get(service.serviceId) ?? 0;
+        const laneIndex = laneSeen.get(lane) ?? 0;
+        const laneCount = laneCounts.get(lane) ?? 1;
+        laneSeen.set(lane, laneIndex + 1);
 
         return {
           id: String(service.serviceId),
           type: "serviceNode",
           position: {
-            x: 80 + serviceDepth * 340,
-            y: 80 + peersBefore * 170,
+            x: lane * X_SPACING,
+            y: (laneIndex - (laneCount - 1) / 2) * Y_SPACING,
           },
           data: {
             label: service.serviceName,
@@ -106,7 +140,7 @@ export function ServiceRelationFlow() {
           },
         };
       });
-  }, [depthByServiceId, focusedServiceId, services, visibleServiceIds]);
+  }, [focusedServiceId, laneByServiceId, services, visibleServiceIds]);
 
   const nodeTypes = useMemo(
     () => ({
@@ -138,10 +172,15 @@ export function ServiceRelationFlow() {
           source: String(relation.sourceServiceId),
           target: String(relation.targetServiceId),
           animated: isFocused && relation.relationStatusCode === "ACTIVE",
-          label: `${codeLabels.relationType[relation.relationTypeCode]} · ${
-            relation.mandatoryYn === "Y" ? "필수" : "선택"
-          }`,
-          type: relation.sourceServiceId === relation.targetServiceId ? "step" : "smoothstep",
+          label: isFocused
+            ? `${codeLabels.relationType[relation.relationTypeCode]} · ${
+                relation.mandatoryYn === "Y" ? "필수" : "선택"
+              }`
+            : "",
+          type:
+            relation.sourceServiceId === relation.targetServiceId
+              ? "step"
+              : "smoothstep",
           markerEnd: {
             type: MarkerType.ArrowClosed,
             color: relation.mandatoryYn === "Y" ? "#f60" : "#64748b",
@@ -155,6 +194,12 @@ export function ServiceRelationFlow() {
             fontSize: 12,
             fontWeight: 600,
           },
+          labelBgStyle: {
+            fill: "#fff",
+            fillOpacity: 0.94,
+          },
+          labelBgPadding: [8, 4] as [number, number],
+          labelBgBorderRadius: 6,
           data: {
             sourceName: source?.serviceName,
             targetName: target?.serviceName,
@@ -174,12 +219,27 @@ export function ServiceRelationFlow() {
   const selectService = (serviceId: number) => {
     setFocusedServiceId(serviceId);
     setQuery("");
+    centerFocusedNode();
+  };
+
+  const changeDepth = (nextDepth: number) => {
+    setDepth(nextDepth);
+    centerFocusedNode();
+  };
+
+  const centerFocusedNode = () => {
+    window.setTimeout(() => {
+      flowInstance?.setCenter(NODE_WIDTH / 2, NODE_HEIGHT / 2, {
+        zoom: 0.9,
+        duration: 650,
+      });
+    }, 40);
   };
 
   return (
     <div className="space-y-6">
       <section className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="space-y-5">
           <div>
             <h3 className="text-lg font-semibold text-gray-900">
               서비스 관계도
@@ -190,7 +250,7 @@ export function ServiceRelationFlow() {
             </p>
           </div>
 
-          <div className="w-full max-w-xl space-y-3">
+          <div className="w-full space-y-3">
             <label className="relative block">
               <Search
                 size={18}
@@ -218,22 +278,6 @@ export function ServiceRelationFlow() {
                 </button>
               ))}
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-medium text-gray-700">Depth</span>
-              {[1, 2, 3, 4].map((item) => (
-                <button
-                  key={item}
-                  onClick={() => setDepth(item)}
-                  className={`rounded-lg px-3 py-1.5 text-sm ${
-                    depth === item
-                      ? "bg-[#f60] text-white"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  }`}
-                >
-                  {item}
-                </button>
-              ))}
-            </div>
           </div>
         </div>
       </section>
@@ -245,16 +289,37 @@ export function ServiceRelationFlow() {
       </section>
 
       <section className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        <div className="h-[620px]">
+        <div className="relative h-[680px]">
+          <div className="absolute left-4 top-4 z-10 flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-white/95 px-3 py-2 shadow-sm">
+            <span className="text-sm font-medium text-gray-700">Depth</span>
+            {[1, 2, 3, 4].map((item) => (
+              <button
+                key={item}
+                onClick={() => changeDepth(item)}
+                className={`rounded-lg px-3 py-1.5 text-sm ${
+                  depth === item
+                    ? "bg-[#f60] text-white"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                {item}
+              </button>
+            ))}
+          </div>
           <ReactFlow
             nodes={nodes}
             edges={edges}
             nodeTypes={nodeTypes}
+            onInit={(instance) => {
+              setFlowInstance(instance);
+              instance.setCenter(NODE_WIDTH / 2, NODE_HEIGHT / 2, {
+                zoom: 0.9,
+                duration: 0,
+              });
+            }}
             onNodeClick={(_, node) => selectService(Number(node.id))}
-            fitView
-            fitViewOptions={{ padding: 0.25 }}
-            minZoom={0.4}
-            maxZoom={1.5}
+            minZoom={0.25}
+            maxZoom={1.6}
           >
             <Background gap={24} size={1.2} color="#dbe4f0" />
             <MiniMap
@@ -277,6 +342,19 @@ export function ServiceRelationFlow() {
           box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
           color: #0f172a;
           padding: 14px 16px;
+          width: ${NODE_WIDTH}px;
+        }
+
+        .react-flow__node {
+          transition: transform 620ms cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        .react-flow__edge-path {
+          stroke-linecap: round;
+        }
+
+        .react-flow__edge-textbg {
+          filter: drop-shadow(0 2px 5px rgba(15, 23, 42, 0.12));
         }
 
         .chainview-flow-node-selected {
