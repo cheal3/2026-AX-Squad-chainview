@@ -50,7 +50,7 @@ export function Layout() {
         <div className="p-6 border-b border-white/10">
           <div className="flex items-center gap-3">
             <h1 className="text-xl font-semibold">ChainView</h1>
-            <span className="px-2 py-1 text-xs font-semibold rounded-full bg-emerald-600">
+            <span className="px-2 py-1 text-xs font-semibold rounded-full bg-[#f60]">
               Portal
             </span>
           </div>
@@ -70,7 +70,7 @@ export function Layout() {
                 to={item.path}
                 className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
                   active
-                    ? "bg-emerald-600 text-white"
+                    ? "bg-[#f60] text-white"
                     : "text-gray-300 hover:bg-white/10 hover:text-white"
                 }`}
               >
@@ -85,7 +85,7 @@ export function Layout() {
       <div className="flex-1 flex flex-col overflow-hidden">
         <header className="bg-[#111827] text-white border-b border-gray-800 px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Monitor size={20} className="text-emerald-300" />
+            <Monitor size={20} className="text-[#f60]" />
             <h2 className="text-lg font-semibold">{currentTitle}</h2>
           </div>
 
@@ -96,7 +96,7 @@ export function Layout() {
             </button>
 
             <div className="flex items-center gap-3 pl-4 border-l border-gray-700">
-              <div className="w-8 h-8 rounded-full flex items-center justify-center bg-emerald-600">
+              <div className="w-8 h-8 rounded-full flex items-center justify-center bg-[#f60]">
                 <User size={16} className="text-white" />
               </div>
               <div className="text-sm">

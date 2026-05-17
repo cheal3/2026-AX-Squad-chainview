@@ -8,6 +8,7 @@ import {
   Plus,
   Server,
   Trash2,
+  X,
   Users,
   Wrench,
 } from "lucide-react";
@@ -93,8 +94,8 @@ export function ServerServicePortal() {
             </p>
           </div>
           <button
-            onClick={() => setShowServerForm((value) => !value)}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+            onClick={() => setShowServerForm(true)}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-[#f60] text-white rounded-lg hover:bg-[#e65c00] transition-colors"
           >
             <Plus size={18} />
             서버 등록
@@ -109,7 +110,12 @@ export function ServerServicePortal() {
         <Summary label="헬스체크" value={healthChecks.length} />
       </section>
 
-      {showServerForm && (
+      <Modal
+        open={showServerForm}
+        title="신규 서버 등록"
+        onClose={() => setShowServerForm(false)}
+        maxWidth="max-w-4xl"
+      >
         <ServerForm
           onCancel={() => setShowServerForm(false)}
           onSubmit={(input) => {
@@ -119,7 +125,7 @@ export function ServerServicePortal() {
             setMessage("서버가 등록되었습니다.");
           }}
         />
-      )}
+      </Modal>
 
       <section className="grid grid-cols-1 xl:grid-cols-[420px_1fr] gap-6">
         <div className="space-y-4">
@@ -137,14 +143,14 @@ export function ServerServicePortal() {
                 }}
                 className={`w-full text-left rounded-lg border p-5 transition-colors ${
                   active
-                    ? "border-emerald-500 bg-emerald-50"
+                    ? "border-[#f60] bg-orange-50"
                     : "border-gray-200 bg-white hover:bg-gray-50"
                 }`}
               >
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <div className="flex items-center gap-2">
-                      <Server size={18} className="text-emerald-600" />
+                      <Server size={18} className="text-[#f60]" />
                       <h4 className="font-semibold text-gray-900">
                         {server.serverName}
                       </h4>
@@ -228,15 +234,20 @@ export function ServerServicePortal() {
                   </p>
                 </div>
                 <button
-                  onClick={() => setShowServiceForm((value) => !value)}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  onClick={() => setShowServiceForm(true)}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-[#f60] text-white rounded-lg hover:bg-[#e65c00]"
                 >
                   <Plus size={18} />
                   서비스 등록
                 </button>
               </div>
 
-              {showServiceForm && (
+              <Modal
+                open={showServiceForm}
+                title="서비스 신규 등록"
+                onClose={() => setShowServiceForm(false)}
+                maxWidth="max-w-5xl"
+              >
                 <ServiceForm
                   serverId={selectedServer.serverId}
                   onCancel={() => setShowServiceForm(false)}
@@ -247,7 +258,7 @@ export function ServerServicePortal() {
                     setMessage("서비스가 등록되었습니다.");
                   }}
                 />
-              )}
+              </Modal>
 
               <div className="space-y-3 mt-4">
                 {servicesOnServer.map((service, index) => (
@@ -256,7 +267,7 @@ export function ServerServicePortal() {
                     onClick={() => setSelectedServiceId(service.serviceId)}
                     className={`w-full text-left rounded-lg border p-4 transition-colors ${
                       selectedService?.serviceId === service.serviceId
-                        ? "border-blue-500 bg-blue-50"
+                        ? "border-[#f60] bg-orange-50"
                         : "border-gray-200 hover:bg-gray-50"
                     }`}
                   >
@@ -267,7 +278,7 @@ export function ServerServicePortal() {
                             {service.serviceName}
                           </span>
                           {index === 0 && (
-                            <span className="px-2 py-0.5 text-xs bg-emerald-100 text-emerald-700 rounded-full">
+                            <span className="px-2 py-0.5 text-xs bg-orange-100 text-orange-700 rounded-full">
                               대표
                             </span>
                           )}
@@ -352,8 +363,7 @@ function ServerForm({
   const [description, setDescription] = useState("");
 
   return (
-    <section className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-      <h4 className="font-semibold text-gray-900 mb-4">신규 서버 등록</h4>
+    <div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Input label="서버명 *" value={serverName} onChange={setServerName} placeholder="prod-was-01" />
         <Input label="호스트명 *" value={hostName} onChange={setHostName} placeholder="prod-was-01.internal" />
@@ -380,7 +390,7 @@ function ServerForm({
             })
           }
           disabled={!serverName || !hostName || !ipAddress}
-          className="px-5 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-40"
+          className="px-5 py-2 bg-[#f60] text-white rounded-lg hover:bg-[#e65c00] disabled:opacity-40"
         >
           등록
         </button>
@@ -388,7 +398,7 @@ function ServerForm({
           취소
         </button>
       </div>
-    </section>
+    </div>
   );
 }
 
@@ -429,8 +439,7 @@ function ServiceForm({
   const [description, setDescription] = useState("");
 
   return (
-    <div className="rounded-lg border border-blue-200 bg-blue-50 p-5">
-      <h5 className="font-semibold text-gray-900 mb-4">서비스 신규 등록</h5>
+    <div>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Select label="1단계 분류" value={level1} onChange={(value) => {
           setLevel1(value);
@@ -470,7 +479,7 @@ function ServiceForm({
             })
           }
           disabled={!serviceCode || !serviceName}
-          className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-40"
+          className="px-5 py-2 bg-[#f60] text-white rounded-lg hover:bg-[#e65c00] disabled:opacity-40"
         >
           등록
         </button>
@@ -586,7 +595,7 @@ function ServiceDetail({
               const result = onHealthCheck(healthUrl);
               setHealthMessage(`${result.statusCode} · ${result.statusText}`);
             }}
-            className="inline-flex items-center gap-2 px-3 py-2 bg-emerald-600 text-white rounded-lg"
+            className="inline-flex items-center gap-2 px-3 py-2 bg-[#f60] text-white rounded-lg hover:bg-[#e65c00]"
           >
             <CheckCircle2 size={16} />
             헬스체크
@@ -640,7 +649,7 @@ function ActionPanel({
   return (
     <div className="rounded-lg border border-gray-200 p-4">
       <div className="flex items-center gap-2 mb-3">
-        <Icon size={17} className="text-emerald-600" />
+        <Icon size={17} className="text-[#f60]" />
         <h5 className="font-semibold text-gray-900">{title}</h5>
       </div>
       {children}
@@ -668,7 +677,7 @@ function Input({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
-        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#f60]"
       />
     </label>
   );
@@ -693,7 +702,7 @@ function Select({
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#f60]"
       >
         {Object.entries(options).map(([code, labelText]) => (
           <option key={code} value={code}>
@@ -710,4 +719,44 @@ function toOptions(values: string[]) {
     acc[value] = value;
     return acc;
   }, {});
+}
+
+function Modal({
+  open,
+  title,
+  onClose,
+  children,
+  maxWidth,
+}: {
+  open: boolean;
+  title: string;
+  onClose: () => void;
+  children: ReactNode;
+  maxWidth: string;
+}) {
+  if (!open) {
+    return null;
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
+      <div
+        className={`w-full ${maxWidth} max-h-[90vh] overflow-hidden rounded-lg bg-white shadow-2xl`}
+      >
+        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+          <h4 className="text-lg font-semibold text-gray-900">{title}</h4>
+          <button
+            onClick={onClose}
+            className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+            aria-label="닫기"
+          >
+            <X size={20} />
+          </button>
+        </div>
+        <div className="max-h-[calc(90vh-73px)] overflow-auto p-6">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
 }
