@@ -14,7 +14,7 @@ import {
 import "@xyflow/react/dist/style.css";
 import { Activity, Focus, GitBranch, Search } from "lucide-react";
 import { usePortalData } from "../PortalDataStore";
-import { codeLabels } from "../mockData";
+import { codeLabels, type ServiceRelationRecord } from "../mockData";
 
 type ServiceNodeData = {
   label: string;
@@ -23,10 +23,40 @@ type ServiceNodeData = {
   selected: boolean;
 };
 
+type DirectionFilter = "ALL" | "DEPENDENCY" | "DEPENDENT";
+
 const NODE_WIDTH = 220;
 const NODE_HEIGHT = 96;
 const X_SPACING = 440;
 const Y_SPACING = 210;
+
+function relationMatchesFilter(
+  relation: ServiceRelationRecord,
+  mandatoryOnly: boolean,
+  activeOnly: boolean
+) {
+  if (mandatoryOnly && relation.mandatoryYn !== "Y") {
+    return false;
+  }
+  if (activeOnly && relation.relationStatusCode !== "ACTIVE") {
+    return false;
+  }
+  return true;
+}
+
+function relationMatchesDirection(
+  relation: ServiceRelationRecord,
+  focusedServiceId: number,
+  directionFilter: DirectionFilter
+) {
+  if (directionFilter === "DEPENDENCY") {
+    return relation.sourceServiceId === focusedServiceId;
+  }
+  if (directionFilter === "DEPENDENT") {
+    return relation.targetServiceId === focusedServiceId;
+  }
+  return true;
+}
 
 export function ServiceRelationFlow() {
   const { services, relations } = usePortalData();
@@ -35,6 +65,11 @@ export function ServiceRelationFlow() {
   );
   const [depth, setDepth] = useState(1);
   const [query, setQuery] = useState("");
+  const [directionFilter, setDirectionFilter] =
+    useState<DirectionFilter>("ALL");
+  const [mandatoryOnly, setMandatoryOnly] = useState(false);
+  const [activeOnly, setActiveOnly] = useState(true);
+  const [showLabels, setShowLabels] = useState(false);
   const [flowInstance, setFlowInstance] =
     useState<ReactFlowInstance<ServiceNodeData> | null>(null);
   const focusedService =
@@ -71,7 +106,11 @@ export function ServiceRelationFlow() {
 
       dependencyFrontier.forEach((serviceId) => {
         relations.forEach((relation) => {
-          if (relation.sourceServiceId === serviceId) {
+          if (
+            directionFilter !== "DEPENDENT" &&
+            relation.sourceServiceId === serviceId &&
+            relationMatchesFilter(relation, mandatoryOnly, activeOnly)
+          ) {
             nextDependencies.add(relation.targetServiceId);
           }
         });
@@ -79,7 +118,11 @@ export function ServiceRelationFlow() {
 
       dependentFrontier.forEach((serviceId) => {
         relations.forEach((relation) => {
-          if (relation.targetServiceId === serviceId) {
+          if (
+            directionFilter !== "DEPENDENCY" &&
+            relation.targetServiceId === serviceId &&
+            relationMatchesFilter(relation, mandatoryOnly, activeOnly)
+          ) {
             nextDependents.add(relation.sourceServiceId);
           }
         });
@@ -103,7 +146,7 @@ export function ServiceRelationFlow() {
     }
 
     return { visibleServiceIds: visible, laneByServiceId: laneMap };
-  }, [depth, focusedServiceId, relations]);
+  }, [activeOnly, depth, directionFilter, focusedServiceId, mandatoryOnly, relations]);
 
   const nodes = useMemo<Node<ServiceNodeData>[]>(() => {
     const visibleServices = services.filter((service) =>
@@ -154,7 +197,9 @@ export function ServiceRelationFlow() {
       .filter(
         (relation) =>
           visibleServiceIds.has(relation.sourceServiceId) &&
-          visibleServiceIds.has(relation.targetServiceId)
+          visibleServiceIds.has(relation.targetServiceId) &&
+          relationMatchesFilter(relation, mandatoryOnly, activeOnly) &&
+          relationMatchesDirection(relation, focusedServiceId, directionFilter)
       )
       .map((relation) => {
         const source = services.find(
@@ -172,7 +217,7 @@ export function ServiceRelationFlow() {
           source: String(relation.sourceServiceId),
           target: String(relation.targetServiceId),
           animated: isFocused && relation.relationStatusCode === "ACTIVE",
-          label: isFocused
+          label: showLabels && isFocused
             ? `${codeLabels.relationType[relation.relationTypeCode]} · ${
                 relation.mandatoryYn === "Y" ? "필수" : "선택"
               }`
@@ -206,7 +251,16 @@ export function ServiceRelationFlow() {
           },
         };
       });
-  }, [focusedServiceId, relations, services, visibleServiceIds]);
+  }, [
+    activeOnly,
+    directionFilter,
+    focusedServiceId,
+    mandatoryOnly,
+    relations,
+    services,
+    showLabels,
+    visibleServiceIds,
+  ]);
 
   const activeCount = relations.filter(
     (relation) => relation.relationStatusCode === "ACTIVE"
@@ -229,7 +283,7 @@ export function ServiceRelationFlow() {
     const frame = window.requestAnimationFrame(() => {
       flowInstance?.setCenter(NODE_WIDTH / 2, NODE_HEIGHT / 2, {
         zoom: 0.9,
-        duration: 650,
+        duration: 1200,
       });
     });
 
@@ -305,6 +359,51 @@ export function ServiceRelationFlow() {
                 {item}
               </button>
             ))}
+            <div className="mx-1 h-6 w-px bg-gray-200" />
+            {[
+              ["ALL", "전체"],
+              ["DEPENDENCY", "의존"],
+              ["DEPENDENT", "종속"],
+            ].map(([value, label]) => (
+              <button
+                key={value}
+                onClick={() => setDirectionFilter(value as DirectionFilter)}
+                className={`rounded-lg px-3 py-1.5 text-sm ${
+                  directionFilter === value
+                    ? "bg-[#f60] text-white"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+            <label className="flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-1.5 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={mandatoryOnly}
+                onChange={(event) => setMandatoryOnly(event.target.checked)}
+                className="accent-[#f60]"
+              />
+              필수
+            </label>
+            <label className="flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-1.5 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={activeOnly}
+                onChange={(event) => setActiveOnly(event.target.checked)}
+                className="accent-[#f60]"
+              />
+              활성
+            </label>
+            <label className="flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-1.5 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={showLabels}
+                onChange={(event) => setShowLabels(event.target.checked)}
+                className="accent-[#f60]"
+              />
+              라벨
+            </label>
           </div>
           <ReactFlow
             nodes={nodes}
