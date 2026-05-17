@@ -14,7 +14,7 @@ import {
 import "@xyflow/react/dist/style.css";
 import { Activity, Focus, GitBranch, Search } from "lucide-react";
 import { usePortalData } from "../PortalDataStore";
-import { codeLabels, type ServiceRelationRecord } from "../mockData";
+import { codeLabels } from "../mockData";
 
 type ServiceNodeData = {
   label: string;
@@ -23,53 +23,17 @@ type ServiceNodeData = {
   selected: boolean;
 };
 
-type DirectionFilter = "ALL" | "DEPENDENCY" | "DEPENDENT";
-
 const NODE_WIDTH = 220;
 const NODE_HEIGHT = 96;
-const X_SPACING = 440;
-const Y_SPACING = 210;
-
-function relationMatchesFilter(
-  relation: ServiceRelationRecord,
-  mandatoryOnly: boolean,
-  activeOnly: boolean
-) {
-  if (mandatoryOnly && relation.mandatoryYn !== "Y") {
-    return false;
-  }
-  if (activeOnly && relation.relationStatusCode !== "ACTIVE") {
-    return false;
-  }
-  return true;
-}
-
-function relationMatchesDirection(
-  relation: ServiceRelationRecord,
-  focusedServiceId: number,
-  directionFilter: DirectionFilter
-) {
-  if (directionFilter === "DEPENDENCY") {
-    return relation.sourceServiceId === focusedServiceId;
-  }
-  if (directionFilter === "DEPENDENT") {
-    return relation.targetServiceId === focusedServiceId;
-  }
-  return true;
-}
+const X_SPACING = 560;
+const Y_SPACING = 240;
 
 export function ServiceRelationFlow() {
   const { services, relations } = usePortalData();
   const [focusedServiceId, setFocusedServiceId] = useState<number>(
     services[0]?.serviceId ?? 0
   );
-  const [depth, setDepth] = useState(1);
   const [query, setQuery] = useState("");
-  const [directionFilter, setDirectionFilter] =
-    useState<DirectionFilter>("ALL");
-  const [mandatoryOnly, setMandatoryOnly] = useState(false);
-  const [activeOnly, setActiveOnly] = useState(true);
-  const [showLabels, setShowLabels] = useState(false);
   const [flowInstance, setFlowInstance] =
     useState<ReactFlowInstance<ServiceNodeData> | null>(null);
   const focusedService =
@@ -97,56 +61,20 @@ export function ServiceRelationFlow() {
   const { visibleServiceIds, laneByServiceId } = useMemo(() => {
     const visible = new Set<number>([focusedServiceId]);
     const laneMap = new Map<number, number>([[focusedServiceId, 0]]);
-    let dependencyFrontier = [focusedServiceId];
-    let dependentFrontier = [focusedServiceId];
 
-    for (let level = 1; level <= depth; level += 1) {
-      const nextDependencies = new Set<number>();
-      const nextDependents = new Set<number>();
-
-      dependencyFrontier.forEach((serviceId) => {
-        relations.forEach((relation) => {
-          if (
-            directionFilter !== "DEPENDENT" &&
-            relation.sourceServiceId === serviceId &&
-            relationMatchesFilter(relation, mandatoryOnly, activeOnly)
-          ) {
-            nextDependencies.add(relation.targetServiceId);
-          }
-        });
-      });
-
-      dependentFrontier.forEach((serviceId) => {
-        relations.forEach((relation) => {
-          if (
-            directionFilter !== "DEPENDENCY" &&
-            relation.targetServiceId === serviceId &&
-            relationMatchesFilter(relation, mandatoryOnly, activeOnly)
-          ) {
-            nextDependents.add(relation.sourceServiceId);
-          }
-        });
-      });
-
-      dependencyFrontier = Array.from(nextDependencies).filter(
-        (serviceId) => !visible.has(serviceId)
-      );
-      dependencyFrontier.forEach((serviceId) => {
-        visible.add(serviceId);
-        laneMap.set(serviceId, level);
-      });
-
-      dependentFrontier = Array.from(nextDependents).filter(
-        (serviceId) => !visible.has(serviceId)
-      );
-      dependentFrontier.forEach((serviceId) => {
-        visible.add(serviceId);
-        laneMap.set(serviceId, -level);
-      });
-    }
+    relations.forEach((relation) => {
+      if (relation.sourceServiceId === focusedServiceId) {
+        visible.add(relation.targetServiceId);
+        laneMap.set(relation.targetServiceId, 1);
+      }
+      if (relation.targetServiceId === focusedServiceId) {
+        visible.add(relation.sourceServiceId);
+        laneMap.set(relation.sourceServiceId, -1);
+      }
+    });
 
     return { visibleServiceIds: visible, laneByServiceId: laneMap };
-  }, [activeOnly, depth, directionFilter, focusedServiceId, mandatoryOnly, relations]);
+  }, [focusedServiceId, relations]);
 
   const nodes = useMemo<Node<ServiceNodeData>[]>(() => {
     const visibleServices = services.filter((service) =>
@@ -198,8 +126,8 @@ export function ServiceRelationFlow() {
         (relation) =>
           visibleServiceIds.has(relation.sourceServiceId) &&
           visibleServiceIds.has(relation.targetServiceId) &&
-          relationMatchesFilter(relation, mandatoryOnly, activeOnly) &&
-          relationMatchesDirection(relation, focusedServiceId, directionFilter)
+          (relation.sourceServiceId === focusedServiceId ||
+            relation.targetServiceId === focusedServiceId)
       )
       .map((relation) => {
         const source = services.find(
@@ -217,11 +145,7 @@ export function ServiceRelationFlow() {
           source: String(relation.sourceServiceId),
           target: String(relation.targetServiceId),
           animated: isFocused && relation.relationStatusCode === "ACTIVE",
-          label: showLabels && isFocused
-            ? `${codeLabels.relationType[relation.relationTypeCode]} · ${
-                relation.mandatoryYn === "Y" ? "필수" : "선택"
-              }`
-            : "",
+          label: "",
           type:
             relation.sourceServiceId === relation.targetServiceId
               ? "step"
@@ -252,13 +176,9 @@ export function ServiceRelationFlow() {
         };
       });
   }, [
-    activeOnly,
-    directionFilter,
     focusedServiceId,
-    mandatoryOnly,
     relations,
     services,
-    showLabels,
     visibleServiceIds,
   ]);
 
@@ -275,10 +195,6 @@ export function ServiceRelationFlow() {
     setQuery("");
   };
 
-  const changeDepth = (nextDepth: number) => {
-    setDepth(nextDepth);
-  };
-
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
       flowInstance?.setCenter(NODE_WIDTH / 2, NODE_HEIGHT / 2, {
@@ -288,7 +204,7 @@ export function ServiceRelationFlow() {
     });
 
     return () => window.cancelAnimationFrame(frame);
-  }, [depth, flowInstance, focusedServiceId, nodes]);
+  }, [flowInstance, focusedServiceId, nodes]);
 
   return (
     <div className="space-y-6">
@@ -344,66 +260,8 @@ export function ServiceRelationFlow() {
 
       <section className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         <div className="relative h-[680px]">
-          <div className="absolute left-4 top-4 z-10 flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-white/95 px-3 py-2 shadow-sm">
-            <span className="text-sm font-medium text-gray-700">Depth</span>
-            {[1, 2, 3, 4].map((item) => (
-              <button
-                key={item}
-                onClick={() => changeDepth(item)}
-                className={`rounded-lg px-3 py-1.5 text-sm ${
-                  depth === item
-                    ? "bg-[#f60] text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
-                {item}
-              </button>
-            ))}
-            <div className="mx-1 h-6 w-px bg-gray-200" />
-            {[
-              ["ALL", "전체"],
-              ["DEPENDENCY", "의존"],
-              ["DEPENDENT", "종속"],
-            ].map(([value, label]) => (
-              <button
-                key={value}
-                onClick={() => setDirectionFilter(value as DirectionFilter)}
-                className={`rounded-lg px-3 py-1.5 text-sm ${
-                  directionFilter === value
-                    ? "bg-[#f60] text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-            <label className="flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-1.5 text-sm text-gray-700">
-              <input
-                type="checkbox"
-                checked={mandatoryOnly}
-                onChange={(event) => setMandatoryOnly(event.target.checked)}
-                className="accent-[#f60]"
-              />
-              필수
-            </label>
-            <label className="flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-1.5 text-sm text-gray-700">
-              <input
-                type="checkbox"
-                checked={activeOnly}
-                onChange={(event) => setActiveOnly(event.target.checked)}
-                className="accent-[#f60]"
-              />
-              활성
-            </label>
-            <label className="flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-1.5 text-sm text-gray-700">
-              <input
-                type="checkbox"
-                checked={showLabels}
-                onChange={(event) => setShowLabels(event.target.checked)}
-                className="accent-[#f60]"
-              />
-              라벨
-            </label>
+          <div className="absolute left-4 top-4 z-10 rounded-lg border border-gray-200 bg-white/95 px-3 py-2 text-sm text-gray-600 shadow-sm">
+            직접 연결된 의존/종속 관계만 표시
           </div>
           <ReactFlow
             nodes={nodes}
