@@ -73,7 +73,7 @@ export function ServerPortal() {
           </div>
           <button
             onClick={() => setShowCreate(true)}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#f60] px-4 py-2 text-white hover:bg-[#e65c00]"
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#2563eb] px-4 py-2 text-white hover:bg-[#1d4ed8]"
           >
             <Plus size={18} />
             서버 등록
@@ -92,7 +92,7 @@ export function ServerPortal() {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="서버명, 호스트명, IP 검색"
-              className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-[#f60]"
+              className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-[#2563eb]"
             />
           </label>
           <SelectBox
@@ -108,22 +108,22 @@ export function ServerPortal() {
         </div>
 
         <div className="overflow-auto">
-          <table className="w-full min-w-[980px]">
+          <table className="w-full min-w-[1320px]">
             <thead className="border-b border-gray-200 bg-gray-50">
               <tr>
-                <Th>서버명</Th>
-                <Th>호스트/IP</Th>
-                <Th>환경</Th>
-                <Th>OS</Th>
-                <Th>상태</Th>
-                <Th align="right">서비스 수</Th>
-                <Th align="right">작업</Th>
+                <Th className="w-[260px]">서버명</Th>
+                <Th className="w-[340px]">호스트/IP</Th>
+                <Th className="w-[140px]">환경</Th>
+                <Th className="w-[260px]">OS</Th>
+                <Th className="w-[130px]">상태</Th>
+                <Th align="right" className="w-[110px]">서비스 수</Th>
+                <Th align="right" className="sticky right-0 z-10 w-[260px] bg-gray-50 shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.35)]">작업</Th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {filteredServers.map((server) => (
-                <tr key={server.serverId} className="hover:bg-gray-50">
-                  <td className="px-5 py-4">
+                <tr key={server.serverId} className="group hover:bg-gray-50">
+                  <td className="whitespace-nowrap px-5 py-4">
                     <div className="font-semibold text-gray-900">
                       {server.serverName}
                     </div>
@@ -131,24 +131,24 @@ export function ServerPortal() {
                       #{server.serverId}
                     </div>
                   </td>
-                  <td className="px-5 py-4 text-sm text-gray-700">
+                  <td className="whitespace-nowrap px-5 py-4 text-sm text-gray-700">
                     <div>{server.hostName}</div>
                     <div className="text-gray-500">{server.ipAddress}</div>
                   </td>
-                  <td className="px-5 py-4 text-sm text-gray-700">
+                  <td className="whitespace-nowrap px-5 py-4 text-sm text-gray-700">
                     {codeLabels.envType[server.envCode]}
                   </td>
-                  <td className="px-5 py-4 text-sm text-gray-700">
+                  <td className="whitespace-nowrap px-5 py-4 text-sm text-gray-700">
                     {codeLabels.osType[server.osTypeCode]} {server.osVersion}
                   </td>
-                  <td className="px-5 py-4">
+                  <td className="whitespace-nowrap px-5 py-4">
                     <BadgeText>{codeLabels.serverStatus[server.statusCode]}</BadgeText>
                   </td>
-                  <td className="px-5 py-4 text-right text-sm font-semibold">
+                  <td className="whitespace-nowrap px-5 py-4 text-right text-sm font-semibold">
                     {getServiceCount(server.serverId)}
                   </td>
-                  <td className="px-5 py-4">
-                    <div className="flex justify-end gap-2">
+                  <td className="sticky right-0 z-10 whitespace-nowrap bg-white px-5 py-4 shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.35)] group-hover:bg-gray-50">
+                    <div className="flex flex-nowrap justify-end gap-2">
                       <ActionButton onClick={() => setDetailServerId(server.serverId)}>
                         <Eye size={15} />
                         상세
@@ -159,7 +159,7 @@ export function ServerPortal() {
                       </ActionButton>
                       <button
                         onClick={() => handleDelete(server)}
-                        className="inline-flex items-center gap-1 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 hover:bg-red-100"
+                        className="inline-flex min-w-[70px] items-center justify-center gap-1 whitespace-nowrap rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 hover:bg-red-100"
                       >
                         <Trash2 size={15} />
                         삭제
@@ -378,15 +378,17 @@ function ServerDetail({
 function Th({
   children,
   align = "left",
+  className = "",
 }: {
   children: string;
   align?: "left" | "right";
+  className?: string;
 }) {
   return (
     <th
-      className={`px-5 py-3 text-xs font-medium uppercase text-gray-500 ${
+      className={`whitespace-nowrap px-5 py-3 text-xs font-medium uppercase text-gray-500 ${
         align === "right" ? "text-right" : "text-left"
-      }`}
+      } ${className}`}
     >
       {children}
     </th>
@@ -403,7 +405,7 @@ function ActionButton({
   return (
     <button
       onClick={onClick}
-      className="inline-flex items-center gap-1 rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-700 hover:bg-gray-200"
+      className="inline-flex min-w-[70px] items-center justify-center gap-1 whitespace-nowrap rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-700 hover:bg-gray-200"
     >
       {children}
     </button>
@@ -457,7 +459,7 @@ function FormActions({
       <button
         onClick={onSubmit}
         disabled={disabled}
-        className="rounded-lg bg-[#f60] px-5 py-2 text-white hover:bg-[#e65c00] disabled:opacity-40"
+        className="rounded-lg bg-[#2563eb] px-5 py-2 text-white hover:bg-[#1d4ed8] disabled:opacity-40"
       >
         {submitLabel}
       </button>

@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate } from "react-router";
 import { Layout } from "./components/Layout";
 import { Dashboard } from "./pages/Dashboard";
 import { IncidentImpact } from "./pages/IncidentImpact";
+import { IncidentStatusDashboard } from "./pages/IncidentStatusDashboard";
 import { ServerPortal } from "./pages/ServerPortal";
 import { ServicePortal } from "./pages/ServicePortal";
 import { ServiceRelationFlow } from "./pages/ServiceRelationFlow";
@@ -13,6 +14,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <Navigate to="/dashboard" replace /> },
       { path: "dashboard", Component: Dashboard },
+      { path: "incident-status", Component: IncidentStatusDashboard },
       { path: "servers", Component: ServerPortal },
       { path: "services", Component: ServicePortal },
       { path: "relations", Component: ServiceRelationFlow },

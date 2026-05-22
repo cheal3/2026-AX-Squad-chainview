@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
+import { Link } from "react-router";
 import {
   Activity,
   ArrowRight,
@@ -16,6 +17,7 @@ import {
 import { usePortalData } from "../PortalDataStore";
 import {
   codeLabels,
+  type ImportanceCode,
   type RelationStatusCode,
   type RelationTypeCode,
   type ServerRecord,
@@ -79,6 +81,7 @@ type ServiceFormInput = {
   serviceCode: string;
   serviceName: string;
   serviceTypeCode: ServiceTypeCode;
+  importanceCode: ImportanceCode;
   statusCode: ServiceStatusCode;
   endpointUrl: string;
   deployPath: string;
@@ -123,6 +126,9 @@ export function ServicePortal() {
   const [serverFilter, setServerFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [typeFilter, setTypeFilter] = useState("ALL");
+  const [importanceFilter, setImportanceFilter] = useState("ALL");
+  const [ownerFilter, setOwnerFilter] = useState("ALL");
+  const [categoryFilter, setCategoryFilter] = useState("ALL");
   const [detailServiceId, setDetailServiceId] = useState<number | null>(null);
   const [editServiceId, setEditServiceId] = useState<number | null>(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -151,9 +157,38 @@ export function ServicePortal() {
         statusFilter === "ALL" || service.statusCode === statusFilter;
       const matchesType =
         typeFilter === "ALL" || service.serviceTypeCode === typeFilter;
-      return matchesQuery && matchesServer && matchesStatus && matchesType;
+      const matchesImportance =
+        importanceFilter === "ALL" ||
+        (service.importanceCode ?? "NORMAL") === importanceFilter;
+      const ownerNames = owners
+        .filter((owner) => owner.serviceId === service.serviceId)
+        .map((owner) => owner.ownerName);
+      const matchesOwner =
+        ownerFilter === "ALL" || ownerNames.includes(ownerFilter);
+      const matchesCategory =
+        categoryFilter === "ALL" || service.categoryPath[0] === categoryFilter;
+      return (
+        matchesQuery &&
+        matchesServer &&
+        matchesStatus &&
+        matchesType &&
+        matchesImportance &&
+        matchesOwner &&
+        matchesCategory
+      );
     });
-  }, [query, serverFilter, servers, services, statusFilter, typeFilter]);
+  }, [
+    categoryFilter,
+    importanceFilter,
+    owners,
+    ownerFilter,
+    query,
+    serverFilter,
+    servers,
+    services,
+    statusFilter,
+    typeFilter,
+  ]);
 
   const detailService =
     services.find((service) => service.serviceId === detailServiceId) ?? null;
@@ -168,6 +203,8 @@ export function ServicePortal() {
         relation.sourceServiceId === serviceId ||
         relation.targetServiceId === serviceId
     ).length;
+  const getOwnerGroup = (serviceId: number) =>
+    owners.find((owner) => owner.serviceId === serviceId)?.ownerName ?? "미지정";
 
   const handleDelete = (service: ServiceRecord) => {
     deleteService(service.serviceId);
@@ -188,7 +225,7 @@ export function ServicePortal() {
           </div>
           <button
             onClick={() => setShowCreate(true)}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#f60] px-4 py-2 text-white hover:bg-[#e65c00]"
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#2563eb] px-4 py-2 text-white hover:bg-[#1d4ed8]"
           >
             <Plus size={18} />
             서비스 등록
@@ -197,7 +234,7 @@ export function ServicePortal() {
       </section>
 
       <section className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-        <div className="grid grid-cols-1 gap-3 border-b border-gray-200 p-4 lg:grid-cols-[minmax(260px,1fr)_180px_160px_160px]">
+        <div className="grid grid-cols-1 gap-3 border-b border-gray-200 p-4 xl:grid-cols-[minmax(260px,1fr)_170px_170px_150px_150px_180px_170px]">
           <label className="relative block">
             <Search
               size={18}
@@ -207,9 +244,20 @@ export function ServicePortal() {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="서비스명, 코드, 분류, 서버 검색"
-              className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-[#f60]"
+              className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-[#2563eb]"
             />
           </label>
+          <SelectBox
+            value={categoryFilter}
+            onChange={setCategoryFilter}
+            options={{
+              ALL: "전체 분류",
+              ...categoryLevel1.reduce<Record<string, string>>((acc, item) => {
+                acc[item] = item;
+                return acc;
+              }, {}),
+            }}
+          />
           <SelectBox
             value={serverFilter}
             onChange={setServerFilter}
@@ -231,27 +279,47 @@ export function ServicePortal() {
             onChange={setTypeFilter}
             options={{ ALL: "전체 유형", ...codeLabels.serviceType }}
           />
+          <SelectBox
+            value={importanceFilter}
+            onChange={setImportanceFilter}
+            options={{ ALL: "전체 중요도", ...codeLabels.importance }}
+          />
+          <SelectBox
+            value={ownerFilter}
+            onChange={setOwnerFilter}
+            options={{
+              ALL: "전체 담당",
+              ...Array.from(new Set(owners.map((owner) => owner.ownerName))).reduce<
+                Record<string, string>
+              >((acc, ownerName) => {
+                acc[ownerName] = ownerName;
+                return acc;
+              }, {}),
+            }}
+          />
         </div>
 
         <div className="overflow-auto">
-          <table className="w-full min-w-[1120px]">
+          <table className="w-full min-w-[1780px]">
             <thead className="border-b border-gray-200 bg-gray-50">
               <tr>
-                <Th>서비스명</Th>
-                <Th>분류</Th>
-                <Th>서버</Th>
-                <Th>유형</Th>
-                <Th>상태</Th>
-                <Th align="right">관계</Th>
-                <Th align="right">작업</Th>
+                <Th className="w-[280px]">서비스명</Th>
+                <Th className="w-[420px]">분류</Th>
+                <Th className="w-[140px]">상태</Th>
+                <Th className="w-[140px]">중요도</Th>
+                <Th className="w-[240px]">담당 그룹</Th>
+                <Th align="right" className="w-[120px]">서버 수</Th>
+                <Th className="w-[130px]">유형</Th>
+                <Th align="right" className="w-[100px]">관계</Th>
+                <Th className="w-[180px]">최근 수정일</Th>
+                <Th align="right" className="sticky right-0 z-10 w-[260px] bg-gray-50 shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.35)]">작업</Th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {filteredServices.map((service) => {
-                const server = getServer(service);
                 return (
-                  <tr key={service.serviceId} className="hover:bg-gray-50">
-                    <td className="px-5 py-4">
+                  <tr key={service.serviceId} className="group hover:bg-gray-50">
+                    <td className="whitespace-nowrap px-5 py-4">
                       <div className="font-semibold text-gray-900">
                         {service.serviceName}
                       </div>
@@ -262,22 +330,33 @@ export function ServicePortal() {
                     <td className="whitespace-nowrap px-5 py-4 text-sm text-gray-700">
                       {service.categoryPath.join(" / ")}
                     </td>
-                    <td className="px-5 py-4 text-sm text-gray-700">
-                      {server?.serverName ?? "미지정"}
-                    </td>
-                    <td className="px-5 py-4 text-sm text-gray-700">
-                      {codeLabels.serviceType[service.serviceTypeCode]}
-                    </td>
-                    <td className="px-5 py-4">
+                    <td className="whitespace-nowrap px-5 py-4">
                       <BadgeText>
                         {codeLabels.serviceStatus[service.statusCode]}
                       </BadgeText>
                     </td>
-                    <td className="px-5 py-4 text-right text-sm font-semibold">
+                    <td className="whitespace-nowrap px-5 py-4">
+                      <BadgeText>
+                        {codeLabels.importance[service.importanceCode ?? "NORMAL"]}
+                      </BadgeText>
+                    </td>
+                    <td className="whitespace-nowrap px-5 py-4 text-sm text-gray-700">
+                      {getOwnerGroup(service.serviceId)}
+                    </td>
+                    <td className="whitespace-nowrap px-5 py-4 text-right text-sm font-semibold">
+                      {service.serverId ? 1 : 0}
+                    </td>
+                    <td className="whitespace-nowrap px-5 py-4 text-sm text-gray-700">
+                      {codeLabels.serviceType[service.serviceTypeCode]}
+                    </td>
+                    <td className="whitespace-nowrap px-5 py-4 text-right text-sm font-semibold">
                       {getRelationCount(service.serviceId)}
                     </td>
-                    <td className="px-5 py-4">
-                      <div className="flex justify-end gap-2">
+                    <td className="whitespace-nowrap px-5 py-4 text-sm text-gray-500">
+                      {service.updatedAt}
+                    </td>
+                    <td className="sticky right-0 z-10 whitespace-nowrap bg-white px-5 py-4 shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.35)] group-hover:bg-gray-50">
+                      <div className="flex flex-nowrap justify-end gap-2">
                         <ActionButton
                           onClick={() => setDetailServiceId(service.serviceId)}
                         >
@@ -292,7 +371,7 @@ export function ServicePortal() {
                         </ActionButton>
                         <button
                           onClick={() => handleDelete(service)}
-                          className="inline-flex items-center gap-1 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 hover:bg-red-100"
+                          className="inline-flex min-w-[70px] items-center justify-center gap-1 whitespace-nowrap rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 hover:bg-red-100"
                         >
                           <Trash2 size={15} />
                           삭제
@@ -449,6 +528,9 @@ function ServiceForm({
   const [serviceTypeCode, setServiceTypeCode] = useState<ServiceTypeCode>(
     initialValue?.serviceTypeCode ?? "WEB"
   );
+  const [importanceCode, setImportanceCode] = useState<ImportanceCode>(
+    initialValue?.importanceCode ?? "NORMAL"
+  );
   const [statusCode, setStatusCode] = useState<ServiceStatusCode>(
     initialValue?.statusCode ?? "NORMAL"
   );
@@ -497,6 +579,12 @@ function ServiceForm({
           value={serviceTypeCode}
           onChange={(value) => setServiceTypeCode(value as ServiceTypeCode)}
           options={codeLabels.serviceType}
+        />
+        <Select
+          label="중요도"
+          value={importanceCode}
+          onChange={(value) => setImportanceCode(value as ImportanceCode)}
+          options={codeLabels.importance}
         />
         <Select
           label="상태"
@@ -562,12 +650,12 @@ function ServiceForm({
             type="checkbox"
             checked={useRelation}
             onChange={(event) => setUseRelation(event.target.checked)}
-            className="h-4 w-4 accent-[#f60]"
+            className="h-4 w-4 accent-[#2563eb]"
           />
           저장하면서 현재 서비스 기준 관계도 함께 등록
         </label>
         {useRelation && (
-          <div className="space-y-4 rounded-lg border border-orange-100 bg-orange-50/40 p-4">
+          <div className="space-y-4 rounded-lg border border-blue-100 bg-blue-50/40 p-4">
             <Select
               label="관계 방향"
               value={relationDirection}
@@ -626,6 +714,7 @@ function ServiceForm({
             serviceCode,
             serviceName,
             serviceTypeCode,
+            importanceCode,
             statusCode,
             endpointUrl,
             deployPath,
@@ -694,7 +783,20 @@ function ServiceDetail({
   return (
     <div className="space-y-7">
       <section>
-        <h5 className="mb-4 font-semibold text-gray-900">서비스 정보</h5>
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h5 className="font-semibold text-gray-900">서비스 정보</h5>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              to="/relations"
+              className="rounded-lg border border-blue-200 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50"
+            >
+              관계도 보기
+            </Link>
+            <button className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+              장애 상태 변경
+            </button>
+          </div>
+        </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Info label="서비스 코드" value={service.serviceCode} />
           <Info label="분류" value={service.categoryPath.join(" / ")} />
@@ -706,6 +808,10 @@ function ServiceDetail({
           <Info
             label="상태"
             value={codeLabels.serviceStatus[service.statusCode]}
+          />
+          <Info
+            label="중요도"
+            value={codeLabels.importance[service.importanceCode ?? "NORMAL"]}
           />
           <Info label="엔드포인트" value={service.endpointUrl || "미입력"} />
           <Info label="배포 경로" value={service.deployPath || "미입력"} />
@@ -737,7 +843,7 @@ function ServiceDetail({
               />
               <button
                 onClick={() => onAddGroup(groupName)}
-                className="rounded-lg bg-[#f60] px-3 py-2 text-white"
+                className="rounded-lg bg-[#2563eb] px-3 py-2 text-white"
               >
                 추가
               </button>
@@ -761,7 +867,7 @@ function ServiceDetail({
               />
               <button
                 onClick={() => onAddTech(techName)}
-                className="rounded-lg bg-[#f60] px-3 py-2 text-white"
+                className="rounded-lg bg-[#2563eb] px-3 py-2 text-white"
               >
                 추가
               </button>
@@ -773,14 +879,14 @@ function ServiceDetail({
               value={healthUrl}
               onChange={(event) => setHealthUrl(event.target.value)}
               placeholder="https://..."
-              className="mb-3 w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#f60]"
+              className="mb-3 w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#2563eb]"
             />
             <button
               onClick={() => {
                 const result = onHealthCheck(healthUrl);
                 setHealthMessage(`${result.statusCode} · ${result.statusText}`);
               }}
-              className="inline-flex items-center gap-2 rounded-lg bg-[#f60] px-3 py-2 text-white"
+              className="inline-flex items-center gap-2 rounded-lg bg-[#2563eb] px-3 py-2 text-white"
             >
               <CheckCircle2 size={16} />
               헬스체크
@@ -802,6 +908,28 @@ function ServiceDetail({
         onAddRelation={onAddRelation}
         onRemoveRelation={onRemoveRelation}
       />
+
+      <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className="rounded-lg border border-gray-200 p-4">
+          <h5 className="mb-3 font-semibold text-gray-900">장애 이력</h5>
+          <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-800">
+            최근 장애 이력은 AI 영향 분석 결과와 함께 표시될 예정입니다.
+          </div>
+        </div>
+        <div className="rounded-lg border border-gray-200 p-4">
+          <h5 className="mb-3 font-semibold text-gray-900">변경 이력</h5>
+          <div className="space-y-3 text-sm text-gray-600">
+            <div className="flex items-center justify-between">
+              <span>서비스 정보 수정</span>
+              <span>{service.updatedAt}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>서비스 최초 등록</span>
+              <span>{service.createdAt}</span>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
@@ -854,7 +982,7 @@ function RelationManager({
   return (
     <section>
       <div className="mb-4 flex items-center gap-2">
-        <Link2 size={18} className="text-[#f60]" />
+        <Link2 size={18} className="text-[#2563eb]" />
         <h5 className="font-semibold text-gray-900">의존/종속 관계</h5>
       </div>
 
@@ -925,7 +1053,7 @@ function RelationManager({
             }
           }}
           disabled={!normalizedTarget}
-          className="mt-4 inline-flex items-center gap-2 rounded-lg bg-[#f60] px-4 py-2 text-white hover:bg-[#e65c00] disabled:opacity-40"
+          className="mt-4 inline-flex items-center gap-2 rounded-lg bg-[#2563eb] px-4 py-2 text-white hover:bg-[#1d4ed8] disabled:opacity-40"
         >
           <Plus size={18} />
           관계 추가
@@ -1006,7 +1134,7 @@ function RelationList({
                   </div>
                   <button
                     onClick={() => onRemove(relation.relationId)}
-                    className="shrink-0 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 hover:bg-red-100"
+                    className="shrink-0 whitespace-nowrap rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 hover:bg-red-100"
                   >
                     삭제
                   </button>
@@ -1023,15 +1151,17 @@ function RelationList({
 function Th({
   children,
   align = "left",
+  className = "",
 }: {
   children: string;
   align?: "left" | "right";
+  className?: string;
 }) {
   return (
     <th
-      className={`px-5 py-3 text-xs font-medium uppercase text-gray-500 ${
+      className={`whitespace-nowrap px-5 py-3 text-xs font-medium uppercase text-gray-500 ${
         align === "right" ? "text-right" : "text-left"
-      }`}
+      } ${className}`}
     >
       {children}
     </th>
@@ -1048,7 +1178,7 @@ function ActionButton({
   return (
     <button
       onClick={onClick}
-      className="inline-flex items-center gap-1 rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-700 hover:bg-gray-200"
+      className="inline-flex min-w-[70px] items-center justify-center gap-1 whitespace-nowrap rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-700 hover:bg-gray-200"
     >
       {children}
     </button>
@@ -1102,7 +1232,7 @@ function FormActions({
       <button
         onClick={onSubmit}
         disabled={disabled}
-        className="rounded-lg bg-[#f60] px-5 py-2 text-white hover:bg-[#e65c00] disabled:opacity-40"
+        className="rounded-lg bg-[#2563eb] px-5 py-2 text-white hover:bg-[#1d4ed8] disabled:opacity-40"
       >
         {submitLabel}
       </button>

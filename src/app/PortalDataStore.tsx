@@ -14,6 +14,7 @@ import {
   type DeploymentStatusCode,
   type EnvCode,
   type IncidentRecord,
+  type ImportanceCode,
   type OsTypeCode,
   type RelationStatusCode,
   type RelationTypeCode,
@@ -45,6 +46,7 @@ type NewServiceInput = {
   serviceCode: string;
   serviceName: string;
   serviceTypeCode: ServiceTypeCode;
+  importanceCode?: ImportanceCode;
   statusCode: ServiceStatusCode;
   endpointUrl: string;
   deployPath: string;
