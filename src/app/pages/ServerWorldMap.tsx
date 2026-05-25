@@ -374,7 +374,9 @@ export function ServerWorldMap() {
   }, [pointServers, serverSearch]);
 
   const focusServer = (server: PointServer, openServices = true) => {
-    const nextScale = openServices ? Math.max(scale, FOCUS_SCALE) : Math.max(scale, SERVER_ZOOM);
+    const nextScale = openServices
+      ? Math.max(scale, FOCUS_SCALE)
+      : Math.max(scale, SERVER_ZOOM);
     setFocusedServerId(server.serverId);
     setExpandedServerId(server.serverId);
     setFinderOpen(true);
@@ -395,10 +397,21 @@ export function ServerWorldMap() {
     focusServer(server);
   };
 
+  const zoomAt = (nextScale: number, anchorX: number, anchorY: number) => {
+    const mapAnchorX = (anchorX - offset.x) / scale;
+    const mapAnchorY = (anchorY - offset.y) / scale;
+    setScale(nextScale);
+    setOffset({
+      x: anchorX - mapAnchorX * nextScale,
+      y: anchorY - mapAnchorY * nextScale,
+    });
+  };
+
   const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
     event.preventDefault();
     const nextScale = clamp(scale - event.deltaY * 0.001, 0.36, 2.25);
-    setScale(nextScale);
+    const rect = event.currentTarget.getBoundingClientRect();
+    zoomAt(nextScale, event.clientX - rect.left, event.clientY - rect.top);
   };
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -442,7 +455,11 @@ export function ServerWorldMap() {
   };
 
   const zoomBy = (delta: number) => {
-    setScale((current) => clamp(current + delta, 0.36, 2.25));
+    zoomAt(
+      clamp(scale + delta, 0.36, 2.25),
+      viewportSize.width / 2,
+      viewportSize.height / 2
+    );
   };
 
   return (
@@ -867,6 +884,12 @@ function ServerMarker({
   const footprint = getServerFootprint(server.services.length, showServices);
   const visibleServices = server.services.slice(0, MAX_SERVICE_MARKERS);
   const hiddenServiceCount = Math.max(0, server.services.length - MAX_SERVICE_MARKERS);
+  const serverStatusLabel =
+    server.statusCode === "INCIDENT"
+      ? "장애"
+      : server.statusCode === "MAINTENANCE"
+        ? "점검"
+        : codeLabels.serverStatus[server.statusCode];
 
   return (
     <div
@@ -888,11 +911,15 @@ function ServerMarker({
         zIndex: focused ? 8 : hasIncident || server.statusCode === "INCIDENT" ? 4 : 2,
       }}
     >
-      {showServices && (
-        <div className="absolute inset-0 rounded-[24px] border border-slate-300 bg-white/86 shadow-sm backdrop-blur-sm" />
-      )}
+      <div
+        className={`absolute inset-0 rounded-[24px] border bg-white/74 shadow-sm backdrop-blur-sm transition ${
+          focused
+            ? "border-[#f60] border-solid"
+            : "border-dashed border-slate-300"
+        }`}
+      />
       <button
-        className={`absolute left-1/2 top-2 flex -translate-x-1/2 flex-col items-center ${
+        className={`absolute left-1/2 top-3 flex -translate-x-1/2 flex-col items-center ${
           focused ? "text-[#f60]" : "text-slate-800"
         }`}
         type="button"
@@ -916,9 +943,21 @@ function ServerMarker({
             </span>
           )}
         </span>
-        {focused && (
-          <span className="mt-4 max-w-[190px] truncate rounded-full border border-orange-200 bg-white px-3 py-1 text-xs font-black shadow-sm">
-            {server.serverName}
+        <span
+          className={`mt-4 max-w-[190px] truncate rounded-full border bg-white px-3 py-1 text-xs font-black shadow-sm ${
+            focused ? "border-orange-200" : "border-slate-200"
+          }`}
+        >
+          {server.serverName}
+        </span>
+        {!showServices && (
+          <span className="mt-1 max-w-[160px] truncate text-[10px] font-bold text-slate-500">
+            서비스 {server.services.length} · {serverStatusLabel}
+          </span>
+        )}
+        {showServices && (
+          <span className="mt-1 max-w-[190px] truncate text-[10px] font-bold text-slate-500">
+            서비스 {server.services.length} · {serverStatusLabel}
           </span>
         )}
       </button>
@@ -1123,8 +1162,8 @@ function getServerFootprint(serviceCount: number, showServices = false) {
     return {
       columns: 1,
       gridWidth: 0,
-      width: 82,
-      height: 82,
+      width: 188,
+      height: 132,
     };
   }
 
