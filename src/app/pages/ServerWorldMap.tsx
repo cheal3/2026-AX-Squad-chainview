@@ -182,9 +182,10 @@ export function ServerWorldMap() {
     if (target.closest("[data-map-panel]")) {
       return;
     }
-    if (!target.closest("[data-service-marker]")) {
-      setSelectedServiceId(null);
+    if (target.closest("[data-service-marker]")) {
+      return;
     }
+    setSelectedServiceId(null);
     setDragging(true);
     event.currentTarget.setPointerCapture(event.pointerId);
     dragStartRef.current = {
@@ -241,17 +242,24 @@ export function ServerWorldMap() {
           >
             <MapCanvas />
             {regions.map((region) => (
-              <RegionArea key={region.name} region={region} />
-            ))}
-
-            {pointServers.map((server) => (
-              <ServerMarker
-                key={server.serverId}
-                server={server}
+              <RegionArea
+                key={region.name}
+                region={region}
                 zoomedIn={zoomedIn}
-                onServiceClick={(serviceId) => setSelectedServiceId(serviceId)}
+                servers={pointServers.filter(
+                  (server) => server.regionName === region.name
+                )}
               />
             ))}
+
+            {zoomedIn &&
+              pointServers.map((server) => (
+                <ServerMarker
+                  key={server.serverId}
+                  server={server}
+                  onServiceClick={(serviceId) => setSelectedServiceId(serviceId)}
+                />
+              ))}
           </div>
         </div>
 
@@ -347,10 +355,32 @@ function MapCanvas() {
   );
 }
 
-function RegionArea({ region }: { region: Region }) {
+function RegionArea({
+  region,
+  zoomedIn,
+  servers,
+}: {
+  region: Region;
+  zoomedIn: boolean;
+  servers: PointServer[];
+}) {
+  const incidentCount = servers.filter(
+    (server) =>
+      server.statusCode === "INCIDENT" ||
+      server.services.some((service) =>
+        ["INCIDENT", "IMPACTED"].includes(service.statusCode)
+      )
+  ).length;
+  const serviceCount = servers.reduce(
+    (total, server) => total + server.services.length,
+    0
+  );
+
   return (
     <div
-      className="absolute rounded-[28px] border-2 border-dashed border-slate-300 bg-white/42"
+      className={`absolute rounded-[28px] border-2 border-dashed border-slate-300 bg-white/42 transition-opacity ${
+        zoomedIn ? "opacity-25" : "opacity-100"
+      }`}
       style={{
         left: region.x - region.width / 2,
         top: region.y - region.height / 2,
@@ -363,6 +393,21 @@ function RegionArea({ region }: { region: Region }) {
         <div className="mt-1 text-lg font-bold text-slate-500">
           안정도 {region.explore}%
         </div>
+        {!zoomedIn && (
+          <div className="mt-4 flex flex-wrap gap-2 text-sm font-bold">
+            <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-600">
+              서버 {servers.length}
+            </span>
+            <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-600">
+              서비스 {serviceCount}
+            </span>
+            {incidentCount > 0 && (
+              <span className="rounded-full border border-red-200 bg-red-50 px-3 py-1 text-red-600">
+                장애 {incidentCount}
+              </span>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -370,11 +415,9 @@ function RegionArea({ region }: { region: Region }) {
 
 function ServerMarker({
   server,
-  zoomedIn,
   onServiceClick,
 }: {
   server: PointServer;
-  zoomedIn: boolean;
   onServiceClick: (serviceId: number) => void;
 }) {
   const hasIncident = server.services.some((service) =>
@@ -405,51 +448,47 @@ function ServerMarker({
           )}
         </div>
 
-        {!zoomedIn && (
-          <div className="mt-4 whitespace-nowrap rounded-full border border-slate-200 bg-white px-3 py-1.5 text-center text-sm font-bold text-slate-800 shadow-sm">
-            {server.serverName}
-            <div className="text-xs font-semibold text-slate-500">
-              {codeLabels.envType[server.envCode]} · 서비스 {server.services.length}
-            </div>
-          </div>
-        )}
-
-        {zoomedIn && (
-          <div className="pointer-events-none absolute left-1/2 top-1/2 h-1 w-1">
-            {server.services.slice(0, 7).map((service, index) => {
-              const angle = (-90 + index * (360 / Math.max(server.services.length, 3))) * (Math.PI / 180);
-              const distance = 88 + (index % 2) * 22;
-              return (
-                <button
-                  key={service.serviceId}
-                  data-service-marker
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onServiceClick(service.serviceId);
-                  }}
-                  className="pointer-events-auto absolute flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 whitespace-nowrap rounded-full border border-slate-200 bg-white py-1.5 pl-2 pr-3 text-xs font-bold text-slate-800 shadow-sm hover:bg-orange-50"
-                  style={{
-                    left: Math.cos(angle) * distance,
-                    top: Math.sin(angle) * distance,
-                  }}
+        <div className="pointer-events-none absolute left-1/2 top-1/2 h-1 w-1">
+          {server.services.slice(0, 7).map((service, index) => {
+            const angle =
+              (-90 + index * (360 / Math.max(server.services.length, 3))) *
+              (Math.PI / 180);
+            const distance = 88 + (index % 2) * 22;
+            return (
+              <button
+                key={service.serviceId}
+                data-service-marker
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onServiceClick(service.serviceId);
+                }}
+                className="pointer-events-auto absolute flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 whitespace-nowrap rounded-full border border-slate-200 bg-white py-1.5 pl-2 pr-3 text-xs font-bold text-slate-800 shadow-sm hover:bg-orange-50"
+                style={{
+                  left: Math.cos(angle) * distance,
+                  top: Math.sin(angle) * distance,
+                }}
+              >
+                <span
+                  className={`flex h-6 w-6 items-center justify-center rounded-full ${
+                    ["INCIDENT", "IMPACTED"].includes(service.statusCode)
+                      ? "bg-red-500 text-white"
+                      : service.statusCode === "MAINTENANCE"
+                        ? "bg-yellow-400 text-slate-900"
+                        : "bg-cyan-400 text-slate-950"
+                  }`}
                 >
-                  <span
-                    className={`flex h-6 w-6 items-center justify-center rounded-full ${
-                      ["INCIDENT", "IMPACTED"].includes(service.statusCode)
-                        ? "bg-red-500"
-                        : service.statusCode === "MAINTENANCE"
-                          ? "bg-yellow-400 text-slate-900"
-                          : "bg-cyan-400 text-slate-950"
-                    }`}
-                  >
-                    {["INCIDENT", "IMPACTED"].includes(service.statusCode) ? "!" : <Database size={13} />}
-                  </span>
-                  {service.serviceName}
-                </button>
-              );
-            })}
-          </div>
-        )}
+                  {["INCIDENT", "IMPACTED"].includes(service.statusCode) ? (
+                    "!"
+                  ) : (
+                    <Database size={13} />
+                  )}
+                </span>
+                {service.serviceName}
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
