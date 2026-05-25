@@ -144,10 +144,12 @@ export function ServerWorldMap() {
     null
   );
   const [focusedServerId, setFocusedServerId] = useState<number | null>(null);
+  const [drillingServerId, setDrillingServerId] = useState<number | null>(null);
   const [expandedServerId, setExpandedServerId] = useState<number | null>(null);
   const [finderOpen, setFinderOpen] = useState(true);
   const [serverSearch, setServerSearch] = useState("");
   const viewportRef = useRef<HTMLDivElement | null>(null);
+  const serverFocusTimerRef = useRef<number | null>(null);
   const dragStartRef = useRef({
     pointerX: 0,
     pointerY: 0,
@@ -176,6 +178,14 @@ export function ServerWorldMap() {
     const observer = new ResizeObserver(updateViewportSize);
     observer.observe(element);
     return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (serverFocusTimerRef.current) {
+        window.clearTimeout(serverFocusTimerRef.current);
+      }
+    };
   }, []);
 
   const serviceById = useMemo(
@@ -388,6 +398,10 @@ export function ServerWorldMap() {
   };
 
   const focusRegion = (region: LayoutRegion) => {
+    if (serverFocusTimerRef.current) {
+      window.clearTimeout(serverFocusTimerRef.current);
+      serverFocusTimerRef.current = null;
+    }
     const focus = screenFocus();
     const nextScale = clamp(
       Math.max(
@@ -399,6 +413,7 @@ export function ServerWorldMap() {
     );
     setFocusedRegionName(region.name);
     setFocusedServerId(null);
+    setDrillingServerId(null);
     setExpandedServerId(null);
     setSelectedServiceId(null);
     setScale(nextScale);
@@ -409,6 +424,10 @@ export function ServerWorldMap() {
   };
 
   const focusServer = (server: PointServer, openServices = true) => {
+    if (serverFocusTimerRef.current) {
+      window.clearTimeout(serverFocusTimerRef.current);
+      serverFocusTimerRef.current = null;
+    }
     const focus = screenFocus(true);
     const focusedFootprint = getServerFootprint(server.services.length, openServices);
     const fittedScale = openServices
@@ -421,7 +440,8 @@ export function ServerWorldMap() {
       ? clamp(Math.max(fittedScale, FOCUS_SCALE), SERVICE_ZOOM + 0.08, 2.25)
       : Math.max(scale, SERVER_ZOOM);
     setFocusedRegionName(server.regionName);
-    setFocusedServerId(server.serverId);
+    setFocusedServerId(null);
+    setDrillingServerId(openServices ? server.serverId : null);
     setExpandedServerId(server.serverId);
     setFinderOpen(true);
     setSelectedServiceId(null);
@@ -430,6 +450,38 @@ export function ServerWorldMap() {
       x: focus.x - server.mapX * nextScale,
       y: focus.y - server.mapY * nextScale,
     });
+
+    if (openServices) {
+      serverFocusTimerRef.current = window.setTimeout(() => {
+        setFocusedServerId(server.serverId);
+        setDrillingServerId(null);
+        serverFocusTimerRef.current = null;
+      }, 680);
+    } else {
+      setFocusedServerId(server.serverId);
+    }
+  };
+
+  const closeServerFocus = () => {
+    if (serverFocusTimerRef.current) {
+      window.clearTimeout(serverFocusTimerRef.current);
+      serverFocusTimerRef.current = null;
+    }
+
+    const targetRegionName = focusedServer?.regionName ?? focusedRegionName;
+    const targetRegion = layoutRegions.find(
+      (region) => region.name === targetRegionName
+    );
+
+    if (targetRegion) {
+      focusRegion(targetRegion);
+      return;
+    }
+
+    setFocusedServerId(null);
+    setDrillingServerId(null);
+    setExpandedServerId(null);
+    setSelectedServiceId(null);
   };
 
   const toggleServerInFinder = (server: PointServer) => {
@@ -445,7 +497,12 @@ export function ServerWorldMap() {
     const mapAnchorX = (anchorX - offset.x) / scale;
     const mapAnchorY = (anchorY - offset.y) / scale;
     if (nextScale < SERVICE_FADE_START) {
+      if (serverFocusTimerRef.current) {
+        window.clearTimeout(serverFocusTimerRef.current);
+        serverFocusTimerRef.current = null;
+      }
       setFocusedServerId(null);
+      setDrillingServerId(null);
       setExpandedServerId(null);
       setSelectedServiceId(null);
     }
@@ -475,6 +532,10 @@ export function ServerWorldMap() {
       return;
     }
     if (target.closest("[data-server-marker]")) {
+      return;
+    }
+    if (focusedServer || drillingServerId) {
+      closeServerFocus();
       return;
     }
     setSelectedServiceId(null);
@@ -548,7 +609,7 @@ export function ServerWorldMap() {
             transformOrigin: "0 0",
             transition: dragging
               ? "none"
-              : "transform 420ms cubic-bezier(0.22, 1, 0.36, 1)",
+              : "transform 760ms cubic-bezier(0.16, 1, 0.3, 1)",
           }}
         >
           <div
@@ -574,8 +635,10 @@ export function ServerWorldMap() {
                   key={server.serverId}
                   dimmed={
                     Boolean(activeRegionName && server.regionName !== activeRegionName) ||
-                    Boolean(focusedServerId && server.serverId !== focusedServerId)
+                    Boolean(focusedServerId && server.serverId !== focusedServerId) ||
+                    Boolean(drillingServerId && server.serverId !== drillingServerId)
                   }
+                  drilling={server.serverId === drillingServerId}
                   server={server}
                   focused={server.serverId === focusedServerId}
                   layerOpacity={serverLayerOpacity}
@@ -942,6 +1005,7 @@ function RegionArea({
 
 function ServerMarker({
   dimmed,
+  drilling,
   server,
   focused,
   layerOpacity,
@@ -952,6 +1016,7 @@ function ServerMarker({
   onServiceClick,
 }: {
   dimmed: boolean;
+  drilling: boolean;
   server: PointServer;
   focused: boolean;
   layerOpacity: number;
@@ -972,6 +1037,7 @@ function ServerMarker({
   const visibleServices = server.services.slice(0, MAX_SERVICE_MARKERS);
   const hiddenServiceCount = Math.max(0, server.services.length - MAX_SERVICE_MARKERS);
   const effectiveLayerOpacity = dimmed ? layerOpacity * 0.16 : layerOpacity;
+  const highlighted = focused || drilling;
   const serverStatusLabel =
     server.statusCode === "INCIDENT"
       ? "장애"
@@ -983,7 +1049,7 @@ function ServerMarker({
     <div
       data-server-marker
       className={`absolute ${
-        dimmed ? "" : "transition-all duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]"
+        dimmed ? "" : "transition-all duration-[800ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
       }`}
       onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => {
@@ -1006,24 +1072,23 @@ function ServerMarker({
     >
       <div
         className={`absolute inset-0 rounded-[24px] border bg-white/74 shadow-sm backdrop-blur-sm ${
-          focused
+          highlighted
             ? "border-[#f60] border-solid"
             : "border-dashed border-slate-300"
         }`}
       />
       <button
         className={`absolute left-1/2 top-3 flex -translate-x-1/2 flex-col items-center ${
-          focused ? "text-[#f60]" : "text-slate-800"
+          highlighted ? "text-[#f60]" : "text-slate-800"
         }`}
         type="button"
       >
         <span
           className={`relative flex h-11 w-11 items-center justify-center rounded-full border-[4px] border-white shadow-md ${
-            focused ? "bg-[#f60] text-white" : "bg-sky-300 text-slate-900"
+            highlighted ? "bg-[#f60] text-white" : "bg-sky-300 text-slate-900"
           }`}
         >
           <Server size={20} />
-          <span className="absolute -bottom-3 h-5 w-5 rotate-45 border-b-4 border-r-4 border-white bg-slate-950" />
           {(hasIncident || server.statusCode === "INCIDENT") && (
             <MapExclamation active={!dimmed} />
           )}
@@ -1040,7 +1105,7 @@ function ServerMarker({
         </span>
         <span
           className={`mt-4 max-w-[190px] truncate rounded-full border bg-white px-3 py-1 text-xs font-black shadow-sm ${
-            focused ? "border-orange-200" : "border-slate-200"
+            highlighted ? "border-orange-200" : "border-slate-200"
           }`}
         >
           {server.serverName}
