@@ -1100,7 +1100,7 @@ function ServerMarker({
         >
           <Server size={20} />
           {(hasIncident || server.statusCode === "INCIDENT") && (
-            <MapExclamation active={!dimmed} />
+            <MapExclamation />
           )}
           {!hasIncident && hasMaintenance && (
             <span className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-yellow-400 text-xs font-black text-slate-900">
@@ -1198,14 +1198,11 @@ function ServerMarker({
   );
 }
 
-function MapExclamation({ active = true }: { active?: boolean }) {
+function MapExclamation() {
   return (
     <div className="absolute -right-3 -top-4">
       <div className="relative flex h-9 w-9 items-center justify-center rounded-full border-[3px] border-white bg-red-500 text-xl font-black text-white shadow-lg">
         !
-        {active && (
-          <span className="absolute h-12 w-12 animate-ping rounded-full bg-red-500/30" />
-        )}
       </div>
     </div>
   );
