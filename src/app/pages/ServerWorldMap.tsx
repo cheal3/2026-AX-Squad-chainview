@@ -67,9 +67,9 @@ const SERVER_ZOOM = 0.72;
 const SERVER_FADE_START = 0.58;
 const SERVICE_ZOOM = 1.2;
 const SERVICE_FADE_START = 1.02;
-const FOCUS_SCALE = 1.34;
+const FOCUS_SCALE = 1.56;
 const MAX_SERVICE_MARKERS = 16;
-const MAP_TRANSITION = "transform 760ms cubic-bezier(0.16, 1, 0.3, 1)";
+const MAP_TRANSITION = "transform 520ms cubic-bezier(0.16, 1, 0.3, 1)";
 
 const regions: Region[] = [
   {
@@ -492,24 +492,14 @@ export function ServerWorldMap() {
       ? clamp(Math.max(fittedScale, FOCUS_SCALE), SERVICE_ZOOM + 0.08, 2.25)
       : Math.max(scale, SERVER_ZOOM);
     setFocusedRegionName(server.regionName);
-    setFocusedServerId(null);
-    setDrillingServerId(openServices ? server.serverId : null);
+    setFocusedServerId(server.serverId);
+    setDrillingServerId(null);
     setFinderOpen(true);
     setSelectedServiceId(null);
     commitMapView(nextScale, {
       x: focus.x - server.mapX * nextScale,
       y: focus.y - server.mapY * nextScale,
     });
-
-    if (openServices) {
-      serverFocusTimerRef.current = window.setTimeout(() => {
-        setFocusedServerId(server.serverId);
-        setDrillingServerId(null);
-        serverFocusTimerRef.current = null;
-      }, 680);
-    } else {
-      setFocusedServerId(server.serverId);
-    }
   };
 
   const closeServerFocus = () => {
@@ -531,22 +521,6 @@ export function ServerWorldMap() {
     setFocusedServerId(null);
     setDrillingServerId(null);
     setSelectedServiceId(null);
-  };
-
-  const handleDepthSelect = (depth: number) => {
-    if (depth === 1) {
-      resetMapFocus();
-      return;
-    }
-
-    if (depth === 2 && activeRegion) {
-      focusRegion(activeRegion);
-      return;
-    }
-
-    if (depth === 3 && focusedServer) {
-      focusServer(focusedServer);
-    }
   };
 
   const zoomAt = (nextScale: number, anchorX: number, anchorY: number) => {
@@ -698,7 +672,6 @@ export function ServerWorldMap() {
 
         <MapNavigationPanel
           activeRegion={activeRegion}
-          activeRegionName={activeRegionName}
           activeRegionServers={activeRegionServers}
           currentDepth={focusedServer ? 3 : activeRegionName ? 2 : 1}
           focusedServer={focusedServer}
@@ -706,7 +679,7 @@ export function ServerWorldMap() {
           regions={layoutRegions}
           searchValue={serverSearch}
           onOpenChange={setFinderOpen}
-          onDepthSelect={handleDepthSelect}
+          onOverviewSelect={resetMapFocus}
           onRegionSelect={focusRegion}
           onSearchChange={setServerSearch}
           onServerSelect={focusServer}
@@ -904,7 +877,6 @@ function applyMapView(
 
 function MapNavigationPanel({
   activeRegion,
-  activeRegionName,
   activeRegionServers,
   currentDepth,
   focusedServer,
@@ -912,14 +884,13 @@ function MapNavigationPanel({
   regions,
   searchValue,
   onOpenChange,
-  onDepthSelect,
+  onOverviewSelect,
   onRegionSelect,
   onSearchChange,
   onServerSelect,
   onServiceSelect,
 }: {
   activeRegion?: LayoutRegion;
-  activeRegionName?: string | null;
   activeRegionServers: PointServer[];
   currentDepth: number;
   focusedServer?: PointServer;
@@ -927,7 +898,7 @@ function MapNavigationPanel({
   regions: LayoutRegion[];
   searchValue: string;
   onOpenChange: (open: boolean) => void;
-  onDepthSelect: (depth: number) => void;
+  onOverviewSelect: () => void;
   onRegionSelect: (region: LayoutRegion) => void;
   onSearchChange: (value: string) => void;
   onServerSelect: (server: PointServer) => void;
@@ -936,10 +907,10 @@ function MapNavigationPanel({
   const keyword = searchValue.trim().toLowerCase();
   const depthLabel =
     currentDepth === 1
-      ? "1뎁스 · 영역"
+      ? "영역 목록"
       : currentDepth === 2
-        ? "2뎁스 · 서버"
-        : "3뎁스 · 서비스";
+        ? "서버 목록"
+        : "서비스 목록";
   const filteredRegions = keyword
     ? regions.filter((region) => region.name.toLowerCase().includes(keyword))
     : regions;
@@ -1032,34 +1003,9 @@ function MapNavigationPanel({
           </button>
         </div>
 
-        <div className="mt-4 grid grid-cols-3 gap-1 rounded-xl bg-slate-100 p-1">
-          {[1, 2, 3].map((depth) => {
-            const disabled =
-              (depth === 2 && !activeRegionName) ||
-              (depth === 3 && !focusedServer);
-
-            return (
-              <button
-                key={depth}
-                disabled={disabled}
-                onClick={() => onDepthSelect(depth)}
-                className={`rounded-lg px-2 py-2 text-xs font-black transition ${
-                  currentDepth === depth
-                    ? "bg-[#f60] text-white shadow-sm"
-                    : disabled
-                      ? "text-slate-300"
-                      : "bg-white text-slate-600 hover:text-[#f60]"
-                }`}
-              >
-                {depth}뎁스
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="mt-3 flex min-w-0 flex-wrap items-center gap-1 text-xs font-black">
+        <div className="mt-4 flex min-w-0 flex-wrap items-center gap-1 text-xs font-black">
           <button
-            onClick={() => onDepthSelect(1)}
+            onClick={onOverviewSelect}
             className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600 hover:bg-orange-50 hover:text-[#f60]"
           >
             전체
@@ -1365,7 +1311,7 @@ function ServerMarker({
       data-server-marker
       data-server-region={server.regionName}
       className={`absolute ${
-        dimmed ? "" : "transition-all duration-[800ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
+        dimmed ? "" : "transition-opacity duration-200 ease-out"
       }`}
       onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => {
@@ -1384,7 +1330,7 @@ function ServerMarker({
         opacity: effectiveLayerOpacity,
         pointerEvents: dimmed ? "none" : serverInteractive ? "auto" : "none",
         contain: "layout paint style",
-        willChange: highlighted ? "width, height, opacity" : "opacity",
+        willChange: "opacity",
         zIndex: focused ? 8 : hasIncident || server.statusCode === "INCIDENT" ? 4 : 2,
       }}
     >
@@ -1528,10 +1474,10 @@ function MapLegend({
 }) {
   const depthLabel =
     mapDepth === 1
-      ? "1뎁스 · 구역"
+      ? "영역"
       : mapDepth === 2
-        ? "2뎁스 · 서버"
-        : "3뎁스 · 서비스";
+        ? "서버"
+        : "서비스";
 
   return (
     <div className="pointer-events-none absolute bottom-6 right-6 z-30 rounded-2xl border border-slate-200 bg-white p-4 text-slate-800 shadow-sm">
