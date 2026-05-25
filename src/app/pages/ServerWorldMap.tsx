@@ -140,6 +140,9 @@ export function ServerWorldMap() {
   const [selectedServiceId, setSelectedServiceId] = useState<number | null>(
     null
   );
+  const [focusedRegionName, setFocusedRegionName] = useState<string | null>(
+    null
+  );
   const [focusedServerId, setFocusedServerId] = useState<number | null>(null);
   const [expandedServerId, setExpandedServerId] = useState<number | null>(null);
   const [finderOpen, setFinderOpen] = useState(true);
@@ -348,6 +351,7 @@ export function ServerWorldMap() {
   const focusedServer = focusedServerId
     ? pointServers.find((server) => server.serverId === focusedServerId)
     : undefined;
+  const activeRegionName = focusedServer?.regionName ?? focusedRegionName;
 
   const searchedServers = useMemo(() => {
     const keyword = serverSearch.trim().toLowerCase();
@@ -373,18 +377,58 @@ export function ServerWorldMap() {
     });
   }, [pointServers, serverSearch]);
 
+  const screenFocus = () => {
+    const leftReserved = finderOpen ? 370 : 0;
+    return {
+      x: leftReserved + (viewportSize.width - leftReserved) / 2,
+      y: viewportSize.height / 2,
+      width: Math.max(320, viewportSize.width - leftReserved),
+      height: viewportSize.height,
+    };
+  };
+
+  const focusRegion = (region: LayoutRegion) => {
+    const focus = screenFocus();
+    const nextScale = clamp(
+      Math.max(
+        SERVER_ZOOM + 0.06,
+        Math.min((focus.width - 120) / region.width, (focus.height - 170) / region.height)
+      ),
+      SERVER_ZOOM + 0.04,
+      SERVICE_ZOOM - 0.1
+    );
+    setFocusedRegionName(region.name);
+    setFocusedServerId(null);
+    setExpandedServerId(null);
+    setSelectedServiceId(null);
+    setScale(nextScale);
+    setOffset({
+      x: focus.x - region.x * nextScale,
+      y: focus.y - region.y * nextScale,
+    });
+  };
+
   const focusServer = (server: PointServer, openServices = true) => {
+    const focus = screenFocus();
+    const focusedFootprint = getServerFootprint(server.services.length, openServices);
+    const fittedScale = openServices
+      ? Math.min(
+          (focus.width - 140) / focusedFootprint.width,
+          (focus.height - 180) / focusedFootprint.height
+        )
+      : SERVER_ZOOM;
     const nextScale = openServices
-      ? Math.max(scale, FOCUS_SCALE)
+      ? clamp(Math.max(fittedScale, FOCUS_SCALE), SERVICE_ZOOM + 0.08, 2.25)
       : Math.max(scale, SERVER_ZOOM);
+    setFocusedRegionName(server.regionName);
     setFocusedServerId(server.serverId);
     setExpandedServerId(server.serverId);
     setFinderOpen(true);
     setSelectedServiceId(null);
     setScale(nextScale);
     setOffset({
-      x: viewportSize.width / 2 - server.mapX * nextScale,
-      y: viewportSize.height / 2 - server.mapY * nextScale,
+      x: focus.x - server.mapX * nextScale,
+      y: focus.y - server.mapY * nextScale,
     });
   };
 
@@ -507,8 +551,11 @@ export function ServerWorldMap() {
             {layoutRegions.map((region) => (
               <RegionArea
                 key={region.name}
+                active={activeRegionName === region.name}
+                dimmed={Boolean(activeRegionName && activeRegionName !== region.name)}
                 region={region}
                 serverLayerOpacity={serverLayerOpacity}
+                onRegionClick={() => focusRegion(region)}
               />
             ))}
 
@@ -516,6 +563,10 @@ export function ServerWorldMap() {
               visiblePointServers.map((server) => (
                 <ServerMarker
                   key={server.serverId}
+                  dimmed={
+                    Boolean(activeRegionName && server.regionName !== activeRegionName) ||
+                    Boolean(focusedServerId && server.serverId !== focusedServerId)
+                  }
                   server={server}
                   focused={server.serverId === focusedServerId}
                   layerOpacity={serverLayerOpacity}
@@ -547,7 +598,11 @@ export function ServerWorldMap() {
           </button>
         </div>
 
-        <MapLegend focusedServer={focusedServer} mapDepth={mapDepth} />
+        <MapLegend
+          focusedRegionName={focusedRegionName}
+          focusedServer={focusedServer}
+          mapDepth={mapDepth}
+        />
 
         {selectedService && (
           <ServiceSidePanel
@@ -807,26 +862,47 @@ function ServerFinderPanel({
 }
 
 function RegionArea({
+  active,
+  dimmed,
+  onRegionClick,
   region,
   serverLayerOpacity,
 }: {
+  active: boolean;
+  dimmed: boolean;
+  onRegionClick: () => void;
   region: LayoutRegion;
   serverLayerOpacity: number;
 }) {
-  const regionOpacity = 1 - serverLayerOpacity * 0.46;
-  const labelOpacity = clamp(1 - serverLayerOpacity * 0.75, 0.18, 1);
+  const regionOpacity = dimmed
+    ? 0.16
+    : active
+      ? 0.94
+      : 1 - serverLayerOpacity * 0.46;
+  const labelOpacity = dimmed
+    ? 0.2
+    : active
+      ? 1
+      : clamp(1 - serverLayerOpacity * 0.75, 0.18, 1);
 
   return (
     <div
       data-region-area
-      className="absolute rounded-[28px] border-2 border-dashed border-slate-300 bg-white/42"
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={onRegionClick}
+      className={`absolute cursor-pointer rounded-[28px] border-2 bg-white/42 ${
+        active ? "border-solid border-[#f60]" : "border-dashed border-slate-300"
+      }`}
       style={{
         left: region.x - region.width / 2,
         top: region.y - region.height / 2,
         width: region.width,
         height: region.height,
         opacity: regionOpacity,
-        transition: "opacity 360ms ease, width 360ms ease, height 360ms ease",
+        pointerEvents: dimmed ? "none" : "auto",
+        transition: dimmed
+          ? "none"
+          : "opacity 360ms ease, width 360ms ease, height 360ms ease",
       }}
     >
       <div
@@ -856,6 +932,7 @@ function RegionArea({
 }
 
 function ServerMarker({
+  dimmed,
   server,
   focused,
   layerOpacity,
@@ -865,6 +942,7 @@ function ServerMarker({
   onServerClick,
   onServiceClick,
 }: {
+  dimmed: boolean;
   server: PointServer;
   focused: boolean;
   layerOpacity: number;
@@ -884,6 +962,7 @@ function ServerMarker({
   const footprint = getServerFootprint(server.services.length, showServices);
   const visibleServices = server.services.slice(0, MAX_SERVICE_MARKERS);
   const hiddenServiceCount = Math.max(0, server.services.length - MAX_SERVICE_MARKERS);
+  const effectiveLayerOpacity = dimmed ? layerOpacity * 0.16 : layerOpacity;
   const serverStatusLabel =
     server.statusCode === "INCIDENT"
       ? "장애"
@@ -894,9 +973,12 @@ function ServerMarker({
   return (
     <div
       data-server-marker
-      className="absolute transition-opacity duration-500 ease-out"
+      className={`absolute ${dimmed ? "" : "transition-opacity duration-500 ease-out"}`}
       onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => {
+        if (dimmed) {
+          return;
+        }
         event.stopPropagation();
         onServerClick();
       }}
@@ -906,13 +988,13 @@ function ServerMarker({
         transform: "translate(-50%, -50%)",
         width: footprint.width,
         height: footprint.height,
-        opacity: layerOpacity,
-        pointerEvents: serverInteractive ? "auto" : "none",
+        opacity: effectiveLayerOpacity,
+        pointerEvents: dimmed ? "none" : serverInteractive ? "auto" : "none",
         zIndex: focused ? 8 : hasIncident || server.statusCode === "INCIDENT" ? 4 : 2,
       }}
     >
       <div
-        className={`absolute inset-0 rounded-[24px] border bg-white/74 shadow-sm backdrop-blur-sm transition ${
+        className={`absolute inset-0 rounded-[24px] border bg-white/74 shadow-sm backdrop-blur-sm ${
           focused
             ? "border-[#f60] border-solid"
             : "border-dashed border-slate-300"
@@ -931,7 +1013,9 @@ function ServerMarker({
         >
           <Server size={20} />
           <span className="absolute -bottom-3 h-5 w-5 rotate-45 border-b-4 border-r-4 border-white bg-slate-950" />
-          {(hasIncident || server.statusCode === "INCIDENT") && <MapExclamation />}
+          {(hasIncident || server.statusCode === "INCIDENT") && (
+            <MapExclamation active={!dimmed} />
+          )}
           {!hasIncident && hasMaintenance && (
             <span className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-yellow-400 text-xs font-black text-slate-900">
               !
@@ -1021,21 +1105,25 @@ function ServerMarker({
   );
 }
 
-function MapExclamation() {
+function MapExclamation({ active = true }: { active?: boolean }) {
   return (
     <div className="absolute -right-3 -top-4">
       <div className="relative flex h-9 w-9 items-center justify-center rounded-full border-[3px] border-white bg-red-500 text-xl font-black text-white shadow-lg">
         !
-        <span className="absolute h-12 w-12 animate-ping rounded-full bg-red-500/30" />
+        {active && (
+          <span className="absolute h-12 w-12 animate-ping rounded-full bg-red-500/30" />
+        )}
       </div>
     </div>
   );
 }
 
 function MapLegend({
+  focusedRegionName,
   focusedServer,
   mapDepth,
 }: {
+  focusedRegionName?: string | null;
   focusedServer?: PointServer;
   mapDepth: number;
 }) {
@@ -1052,11 +1140,15 @@ function MapLegend({
         <Compass size={18} className="text-[#f60]" />
         {focusedServer
           ? focusedServer.serverName
+          : focusedRegionName
+            ? focusedRegionName
           : depthLabel}
       </div>
       <div className="mt-2 text-xs text-slate-500">
         {focusedServer
           ? `${depthLabel} · 서비스 ${focusedServer.services.length}개`
+          : focusedRegionName
+            ? `${depthLabel} · 서버 영역`
           : "마우스 드래그로 이동 · 휠로 확대/축소"}
       </div>
     </div>
