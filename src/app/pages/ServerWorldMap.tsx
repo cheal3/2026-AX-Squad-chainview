@@ -547,6 +547,12 @@ export function ServerWorldMap() {
       closeServerFocus();
       return;
     }
+    if (focusedRegionName) {
+      setFocusedRegionName(null);
+      setExpandedServerId(null);
+      setSelectedServiceId(null);
+      return;
+    }
     setSelectedServiceId(null);
     setDragging(true);
     event.currentTarget.setPointerCapture(event.pointerId);
