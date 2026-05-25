@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import {
   AlertTriangle,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   ChevronsRight,
@@ -74,7 +73,7 @@ const MAP_TRANSITION = "transform 760ms cubic-bezier(0.16, 1, 0.3, 1)";
 
 const regions: Region[] = [
   {
-    name: "크라운 마운틴",
+    name: "홈페이지",
     explore: 100,
     x: 520,
     y: 620,
@@ -82,7 +81,7 @@ const regions: Region[] = [
     height: 560,
   },
   {
-    name: "별이 떨어지는 산골짜기",
+    name: "고객 채널",
     explore: 90,
     x: 1540,
     y: 620,
@@ -90,7 +89,7 @@ const regions: Region[] = [
     height: 560,
   },
   {
-    name: "장풍 고지대",
+    name: "업무 시스템",
     explore: 94,
     x: 2560,
     y: 620,
@@ -98,7 +97,7 @@ const regions: Region[] = [
     height: 560,
   },
   {
-    name: "울부짖는 언덕",
+    name: "데이터 플랫폼",
     explore: 100,
     x: 3580,
     y: 620,
@@ -106,7 +105,7 @@ const regions: Region[] = [
     height: 560,
   },
   {
-    name: "드래곤스파인",
+    name: "인프라",
     explore: 100,
     x: 520,
     y: 1880,
@@ -114,7 +113,7 @@ const regions: Region[] = [
     height: 560,
   },
   {
-    name: "백수원",
+    name: "공통 서비스",
     explore: 71,
     x: 1540,
     y: 1880,
@@ -122,7 +121,7 @@ const regions: Region[] = [
     height: 560,
   },
   {
-    name: "데이터 항만",
+    name: "인증/보안",
     explore: 88,
     x: 2560,
     y: 1880,
@@ -130,7 +129,7 @@ const regions: Region[] = [
     height: 560,
   },
   {
-    name: "공통 플랫폼 성채",
+    name: "운영 관제",
     explore: 96,
     x: 3580,
     y: 1880,
@@ -156,7 +155,6 @@ export function ServerWorldMap() {
   );
   const [focusedServerId, setFocusedServerId] = useState<number | null>(null);
   const [drillingServerId, setDrillingServerId] = useState<number | null>(null);
-  const [expandedServerId, setExpandedServerId] = useState<number | null>(null);
   const [finderOpen, setFinderOpen] = useState(true);
   const [serverSearch, setServerSearch] = useState("");
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -168,6 +166,7 @@ export function ServerWorldMap() {
   });
   const serverFocusTimerRef = useRef<number | null>(null);
   const dragFrameRef = useRef<number | null>(null);
+  const dragMovedRef = useRef(false);
   const dragStartRef = useRef({
     pointerX: 0,
     pointerY: 0,
@@ -390,6 +389,16 @@ export function ServerWorldMap() {
     ? pointServerById.get(focusedServerId)
     : undefined;
   const activeRegionName = focusedServer?.regionName ?? focusedRegionName;
+  const activeRegion = activeRegionName
+    ? layoutRegions.find((region) => region.name === activeRegionName)
+    : undefined;
+  const activeRegionServers = useMemo(() => {
+    if (!activeRegionName) {
+      return [];
+    }
+
+    return pointServers.filter((server) => server.regionName === activeRegionName);
+  }, [activeRegionName, pointServers]);
   const visiblePointServers = useMemo(() => {
     if (serverLayerOpacity <= 0.02) {
       return [];
@@ -401,30 +410,6 @@ export function ServerWorldMap() {
         isServerInBounds(server, mapBounds)
     );
   }, [activeRegionName, mapBounds, pointServers, serverLayerOpacity]);
-
-  const searchedServers = useMemo(() => {
-    const keyword = serverSearch.trim().toLowerCase();
-    if (!keyword) {
-      return pointServers;
-    }
-
-    return pointServers.filter((server) => {
-      const serviceText = server.services
-        .map((service) => `${service.serviceName} ${service.serviceCode}`)
-        .join(" ")
-        .toLowerCase();
-      const serverText = [
-        server.serverName,
-        server.hostName,
-        server.ipAddress,
-        server.regionName,
-      ]
-        .join(" ")
-        .toLowerCase();
-
-      return `${serverText} ${serviceText}`.includes(keyword);
-    });
-  }, [pointServers, serverSearch]);
 
   const screenFocus = (reserveFinder = finderOpen) => {
     const leftReserved = reserveFinder ? 370 : 0;
@@ -453,6 +438,19 @@ export function ServerWorldMap() {
     setOffset(nextOffset);
   };
 
+  const resetMapFocus = () => {
+    if (serverFocusTimerRef.current) {
+      window.clearTimeout(serverFocusTimerRef.current);
+      serverFocusTimerRef.current = null;
+    }
+
+    setFocusedRegionName(null);
+    setFocusedServerId(null);
+    setDrillingServerId(null);
+    setSelectedServiceId(null);
+    commitMapView(INITIAL_SCALE, { ...INITIAL_OFFSET });
+  };
+
   const focusRegion = (region: LayoutRegion) => {
     if (serverFocusTimerRef.current) {
       window.clearTimeout(serverFocusTimerRef.current);
@@ -470,7 +468,6 @@ export function ServerWorldMap() {
     setFocusedRegionName(region.name);
     setFocusedServerId(null);
     setDrillingServerId(null);
-    setExpandedServerId(null);
     setSelectedServiceId(null);
     commitMapView(nextScale, {
       x: focus.x - region.x * nextScale,
@@ -497,7 +494,6 @@ export function ServerWorldMap() {
     setFocusedRegionName(server.regionName);
     setFocusedServerId(null);
     setDrillingServerId(openServices ? server.serverId : null);
-    setExpandedServerId(server.serverId);
     setFinderOpen(true);
     setSelectedServiceId(null);
     commitMapView(nextScale, {
@@ -534,17 +530,23 @@ export function ServerWorldMap() {
 
     setFocusedServerId(null);
     setDrillingServerId(null);
-    setExpandedServerId(null);
     setSelectedServiceId(null);
   };
 
-  const toggleServerInFinder = (server: PointServer) => {
-    if (expandedServerId === server.serverId) {
-      setExpandedServerId(null);
-      setFocusedServerId(server.serverId);
+  const handleDepthSelect = (depth: number) => {
+    if (depth === 1) {
+      resetMapFocus();
       return;
     }
-    focusServer(server);
+
+    if (depth === 2 && activeRegion) {
+      focusRegion(activeRegion);
+      return;
+    }
+
+    if (depth === 3 && focusedServer) {
+      focusServer(focusedServer);
+    }
   };
 
   const zoomAt = (nextScale: number, anchorX: number, anchorY: number) => {
@@ -558,7 +560,6 @@ export function ServerWorldMap() {
       }
       setFocusedServerId(null);
       setDrillingServerId(null);
-      setExpandedServerId(null);
       setSelectedServiceId(null);
     }
     if (nextScale < SERVER_ZOOM) {
@@ -580,6 +581,7 @@ export function ServerWorldMap() {
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement;
+    const regionTarget = target.closest("[data-region-area]");
     if (target.closest("[data-map-panel]")) {
       return;
     }
@@ -593,14 +595,14 @@ export function ServerWorldMap() {
       closeServerFocus();
       return;
     }
-    if (focusedRegionName) {
+    if (focusedRegionName && !regionTarget) {
       setFocusedRegionName(null);
-      setExpandedServerId(null);
       setSelectedServiceId(null);
       return;
     }
     setSelectedServiceId(null);
     setDragging(true);
+    dragMovedRef.current = false;
     event.currentTarget.setPointerCapture(event.pointerId);
     const currentView = viewRef.current;
     dragStartRef.current = {
@@ -616,6 +618,12 @@ export function ServerWorldMap() {
       return;
     }
     const start = dragStartRef.current;
+    if (
+      Math.abs(event.clientX - start.pointerX) > 4 ||
+      Math.abs(event.clientY - start.pointerY) > 4
+    ) {
+      dragMovedRef.current = true;
+    }
     viewRef.current = {
       ...viewRef.current,
       offset: {
@@ -658,6 +666,9 @@ export function ServerWorldMap() {
     setScale(nextView.scale);
     setOffset(nextView.offset);
     setDragging(false);
+    window.setTimeout(() => {
+      dragMovedRef.current = false;
+    }, 0);
   };
 
   const zoomBy = (delta: number) => {
@@ -685,16 +696,20 @@ export function ServerWorldMap() {
         <MapCanvas gridRef={mapGridRef} offset={offset} scale={scale} />
         <MapTopBar stats={stats} />
 
-        <ServerFinderPanel
-          expandedServerId={expandedServerId}
-          focusedServerId={focusedServerId}
+        <MapNavigationPanel
+          activeRegion={activeRegion}
+          activeRegionName={activeRegionName}
+          activeRegionServers={activeRegionServers}
+          currentDepth={focusedServer ? 3 : activeRegionName ? 2 : 1}
+          focusedServer={focusedServer}
           open={finderOpen}
+          regions={layoutRegions}
           searchValue={serverSearch}
-          servers={searchedServers}
-          totalServers={pointServers.length}
           onOpenChange={setFinderOpen}
+          onDepthSelect={handleDepthSelect}
+          onRegionSelect={focusRegion}
           onSearchChange={setServerSearch}
-          onServerSelect={toggleServerInFinder}
+          onServerSelect={focusServer}
           onServiceSelect={setSelectedServiceId}
         />
 
@@ -725,6 +740,7 @@ export function ServerWorldMap() {
                   dimmed={Boolean(activeRegionName && activeRegionName !== region.name)}
                   region={region}
                   serverLayerOpacity={serverLayerOpacity}
+                  shouldIgnoreClick={() => dragMovedRef.current}
                   onRegionClick={() => focusRegion(region)}
                 />
               ))}
@@ -886,30 +902,94 @@ function applyMapView(
   }
 }
 
-function ServerFinderPanel({
-  expandedServerId,
-  focusedServerId,
+function MapNavigationPanel({
+  activeRegion,
+  activeRegionName,
+  activeRegionServers,
+  currentDepth,
+  focusedServer,
   open,
-  servers,
-  totalServers,
+  regions,
   searchValue,
   onOpenChange,
+  onDepthSelect,
+  onRegionSelect,
   onSearchChange,
   onServerSelect,
   onServiceSelect,
 }: {
-  expandedServerId: number | null;
-  focusedServerId: number | null;
+  activeRegion?: LayoutRegion;
+  activeRegionName?: string | null;
+  activeRegionServers: PointServer[];
+  currentDepth: number;
+  focusedServer?: PointServer;
   open: boolean;
-  servers: PointServer[];
-  totalServers: number;
+  regions: LayoutRegion[];
   searchValue: string;
   onOpenChange: (open: boolean) => void;
+  onDepthSelect: (depth: number) => void;
+  onRegionSelect: (region: LayoutRegion) => void;
   onSearchChange: (value: string) => void;
   onServerSelect: (server: PointServer) => void;
   onServiceSelect: (serviceId: number) => void;
 }) {
-  const visibleServers = servers.slice(0, 60);
+  const keyword = searchValue.trim().toLowerCase();
+  const depthLabel =
+    currentDepth === 1
+      ? "1뎁스 · 영역"
+      : currentDepth === 2
+        ? "2뎁스 · 서버"
+        : "3뎁스 · 서비스";
+  const filteredRegions = keyword
+    ? regions.filter((region) => region.name.toLowerCase().includes(keyword))
+    : regions;
+  const filteredServers = keyword
+    ? activeRegionServers.filter((server) =>
+        [
+          server.serverName,
+          server.hostName,
+          server.ipAddress,
+          server.regionName,
+        ]
+          .join(" ")
+          .toLowerCase()
+          .includes(keyword)
+      )
+    : activeRegionServers;
+  const serverServices = focusedServer?.services ?? [];
+  const filteredServices = keyword
+    ? serverServices.filter((service) =>
+        [
+          service.serviceName,
+          service.serviceCode,
+          codeLabels.serviceStatus[service.statusCode],
+          codeLabels.serviceType[service.serviceTypeCode],
+        ]
+          .join(" ")
+          .toLowerCase()
+          .includes(keyword)
+      )
+    : serverServices;
+  const visibleServers = filteredServers.slice(0, 60);
+  const visibleServices = filteredServices.slice(0, 60);
+  const currentCount =
+    currentDepth === 1
+      ? filteredRegions.length
+      : currentDepth === 2
+        ? filteredServers.length
+        : filteredServices.length;
+  const totalCount =
+    currentDepth === 1
+      ? regions.length
+      : currentDepth === 2
+        ? activeRegionServers.length
+        : serverServices.length;
+  const searchPlaceholder =
+    currentDepth === 1
+      ? "영역명 검색"
+      : currentDepth === 2
+        ? "서버명, 호스트명, IP 검색"
+        : "서비스명, 코드, 상태 검색";
 
   if (!open) {
     return (
@@ -919,9 +999,9 @@ function ServerFinderPanel({
         className="absolute left-5 top-24 z-30 flex h-12 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-black text-slate-800 shadow-sm hover:border-[#f60] hover:text-[#f60]"
       >
         <MapPin size={18} className="text-[#f60]" />
-        서버 찾기
+        네비게이션
         <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">
-          {totalServers}
+          {totalCount}
         </span>
       </button>
     );
@@ -935,18 +1015,77 @@ function ServerFinderPanel({
       <div className="border-b border-slate-200 p-4">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <div className="text-xs font-bold text-[#f60]">서버 찾기</div>
+            <div className="text-xs font-bold text-[#f60]">네비게이션</div>
             <div className="mt-1 text-lg font-black">
-              {servers.length} / {totalServers}
+              {currentCount} / {totalCount}
+            </div>
+            <div className="mt-1 text-xs font-bold text-slate-500">
+              {depthLabel}
             </div>
           </div>
           <button
             onClick={() => onOpenChange(false)}
             className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-50 text-[#f60] hover:bg-orange-100"
-            title="서버 찾기 접기"
+            title="네비게이션 접기"
           >
             <ChevronLeft size={19} />
           </button>
+        </div>
+
+        <div className="mt-4 grid grid-cols-3 gap-1 rounded-xl bg-slate-100 p-1">
+          {[1, 2, 3].map((depth) => {
+            const disabled =
+              (depth === 2 && !activeRegionName) ||
+              (depth === 3 && !focusedServer);
+
+            return (
+              <button
+                key={depth}
+                disabled={disabled}
+                onClick={() => onDepthSelect(depth)}
+                className={`rounded-lg px-2 py-2 text-xs font-black transition ${
+                  currentDepth === depth
+                    ? "bg-[#f60] text-white shadow-sm"
+                    : disabled
+                      ? "text-slate-300"
+                      : "bg-white text-slate-600 hover:text-[#f60]"
+                }`}
+              >
+                {depth}뎁스
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="mt-3 flex min-w-0 flex-wrap items-center gap-1 text-xs font-black">
+          <button
+            onClick={() => onDepthSelect(1)}
+            className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600 hover:bg-orange-50 hover:text-[#f60]"
+          >
+            전체
+          </button>
+          {activeRegion && (
+            <>
+              <ChevronRight size={14} className="text-slate-300" />
+              <button
+                onClick={() => onRegionSelect(activeRegion)}
+                className="max-w-[150px] truncate rounded-full bg-orange-50 px-2.5 py-1 text-[#f60] hover:bg-orange-100"
+              >
+                {activeRegion.name}
+              </button>
+            </>
+          )}
+          {focusedServer && (
+            <>
+              <ChevronRight size={14} className="text-slate-300" />
+              <button
+                onClick={() => onServerSelect(focusedServer)}
+                className="max-w-[150px] truncate rounded-full bg-slate-900 px-2.5 py-1 text-white"
+              >
+                {focusedServer.serverName}
+              </button>
+            </>
+          )}
         </div>
 
         <label className="mt-4 flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 focus-within:border-[#f60] focus-within:bg-white">
@@ -954,114 +1093,65 @@ function ServerFinderPanel({
           <input
             value={searchValue}
             onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="서버명, 호스트명, IP, 서비스명"
+            placeholder={searchPlaceholder}
             className="min-w-0 flex-1 bg-transparent text-sm font-semibold text-slate-800 outline-none placeholder:text-slate-400"
           />
         </label>
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto p-2">
-        {visibleServers.map((server) => {
-          const expanded = server.serverId === expandedServerId;
-          const focused = server.serverId === focusedServerId;
-          const hasIncident =
-            server.statusCode === "INCIDENT" ||
-            server.services.some((service) =>
-              ["INCIDENT", "IMPACTED"].includes(service.statusCode)
-            );
-
-          return (
-            <div
-              key={server.serverId}
-              className={`mb-1 overflow-hidden rounded-xl border transition ${
-                expanded || focused
-                  ? "border-[#f60] bg-orange-50"
-                  : "border-transparent hover:border-slate-200 hover:bg-slate-50"
-              }`}
+        {currentDepth === 1 &&
+          filteredRegions.map((region) => (
+            <button
+              key={region.name}
+              onClick={() => onRegionSelect(region)}
+              className="mb-1 flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-3 text-left hover:border-slate-200 hover:bg-slate-50"
             >
-              <button
-                onClick={() => onServerSelect(server)}
-                className="flex w-full items-center gap-3 px-3 py-2.5 text-left"
-              >
-                <span
-                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                    hasIncident
-                      ? "bg-red-500 text-white"
-                      : server.statusCode === "MAINTENANCE"
-                        ? "bg-yellow-400 text-slate-900"
-                        : "bg-cyan-100 text-slate-800"
-                  }`}
-                >
-                  {hasIncident ? "!" : <Server size={16} />}
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-orange-50 text-[#f60]">
+                <MapPin size={17} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-black text-slate-800">
+                  {region.name}
                 </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-black text-slate-800">
-                    {server.serverName}
-                  </span>
-                  <span className="mt-0.5 block truncate text-xs font-semibold text-slate-500">
-                    {server.regionName} · {server.ipAddress}
-                  </span>
+                <span className="mt-0.5 block truncate text-xs font-semibold text-slate-500">
+                  서버 {region.serverCount} · 서비스 {region.serviceCount}
                 </span>
-                <span className="flex shrink-0 items-center gap-1">
-                  <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-black text-slate-500">
-                    {server.services.length}
-                  </span>
-                  {expanded ? (
-                    <ChevronDown size={16} className="text-slate-400" />
-                  ) : (
-                    <ChevronRight size={16} className="text-slate-400" />
-                  )}
-                </span>
-              </button>
+              </span>
+              <ChevronRight size={16} className="text-slate-400" />
+            </button>
+          ))}
 
-              {expanded && (
-                <div className="space-y-1 border-t border-orange-100 bg-white/78 p-2">
-                  {server.services.length === 0 ? (
-                    <div className="rounded-lg bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-400">
-                      등록된 서비스가 없습니다.
-                    </div>
-                  ) : (
-                    server.services.map((service) => (
-                      <button
-                        key={service.serviceId}
-                        onClick={() => onServiceSelect(service.serviceId)}
-                        className="flex w-full items-start gap-2 rounded-lg px-2 py-2 text-left hover:bg-orange-50"
-                      >
-                        <span
-                          className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
-                            ["INCIDENT", "IMPACTED"].includes(service.statusCode)
-                              ? "bg-red-500 text-white"
-                              : service.statusCode === "MAINTENANCE"
-                                ? "bg-yellow-400 text-slate-900"
-                                : "bg-cyan-100 text-slate-800"
-                          }`}
-                        >
-                          {["INCIDENT", "IMPACTED"].includes(service.statusCode) ? (
-                            "!"
-                          ) : (
-                            <Database size={13} />
-                          )}
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-xs font-black text-slate-800">
-                            {service.serviceName}
-                          </span>
-                          <span className="mt-0.5 block truncate text-[11px] font-semibold text-slate-500">
-                            {service.serviceCode} ·{" "}
-                            {codeLabels.serviceType[service.serviceTypeCode]} ·{" "}
-                            {codeLabels.serviceStatus[service.statusCode]}
-                          </span>
-                        </span>
-                      </button>
-                    ))
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })}
+        {currentDepth === 2 &&
+          visibleServers.map((server) => (
+            <NavigationServerRow
+              key={server.serverId}
+              server={server}
+              onSelect={() => onServerSelect(server)}
+            />
+          ))}
 
-        {servers.length > visibleServers.length && (
+        {currentDepth === 3 &&
+          visibleServices.map((service) => (
+            <NavigationServiceRow
+              key={service.serviceId}
+              service={service}
+              onSelect={() => onServiceSelect(service.serviceId)}
+            />
+          ))}
+
+        {currentCount === 0 && (
+          <div className="rounded-xl bg-slate-50 px-3 py-4 text-center text-xs font-bold text-slate-400">
+            표시할 항목이 없습니다.
+          </div>
+        )}
+
+        {currentDepth === 2 && filteredServers.length > visibleServers.length && (
+          <div className="px-3 py-2 text-center text-xs font-bold text-slate-400">
+            검색어를 입력하면 더 정확하게 찾을 수 있습니다.
+          </div>
+        )}
+        {currentDepth === 3 && filteredServices.length > visibleServices.length && (
           <div className="px-3 py-2 text-center text-xs font-bold text-slate-400">
             검색어를 입력하면 더 정확하게 찾을 수 있습니다.
           </div>
@@ -1071,18 +1161,101 @@ function ServerFinderPanel({
   );
 }
 
+function NavigationServerRow({
+  server,
+  onSelect,
+}: {
+  server: PointServer;
+  onSelect: () => void;
+}) {
+  const hasIncident =
+    server.statusCode === "INCIDENT" ||
+    server.services.some((service) =>
+      ["INCIDENT", "IMPACTED"].includes(service.statusCode)
+    );
+
+  return (
+    <button
+      onClick={onSelect}
+      className="mb-1 flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-2.5 text-left hover:border-slate-200 hover:bg-slate-50"
+    >
+      <span
+        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+          hasIncident
+            ? "bg-red-500 text-white"
+            : server.statusCode === "MAINTENANCE"
+              ? "bg-yellow-400 text-slate-900"
+              : "bg-cyan-100 text-slate-800"
+        }`}
+      >
+        {hasIncident ? "!" : <Server size={16} />}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-black text-slate-800">
+          {server.serverName}
+        </span>
+        <span className="mt-0.5 block truncate text-xs font-semibold text-slate-500">
+          {server.hostName} · {server.ipAddress}
+        </span>
+      </span>
+      <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-black text-slate-500">
+        {server.services.length}
+      </span>
+    </button>
+  );
+}
+
+function NavigationServiceRow({
+  service,
+  onSelect,
+}: {
+  service: ServiceRecord;
+  onSelect: () => void;
+}) {
+  const danger = ["INCIDENT", "IMPACTED"].includes(service.statusCode);
+
+  return (
+    <button
+      onClick={onSelect}
+      className="mb-1 flex w-full items-start gap-2 rounded-xl border border-transparent px-3 py-2.5 text-left hover:border-slate-200 hover:bg-slate-50"
+    >
+      <span
+        className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
+          danger
+            ? "bg-red-500 text-white"
+            : service.statusCode === "MAINTENANCE"
+              ? "bg-yellow-400 text-slate-900"
+              : "bg-cyan-100 text-slate-800"
+        }`}
+      >
+        {danger ? "!" : <Database size={14} />}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-black text-slate-800">
+          {service.serviceName}
+        </span>
+        <span className="mt-0.5 block truncate text-xs font-semibold text-slate-500">
+          {service.serviceCode} · {codeLabels.serviceStatus[service.statusCode]}
+        </span>
+      </span>
+    </button>
+  );
+}
+
 function RegionArea({
   active,
   dimmed,
   onRegionClick,
   region,
   serverLayerOpacity,
+  shouldIgnoreClick,
 }: {
   active: boolean;
   dimmed: boolean;
   onRegionClick: () => void;
   region: LayoutRegion;
   serverLayerOpacity: number;
+  shouldIgnoreClick: () => boolean;
 }) {
   const regionOpacity = dimmed
     ? 0.16
@@ -1098,8 +1271,11 @@ function RegionArea({
   return (
     <div
       data-region-area
-      onPointerDown={(event) => event.stopPropagation()}
-      onClick={onRegionClick}
+      onClick={() => {
+        if (!shouldIgnoreClick()) {
+          onRegionClick();
+        }
+      }}
       className={`absolute cursor-pointer rounded-[28px] border-2 bg-white/42 ${
         active ? "border-solid border-[#f60]" : "border-dashed border-slate-300"
       }`}
