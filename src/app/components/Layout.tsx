@@ -5,6 +5,7 @@ import {
   Bell,
   ChevronDown,
   LayoutDashboard,
+  Map,
   Network,
   Search,
   Server,
@@ -21,6 +22,7 @@ type NavItem = {
 const navItems: NavItem[] = [
   { path: "/dashboard", label: "대시보드", icon: LayoutDashboard },
   { path: "/incident-status", label: "장애 현황", icon: AlertTriangle },
+  { path: "/world-map", label: "서버 월드맵", icon: Map },
   { path: "/servers", label: "서버 조회", icon: Server },
   { path: "/services", label: "서비스 조회", icon: SquareStack },
   { path: "/relations", label: "관계 그래프", icon: Network },
@@ -29,6 +31,7 @@ const navItems: NavItem[] = [
 const pageTitles = [
   { path: "/dashboard", label: "서비스 대시보드" },
   { path: "/incident-status", label: "장애 현황 대시보드" },
+  { path: "/world-map", label: "서버 월드맵" },
   { path: "/servers", label: "서버 관리" },
   { path: "/services", label: "서비스 관리" },
   { path: "/relations", label: "서비스 관계도" },
@@ -36,8 +39,8 @@ const pageTitles = [
 
 const navSections = [
   { label: "포털", items: navItems.slice(0, 2) },
-  { label: "배포 인프라", items: navItems.slice(2, 3) },
-  { label: "서비스 관계", items: navItems.slice(3) },
+  { label: "배포 인프라", items: navItems.slice(2, 4) },
+  { label: "서비스 관계", items: navItems.slice(4) },
 ];
 
 export function Layout() {
