@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import {
   AlertTriangle,
   ChevronDown,
@@ -50,16 +50,27 @@ type MapBounds = {
   bottom: number;
 };
 
+type MapView = {
+  scale: number;
+  offset: {
+    x: number;
+    y: number;
+  };
+};
+
 const MAP_WIDTH = 12000;
 const MAP_HEIGHT = 8000;
 const REGION_OFFSET_X = 3800;
 const REGION_OFFSET_Y = 2500;
+const INITIAL_SCALE = 0.42;
+const INITIAL_OFFSET = { x: -1505, y: -1010 };
 const SERVER_ZOOM = 0.72;
 const SERVER_FADE_START = 0.58;
 const SERVICE_ZOOM = 1.2;
 const SERVICE_FADE_START = 1.02;
 const FOCUS_SCALE = 1.34;
 const MAX_SERVICE_MARKERS = 16;
+const MAP_TRANSITION = "transform 760ms cubic-bezier(0.16, 1, 0.3, 1)";
 
 const regions: Region[] = [
   {
@@ -134,8 +145,8 @@ const regions: Region[] = [
 
 export function ServerWorldMap() {
   const { servers, services } = usePortalData();
-  const [scale, setScale] = useState(0.42);
-  const [offset, setOffset] = useState({ x: -1505, y: -1010 });
+  const [scale, setScale] = useState(INITIAL_SCALE);
+  const [offset, setOffset] = useState({ ...INITIAL_OFFSET });
   const [dragging, setDragging] = useState(false);
   const [selectedServiceId, setSelectedServiceId] = useState<number | null>(
     null
@@ -149,7 +160,14 @@ export function ServerWorldMap() {
   const [finderOpen, setFinderOpen] = useState(true);
   const [serverSearch, setServerSearch] = useState("");
   const viewportRef = useRef<HTMLDivElement | null>(null);
+  const mapLayerRef = useRef<HTMLDivElement | null>(null);
+  const mapGridRef = useRef<HTMLDivElement | null>(null);
+  const viewRef = useRef<MapView>({
+    scale: INITIAL_SCALE,
+    offset: { ...INITIAL_OFFSET },
+  });
   const serverFocusTimerRef = useRef<number | null>(null);
+  const dragFrameRef = useRef<number | null>(null);
   const dragStartRef = useRef({
     pointerX: 0,
     pointerY: 0,
@@ -185,12 +203,24 @@ export function ServerWorldMap() {
       if (serverFocusTimerRef.current) {
         window.clearTimeout(serverFocusTimerRef.current);
       }
+      if (dragFrameRef.current) {
+        window.cancelAnimationFrame(dragFrameRef.current);
+      }
     };
   }, []);
+
+  useEffect(() => {
+    viewRef.current = { scale, offset };
+    applyMapView(mapLayerRef.current, mapGridRef.current, scale, offset, !dragging);
+  }, [dragging, offset, scale]);
 
   const serviceById = useMemo(
     () => new Map(services.map((service) => [service.serviceId, service])),
     [services]
+  );
+  const serverById = useMemo(
+    () => new Map(servers.map((server) => [server.serverId, server])),
+    [servers]
   );
   const servicesByServerId = useMemo(() => {
     const next = new Map<number, ServiceRecord[]>();
@@ -205,7 +235,7 @@ export function ServerWorldMap() {
     ? serviceById.get(selectedServiceId)
     : undefined;
   const selectedServer = selectedService
-    ? servers.find((server) => server.serverId === selectedService.serverId)
+    ? serverById.get(selectedService.serverId)
     : undefined;
 
   const layoutRegions = useMemo<LayoutRegion[]>(() => {
@@ -307,6 +337,11 @@ export function ServerWorldMap() {
     });
   }, [servers, layoutRegions, servicesByServerId]);
 
+  const pointServerById = useMemo(
+    () => new Map(pointServers.map((server) => [server.serverId, server])),
+    [pointServers]
+  );
+
   const stats = useMemo(() => {
     const incidentServices = services.filter((service) =>
       ["INCIDENT", "IMPACTED"].includes(service.statusCode)
@@ -351,26 +386,21 @@ export function ServerWorldMap() {
     };
   }, [offset.x, offset.y, scale, viewportSize.height, viewportSize.width]);
 
+  const focusedServer = focusedServerId
+    ? pointServerById.get(focusedServerId)
+    : undefined;
+  const activeRegionName = focusedServer?.regionName ?? focusedRegionName;
   const visiblePointServers = useMemo(() => {
     if (serverLayerOpacity <= 0.02) {
       return [];
     }
-    return pointServers.filter((server) => isServerInBounds(server, mapBounds));
-  }, [mapBounds, pointServers, serverLayerOpacity]);
 
-  const focusedServer = focusedServerId
-    ? pointServers.find((server) => server.serverId === focusedServerId)
-    : undefined;
-  const activeRegionName = focusedServer?.regionName ?? focusedRegionName;
-  const renderedPointServers = useMemo(() => {
-    if (!activeRegionName) {
-      return visiblePointServers;
-    }
-
-    return visiblePointServers.filter(
-      (server) => server.regionName === activeRegionName
+    return pointServers.filter(
+      (server) =>
+        (!activeRegionName || server.regionName === activeRegionName) &&
+        isServerInBounds(server, mapBounds)
     );
-  }, [activeRegionName, visiblePointServers]);
+  }, [activeRegionName, mapBounds, pointServers, serverLayerOpacity]);
 
   const searchedServers = useMemo(() => {
     const keyword = serverSearch.trim().toLowerCase();
@@ -406,6 +436,23 @@ export function ServerWorldMap() {
     };
   };
 
+  const commitMapView = (
+    nextScale: number,
+    nextOffset: { x: number; y: number },
+    animated = true
+  ) => {
+    viewRef.current = { scale: nextScale, offset: nextOffset };
+    applyMapView(
+      mapLayerRef.current,
+      mapGridRef.current,
+      nextScale,
+      nextOffset,
+      animated
+    );
+    setScale(nextScale);
+    setOffset(nextOffset);
+  };
+
   const focusRegion = (region: LayoutRegion) => {
     if (serverFocusTimerRef.current) {
       window.clearTimeout(serverFocusTimerRef.current);
@@ -425,8 +472,7 @@ export function ServerWorldMap() {
     setDrillingServerId(null);
     setExpandedServerId(null);
     setSelectedServiceId(null);
-    setScale(nextScale);
-    setOffset({
+    commitMapView(nextScale, {
       x: focus.x - region.x * nextScale,
       y: focus.y - region.y * nextScale,
     });
@@ -454,8 +500,7 @@ export function ServerWorldMap() {
     setExpandedServerId(server.serverId);
     setFinderOpen(true);
     setSelectedServiceId(null);
-    setScale(nextScale);
-    setOffset({
+    commitMapView(nextScale, {
       x: focus.x - server.mapX * nextScale,
       y: focus.y - server.mapY * nextScale,
     });
@@ -503,8 +548,9 @@ export function ServerWorldMap() {
   };
 
   const zoomAt = (nextScale: number, anchorX: number, anchorY: number) => {
-    const mapAnchorX = (anchorX - offset.x) / scale;
-    const mapAnchorY = (anchorY - offset.y) / scale;
+    const currentView = viewRef.current;
+    const mapAnchorX = (anchorX - currentView.offset.x) / currentView.scale;
+    const mapAnchorY = (anchorY - currentView.offset.y) / currentView.scale;
     if (nextScale < SERVICE_FADE_START) {
       if (serverFocusTimerRef.current) {
         window.clearTimeout(serverFocusTimerRef.current);
@@ -518,8 +564,7 @@ export function ServerWorldMap() {
     if (nextScale < SERVER_ZOOM) {
       setFocusedRegionName(null);
     }
-    setScale(nextScale);
-    setOffset({
+    commitMapView(nextScale, {
       x: anchorX - mapAnchorX * nextScale,
       y: anchorY - mapAnchorY * nextScale,
     });
@@ -527,7 +572,8 @@ export function ServerWorldMap() {
 
   const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
     event.preventDefault();
-    const nextScale = clamp(scale - event.deltaY * 0.001, 0.36, 2.25);
+    const currentView = viewRef.current;
+    const nextScale = clamp(currentView.scale - event.deltaY * 0.001, 0.36, 2.25);
     const rect = event.currentTarget.getBoundingClientRect();
     zoomAt(nextScale, event.clientX - rect.left, event.clientY - rect.top);
   };
@@ -556,11 +602,12 @@ export function ServerWorldMap() {
     setSelectedServiceId(null);
     setDragging(true);
     event.currentTarget.setPointerCapture(event.pointerId);
+    const currentView = viewRef.current;
     dragStartRef.current = {
       pointerX: event.clientX,
       pointerY: event.clientY,
-      offsetX: offset.x,
-      offsetY: offset.y,
+      offsetX: currentView.offset.x,
+      offsetY: currentView.offset.y,
     };
   };
 
@@ -569,22 +616,54 @@ export function ServerWorldMap() {
       return;
     }
     const start = dragStartRef.current;
-    setOffset({
-      x: start.offsetX + event.clientX - start.pointerX,
-      y: start.offsetY + event.clientY - start.pointerY,
-    });
+    viewRef.current = {
+      ...viewRef.current,
+      offset: {
+        x: start.offsetX + event.clientX - start.pointerX,
+        y: start.offsetY + event.clientY - start.pointerY,
+      },
+    };
+
+    if (!dragFrameRef.current) {
+      dragFrameRef.current = window.requestAnimationFrame(() => {
+        dragFrameRef.current = null;
+        const nextView = viewRef.current;
+        applyMapView(
+          mapLayerRef.current,
+          mapGridRef.current,
+          nextView.scale,
+          nextView.offset,
+          false
+        );
+      });
+    }
   };
 
   const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
+    if (dragFrameRef.current) {
+      window.cancelAnimationFrame(dragFrameRef.current);
+      dragFrameRef.current = null;
+    }
+    const nextView = viewRef.current;
+    applyMapView(
+      mapLayerRef.current,
+      mapGridRef.current,
+      nextView.scale,
+      nextView.offset,
+      false
+    );
+    setScale(nextView.scale);
+    setOffset(nextView.offset);
     setDragging(false);
   };
 
   const zoomBy = (delta: number) => {
+    const currentView = viewRef.current;
     zoomAt(
-      clamp(scale + delta, 0.36, 2.25),
+      clamp(currentView.scale + delta, 0.36, 2.25),
       viewportSize.width / 2,
       viewportSize.height / 2
     );
@@ -594,6 +673,7 @@ export function ServerWorldMap() {
     <div className="h-[calc(100vh-136px)] min-h-[720px] overflow-hidden rounded-2xl border border-slate-300 bg-slate-100 shadow-sm">
       <div
         ref={viewportRef}
+        data-world-map-viewport
         className={`relative h-full select-none overflow-hidden ${
           dragging ? "cursor-grabbing" : "cursor-grab"
         }`}
@@ -602,6 +682,7 @@ export function ServerWorldMap() {
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
       >
+        <MapCanvas gridRef={mapGridRef} offset={offset} scale={scale} />
         <MapTopBar stats={stats} />
 
         <ServerFinderPanel
@@ -618,20 +699,24 @@ export function ServerWorldMap() {
         />
 
         <div
+          ref={mapLayerRef}
+          data-map-layer
           className="absolute left-0 top-0 h-full w-full"
           style={{
             transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
             transformOrigin: "0 0",
-            transition: dragging
-              ? "none"
-              : "transform 760ms cubic-bezier(0.16, 1, 0.3, 1)",
+            transition: dragging ? "none" : MAP_TRANSITION,
+            willChange: "transform",
           }}
         >
           <div
-            className="relative overflow-hidden rounded-[32px] bg-slate-50"
-            style={{ width: MAP_WIDTH, height: MAP_HEIGHT }}
+            className="relative overflow-hidden rounded-[32px]"
+            style={{
+              width: MAP_WIDTH,
+              height: MAP_HEIGHT,
+              contain: "layout paint style",
+            }}
           >
-            <MapCanvas />
             {!focusedServer &&
               layoutRegions.map((region) => (
                 <RegionArea
@@ -645,7 +730,7 @@ export function ServerWorldMap() {
               ))}
 
             {serverLayerOpacity > 0.02 &&
-              renderedPointServers.map((server) => (
+              visiblePointServers.map((server) => (
                 <ServerMarker
                   key={server.serverId}
                   dimmed={
@@ -749,18 +834,56 @@ function StatusPill({
   );
 }
 
-function MapCanvas() {
+function MapCanvas({
+  gridRef,
+  offset,
+  scale,
+}: {
+  gridRef: RefObject<HTMLDivElement | null>;
+  offset: { x: number; y: number };
+  scale: number;
+}) {
   return (
     <div
-      className="absolute inset-0"
-      style={{
-        backgroundColor: "#f8fafc",
-        backgroundImage:
-          "radial-gradient(circle, rgba(15, 23, 42, 0.18) 1.2px, transparent 1.2px), linear-gradient(rgba(15, 23, 42, 0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(15, 23, 42, 0.06) 1px, transparent 1px)",
-        backgroundSize: "28px 28px, 140px 140px, 140px 140px",
-      }}
+      ref={gridRef}
+      className="pointer-events-none absolute inset-0"
+      style={getMapGridStyle(scale, offset)}
     />
   );
+}
+
+function getMapGridStyle(scale: number, offset: { x: number; y: number }) {
+  const dotSize = Math.max(12, 28 * scale);
+  const gridSize = Math.max(64, 140 * scale);
+  const position = `${offset.x}px ${offset.y}px`;
+
+  return {
+    backgroundColor: "#f8fafc",
+    backgroundImage:
+      "radial-gradient(circle, rgba(15, 23, 42, 0.16) 1.2px, transparent 1.2px), linear-gradient(rgba(15, 23, 42, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(15, 23, 42, 0.05) 1px, transparent 1px)",
+    backgroundPosition: `${position}, ${position}, ${position}`,
+    backgroundSize: `${dotSize}px ${dotSize}px, ${gridSize}px ${gridSize}px, ${gridSize}px ${gridSize}px`,
+    willChange: "background-position, background-size",
+  };
+}
+
+function applyMapView(
+  mapLayer: HTMLDivElement | null,
+  mapGrid: HTMLDivElement | null,
+  scale: number,
+  offset: { x: number; y: number },
+  animated: boolean
+) {
+  if (mapLayer) {
+    mapLayer.style.transition = animated ? MAP_TRANSITION : "none";
+    mapLayer.style.transform = `translate(${offset.x}px, ${offset.y}px) scale(${scale})`;
+  }
+
+  if (mapGrid) {
+    const gridStyle = getMapGridStyle(scale, offset);
+    mapGrid.style.backgroundPosition = gridStyle.backgroundPosition;
+    mapGrid.style.backgroundSize = gridStyle.backgroundSize;
+  }
 }
 
 function ServerFinderPanel({
@@ -786,7 +909,7 @@ function ServerFinderPanel({
   onServerSelect: (server: PointServer) => void;
   onServiceSelect: (serviceId: number) => void;
 }) {
-  const visibleServers = servers.slice(0, 80);
+  const visibleServers = servers.slice(0, 60);
 
   if (!open) {
     return (
@@ -807,7 +930,7 @@ function ServerFinderPanel({
   return (
     <aside
       data-map-panel
-      className="absolute left-5 top-24 z-30 flex max-h-[calc(100%-170px)] w-[330px] flex-col rounded-2xl border border-slate-200 bg-white/95 text-slate-900 shadow-sm backdrop-blur"
+      className="absolute left-5 top-24 z-30 flex max-h-[calc(100%-170px)] w-[330px] flex-col rounded-2xl border border-slate-200 bg-white/95 text-slate-900 shadow-sm"
     >
       <div className="border-b border-slate-200 p-4">
         <div className="flex items-center justify-between gap-3">
@@ -990,6 +1113,7 @@ function RegionArea({
         transition: dimmed
           ? "none"
           : "opacity 360ms ease, width 360ms ease, height 360ms ease",
+        contain: "layout paint style",
       }}
     >
       <div
@@ -1083,11 +1207,13 @@ function ServerMarker({
         height: footprint.height,
         opacity: effectiveLayerOpacity,
         pointerEvents: dimmed ? "none" : serverInteractive ? "auto" : "none",
+        contain: "layout paint style",
+        willChange: highlighted ? "width, height, opacity" : "opacity",
         zIndex: focused ? 8 : hasIncident || server.statusCode === "INCIDENT" ? 4 : 2,
       }}
     >
       <div
-        className={`absolute inset-0 rounded-[24px] border bg-white/74 shadow-sm backdrop-blur-sm ${
+        className={`absolute inset-0 rounded-[24px] border bg-white/88 ${
           highlighted
             ? "border-[#f60] border-solid"
             : "border-dashed border-slate-300"
@@ -1152,6 +1278,7 @@ function ServerMarker({
             opacity: serviceLayerOpacity,
             pointerEvents: serviceInteractive ? "auto" : "none",
             transition: "opacity 420ms ease",
+            contain: "layout paint style",
           }}
         >
           {visibleServices.map((service) => (
@@ -1163,7 +1290,7 @@ function ServerMarker({
                 event.stopPropagation();
                 onServiceClick(service.serviceId);
               }}
-              className="flex min-h-[88px] min-w-0 items-start gap-3 rounded-[22px] border-2 border-dashed border-slate-300 bg-white/90 p-3 text-left text-xs font-bold text-slate-800 shadow-sm transition hover:border-[#f60] hover:bg-orange-50"
+              className="flex min-h-[88px] min-w-0 items-start gap-3 rounded-[22px] border-2 border-dashed border-slate-300 bg-white/90 p-3 text-left text-xs font-bold text-slate-800 transition hover:border-[#f60] hover:bg-orange-50"
               title={`${service.serviceName} (${service.serviceCode})`}
             >
               <span
