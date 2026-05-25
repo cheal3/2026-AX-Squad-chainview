@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ChevronsRight,
   CircleDot,
   Compass,
@@ -47,11 +50,15 @@ type MapBounds = {
   bottom: number;
 };
 
-const MAP_WIDTH = 4200;
-const MAP_HEIGHT = 2500;
-const SERVICE_ZOOM = 1.08;
-const SERVICE_FADE_START = 0.82;
-const FOCUS_SCALE = 1.24;
+const MAP_WIDTH = 12000;
+const MAP_HEIGHT = 8000;
+const REGION_OFFSET_X = 3800;
+const REGION_OFFSET_Y = 2500;
+const SERVER_ZOOM = 0.72;
+const SERVER_FADE_START = 0.58;
+const SERVICE_ZOOM = 1.2;
+const SERVICE_FADE_START = 1.02;
+const FOCUS_SCALE = 1.34;
 const MAX_SERVICE_MARKERS = 10;
 
 const regions: Region[] = [
@@ -119,17 +126,23 @@ const regions: Region[] = [
     width: 660,
     height: 560,
   },
-];
+].map((region) => ({
+  ...region,
+  x: region.x + REGION_OFFSET_X,
+  y: region.y + REGION_OFFSET_Y,
+}));
 
 export function ServerWorldMap() {
   const { servers, services } = usePortalData();
   const [scale, setScale] = useState(0.42);
-  const [offset, setOffset] = useState({ x: 30, y: 45 });
+  const [offset, setOffset] = useState({ x: -1505, y: -1010 });
   const [dragging, setDragging] = useState(false);
   const [selectedServiceId, setSelectedServiceId] = useState<number | null>(
     null
   );
   const [focusedServerId, setFocusedServerId] = useState<number | null>(null);
+  const [expandedServerId, setExpandedServerId] = useState<number | null>(null);
+  const [finderOpen, setFinderOpen] = useState(true);
   const [serverSearch, setServerSearch] = useState("");
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const dragStartRef = useRef({
@@ -301,13 +314,19 @@ export function ServerWorldMap() {
     };
   }, [servers, services]);
 
+  const serverLayerOpacity = clamp(
+    (scale - SERVER_FADE_START) / (SERVER_ZOOM - SERVER_FADE_START),
+    0,
+    1
+  );
+  const serverLayerInteractive = serverLayerOpacity > 0.72;
   const serviceLayerOpacity = clamp(
     (scale - SERVICE_FADE_START) / (SERVICE_ZOOM - SERVICE_FADE_START),
     0,
     1
   );
   const serviceLayerInteractive = serviceLayerOpacity > 0.72;
-  const zoomedIn = serviceLayerOpacity > 0.55;
+  const mapDepth = scale < SERVER_ZOOM ? 1 : scale < SERVICE_ZOOM ? 2 : 3;
 
   const mapBounds = useMemo<MapBounds>(() => {
     const margin = 480 / scale + 160;
@@ -320,11 +339,11 @@ export function ServerWorldMap() {
   }, [offset.x, offset.y, scale, viewportSize.height, viewportSize.width]);
 
   const visiblePointServers = useMemo(() => {
-    if (serviceLayerOpacity <= 0.02) {
+    if (serverLayerOpacity <= 0.02) {
       return [];
     }
     return pointServers.filter((server) => isServerInBounds(server, mapBounds));
-  }, [mapBounds, pointServers, serviceLayerOpacity]);
+  }, [mapBounds, pointServers, serverLayerOpacity]);
 
   const focusedServer = focusedServerId
     ? pointServers.find((server) => server.serverId === focusedServerId)
@@ -354,15 +373,26 @@ export function ServerWorldMap() {
     });
   }, [pointServers, serverSearch]);
 
-  const focusServer = (server: PointServer) => {
-    const nextScale = Math.max(scale, FOCUS_SCALE);
+  const focusServer = (server: PointServer, openServices = true) => {
+    const nextScale = openServices ? Math.max(scale, FOCUS_SCALE) : Math.max(scale, SERVER_ZOOM);
     setFocusedServerId(server.serverId);
+    setExpandedServerId(server.serverId);
+    setFinderOpen(true);
     setSelectedServiceId(null);
     setScale(nextScale);
     setOffset({
       x: viewportSize.width / 2 - server.mapX * nextScale,
       y: viewportSize.height / 2 - server.mapY * nextScale,
     });
+  };
+
+  const toggleServerInFinder = (server: PointServer) => {
+    if (expandedServerId === server.serverId) {
+      setExpandedServerId(null);
+      setFocusedServerId(server.serverId);
+      return;
+    }
+    focusServer(server);
   };
 
   const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
@@ -430,12 +460,16 @@ export function ServerWorldMap() {
         <MapTopBar stats={stats} />
 
         <ServerFinderPanel
+          expandedServerId={expandedServerId}
           focusedServerId={focusedServerId}
+          open={finderOpen}
           searchValue={serverSearch}
           servers={searchedServers}
           totalServers={pointServers.length}
+          onOpenChange={setFinderOpen}
           onSearchChange={setServerSearch}
-          onServerSelect={focusServer}
+          onServerSelect={toggleServerInFinder}
+          onServiceSelect={setSelectedServiceId}
         />
 
         <div
@@ -457,18 +491,20 @@ export function ServerWorldMap() {
               <RegionArea
                 key={region.name}
                 region={region}
-                serviceLayerOpacity={serviceLayerOpacity}
+                serverLayerOpacity={serverLayerOpacity}
               />
             ))}
 
-            {serviceLayerOpacity > 0.02 &&
+            {serverLayerOpacity > 0.02 &&
               visiblePointServers.map((server) => (
                 <ServerMarker
                   key={server.serverId}
                   server={server}
                   focused={server.serverId === focusedServerId}
-                  interactive={serviceLayerInteractive}
-                  layerOpacity={serviceLayerOpacity}
+                  layerOpacity={serverLayerOpacity}
+                  serviceInteractive={serviceLayerInteractive}
+                  serviceLayerOpacity={serviceLayerOpacity}
+                  serverInteractive={serverLayerInteractive}
                   onServerClick={() => focusServer(server)}
                   onServiceClick={(serviceId) => setSelectedServiceId(serviceId)}
                 />
@@ -494,7 +530,7 @@ export function ServerWorldMap() {
           </button>
         </div>
 
-        <MapLegend focusedServer={focusedServer} zoomedIn={zoomedIn} />
+        <MapLegend focusedServer={focusedServer} mapDepth={mapDepth} />
 
         {selectedService && (
           <ServiceSidePanel
@@ -569,26 +605,50 @@ function MapCanvas() {
 }
 
 function ServerFinderPanel({
+  expandedServerId,
+  focusedServerId,
+  open,
   servers,
   totalServers,
-  focusedServerId,
   searchValue,
+  onOpenChange,
   onSearchChange,
   onServerSelect,
+  onServiceSelect,
 }: {
+  expandedServerId: number | null;
+  focusedServerId: number | null;
+  open: boolean;
   servers: PointServer[];
   totalServers: number;
-  focusedServerId: number | null;
   searchValue: string;
+  onOpenChange: (open: boolean) => void;
   onSearchChange: (value: string) => void;
   onServerSelect: (server: PointServer) => void;
+  onServiceSelect: (serviceId: number) => void;
 }) {
   const visibleServers = servers.slice(0, 80);
+
+  if (!open) {
+    return (
+      <button
+        data-map-panel
+        onClick={() => onOpenChange(true)}
+        className="absolute left-5 top-24 z-30 flex h-12 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-black text-slate-800 shadow-sm hover:border-[#f60] hover:text-[#f60]"
+      >
+        <MapPin size={18} className="text-[#f60]" />
+        서버 찾기
+        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">
+          {totalServers}
+        </span>
+      </button>
+    );
+  }
 
   return (
     <aside
       data-map-panel
-      className="absolute left-5 top-24 z-30 flex max-h-[calc(100%-170px)] w-[310px] flex-col rounded-2xl border border-slate-200 bg-white/95 text-slate-900 shadow-sm backdrop-blur"
+      className="absolute left-5 top-24 z-30 flex max-h-[calc(100%-170px)] w-[330px] flex-col rounded-2xl border border-slate-200 bg-white/95 text-slate-900 shadow-sm backdrop-blur"
     >
       <div className="border-b border-slate-200 p-4">
         <div className="flex items-center justify-between gap-3">
@@ -598,9 +658,13 @@ function ServerFinderPanel({
               {servers.length} / {totalServers}
             </div>
           </div>
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-50 text-[#f60]">
-            <MapPin size={19} />
-          </div>
+          <button
+            onClick={() => onOpenChange(false)}
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-50 text-[#f60] hover:bg-orange-100"
+            title="서버 찾기 접기"
+          >
+            <ChevronLeft size={19} />
+          </button>
         </div>
 
         <label className="mt-4 flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 focus-within:border-[#f60] focus-within:bg-white">
@@ -616,6 +680,7 @@ function ServerFinderPanel({
 
       <div className="min-h-0 flex-1 overflow-auto p-2">
         {visibleServers.map((server) => {
+          const expanded = server.serverId === expandedServerId;
           const focused = server.serverId === focusedServerId;
           const hasIncident =
             server.statusCode === "INCIDENT" ||
@@ -624,40 +689,101 @@ function ServerFinderPanel({
             );
 
           return (
-            <button
+            <div
               key={server.serverId}
-              onClick={() => onServerSelect(server)}
-              className={`mb-1 flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition ${
-                focused
+              className={`mb-1 overflow-hidden rounded-xl border transition ${
+                expanded || focused
                   ? "border-[#f60] bg-orange-50"
                   : "border-transparent hover:border-slate-200 hover:bg-slate-50"
               }`}
             >
-              <span
-                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                  hasIncident
-                    ? "bg-red-500 text-white"
-                    : server.statusCode === "MAINTENANCE"
-                      ? "bg-yellow-400 text-slate-900"
-                      : "bg-cyan-100 text-slate-800"
-                }`}
+              <button
+                onClick={() => onServerSelect(server)}
+                className="flex w-full items-center gap-3 px-3 py-2.5 text-left"
               >
-                {hasIncident ? "!" : <Server size={16} />}
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-black text-slate-800">
-                  {server.serverName}
+                <span
+                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+                    hasIncident
+                      ? "bg-red-500 text-white"
+                      : server.statusCode === "MAINTENANCE"
+                        ? "bg-yellow-400 text-slate-900"
+                        : "bg-cyan-100 text-slate-800"
+                  }`}
+                >
+                  {hasIncident ? "!" : <Server size={16} />}
                 </span>
-                <span className="mt-0.5 block truncate text-xs font-semibold text-slate-500">
-                  {server.regionName} · {server.ipAddress}
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-black text-slate-800">
+                    {server.serverName}
+                  </span>
+                  <span className="mt-0.5 block truncate text-xs font-semibold text-slate-500">
+                    {server.regionName} · {server.ipAddress}
+                  </span>
                 </span>
-              </span>
-              <span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-[11px] font-black text-slate-500">
-                {server.services.length}
-              </span>
-            </button>
+                <span className="flex shrink-0 items-center gap-1">
+                  <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-black text-slate-500">
+                    {server.services.length}
+                  </span>
+                  {expanded ? (
+                    <ChevronDown size={16} className="text-slate-400" />
+                  ) : (
+                    <ChevronRight size={16} className="text-slate-400" />
+                  )}
+                </span>
+              </button>
+
+              {expanded && (
+                <div className="space-y-1 border-t border-orange-100 bg-white/78 p-2">
+                  {server.services.length === 0 ? (
+                    <div className="rounded-lg bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-400">
+                      등록된 서비스가 없습니다.
+                    </div>
+                  ) : (
+                    server.services.map((service) => (
+                      <button
+                        key={service.serviceId}
+                        onClick={() => onServiceSelect(service.serviceId)}
+                        className="flex w-full items-start gap-2 rounded-lg px-2 py-2 text-left hover:bg-orange-50"
+                      >
+                        <span
+                          className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
+                            ["INCIDENT", "IMPACTED"].includes(service.statusCode)
+                              ? "bg-red-500 text-white"
+                              : service.statusCode === "MAINTENANCE"
+                                ? "bg-yellow-400 text-slate-900"
+                                : "bg-cyan-100 text-slate-800"
+                          }`}
+                        >
+                          {["INCIDENT", "IMPACTED"].includes(service.statusCode) ? (
+                            "!"
+                          ) : (
+                            <Database size={13} />
+                          )}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-xs font-black text-slate-800">
+                            {service.serviceName}
+                          </span>
+                          <span className="mt-0.5 block truncate text-[11px] font-semibold text-slate-500">
+                            {service.serviceCode} ·{" "}
+                            {codeLabels.serviceType[service.serviceTypeCode]} ·{" "}
+                            {codeLabels.serviceStatus[service.statusCode]}
+                          </span>
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
           );
         })}
+
+        {servers.length > visibleServers.length && (
+          <div className="px-3 py-2 text-center text-xs font-bold text-slate-400">
+            검색어를 입력하면 더 정확하게 찾을 수 있습니다.
+          </div>
+        )}
       </div>
     </aside>
   );
@@ -665,13 +791,13 @@ function ServerFinderPanel({
 
 function RegionArea({
   region,
-  serviceLayerOpacity,
+  serverLayerOpacity,
 }: {
   region: LayoutRegion;
-  serviceLayerOpacity: number;
+  serverLayerOpacity: number;
 }) {
-  const regionOpacity = 1 - serviceLayerOpacity * 0.72;
-  const labelOpacity = clamp(1 - serviceLayerOpacity * 1.2, 0, 1);
+  const regionOpacity = 1 - serverLayerOpacity * 0.46;
+  const labelOpacity = clamp(1 - serverLayerOpacity * 0.75, 0.18, 1);
 
   return (
     <div
@@ -716,14 +842,18 @@ function ServerMarker({
   server,
   focused,
   layerOpacity,
-  interactive,
+  serverInteractive,
+  serviceInteractive,
+  serviceLayerOpacity,
   onServerClick,
   onServiceClick,
 }: {
   server: PointServer;
   focused: boolean;
   layerOpacity: number;
-  interactive: boolean;
+  serverInteractive: boolean;
+  serviceInteractive: boolean;
+  serviceLayerOpacity: number;
   onServerClick: () => void;
   onServiceClick: (serviceId: number) => void;
 }) {
@@ -733,7 +863,7 @@ function ServerMarker({
   const hasMaintenance = server.services.some(
     (service) => service.statusCode === "MAINTENANCE"
   );
-  const showServices = focused && interactive;
+  const showServices = focused && serviceLayerOpacity > 0.02;
   const footprint = getServerFootprint(server.services.length, showServices);
   const visibleServices = server.services.slice(0, MAX_SERVICE_MARKERS);
   const hiddenServiceCount = Math.max(0, server.services.length - MAX_SERVICE_MARKERS);
@@ -754,7 +884,7 @@ function ServerMarker({
         width: footprint.width,
         height: footprint.height,
         opacity: layerOpacity,
-        pointerEvents: interactive ? "auto" : "none",
+        pointerEvents: serverInteractive ? "auto" : "none",
         zIndex: focused ? 8 : hasIncident || server.statusCode === "INCIDENT" ? 4 : 2,
       }}
     >
@@ -800,6 +930,9 @@ function ServerMarker({
             top: 112,
             width: footprint.gridWidth,
             gridTemplateColumns: `repeat(${footprint.columns}, minmax(0, 1fr))`,
+            opacity: serviceLayerOpacity,
+            pointerEvents: serviceInteractive ? "auto" : "none",
+            transition: "opacity 360ms ease",
           }}
         >
           {visibleServices.map((service) => (
@@ -811,7 +944,7 @@ function ServerMarker({
                 event.stopPropagation();
                 onServiceClick(service.serviceId);
               }}
-              className="flex h-9 min-w-0 items-center gap-2 rounded-full border border-slate-200 bg-white py-1.5 pl-2 pr-3 text-xs font-bold text-slate-800 shadow-sm hover:border-[#f60] hover:bg-orange-50"
+              className="flex min-h-12 min-w-0 items-center gap-2 rounded-2xl border border-slate-200 bg-white py-2 pl-2 pr-3 text-left text-xs font-bold text-slate-800 shadow-sm hover:border-[#f60] hover:bg-orange-50"
               title={`${service.serviceName} (${service.serviceCode})`}
             >
               <span
@@ -829,7 +962,13 @@ function ServerMarker({
                   <Database size={13} />
                 )}
               </span>
-              <span className="min-w-0 truncate">{service.serviceName}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate">{service.serviceName}</span>
+                <span className="mt-0.5 block truncate text-[10px] font-semibold text-slate-500">
+                  {service.serviceCode} ·{" "}
+                  {codeLabels.serviceStatus[service.statusCode]}
+                </span>
+              </span>
             </button>
           ))}
           {hiddenServiceCount > 0 && (
@@ -856,24 +995,29 @@ function MapExclamation() {
 
 function MapLegend({
   focusedServer,
-  zoomedIn,
+  mapDepth,
 }: {
   focusedServer?: PointServer;
-  zoomedIn: boolean;
+  mapDepth: number;
 }) {
+  const depthLabel =
+    mapDepth === 1
+      ? "1뎁스 · 구역"
+      : mapDepth === 2
+        ? "2뎁스 · 서버"
+        : "3뎁스 · 서비스";
+
   return (
     <div className="pointer-events-none absolute bottom-6 right-6 z-30 rounded-2xl border border-slate-200 bg-white p-4 text-slate-800 shadow-sm">
       <div className="flex items-center gap-2 text-sm font-bold">
         <Compass size={18} className="text-[#f60]" />
         {focusedServer
           ? focusedServer.serverName
-          : zoomedIn
-            ? "서버 선택 보기"
-            : "서버 구역 보기"}
+          : depthLabel}
       </div>
       <div className="mt-2 text-xs text-slate-500">
         {focusedServer
-          ? `서비스 ${focusedServer.services.length}개`
+          ? `${depthLabel} · 서비스 ${focusedServer.services.length}개`
           : "마우스 드래그로 이동 · 휠로 확대/축소"}
       </div>
     </div>
@@ -987,13 +1131,13 @@ function getServerFootprint(serviceCount: number, showServices = false) {
   const visibleCount = Math.max(1, Math.min(serviceCount, MAX_SERVICE_MARKERS));
   const columns = visibleCount <= 3 ? 1 : visibleCount <= 6 ? 2 : 3;
   const rows = Math.ceil(visibleCount / columns);
-  const gridWidth = columns * 132 + Math.max(0, columns - 1) * 8;
-  const height = 136 + rows * 36 + Math.max(0, rows - 1) * 8;
+  const gridWidth = columns * 172 + Math.max(0, columns - 1) * 8;
+  const height = 138 + rows * 48 + Math.max(0, rows - 1) * 8;
 
   return {
     columns,
     gridWidth,
-    width: Math.max(220, gridWidth + 30),
+    width: Math.max(240, gridWidth + 30),
     height,
   };
 }
