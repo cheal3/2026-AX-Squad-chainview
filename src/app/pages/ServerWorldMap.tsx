@@ -362,6 +362,15 @@ export function ServerWorldMap() {
     ? pointServers.find((server) => server.serverId === focusedServerId)
     : undefined;
   const activeRegionName = focusedServer?.regionName ?? focusedRegionName;
+  const renderedPointServers = useMemo(() => {
+    if (!activeRegionName) {
+      return visiblePointServers;
+    }
+
+    return visiblePointServers.filter(
+      (server) => server.regionName === activeRegionName
+    );
+  }, [activeRegionName, visiblePointServers]);
 
   const searchedServers = useMemo(() => {
     const keyword = serverSearch.trim().toLowerCase();
@@ -630,7 +639,7 @@ export function ServerWorldMap() {
               ))}
 
             {serverLayerOpacity > 0.02 &&
-              visiblePointServers.map((server) => (
+              renderedPointServers.map((server) => (
                 <ServerMarker
                   key={server.serverId}
                   dimmed={
@@ -1048,6 +1057,7 @@ function ServerMarker({
   return (
     <div
       data-server-marker
+      data-server-region={server.regionName}
       className={`absolute ${
         dimmed ? "" : "transition-all duration-[800ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
       }`}
