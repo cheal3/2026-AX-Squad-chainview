@@ -167,6 +167,7 @@ export function ServerWorldMap() {
   const serverFocusTimerRef = useRef<number | null>(null);
   const dragFrameRef = useRef<number | null>(null);
   const dragMovedRef = useRef(false);
+  const pendingRegionNameRef = useRef<string | null>(null);
   const dragStartRef = useRef({
     pointerX: 0,
     pointerY: 0,
@@ -475,7 +476,12 @@ export function ServerWorldMap() {
     });
   };
 
-  const focusServer = (server: PointServer, openServices = true) => {
+  const focusServerAtAnchor = (
+    server: PointServer,
+    anchorX: number,
+    anchorY: number,
+    openServices = true
+  ) => {
     if (serverFocusTimerRef.current) {
       window.clearTimeout(serverFocusTimerRef.current);
       serverFocusTimerRef.current = null;
@@ -490,16 +496,48 @@ export function ServerWorldMap() {
       : SERVER_ZOOM;
     const nextScale = openServices
       ? clamp(Math.max(fittedScale, FOCUS_SCALE), SERVICE_ZOOM + 0.08, 2.25)
-      : Math.max(scale, SERVER_ZOOM);
+      : Math.max(viewRef.current.scale, SERVER_ZOOM);
     setFocusedRegionName(server.regionName);
     setFocusedServerId(server.serverId);
     setDrillingServerId(null);
     setFinderOpen(true);
     setSelectedServiceId(null);
     commitMapView(nextScale, {
-      x: focus.x - server.mapX * nextScale,
-      y: focus.y - server.mapY * nextScale,
+      x: anchorX - server.mapX * nextScale,
+      y: anchorY - server.mapY * nextScale,
     });
+  };
+
+  const focusServer = (server: PointServer, openServices = true) => {
+    const focus = screenFocus(true);
+    focusServerAtAnchor(server, focus.x, focus.y, openServices);
+  };
+
+  const findServerAtViewportPoint = (anchorX: number, anchorY: number) => {
+    const currentView = viewRef.current;
+    const mapX = (anchorX - currentView.offset.x) / currentView.scale;
+    const mapY = (anchorY - currentView.offset.y) / currentView.scale;
+    const candidates = activeRegionName ? activeRegionServers : visiblePointServers;
+    let nearest: { distance: number; server: PointServer } | undefined;
+
+    for (const server of candidates) {
+      const footprint = getServerFootprint(server.services.length);
+      const dx = mapX - server.mapX;
+      const dy = mapY - server.mapY;
+      const hitWidth = Math.max(footprint.width / 2, 120);
+      const hitHeight = Math.max(footprint.height / 2, 92);
+
+      if (Math.abs(dx) <= hitWidth && Math.abs(dy) <= hitHeight) {
+        return server;
+      }
+
+      const distance = Math.hypot(dx, dy);
+      if (!nearest || distance < nearest.distance) {
+        nearest = { distance, server };
+      }
+    }
+
+    return nearest && nearest.distance <= 250 ? nearest.server : undefined;
   };
 
   const closeServerFocus = () => {
@@ -546,30 +584,58 @@ export function ServerWorldMap() {
   };
 
   const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
+    if ((event.target as HTMLElement).closest("[data-map-panel]")) {
+      return;
+    }
+
     event.preventDefault();
     const currentView = viewRef.current;
     const nextScale = clamp(currentView.scale - event.deltaY * 0.001, 0.36, 2.25);
     const rect = event.currentTarget.getBoundingClientRect();
-    zoomAt(nextScale, event.clientX - rect.left, event.clientY - rect.top);
+    const anchorX = event.clientX - rect.left;
+    const anchorY = event.clientY - rect.top;
+    const zoomingIntoServices =
+      event.deltaY < 0 &&
+      Boolean(activeRegionName) &&
+      !focusedServer &&
+      currentView.scale < SERVICE_ZOOM &&
+      nextScale >= SERVICE_ZOOM;
+    const targetServer = zoomingIntoServices
+      ? findServerAtViewportPoint(anchorX, anchorY)
+      : undefined;
+
+    if (targetServer) {
+      focusServerAtAnchor(targetServer, anchorX, anchorY);
+      return;
+    }
+
+    zoomAt(nextScale, anchorX, anchorY);
   };
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement;
-    const regionTarget = target.closest("[data-region-area]");
+    const regionTarget = target.closest("[data-region-area]") as HTMLElement | null;
+    pendingRegionNameRef.current = regionTarget?.dataset.regionName ?? null;
+
     if (target.closest("[data-map-panel]")) {
+      pendingRegionNameRef.current = null;
       return;
     }
     if (target.closest("[data-service-marker]")) {
+      pendingRegionNameRef.current = null;
       return;
     }
     if (target.closest("[data-server-marker]")) {
+      pendingRegionNameRef.current = null;
       return;
     }
     if (focusedServer || drillingServerId) {
+      pendingRegionNameRef.current = null;
       closeServerFocus();
       return;
     }
     if (focusedRegionName && !regionTarget) {
+      pendingRegionNameRef.current = null;
       setFocusedRegionName(null);
       setSelectedServiceId(null);
       return;
@@ -622,6 +688,10 @@ export function ServerWorldMap() {
   };
 
   const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    const pendingRegionName = pendingRegionNameRef.current;
+    const wasMoved = dragMovedRef.current;
+    pendingRegionNameRef.current = null;
+
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
@@ -643,6 +713,16 @@ export function ServerWorldMap() {
     window.setTimeout(() => {
       dragMovedRef.current = false;
     }, 0);
+
+    if (!wasMoved && pendingRegionName) {
+      const targetRegion = layoutRegions.find(
+        (region) => region.name === pendingRegionName
+      );
+
+      if (targetRegion) {
+        focusRegion(targetRegion);
+      }
+    }
   };
 
   const zoomBy = (delta: number) => {
@@ -713,8 +793,6 @@ export function ServerWorldMap() {
                   dimmed={Boolean(activeRegionName && activeRegionName !== region.name)}
                   region={region}
                   serverLayerOpacity={serverLayerOpacity}
-                  shouldIgnoreClick={() => dragMovedRef.current}
-                  onRegionClick={() => focusRegion(region)}
                 />
               ))}
 
@@ -1191,17 +1269,13 @@ function NavigationServiceRow({
 function RegionArea({
   active,
   dimmed,
-  onRegionClick,
   region,
   serverLayerOpacity,
-  shouldIgnoreClick,
 }: {
   active: boolean;
   dimmed: boolean;
-  onRegionClick: () => void;
   region: LayoutRegion;
   serverLayerOpacity: number;
-  shouldIgnoreClick: () => boolean;
 }) {
   const regionOpacity = dimmed
     ? 0.16
@@ -1217,11 +1291,7 @@ function RegionArea({
   return (
     <div
       data-region-area
-      onClick={() => {
-        if (!shouldIgnoreClick()) {
-          onRegionClick();
-        }
-      }}
+      data-region-name={region.name}
       className={`absolute cursor-pointer rounded-[28px] border-2 bg-white/42 ${
         active ? "border-solid border-[#f60]" : "border-dashed border-slate-300"
       }`}
