@@ -59,7 +59,7 @@ const SERVER_FADE_START = 0.58;
 const SERVICE_ZOOM = 1.2;
 const SERVICE_FADE_START = 1.02;
 const FOCUS_SCALE = 1.34;
-const MAX_SERVICE_MARKERS = 10;
+const MAX_SERVICE_MARKERS = 16;
 
 const regions: Region[] = [
   {
@@ -377,8 +377,8 @@ export function ServerWorldMap() {
     });
   }, [pointServers, serverSearch]);
 
-  const screenFocus = () => {
-    const leftReserved = finderOpen ? 370 : 0;
+  const screenFocus = (reserveFinder = finderOpen) => {
+    const leftReserved = reserveFinder ? 370 : 0;
     return {
       x: leftReserved + (viewportSize.width - leftReserved) / 2,
       y: viewportSize.height / 2,
@@ -409,7 +409,7 @@ export function ServerWorldMap() {
   };
 
   const focusServer = (server: PointServer, openServices = true) => {
-    const focus = screenFocus();
+    const focus = screenFocus(true);
     const focusedFootprint = getServerFootprint(server.services.length, openServices);
     const fittedScale = openServices
       ? Math.min(
@@ -444,6 +444,14 @@ export function ServerWorldMap() {
   const zoomAt = (nextScale: number, anchorX: number, anchorY: number) => {
     const mapAnchorX = (anchorX - offset.x) / scale;
     const mapAnchorY = (anchorY - offset.y) / scale;
+    if (nextScale < SERVICE_FADE_START) {
+      setFocusedServerId(null);
+      setExpandedServerId(null);
+      setSelectedServiceId(null);
+    }
+    if (nextScale < SERVER_ZOOM) {
+      setFocusedRegionName(null);
+    }
     setScale(nextScale);
     setOffset({
       x: anchorX - mapAnchorX * nextScale,
@@ -548,16 +556,17 @@ export function ServerWorldMap() {
             style={{ width: MAP_WIDTH, height: MAP_HEIGHT }}
           >
             <MapCanvas />
-            {layoutRegions.map((region) => (
-              <RegionArea
-                key={region.name}
-                active={activeRegionName === region.name}
-                dimmed={Boolean(activeRegionName && activeRegionName !== region.name)}
-                region={region}
-                serverLayerOpacity={serverLayerOpacity}
-                onRegionClick={() => focusRegion(region)}
-              />
-            ))}
+            {!focusedServer &&
+              layoutRegions.map((region) => (
+                <RegionArea
+                  key={region.name}
+                  active={activeRegionName === region.name}
+                  dimmed={Boolean(activeRegionName && activeRegionName !== region.name)}
+                  region={region}
+                  serverLayerOpacity={serverLayerOpacity}
+                  onRegionClick={() => focusRegion(region)}
+                />
+              ))}
 
             {serverLayerOpacity > 0.02 &&
               visiblePointServers.map((server) => (
@@ -973,7 +982,9 @@ function ServerMarker({
   return (
     <div
       data-server-marker
-      className={`absolute ${dimmed ? "" : "transition-opacity duration-500 ease-out"}`}
+      className={`absolute ${
+        dimmed ? "" : "transition-all duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]"
+      }`}
       onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => {
         if (dimmed) {
@@ -1048,14 +1059,18 @@ function ServerMarker({
 
       {showServices && (
         <div
-          className="absolute left-1/2 grid -translate-x-1/2 gap-2"
+          className="absolute grid gap-4"
           style={{
-            top: 112,
-            width: footprint.gridWidth,
+            left: 34,
+            right: 34,
+            top: 132,
+            bottom: 30,
+            alignContent: "start",
+            gridAutoRows: "minmax(88px, 1fr)",
             gridTemplateColumns: `repeat(${footprint.columns}, minmax(0, 1fr))`,
             opacity: serviceLayerOpacity,
             pointerEvents: serviceInteractive ? "auto" : "none",
-            transition: "opacity 360ms ease",
+            transition: "opacity 420ms ease",
           }}
         >
           {visibleServices.map((service) => (
@@ -1067,11 +1082,11 @@ function ServerMarker({
                 event.stopPropagation();
                 onServiceClick(service.serviceId);
               }}
-              className="flex min-h-12 min-w-0 items-center gap-2 rounded-2xl border border-slate-200 bg-white py-2 pl-2 pr-3 text-left text-xs font-bold text-slate-800 shadow-sm hover:border-[#f60] hover:bg-orange-50"
+              className="flex min-h-[88px] min-w-0 items-start gap-3 rounded-[22px] border-2 border-dashed border-slate-300 bg-white/90 p-3 text-left text-xs font-bold text-slate-800 shadow-sm transition hover:border-[#f60] hover:bg-orange-50"
               title={`${service.serviceName} (${service.serviceCode})`}
             >
               <span
-                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
+                className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
                   ["INCIDENT", "IMPACTED"].includes(service.statusCode)
                     ? "bg-red-500 text-white"
                     : service.statusCode === "MAINTENANCE"
@@ -1091,11 +1106,14 @@ function ServerMarker({
                   {service.serviceCode} ·{" "}
                   {codeLabels.serviceStatus[service.statusCode]}
                 </span>
+                <span className="mt-2 inline-flex rounded-full bg-slate-100 px-2 py-1 text-[10px] font-black text-slate-500">
+                  {codeLabels.serviceType[service.serviceTypeCode]}
+                </span>
               </span>
             </button>
           ))}
           {hiddenServiceCount > 0 && (
-            <div className="flex h-9 items-center justify-center rounded-full border border-slate-200 bg-slate-100 text-xs font-black text-slate-600">
+            <div className="flex min-h-[88px] items-center justify-center rounded-[22px] border-2 border-dashed border-slate-300 bg-slate-100 text-sm font-black text-slate-600">
               +{hiddenServiceCount}
             </div>
           )}
@@ -1260,15 +1278,14 @@ function getServerFootprint(serviceCount: number, showServices = false) {
   }
 
   const visibleCount = Math.max(1, Math.min(serviceCount, MAX_SERVICE_MARKERS));
-  const columns = visibleCount <= 3 ? 1 : visibleCount <= 6 ? 2 : 3;
-  const rows = Math.ceil(visibleCount / columns);
-  const gridWidth = columns * 172 + Math.max(0, columns - 1) * 8;
-  const height = 138 + rows * 48 + Math.max(0, rows - 1) * 8;
+  const columns = visibleCount <= 4 ? 2 : visibleCount <= 8 ? 3 : 4;
+  const width = visibleCount <= 8 ? 800 : 860;
+  const height = 560;
 
   return {
     columns,
-    gridWidth,
-    width: Math.max(240, gridWidth + 30),
+    gridWidth: width - 68,
+    width,
     height,
   };
 }
