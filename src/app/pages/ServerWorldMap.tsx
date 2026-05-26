@@ -1,12 +1,17 @@
-import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 import {
   AlertTriangle,
+  AppWindow,
   ChevronLeft,
   ChevronRight,
   ChevronsRight,
   CircleDot,
-  Compass,
-  Database,
   MapPin,
   Minus,
   Plus,
@@ -14,8 +19,8 @@ import {
   Server,
   ShieldAlert,
   Sparkles,
+  Star,
   X,
-  Zap,
 } from "lucide-react";
 import { usePortalData } from "../PortalDataStore";
 import { codeLabels, type ServerRecord, type ServiceRecord } from "../mockData";
@@ -57,6 +62,34 @@ type MapView = {
   };
 };
 
+type FavoriteItem =
+  | {
+      key: string;
+      type: "region";
+      label: string;
+      description: string;
+      path: string[];
+      region: LayoutRegion;
+    }
+  | {
+      key: string;
+      type: "server";
+      label: string;
+      description: string;
+      path: string[];
+      server: PointServer;
+    }
+  | {
+      key: string;
+      type: "service";
+      label: string;
+      description: string;
+      path: string[];
+      service: ServiceRecord;
+    };
+
+type NavigationListMode = "default" | "favorites" | "incidents" | "normal";
+
 const MAP_WIDTH = 12000;
 const MAP_HEIGHT = 8000;
 const REGION_OFFSET_X = 3800;
@@ -67,9 +100,13 @@ const SERVER_ZOOM = 0.72;
 const SERVER_FADE_START = 0.58;
 const SERVICE_ZOOM = 1.2;
 const SERVICE_FADE_START = 1.02;
-const FOCUS_SCALE = 1.56;
+const FOCUS_MAX_SCALE = 0.96;
+const SERVICE_DRILL_GRACE_MS = 700;
+const WHEEL_BOUNDARY_THRESHOLD = 140;
+const WHEEL_SEQUENCE_TIMEOUT = 520;
+const WHEEL_ZOOM_SPEED = 0.001;
 const MAX_SERVICE_MARKERS = 16;
-const MAP_TRANSITION = "transform 520ms cubic-bezier(0.16, 1, 0.3, 1)";
+const MAP_TRANSITION = "transform 620ms cubic-bezier(0.16, 1, 0.3, 1)";
 
 const regions: Region[] = [
   {
@@ -156,17 +193,29 @@ export function ServerWorldMap() {
   const [focusedServerId, setFocusedServerId] = useState<number | null>(null);
   const [drillingServerId, setDrillingServerId] = useState<number | null>(null);
   const [finderOpen, setFinderOpen] = useState(true);
+  const [favoriteKeys, setFavoriteKeys] = useState<string[]>([]);
+  const [navigationListMode, setNavigationListMode] =
+    useState<NavigationListMode>("default");
   const [serverSearch, setServerSearch] = useState("");
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const mapLayerRef = useRef<HTMLDivElement | null>(null);
   const mapGridRef = useRef<HTMLDivElement | null>(null);
+  const wheelHandlerRef = useRef<((event: WheelEvent) => void) | null>(null);
+  const wheelIntentRef = useRef({
+    direction: 0,
+    amount: 0,
+    lastAt: 0,
+  });
   const viewRef = useRef<MapView>({
     scale: INITIAL_SCALE,
     offset: { ...INITIAL_OFFSET },
   });
   const serverFocusTimerRef = useRef<number | null>(null);
+  const regionFocusedAtRef = useRef(0);
+  const wheelLockedUntilRef = useRef(0);
   const dragFrameRef = useRef<number | null>(null);
   const dragMovedRef = useRef(false);
+  const pendingFocusCloseRef = useRef(false);
   const pendingRegionNameRef = useRef<string | null>(null);
   const dragStartRef = useRef({
     pointerX: 0,
@@ -222,6 +271,7 @@ export function ServerWorldMap() {
     () => new Map(servers.map((server) => [server.serverId, server])),
     [servers]
   );
+  const favoriteKeySet = useMemo(() => new Set(favoriteKeys), [favoriteKeys]);
   const servicesByServerId = useMemo(() => {
     const next = new Map<number, ServiceRecord[]>();
     services.forEach((service) => {
@@ -341,26 +391,96 @@ export function ServerWorldMap() {
     () => new Map(pointServers.map((server) => [server.serverId, server])),
     [pointServers]
   );
+  const regionByFavoriteKey = useMemo(
+    () =>
+      new Map(
+        layoutRegions.map((region) => [regionFavoriteKey(region.name), region])
+      ),
+    [layoutRegions]
+  );
+  const favoriteItems = useMemo<FavoriteItem[]>(
+    () =>
+      favoriteKeys.flatMap((key) => {
+        const [type, id] = key.split(":");
+
+        if (type === "region") {
+          const region = regionByFavoriteKey.get(key);
+          return region
+            ? [
+                {
+                  key,
+                  type,
+                  label: region.name,
+                  description: `서버 ${region.serverCount} · 서비스 ${region.serviceCount}`,
+                  path: [region.name],
+                  region,
+                } satisfies FavoriteItem,
+              ]
+            : [];
+        }
+
+        if (type === "server") {
+          const server = pointServerById.get(Number(id));
+          return server
+            ? [
+                {
+                  key,
+                  type,
+                  label: server.serverName,
+                  description: `${server.regionName} · 서비스 ${server.services.length}`,
+                  path: [server.regionName, server.serverName],
+                  server,
+                } satisfies FavoriteItem,
+              ]
+            : [];
+        }
+
+        if (type === "service") {
+          const service = serviceById.get(Number(id));
+          const server = service
+            ? pointServerById.get(service.serverId)
+            : undefined;
+          return service
+            ? [
+                {
+                  key,
+                  type,
+                  label: service.serviceName,
+                  description: `${service.serviceCode} · ${server?.serverName ?? "서버 미지정"}`,
+                  path: [
+                    server?.regionName,
+                    server?.serverName ?? "서버 미지정",
+                    service.serviceName,
+                  ].filter(Boolean) as string[],
+                  service,
+                } satisfies FavoriteItem,
+              ]
+            : [];
+        }
+
+        return [];
+      }),
+    [favoriteKeys, pointServerById, regionByFavoriteKey, serviceById]
+  );
+
+  const incidentServices = useMemo(
+    () =>
+      services.filter((service) =>
+        ["INCIDENT", "IMPACTED"].includes(service.statusCode)
+      ),
+    [services]
+  );
+  const normalServices = useMemo(
+    () => services.filter((service) => service.statusCode === "NORMAL"),
+    [services]
+  );
 
   const stats = useMemo(() => {
-    const incidentServices = services.filter((service) =>
-      ["INCIDENT", "IMPACTED"].includes(service.statusCode)
-    );
-    const maintenanceServices = services.filter(
-      (service) => service.statusCode === "MAINTENANCE"
-    );
-    const incidentServers = servers.filter(
-      (server) => server.statusCode === "INCIDENT"
-    );
-
     return {
       incidentServices: incidentServices.length,
-      maintenanceServices: maintenanceServices.length,
-      incidentServers: incidentServers.length,
-      normalServices: services.filter((service) => service.statusCode === "NORMAL")
-        .length,
+      normalServices: normalServices.length,
     };
-  }, [servers, services]);
+  }, [incidentServices.length, normalServices.length]);
 
   const serverLayerOpacity = clamp(
     (scale - SERVER_FADE_START) / (SERVER_ZOOM - SERVER_FADE_START),
@@ -374,8 +494,6 @@ export function ServerWorldMap() {
     1
   );
   const serviceLayerInteractive = serviceLayerOpacity > 0.72;
-  const mapDepth = scale < SERVER_ZOOM ? 1 : scale < SERVICE_ZOOM ? 2 : 3;
-
   const mapBounds = useMemo<MapBounds>(() => {
     const margin = 480 / scale + 160;
     return {
@@ -393,6 +511,48 @@ export function ServerWorldMap() {
   const activeRegion = activeRegionName
     ? layoutRegions.find((region) => region.name === activeRegionName)
     : undefined;
+  const currentFavoriteTarget = useMemo<FavoriteItem | undefined>(() => {
+    if (selectedService) {
+      const server = pointServerById.get(selectedService.serverId);
+
+      return {
+        key: serviceFavoriteKey(selectedService.serviceId),
+        type: "service",
+        label: selectedService.serviceName,
+        description: `${selectedService.serviceCode} · ${server?.serverName ?? "서버 미지정"}`,
+        path: [
+          server?.regionName,
+          server?.serverName ?? "서버 미지정",
+          selectedService.serviceName,
+        ].filter(Boolean) as string[],
+        service: selectedService,
+      };
+    }
+
+    if (focusedServer) {
+      return {
+        key: serverFavoriteKey(focusedServer.serverId),
+        type: "server",
+        label: focusedServer.serverName,
+        description: `${focusedServer.regionName} · 서비스 ${focusedServer.services.length}`,
+        path: [focusedServer.regionName, focusedServer.serverName],
+        server: focusedServer,
+      };
+    }
+
+    if (activeRegion) {
+      return {
+        key: regionFavoriteKey(activeRegion.name),
+        type: "region",
+        label: activeRegion.name,
+        description: `서버 ${activeRegion.serverCount} · 서비스 ${activeRegion.serviceCount}`,
+        path: [activeRegion.name],
+        region: activeRegion,
+      };
+    }
+
+    return undefined;
+  }, [activeRegion, focusedServer, pointServerById, selectedService]);
   const activeRegionServers = useMemo(() => {
     if (!activeRegionName) {
       return [];
@@ -420,6 +580,52 @@ export function ServerWorldMap() {
       width: Math.max(320, viewportSize.width - leftReserved),
       height: viewportSize.height,
     };
+  };
+
+  const resetWheelIntent = () => {
+    wheelIntentRef.current = {
+      direction: 0,
+      amount: 0,
+      lastAt: 0,
+    };
+  };
+
+  const lockWheel = (duration = 720) => {
+    wheelLockedUntilRef.current = Math.max(
+      wheelLockedUntilRef.current,
+      performance.now() + duration
+    );
+    resetWheelIntent();
+  };
+
+  const isWheelBoundaryReached = (
+    direction: number,
+    amount: number,
+    now: number,
+    threshold = WHEEL_BOUNDARY_THRESHOLD
+  ) => {
+    const wheelIntent = wheelIntentRef.current;
+
+    if (
+      wheelIntent.direction !== direction ||
+      now - wheelIntent.lastAt > WHEEL_SEQUENCE_TIMEOUT
+    ) {
+      wheelIntentRef.current = {
+        direction,
+        amount: 0,
+        lastAt: now,
+      };
+    }
+
+    wheelIntentRef.current.amount += Math.min(90, amount);
+    wheelIntentRef.current.lastAt = now;
+
+    if (wheelIntentRef.current.amount < threshold) {
+      return false;
+    }
+
+    resetWheelIntent();
+    return true;
   };
 
   const commitMapView = (
@@ -467,6 +673,7 @@ export function ServerWorldMap() {
       SERVICE_ZOOM - 0.1
     );
     setFocusedRegionName(region.name);
+    regionFocusedAtRef.current = performance.now();
     setFocusedServerId(null);
     setDrillingServerId(null);
     setSelectedServiceId(null);
@@ -480,32 +687,62 @@ export function ServerWorldMap() {
     server: PointServer,
     anchorX: number,
     anchorY: number,
-    openServices = true
+    openServices = true,
+    instant = false
   ) => {
     if (serverFocusTimerRef.current) {
       window.clearTimeout(serverFocusTimerRef.current);
       serverFocusTimerRef.current = null;
     }
-    const focus = screenFocus(true);
+    const focus = screenFocus(!instant);
     const focusedFootprint = getServerFootprint(server.services.length, openServices);
     const fittedScale = openServices
       ? Math.min(
-          (focus.width - 140) / focusedFootprint.width,
-          (focus.height - 180) / focusedFootprint.height
+          (focus.width - 120) / focusedFootprint.width,
+          (focus.height - 130) / focusedFootprint.height
         )
       : SERVER_ZOOM;
+    const currentScale = viewRef.current.scale;
     const nextScale = openServices
-      ? clamp(Math.max(fittedScale, FOCUS_SCALE), SERVICE_ZOOM + 0.08, 2.25)
-      : Math.max(viewRef.current.scale, SERVER_ZOOM);
+      ? clamp(
+          fittedScale * (instant ? 0.82 : 0.94),
+          instant ? 0.68 : 0.36,
+          FOCUS_MAX_SCALE
+        )
+      : Math.max(currentScale, SERVER_ZOOM);
+    const renderedWidth = focusedFootprint.width * nextScale;
+    const renderedHeight = focusedFootprint.height * nextScale;
+    const safeAnchorX = instant
+      ? clamp(anchorX, renderedWidth / 2 + 24, viewportSize.width - renderedWidth / 2 - 24)
+      : anchorX;
+    const safeAnchorY = instant
+      ? clamp(
+          anchorY,
+          renderedHeight / 2 + 122,
+          viewportSize.height - renderedHeight / 2 - 32
+        )
+      : anchorY;
     setFocusedRegionName(server.regionName);
-    setFocusedServerId(server.serverId);
-    setDrillingServerId(null);
-    setFinderOpen(true);
+    setDrillingServerId(openServices && !instant ? server.serverId : null);
+    setFocusedServerId(
+      openServices && instant ? server.serverId : openServices ? null : server.serverId
+    );
     setSelectedServiceId(null);
+    if (openServices) {
+      lockWheel(instant ? 760 : 980);
+    }
     commitMapView(nextScale, {
-      x: anchorX - server.mapX * nextScale,
-      y: anchorY - server.mapY * nextScale,
+      x: safeAnchorX - server.mapX * nextScale,
+      y: safeAnchorY - server.mapY * nextScale,
     });
+
+    if (openServices && !instant) {
+      serverFocusTimerRef.current = window.setTimeout(() => {
+        setFocusedServerId(server.serverId);
+        setDrillingServerId(null);
+        serverFocusTimerRef.current = null;
+      }, 220);
+    }
   };
 
   const focusServer = (server: PointServer, openServices = true) => {
@@ -513,11 +750,61 @@ export function ServerWorldMap() {
     focusServerAtAnchor(server, focus.x, focus.y, openServices);
   };
 
-  const findServerAtViewportPoint = (anchorX: number, anchorY: number) => {
+  const focusService = (service: ServiceRecord) => {
+    const server = pointServerById.get(service.serverId);
+
+    if (!server) {
+      setSelectedServiceId(service.serviceId);
+      return;
+    }
+
+    const focus = screenFocus(true);
+    focusServerAtAnchor(server, focus.x, focus.y, true);
+  };
+
+  const toggleFavorite = (key: string) => {
+    setFavoriteKeys((current) =>
+      current.includes(key)
+        ? current.filter((favoriteKey) => favoriteKey !== key)
+        : [...current, key]
+    );
+  };
+
+  const focusFavorite = (item: FavoriteItem) => {
+    if (item.type === "region") {
+      focusRegion(item.region);
+      return;
+    }
+
+    if (item.type === "server") {
+      focusServer(item.server);
+      return;
+    }
+
+    focusService(item.service);
+  };
+
+  const showNavigationList = (mode: NavigationListMode) => {
+    setNavigationListMode((current) => (current === mode ? "default" : mode));
+    setFinderOpen(true);
+  };
+
+  const resetToOverview = () => {
+    setNavigationListMode("default");
+    resetMapFocus();
+  };
+
+  const findServerAtViewportPoint = (
+    anchorX: number,
+    anchorY: number,
+    allowNearest = false
+  ) => {
     const currentView = viewRef.current;
     const mapX = (anchorX - currentView.offset.x) / currentView.scale;
     const mapY = (anchorY - currentView.offset.y) / currentView.scale;
-    const candidates = activeRegionName ? activeRegionServers : visiblePointServers;
+    const candidates = activeRegionName
+      ? activeRegionServers.filter((server) => isServerInBounds(server, mapBounds))
+      : visiblePointServers;
     let nearest: { distance: number; server: PointServer } | undefined;
 
     for (const server of candidates) {
@@ -537,7 +824,70 @@ export function ServerWorldMap() {
       }
     }
 
-    return nearest && nearest.distance <= 250 ? nearest.server : undefined;
+    return nearest && (allowNearest || nearest.distance <= 420)
+      ? nearest.server
+      : undefined;
+  };
+
+  const findServerAtClientPoint = (clientX: number, clientY: number) => {
+    const marker = document
+      .elementsFromPoint(clientX, clientY)
+      .map((element) => element.closest("[data-server-marker]"))
+      .find(Boolean) as HTMLElement | undefined;
+    const serverId = Number(marker?.dataset.serverId);
+
+    if (!Number.isFinite(serverId)) {
+      return undefined;
+    }
+
+    const server = pointServerById.get(serverId);
+
+    if (!server || (activeRegionName && server.regionName !== activeRegionName)) {
+      return undefined;
+    }
+
+    return server;
+  };
+
+  const findRegionAtClientPoint = (clientX: number, clientY: number) => {
+    const regionElement = document
+      .elementsFromPoint(clientX, clientY)
+      .map((element) => element.closest("[data-region-area]"))
+      .find(Boolean) as HTMLElement | undefined;
+    const regionName = regionElement?.dataset.regionName;
+
+    return regionName
+      ? layoutRegions.find((region) => region.name === regionName)
+      : undefined;
+  };
+
+  const findRegionAtViewportPoint = (
+    anchorX: number,
+    anchorY: number,
+    allowNearest = false
+  ) => {
+    const currentView = viewRef.current;
+    const mapX = (anchorX - currentView.offset.x) / currentView.scale;
+    const mapY = (anchorY - currentView.offset.y) / currentView.scale;
+    let nearest: { distance: number; region: LayoutRegion } | undefined;
+
+    for (const region of layoutRegions) {
+      const halfWidth = region.width / 2;
+      const halfHeight = region.height / 2;
+      const dx = mapX - region.x;
+      const dy = mapY - region.y;
+
+      if (Math.abs(dx) <= halfWidth && Math.abs(dy) <= halfHeight) {
+        return region;
+      }
+
+      const distance = Math.hypot(dx, dy);
+      if (!nearest || distance < nearest.distance) {
+        nearest = { distance, region };
+      }
+    }
+
+    return nearest && allowNearest ? nearest.region : undefined;
   };
 
   const closeServerFocus = () => {
@@ -565,57 +915,168 @@ export function ServerWorldMap() {
     const currentView = viewRef.current;
     const mapAnchorX = (anchorX - currentView.offset.x) / currentView.scale;
     const mapAnchorY = (anchorY - currentView.offset.y) / currentView.scale;
-    if (nextScale < SERVICE_FADE_START) {
-      if (serverFocusTimerRef.current) {
-        window.clearTimeout(serverFocusTimerRef.current);
-        serverFocusTimerRef.current = null;
-      }
-      setFocusedServerId(null);
-      setDrillingServerId(null);
-      setSelectedServiceId(null);
-    }
-    if (nextScale < SERVER_ZOOM) {
-      setFocusedRegionName(null);
-    }
     commitMapView(nextScale, {
       x: anchorX - mapAnchorX * nextScale,
       y: anchorY - mapAnchorY * nextScale,
     });
   };
 
-  const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
+  const handleWheel = (event: WheelEvent) => {
     if ((event.target as HTMLElement).closest("[data-map-panel]")) {
       return;
     }
 
-    event.preventDefault();
-    const currentView = viewRef.current;
-    const nextScale = clamp(currentView.scale - event.deltaY * 0.001, 0.36, 2.25);
-    const rect = event.currentTarget.getBoundingClientRect();
-    const anchorX = event.clientX - rect.left;
-    const anchorY = event.clientY - rect.top;
-    const zoomingIntoServices =
-      event.deltaY < 0 &&
-      Boolean(activeRegionName) &&
-      !focusedServer &&
-      currentView.scale < SERVICE_ZOOM &&
-      nextScale >= SERVICE_ZOOM;
-    const targetServer = zoomingIntoServices
-      ? findServerAtViewportPoint(anchorX, anchorY)
-      : undefined;
-
-    if (targetServer) {
-      focusServerAtAnchor(targetServer, anchorX, anchorY);
+    if (event.cancelable) {
+      event.preventDefault();
+    }
+    const now = performance.now();
+    if (now < wheelLockedUntilRef.current) {
+      return;
+    }
+    const viewport = viewportRef.current;
+    if (!viewport || event.deltaY === 0) {
       return;
     }
 
-    zoomAt(nextScale, anchorX, anchorY);
+    const currentView = viewRef.current;
+    const rect = viewport.getBoundingClientRect();
+    const anchorX = event.clientX - rect.left;
+    const anchorY = event.clientY - rect.top;
+    const direction = event.deltaY < 0 ? 1 : -1;
+    const wheelAmount = Math.abs(event.deltaY);
+    const nextScale = currentView.scale - event.deltaY * WHEEL_ZOOM_SPEED;
+    const zoomWithin = (minScale: number, maxScale: number) => {
+      const boundedScale = clamp(nextScale, minScale, maxScale);
+
+      if (Math.abs(boundedScale - currentView.scale) < 0.002) {
+        return false;
+      }
+
+      resetWheelIntent();
+      zoomAt(boundedScale, anchorX, anchorY);
+      return true;
+    };
+
+    if (!activeRegionName && !focusedServer && !drillingServerId) {
+      if (direction > 0) {
+        if (zoomWithin(0.36, SERVER_ZOOM)) {
+          return;
+        }
+
+        if (!isWheelBoundaryReached(direction, wheelAmount, now)) {
+          return;
+        }
+
+        const targetRegion =
+          findRegionAtClientPoint(event.clientX, event.clientY) ??
+          findRegionAtViewportPoint(anchorX, anchorY) ??
+          findRegionAtViewportPoint(
+            viewportSize.width / 2,
+            viewportSize.height / 2,
+            true
+          );
+
+        if (targetRegion) {
+          lockWheel(620);
+          focusRegion(targetRegion);
+        }
+        return;
+      }
+
+      zoomWithin(0.36, SERVER_ZOOM);
+      return;
+    }
+
+    if (direction > 0 && activeRegionName && !focusedServer && !drillingServerId) {
+      if (zoomWithin(SERVER_ZOOM, SERVICE_ZOOM - 0.04)) {
+        return;
+      }
+
+      if (now - regionFocusedAtRef.current <= SERVICE_DRILL_GRACE_MS) {
+        return;
+      }
+
+      if (!isWheelBoundaryReached(direction, wheelAmount, now, 125)) {
+        return;
+      }
+
+      const targetServer =
+        findServerAtClientPoint(event.clientX, event.clientY) ??
+        findServerAtViewportPoint(anchorX, anchorY);
+
+      if (targetServer) {
+        focusServerAtAnchor(targetServer, anchorX, anchorY, true, true);
+        return;
+      }
+      return;
+    }
+
+    if (direction < 0 && (focusedServer || drillingServerId)) {
+      const focusMinScale = Math.min(
+        currentView.scale,
+        SERVER_ZOOM + 0.08
+      );
+
+      if (zoomWithin(focusMinScale, FOCUS_MAX_SCALE)) {
+        return;
+      }
+
+      if (!isWheelBoundaryReached(direction, wheelAmount, now, 125)) {
+        return;
+      }
+
+      lockWheel(720);
+      closeServerFocus();
+      return;
+    }
+
+    if (direction < 0 && activeRegionName) {
+      if (zoomWithin(SERVER_ZOOM, SERVICE_ZOOM - 0.04)) {
+        return;
+      }
+
+      if (!isWheelBoundaryReached(direction, wheelAmount, now)) {
+        return;
+      }
+
+      lockWheel(620);
+      resetMapFocus();
+      return;
+    }
+
+    if (direction > 0 && focusedServer) {
+      zoomWithin(0.36, FOCUS_MAX_SCALE);
+      return;
+    }
+
+    if (direction < 0 && !activeRegionName) {
+      zoomWithin(0.36, SERVER_ZOOM);
+      return;
+    }
   };
+
+  wheelHandlerRef.current = handleWheel;
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) {
+      return;
+    }
+
+    const onWheel = (event: WheelEvent) => {
+      wheelHandlerRef.current?.(event);
+    };
+
+    viewport.addEventListener("wheel", onWheel, { passive: false });
+    return () => viewport.removeEventListener("wheel", onWheel);
+  }, []);
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement;
     const regionTarget = target.closest("[data-region-area]") as HTMLElement | null;
+    const serverTarget = target.closest("[data-server-marker]");
     pendingRegionNameRef.current = regionTarget?.dataset.regionName ?? null;
+    pendingFocusCloseRef.current = false;
 
     if (target.closest("[data-map-panel]")) {
       pendingRegionNameRef.current = null;
@@ -625,16 +1086,14 @@ export function ServerWorldMap() {
       pendingRegionNameRef.current = null;
       return;
     }
-    if (target.closest("[data-server-marker]")) {
+    if (serverTarget && !focusedServer && !drillingServerId) {
       pendingRegionNameRef.current = null;
       return;
     }
     if (focusedServer || drillingServerId) {
       pendingRegionNameRef.current = null;
-      closeServerFocus();
-      return;
-    }
-    if (focusedRegionName && !regionTarget) {
+      pendingFocusCloseRef.current = !serverTarget;
+    } else if (focusedRegionName && !regionTarget) {
       pendingRegionNameRef.current = null;
       setFocusedRegionName(null);
       setSelectedServiceId(null);
@@ -689,8 +1148,10 @@ export function ServerWorldMap() {
 
   const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
     const pendingRegionName = pendingRegionNameRef.current;
+    const pendingFocusClose = pendingFocusCloseRef.current;
     const wasMoved = dragMovedRef.current;
     pendingRegionNameRef.current = null;
+    pendingFocusCloseRef.current = false;
 
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
@@ -714,6 +1175,11 @@ export function ServerWorldMap() {
       dragMovedRef.current = false;
     }, 0);
 
+    if (!wasMoved && pendingFocusClose) {
+      closeServerFocus();
+      return;
+    }
+
     if (!wasMoved && pendingRegionName) {
       const targetRegion = layoutRegions.find(
         (region) => region.name === pendingRegionName
@@ -735,31 +1201,47 @@ export function ServerWorldMap() {
   };
 
   return (
-    <div className="h-[calc(100vh-136px)] min-h-[720px] overflow-hidden rounded-2xl border border-slate-300 bg-slate-100 shadow-sm">
+    <div className="h-[calc(100vh-88px)] min-h-[520px] overflow-hidden rounded-xl border border-slate-300 bg-slate-100 shadow-sm">
       <div
         ref={viewportRef}
         data-world-map-viewport
         className={`relative h-full select-none overflow-hidden ${
           dragging ? "cursor-grabbing" : "cursor-grab"
         }`}
-        onWheel={handleWheel}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
       >
         <MapCanvas gridRef={mapGridRef} offset={offset} scale={scale} />
-        <MapTopBar stats={stats} />
+        <MapTopBar
+          activeMode={navigationListMode}
+          favoriteCount={favoriteItems.length}
+          finderOpen={finderOpen}
+          stats={stats}
+          onModeSelect={showNavigationList}
+        />
 
         <MapNavigationPanel
           activeRegion={activeRegion}
           activeRegionServers={activeRegionServers}
+          currentFavoriteKey={currentFavoriteTarget?.key}
           currentDepth={focusedServer ? 3 : activeRegionName ? 2 : 1}
+          favoriteItems={favoriteItems}
+          favoriteKeys={favoriteKeySet}
           focusedServer={focusedServer}
+          incidentServices={incidentServices}
+          listMode={navigationListMode}
+          normalServices={normalServices}
           open={finderOpen}
           regions={layoutRegions}
           searchValue={serverSearch}
+          serverById={serverById}
           onOpenChange={setFinderOpen}
-          onOverviewSelect={resetMapFocus}
+          onFavoriteSelect={focusFavorite}
+          onFavoriteToggle={toggleFavorite}
+          onIncidentServiceSelect={focusService}
+          onNormalServiceSelect={focusService}
+          onOverviewSelect={resetToOverview}
           onRegionSelect={focusRegion}
           onSearchChange={setServerSearch}
           onServerSelect={focusServer}
@@ -809,9 +1291,16 @@ export function ServerWorldMap() {
                   server={server}
                   focused={server.serverId === focusedServerId}
                   layerOpacity={serverLayerOpacity}
-                  serviceInteractive={serviceLayerInteractive}
-                  serviceLayerOpacity={serviceLayerOpacity}
+                  serviceInteractive={
+                    server.serverId === focusedServerId
+                      ? true
+                      : serviceLayerInteractive
+                  }
+                  serviceLayerOpacity={
+                    server.serverId === focusedServerId ? 1 : serviceLayerOpacity
+                  }
                   serverInteractive={serverLayerInteractive}
+                  onCloseFocus={closeServerFocus}
                   onServerClick={() => focusServer(server)}
                   onServiceClick={(serviceId) => setSelectedServiceId(serviceId)}
                 />
@@ -819,9 +1308,17 @@ export function ServerWorldMap() {
           </div>
         </div>
 
-        <div className="absolute bottom-6 left-6 z-30 flex items-center gap-3">
+        <div
+          data-map-panel
+          className="absolute bottom-6 left-6 z-30 flex items-center gap-3"
+          onPointerDown={(event) => event.stopPropagation()}
+          onPointerUp={(event) => event.stopPropagation()}
+        >
           <button
-            onClick={() => zoomBy(-0.16)}
+            onClick={(event) => {
+              event.stopPropagation();
+              zoomBy(-0.16);
+            }}
             className="flex h-11 w-11 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-800 shadow-sm hover:bg-slate-100"
           >
             <Minus size={20} />
@@ -830,18 +1327,15 @@ export function ServerWorldMap() {
             {Math.round(scale * 100)}%
           </div>
           <button
-            onClick={() => zoomBy(0.16)}
+            onClick={(event) => {
+              event.stopPropagation();
+              zoomBy(0.16);
+            }}
             className="flex h-11 w-11 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-800 shadow-sm hover:bg-slate-100"
           >
             <Plus size={20} />
           </button>
         </div>
-
-        <MapLegend
-          focusedRegionName={focusedRegionName}
-          focusedServer={focusedServer}
-          mapDepth={mapDepth}
-        />
 
         {selectedService && (
           <ServiceSidePanel
@@ -856,21 +1350,69 @@ export function ServerWorldMap() {
 }
 
 function MapTopBar({
+  activeMode,
+  favoriteCount,
+  finderOpen,
   stats,
+  onModeSelect,
 }: {
+  activeMode: NavigationListMode;
+  favoriteCount: number;
+  finderOpen: boolean;
   stats: {
     incidentServices: number;
-    maintenanceServices: number;
-    incidentServers: number;
     normalServices: number;
   };
+  onModeSelect: (mode: NavigationListMode) => void;
 }) {
   return (
-    <div className="pointer-events-none absolute left-1/2 top-5 z-30 flex -translate-x-1/2 flex-wrap items-center justify-center gap-4">
-      <StatusPill icon={ShieldAlert} label="장애 서비스" value={stats.incidentServices} danger />
-      <StatusPill icon={Zap} label="점검 서비스" value={stats.maintenanceServices} />
-      <StatusPill icon={Server} label="장애 서버" value={stats.incidentServers} danger />
-      <StatusPill icon={Sparkles} label="정상 서비스" value={stats.normalServices} />
+    <div
+      className={`pointer-events-none absolute right-6 top-4 z-30 flex flex-nowrap items-center justify-end gap-2 whitespace-nowrap ${
+        finderOpen ? "left-[342px]" : "left-5"
+      }`}
+    >
+      <div
+        data-map-panel
+        className="pointer-events-auto relative"
+        onPointerDown={(event) => event.stopPropagation()}
+      >
+        <StatusPill
+          icon={Star}
+          label="즐겨찾기"
+          value={favoriteCount}
+          active={activeMode === "favorites"}
+          tone="favorite"
+          onClick={() => onModeSelect("favorites")}
+        />
+      </div>
+      <div
+        data-map-panel
+        className="pointer-events-auto relative"
+        onPointerDown={(event) => event.stopPropagation()}
+      >
+        <StatusPill
+          icon={ShieldAlert}
+          label="장애 서비스"
+          value={stats.incidentServices}
+          danger
+          active={activeMode === "incidents"}
+          onClick={() => onModeSelect("incidents")}
+        />
+      </div>
+      <div
+        data-map-panel
+        className="pointer-events-auto relative"
+        onPointerDown={(event) => event.stopPropagation()}
+      >
+        <StatusPill
+          icon={Sparkles}
+          label="정상 서비스"
+          value={stats.normalServices}
+          active={activeMode === "normal"}
+          tone="normal"
+          onClick={() => onModeSelect("normal")}
+        />
+      </div>
     </div>
   );
 }
@@ -879,24 +1421,62 @@ function StatusPill({
   icon: Icon,
   label,
   value,
+  active = false,
   danger = false,
+  tone = "default",
+  onClick,
 }: {
   icon: typeof ShieldAlert;
   label: string;
   value: number;
+  active?: boolean;
   danger?: boolean;
+  tone?: "default" | "favorite" | "normal";
+  onClick?: () => void;
 }) {
-  return (
-    <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-slate-900 shadow-sm">
+  const iconClass = danger
+    ? "bg-red-100 text-red-500"
+    : tone === "favorite"
+      ? "bg-yellow-100 text-yellow-500"
+      : "bg-cyan-100 text-cyan-500";
+  const content = (
+    <>
       <div
-        className={`flex h-8 w-8 items-center justify-center rounded-full ${
-          danger ? "bg-red-500/25 text-red-200" : "bg-cyan-400/20 text-cyan-100"
+        className={`flex h-8 w-8 items-center justify-center rounded-full transition duration-200 group-hover:scale-110 group-hover:-rotate-6 ${iconClass}`}
+      >
+        <Icon
+          size={18}
+          fill={tone === "favorite" || tone === "normal" ? "currentColor" : "none"}
+        />
+      </div>
+      <span className="whitespace-nowrap text-sm font-semibold text-slate-500 transition-colors duration-200 group-hover:text-slate-700">
+        {label}
+      </span>
+      <span className="text-xl font-black transition duration-200 group-hover:translate-x-0.5">
+        {value}
+      </span>
+    </>
+  );
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className={`group flex shrink-0 transform-gpu items-center gap-2 rounded-full border bg-white px-3 py-1.5 text-slate-900 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:scale-[1.02] hover:shadow-md active:translate-y-0 active:scale-[0.99] ${
+          active
+            ? "border-[#f60] shadow-md"
+            : "border-slate-200 hover:border-slate-200"
         }`}
       >
-        <Icon size={18} />
-      </div>
-      <span className="text-sm font-semibold text-slate-500">{label}</span>
-      <span className="text-xl font-black">{value}</span>
+        {content}
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex shrink-0 items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-slate-900 shadow-sm">
+      {content}
     </div>
   );
 }
@@ -956,13 +1536,24 @@ function applyMapView(
 function MapNavigationPanel({
   activeRegion,
   activeRegionServers,
+  currentFavoriteKey,
   currentDepth,
+  favoriteItems,
+  favoriteKeys,
   focusedServer,
+  incidentServices,
+  listMode,
+  normalServices,
   open,
   regions,
   searchValue,
+  serverById,
   onOpenChange,
+  onFavoriteSelect,
   onOverviewSelect,
+  onFavoriteToggle,
+  onIncidentServiceSelect,
+  onNormalServiceSelect,
   onRegionSelect,
   onSearchChange,
   onServerSelect,
@@ -970,25 +1561,75 @@ function MapNavigationPanel({
 }: {
   activeRegion?: LayoutRegion;
   activeRegionServers: PointServer[];
+  currentFavoriteKey?: string;
   currentDepth: number;
+  favoriteItems: FavoriteItem[];
+  favoriteKeys: Set<string>;
   focusedServer?: PointServer;
+  incidentServices: ServiceRecord[];
+  listMode: NavigationListMode;
+  normalServices: ServiceRecord[];
   open: boolean;
   regions: LayoutRegion[];
   searchValue: string;
+  serverById: Map<number, ServerRecord>;
   onOpenChange: (open: boolean) => void;
+  onFavoriteSelect: (item: FavoriteItem) => void;
   onOverviewSelect: () => void;
+  onFavoriteToggle: (key: string) => void;
+  onIncidentServiceSelect: (service: ServiceRecord) => void;
+  onNormalServiceSelect: (service: ServiceRecord) => void;
   onRegionSelect: (region: LayoutRegion) => void;
   onSearchChange: (value: string) => void;
   onServerSelect: (server: PointServer) => void;
   onServiceSelect: (serviceId: number) => void;
 }) {
   const keyword = searchValue.trim().toLowerCase();
+  const filteredFavoriteItems = keyword
+    ? favoriteItems.filter((item) =>
+        [
+          item.label,
+          item.description,
+          item.path.join(" "),
+          favoriteTypeLabel(item.type),
+        ]
+          .join(" ")
+          .toLowerCase()
+          .includes(keyword)
+      )
+    : favoriteItems;
+  const filteredIncidentServices = keyword
+    ? incidentServices.filter((service) => {
+        const server = serverById.get(service.serverId);
+
+        return [service.serviceName, service.serviceCode, server?.serverName]
+          .join(" ")
+          .toLowerCase()
+          .includes(keyword);
+      })
+    : incidentServices;
+  const filteredNormalServices = keyword
+    ? normalServices.filter((service) => {
+        const server = serverById.get(service.serverId);
+
+        return [service.serviceName, service.serviceCode, server?.serverName]
+          .join(" ")
+          .toLowerCase()
+          .includes(keyword);
+      })
+    : normalServices;
   const depthLabel =
-    currentDepth === 1
-      ? "영역 목록"
-      : currentDepth === 2
-        ? "서버 목록"
-        : "서비스 목록";
+    listMode === "favorites"
+      ? "즐겨찾기 목록"
+      : listMode === "incidents"
+        ? "장애 서비스 목록"
+        : listMode === "normal"
+          ? "정상 서비스 목록"
+          : currentDepth === 1
+            ? "영역 목록"
+            : currentDepth === 2
+              ? "서버 목록"
+              : "서비스 목록";
   const filteredRegions = keyword
     ? regions.filter((region) => region.name.toLowerCase().includes(keyword))
     : regions;
@@ -1022,30 +1663,48 @@ function MapNavigationPanel({
   const visibleServers = filteredServers.slice(0, 60);
   const visibleServices = filteredServices.slice(0, 60);
   const currentCount =
-    currentDepth === 1
-      ? filteredRegions.length
-      : currentDepth === 2
-        ? filteredServers.length
-        : filteredServices.length;
+    listMode === "favorites"
+      ? filteredFavoriteItems.length
+      : listMode === "incidents"
+        ? filteredIncidentServices.length
+        : listMode === "normal"
+          ? filteredNormalServices.length
+          : currentDepth === 1
+            ? filteredRegions.length
+            : currentDepth === 2
+              ? filteredServers.length
+              : filteredServices.length;
   const totalCount =
-    currentDepth === 1
-      ? regions.length
-      : currentDepth === 2
-        ? activeRegionServers.length
-        : serverServices.length;
+    listMode === "favorites"
+      ? favoriteItems.length
+      : listMode === "incidents"
+        ? incidentServices.length
+        : listMode === "normal"
+          ? normalServices.length
+          : currentDepth === 1
+            ? regions.length
+            : currentDepth === 2
+              ? activeRegionServers.length
+              : serverServices.length;
   const searchPlaceholder =
-    currentDepth === 1
-      ? "영역명 검색"
-      : currentDepth === 2
-        ? "서버명, 호스트명, IP 검색"
-        : "서비스명, 코드, 상태 검색";
+    listMode === "favorites"
+      ? "즐겨찾기 검색"
+      : listMode === "incidents"
+        ? "장애 서비스 검색"
+        : listMode === "normal"
+          ? "정상 서비스 검색"
+          : currentDepth === 1
+            ? "영역명 검색"
+            : currentDepth === 2
+              ? "서버명, 호스트명, IP 검색"
+              : "서비스명, 코드, 상태 검색";
 
   if (!open) {
     return (
       <button
         data-map-panel
         onClick={() => onOpenChange(true)}
-        className="absolute left-5 top-24 z-30 flex h-12 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-black text-slate-800 shadow-sm hover:border-[#f60] hover:text-[#f60]"
+        className="absolute left-4 top-4 z-30 flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-black text-slate-800 shadow-sm hover:border-[#f60] hover:text-[#f60]"
       >
         <MapPin size={18} className="text-[#f60]" />
         네비게이션
@@ -1059,7 +1718,7 @@ function MapNavigationPanel({
   return (
     <aside
       data-map-panel
-      className="absolute left-5 top-24 z-30 flex max-h-[calc(100%-170px)] w-[330px] flex-col rounded-2xl border border-slate-200 bg-white/95 text-slate-900 shadow-sm"
+      className="absolute left-4 top-4 z-30 flex max-h-[calc(100%-104px)] w-[300px] flex-col rounded-2xl border border-slate-200 bg-white/95 text-slate-900 shadow-sm"
     >
       <div className="border-b border-slate-200 p-4">
         <div className="flex items-center justify-between gap-3">
@@ -1072,28 +1731,37 @@ function MapNavigationPanel({
               {depthLabel}
             </div>
           </div>
-          <button
-            onClick={() => onOpenChange(false)}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-50 text-[#f60] hover:bg-orange-100"
-            title="네비게이션 접기"
-          >
-            <ChevronLeft size={19} />
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            {currentFavoriteKey && (
+              <FavoriteButton
+                active={favoriteKeys.has(currentFavoriteKey)}
+                onToggle={() => onFavoriteToggle(currentFavoriteKey)}
+              />
+            )}
+            <button
+              onClick={() => onOpenChange(false)}
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-50 text-[#f60] hover:bg-orange-100"
+              title="네비게이션 접기"
+            >
+              <ChevronLeft size={19} />
+            </button>
+          </div>
         </div>
 
-        <div className="mt-4 flex min-w-0 flex-wrap items-center gap-1 text-xs font-black">
+        {listMode === "default" && (activeRegion || focusedServer) && (
+          <div className="mt-4 flex min-w-0 flex-nowrap items-center gap-1 overflow-hidden text-xs font-black">
           <button
             onClick={onOverviewSelect}
-            className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600 hover:bg-orange-50 hover:text-[#f60]"
+            className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-slate-600 hover:bg-orange-50 hover:text-[#f60]"
           >
             전체
           </button>
           {activeRegion && (
             <>
-              <ChevronRight size={14} className="text-slate-300" />
+              <ChevronRight size={14} className="shrink-0 text-slate-300" />
               <button
                 onClick={() => onRegionSelect(activeRegion)}
-                className="max-w-[150px] truncate rounded-full bg-orange-50 px-2.5 py-1 text-[#f60] hover:bg-orange-100"
+                className="max-w-[96px] shrink-0 truncate rounded-full bg-orange-50 px-2.5 py-1 text-[#f60] hover:bg-orange-100"
               >
                 {activeRegion.name}
               </button>
@@ -1101,16 +1769,17 @@ function MapNavigationPanel({
           )}
           {focusedServer && (
             <>
-              <ChevronRight size={14} className="text-slate-300" />
+              <ChevronRight size={14} className="shrink-0 text-slate-300" />
               <button
                 onClick={() => onServerSelect(focusedServer)}
-                className="max-w-[150px] truncate rounded-full bg-slate-900 px-2.5 py-1 text-white"
+                className="min-w-0 flex-1 truncate rounded-full bg-slate-900 px-2.5 py-1 text-white"
               >
                 {focusedServer.serverName}
               </button>
             </>
           )}
-        </div>
+          </div>
+        )}
 
         <label className="mt-4 flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 focus-within:border-[#f60] focus-within:bg-white">
           <Search size={17} className="shrink-0 text-slate-400" />
@@ -1124,7 +1793,37 @@ function MapNavigationPanel({
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto p-2">
-        {currentDepth === 1 &&
+        {listMode === "favorites" &&
+          filteredFavoriteItems.map((item) => (
+            <NavigationFavoriteRow
+              key={item.key}
+              item={item}
+              onSelect={() => onFavoriteSelect(item)}
+            />
+          ))}
+
+        {listMode === "incidents" &&
+          filteredIncidentServices.map((service) => (
+            <NavigationIncidentServiceRow
+              key={service.serviceId}
+              server={serverById.get(service.serverId)}
+              service={service}
+              onSelect={() => onIncidentServiceSelect(service)}
+            />
+          ))}
+
+        {listMode === "normal" &&
+          filteredNormalServices.map((service) => (
+            <NavigationNormalServiceRow
+              key={service.serviceId}
+              server={serverById.get(service.serverId)}
+              service={service}
+              onSelect={() => onNormalServiceSelect(service)}
+            />
+          ))}
+
+        {listMode === "default" &&
+          currentDepth === 1 &&
           filteredRegions.map((region) => (
             <button
               key={region.name}
@@ -1142,11 +1841,12 @@ function MapNavigationPanel({
                   서버 {region.serverCount} · 서비스 {region.serviceCount}
                 </span>
               </span>
-              <ChevronRight size={16} className="text-slate-400" />
+              <ChevronRight size={16} className="shrink-0 text-slate-400" />
             </button>
           ))}
 
-        {currentDepth === 2 &&
+        {listMode === "default" &&
+          currentDepth === 2 &&
           visibleServers.map((server) => (
             <NavigationServerRow
               key={server.serverId}
@@ -1155,7 +1855,8 @@ function MapNavigationPanel({
             />
           ))}
 
-        {currentDepth === 3 &&
+        {listMode === "default" &&
+          currentDepth === 3 &&
           visibleServices.map((service) => (
             <NavigationServiceRow
               key={service.serviceId}
@@ -1170,18 +1871,149 @@ function MapNavigationPanel({
           </div>
         )}
 
-        {currentDepth === 2 && filteredServers.length > visibleServers.length && (
+        {listMode === "default" &&
+          currentDepth === 2 &&
+          filteredServers.length > visibleServers.length && (
           <div className="px-3 py-2 text-center text-xs font-bold text-slate-400">
             검색어를 입력하면 더 정확하게 찾을 수 있습니다.
           </div>
         )}
-        {currentDepth === 3 && filteredServices.length > visibleServices.length && (
+        {listMode === "default" &&
+          currentDepth === 3 &&
+          filteredServices.length > visibleServices.length && (
           <div className="px-3 py-2 text-center text-xs font-bold text-slate-400">
             검색어를 입력하면 더 정확하게 찾을 수 있습니다.
           </div>
         )}
       </div>
     </aside>
+  );
+}
+
+function FavoriteButton({
+  active,
+  onToggle,
+}: {
+  active: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={(event) => {
+        event.stopPropagation();
+        onToggle();
+      }}
+      onPointerDown={(event) => event.stopPropagation()}
+      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition ${
+        active
+          ? "bg-yellow-100 text-yellow-500 hover:bg-yellow-200"
+          : "text-slate-300 hover:bg-slate-100 hover:text-yellow-500"
+      }`}
+      title={active ? "즐겨찾기 해제" : "즐겨찾기 추가"}
+    >
+      <Star size={16} fill={active ? "currentColor" : "none"} />
+    </button>
+  );
+}
+
+function NavigationFavoriteRow({
+  item,
+  onSelect,
+}: {
+  item: FavoriteItem;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      onClick={onSelect}
+      className="mb-1 flex w-full items-start gap-3 rounded-xl border border-transparent px-3 py-2.5 text-left hover:border-yellow-100 hover:bg-yellow-50"
+    >
+      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-yellow-100 text-yellow-500">
+        <Star size={15} fill="currentColor" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-black text-slate-800">
+          {item.label}
+        </span>
+        <span className="mt-1 flex flex-wrap items-center gap-1 text-[11px] font-black leading-4 text-slate-600">
+          {item.path.map((segment, index) => (
+            <span key={`${item.key}-${segment}-${index}`} className="contents">
+              {index > 0 && (
+                <ChevronRight size={12} className="shrink-0 text-slate-300" />
+              )}
+              <span className="max-w-full break-words rounded-full bg-slate-100 px-2 py-0.5">
+                {segment}
+              </span>
+            </span>
+          ))}
+        </span>
+        <span className="mt-0.5 block truncate text-xs font-semibold text-slate-500">
+          {favoriteTypeLabel(item.type)} · {item.description}
+        </span>
+      </span>
+      <ChevronRight size={16} className="mt-2 shrink-0 text-slate-400" />
+    </button>
+  );
+}
+
+function NavigationIncidentServiceRow({
+  service,
+  server,
+  onSelect,
+}: {
+  service: ServiceRecord;
+  server?: ServerRecord;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      onClick={onSelect}
+      className="mb-1 flex w-full items-start gap-3 rounded-xl border border-transparent px-3 py-2.5 text-left hover:border-red-100 hover:bg-red-50"
+    >
+      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-red-500 text-xs font-black text-white">
+        !
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-black text-slate-800">
+          {service.serviceName}
+        </span>
+        <span className="mt-0.5 block truncate text-xs font-semibold text-slate-500">
+          {service.serviceCode} · {server?.serverName ?? "서버 미지정"}
+        </span>
+      </span>
+      <ChevronRight size={16} className="mt-2 shrink-0 text-slate-400" />
+    </button>
+  );
+}
+
+function NavigationNormalServiceRow({
+  service,
+  server,
+  onSelect,
+}: {
+  service: ServiceRecord;
+  server?: ServerRecord;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      onClick={onSelect}
+      className="mb-1 flex w-full items-start gap-3 rounded-xl border border-transparent px-3 py-2.5 text-left hover:border-cyan-100 hover:bg-cyan-50"
+    >
+      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-cyan-100 text-cyan-500">
+        <Sparkles size={15} fill="currentColor" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-black text-slate-800">
+          {service.serviceName}
+        </span>
+        <span className="mt-0.5 block truncate text-xs font-semibold text-slate-500">
+          {service.serviceCode} · {server?.serverName ?? "서버 미지정"}
+        </span>
+      </span>
+      <ChevronRight size={16} className="mt-2 shrink-0 text-slate-400" />
+    </button>
   );
 }
 
@@ -1252,7 +2084,7 @@ function NavigationServiceRow({
               : "bg-cyan-100 text-slate-800"
         }`}
       >
-        {danger ? "!" : <Database size={14} />}
+        {danger ? "!" : <AppWindow size={14} />}
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-black text-slate-800">
@@ -1343,6 +2175,7 @@ function ServerMarker({
   serverInteractive,
   serviceInteractive,
   serviceLayerOpacity,
+  onCloseFocus,
   onServerClick,
   onServiceClick,
 }: {
@@ -1354,6 +2187,7 @@ function ServerMarker({
   serverInteractive: boolean;
   serviceInteractive: boolean;
   serviceLayerOpacity: number;
+  onCloseFocus: () => void;
   onServerClick: () => void;
   onServiceClick: (serviceId: number) => void;
 }) {
@@ -1379,16 +2213,24 @@ function ServerMarker({
   return (
     <div
       data-server-marker
+      data-server-id={server.serverId}
       data-server-region={server.regionName}
       className={`absolute ${
         dimmed ? "" : "transition-opacity duration-200 ease-out"
       }`}
-      onPointerDown={(event) => event.stopPropagation()}
+      onPointerDown={(event) => {
+        if (!focused) {
+          event.stopPropagation();
+        }
+      }}
       onClick={(event) => {
         if (dimmed) {
           return;
         }
         event.stopPropagation();
+        if (focused) {
+          return;
+        }
         onServerClick();
       }}
       style={{
@@ -1400,7 +2242,10 @@ function ServerMarker({
         opacity: effectiveLayerOpacity,
         pointerEvents: dimmed ? "none" : serverInteractive ? "auto" : "none",
         contain: "layout paint style",
-        willChange: "opacity",
+        transition: dimmed
+          ? "none"
+          : "width 460ms cubic-bezier(0.16, 1, 0.3, 1), height 460ms cubic-bezier(0.16, 1, 0.3, 1), opacity 200ms ease",
+        willChange: "width, height, opacity",
         zIndex: focused ? 8 : hasIncident || server.statusCode === "INCIDENT" ? 4 : 2,
       }}
     >
@@ -1411,6 +2256,21 @@ function ServerMarker({
             : "border-dashed border-slate-300"
         }`}
       />
+      {focused && (
+        <button
+          data-map-panel
+          type="button"
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.stopPropagation();
+            onCloseFocus();
+          }}
+          className="absolute right-4 top-4 z-20 flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm hover:border-[#f60] hover:text-[#f60]"
+          title="3뎁스 닫기"
+        >
+          <X size={17} />
+        </button>
+      )}
       <button
         className={`absolute left-1/2 top-3 flex -translate-x-1/2 flex-col items-center ${
           highlighted ? "text-[#f60]" : "text-slate-800"
@@ -1497,7 +2357,7 @@ function ServerMarker({
                 {["INCIDENT", "IMPACTED"].includes(service.statusCode) ? (
                   "!"
                 ) : (
-                  <Database size={13} />
+                  <AppWindow size={13} />
                 )}
               </span>
               <span className="min-w-0 flex-1">
@@ -1533,43 +2393,6 @@ function MapExclamation() {
   );
 }
 
-function MapLegend({
-  focusedRegionName,
-  focusedServer,
-  mapDepth,
-}: {
-  focusedRegionName?: string | null;
-  focusedServer?: PointServer;
-  mapDepth: number;
-}) {
-  const depthLabel =
-    mapDepth === 1
-      ? "영역"
-      : mapDepth === 2
-        ? "서버"
-        : "서비스";
-
-  return (
-    <div className="pointer-events-none absolute bottom-6 right-6 z-30 rounded-2xl border border-slate-200 bg-white p-4 text-slate-800 shadow-sm">
-      <div className="flex items-center gap-2 text-sm font-bold">
-        <Compass size={18} className="text-[#f60]" />
-        {focusedServer
-          ? focusedServer.serverName
-          : focusedRegionName
-            ? focusedRegionName
-          : depthLabel}
-      </div>
-      <div className="mt-2 text-xs text-slate-500">
-        {focusedServer
-          ? `${depthLabel} · 서비스 ${focusedServer.services.length}개`
-          : focusedRegionName
-            ? `${depthLabel} · 서버 영역`
-          : "마우스 드래그로 이동 · 휠로 확대/축소"}
-      </div>
-    </div>
-  );
-}
-
 function ServiceSidePanel({
   service,
   server,
@@ -1582,22 +2405,24 @@ function ServiceSidePanel({
   return (
     <aside
       data-map-panel
-      className="absolute right-0 top-0 z-40 h-full w-[420px] border-l border-slate-200 bg-white text-slate-900 shadow-2xl"
+      className="absolute right-0 top-0 z-40 flex h-full w-[min(340px,30vw)] min-w-[300px] max-w-[340px] flex-col border-l border-slate-200 bg-white text-slate-900 shadow-2xl"
     >
-      <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
-        <div>
-          <div className="text-sm font-semibold text-[#f60]">서비스 상세</div>
-          <h3 className="mt-1 text-2xl font-black">{service.serviceName}</h3>
+      <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-200 px-4 py-4">
+        <div className="min-w-0">
+          <div className="text-xs font-semibold text-[#f60]">서비스 상세</div>
+          <h3 className="mt-1 break-words text-xl font-black leading-tight">
+            {service.serviceName}
+          </h3>
         </div>
         <button
           onClick={onClose}
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200"
         >
-          <X size={21} />
+          <X size={19} />
         </button>
       </div>
 
-      <div className="space-y-5 overflow-auto px-6 py-6">
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
         <PanelStatus service={service} />
         <PanelItem label="서비스 코드" value={service.serviceCode} />
         <PanelItem label="배포 서버" value={server?.serverName ?? "미지정"} />
@@ -1608,12 +2433,12 @@ function ServiceSidePanel({
           label="포트 / 인스턴스"
           value={`${service.portInfo || "-"} / ${service.instanceCount}`}
         />
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-          <div className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-700">
-            <ChevronsRight size={17} className="text-[#f60]" />
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+          <div className="mb-2 flex items-center gap-2 text-xs font-bold text-slate-700">
+            <ChevronsRight size={15} className="text-[#f60]" />
             설명
           </div>
-          <p className="text-sm leading-6 text-slate-600">
+          <p className="text-xs leading-5 text-slate-600">
             {service.description || "등록된 설명이 없습니다."}
           </p>
         </div>
@@ -1626,7 +2451,7 @@ function PanelStatus({ service }: { service: ServiceRecord }) {
   const danger = ["INCIDENT", "IMPACTED"].includes(service.statusCode);
   return (
     <div
-      className={`rounded-2xl border p-4 ${
+      className={`rounded-xl border p-3 ${
         danger
           ? "border-red-200 bg-red-50"
           : service.statusCode === "MAINTENANCE"
@@ -1636,15 +2461,15 @@ function PanelStatus({ service }: { service: ServiceRecord }) {
     >
       <div className="flex items-center gap-3">
         <div
-          className={`flex h-11 w-11 items-center justify-center rounded-full ${
+          className={`flex h-9 w-9 items-center justify-center rounded-full ${
             danger ? "bg-red-500 text-white" : "bg-cyan-400 text-slate-950"
           }`}
         >
-          {danger ? <AlertTriangle size={22} /> : <CircleDot size={22} />}
+          {danger ? <AlertTriangle size={18} /> : <CircleDot size={18} />}
         </div>
         <div>
-          <div className="text-sm text-slate-500">상태</div>
-          <div className="text-lg font-black">
+          <div className="text-xs text-slate-500">상태</div>
+          <div className="text-base font-black">
             {codeLabels.serviceStatus[service.statusCode]}
           </div>
         </div>
@@ -1655,9 +2480,9 @@ function PanelStatus({ service }: { service: ServiceRecord }) {
 
 function PanelItem({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+    <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
       <div className="text-xs font-semibold text-slate-400">{label}</div>
-      <div className="mt-1 break-words text-sm font-bold text-slate-800">
+      <div className="mt-1 break-words text-sm font-bold leading-5 text-slate-800">
         {value}
       </div>
     </div>
@@ -1698,6 +2523,30 @@ function isServerInBounds(server: PointServer, bounds: MapBounds) {
     server.mapY + halfHeight >= bounds.top &&
     server.mapY - halfHeight <= bounds.bottom
   );
+}
+
+function regionFavoriteKey(regionName: string) {
+  return `region:${regionName}`;
+}
+
+function serverFavoriteKey(serverId: number) {
+  return `server:${serverId}`;
+}
+
+function serviceFavoriteKey(serviceId: number) {
+  return `service:${serviceId}`;
+}
+
+function favoriteTypeLabel(type: FavoriteItem["type"]) {
+  if (type === "region") {
+    return "영역";
+  }
+
+  if (type === "server") {
+    return "서버";
+  }
+
+  return "서비스";
 }
 
 function clamp(value: number, min: number, max: number) {

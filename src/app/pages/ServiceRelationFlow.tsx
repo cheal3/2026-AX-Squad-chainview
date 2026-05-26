@@ -36,6 +36,10 @@ type ServiceNodeData = {
   ownerGroup: string;
   serverCount: number;
   focused: boolean;
+  connected: boolean;
+  compact: boolean;
+  dimmed: boolean;
+  relationCount: number;
   lane: number;
 };
 
@@ -44,9 +48,15 @@ type LaneNodeData = {
   lane: number;
 };
 
+type GraphNodeData = ServiceNodeData | LaneNodeData;
+type GraphMode = "focused" | "all";
+
 const NODE_WIDTH = 240;
+const COMPACT_NODE_WIDTH = 188;
 const X_SPACING = 440;
 const Y_SPACING = 180;
+const FULL_X_SPACING = 248;
+const FULL_Y_SPACING = 118;
 const DEPENDS_ON_COLOR = "#475569";
 const IMPACT_COLOR = "#2563eb";
 const MUTED_EDGE_COLOR = "#cbd5e1";
@@ -70,13 +80,60 @@ export function ServiceRelationFlow() {
   const [focusedServiceId, setFocusedServiceId] = useState<number>(
     services[0]?.serviceId ?? 0
   );
+  const [graphMode, setGraphMode] = useState<GraphMode>("focused");
   const [query, setQuery] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<"ALL" | ServiceStatusCode>(
     "ALL"
   );
   const [flowInstance, setFlowInstance] =
-    useState<ReactFlowInstance<ServiceNodeData> | null>(null);
+    useState<ReactFlowInstance<GraphNodeData> | null>(null);
+
+  const ownerByServiceId = useMemo(
+    () =>
+      new Map(
+        owners.map((owner) => [owner.serviceId, owner.ownerName])
+      ),
+    [owners]
+  );
+
+  const activeRelations = useMemo(
+    () =>
+      relations.filter(
+        (relation) =>
+          relation.relationStatusCode === "ACTIVE" &&
+          relation.sourceServiceId !== relation.targetServiceId
+      ),
+    [relations]
+  );
+
+  const connectedServiceIds = useMemo(() => {
+    const connected = new Set<number>();
+    activeRelations.forEach((relation) => {
+      if (relation.sourceServiceId === focusedServiceId) {
+        connected.add(relation.targetServiceId);
+      }
+      if (relation.targetServiceId === focusedServiceId) {
+        connected.add(relation.sourceServiceId);
+      }
+    });
+    return connected;
+  }, [activeRelations, focusedServiceId]);
+
+  const relationCountByServiceId = useMemo(() => {
+    const counts = new Map<number, number>();
+    activeRelations.forEach((relation) => {
+      counts.set(
+        relation.sourceServiceId,
+        (counts.get(relation.sourceServiceId) ?? 0) + 1
+      );
+      counts.set(
+        relation.targetServiceId,
+        (counts.get(relation.targetServiceId) ?? 0) + 1
+      );
+    });
+    return counts;
+  }, [activeRelations]);
 
   const filteredSearchServices = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -111,11 +168,7 @@ export function ServiceRelationFlow() {
     const receivingServices: number[] = [];
     const sendingServices: number[] = [];
 
-    relations.forEach((relation) => {
-      if (relation.relationStatusCode !== "ACTIVE") {
-        return;
-      }
-
+    activeRelations.forEach((relation) => {
       if (
         relation.targetServiceId === focusedServiceId &&
         !visible.has(relation.sourceServiceId) &&
@@ -144,7 +197,7 @@ export function ServiceRelationFlow() {
     });
 
     return { visibleServiceIds: visible, laneByServiceId: laneMap };
-  }, [focusedServiceId, relations]);
+  }, [activeRelations, focusedServiceId]);
 
   const laneNodes = useMemo<Node<LaneNodeData>[]>(() => {
     const nodes: Node<LaneNodeData>[] = [];
@@ -168,11 +221,71 @@ export function ServiceRelationFlow() {
 
   const serviceNodes = useMemo<Node<ServiceNodeData>[]>(() => {
     const visibleServices = services.filter((service) => {
-      if (!visibleServiceIds.has(service.serviceId)) {
+      if (statusFilter !== "ALL" && service.statusCode !== statusFilter) {
         return false;
       }
-      return statusFilter === "ALL" || service.statusCode === statusFilter;
+
+      return graphMode === "all" || visibleServiceIds.has(service.serviceId);
     });
+
+    if (graphMode === "all") {
+      const sortedServices = [...visibleServices].sort((first, second) =>
+        [
+          first.categoryPath[0],
+          first.categoryPath[1],
+          first.serviceName,
+          first.serviceCode,
+        ]
+          .join(" ")
+          .localeCompare(
+            [
+              second.categoryPath[0],
+              second.categoryPath[1],
+              second.serviceName,
+              second.serviceCode,
+            ].join(" "),
+            "ko"
+          )
+      );
+      const columns = Math.min(
+        16,
+        Math.max(6, Math.ceil(Math.sqrt(sortedServices.length * 1.55)))
+      );
+      const rows = Math.max(1, Math.ceil(sortedServices.length / columns));
+
+      return sortedServices.map((service, index) => {
+        const column = index % columns;
+        const row = Math.floor(index / columns);
+        const connected =
+          service.serviceId === focusedServiceId ||
+          connectedServiceIds.has(service.serviceId);
+
+        return {
+          id: String(service.serviceId),
+          type: "serviceNode",
+          position: {
+            x: (column - (columns - 1) / 2) * FULL_X_SPACING,
+            y: (row - (rows - 1) / 2) * FULL_Y_SPACING,
+          },
+          data: {
+            label: service.serviceName,
+            code: service.serviceCode,
+            category: service.categoryPath.join(" / "),
+            statusCode: service.statusCode,
+            importanceCode: service.importanceCode ?? "NORMAL",
+            ownerGroup: ownerByServiceId.get(service.serviceId) ?? "미지정",
+            serverCount: service.serverId ? 1 : 0,
+            focused: service.serviceId === focusedServiceId,
+            connected,
+            compact: true,
+            dimmed: !connected,
+            relationCount: relationCountByServiceId.get(service.serviceId) ?? 0,
+            lane: 0,
+          },
+        };
+      });
+    }
+
     const laneCounts = visibleServices.reduce<Map<number, number>>(
       (acc, service) => {
         const lane = laneByServiceId.get(service.serviceId) ?? 0;
@@ -187,9 +300,9 @@ export function ServiceRelationFlow() {
       const lane = laneByServiceId.get(service.serviceId) ?? 0;
       const laneIndex = laneSeen.get(lane) ?? 0;
       const laneCount = laneCounts.get(lane) ?? 1;
-      const ownerGroup =
-        owners.find((owner) => owner.serviceId === service.serviceId)
-          ?.ownerName ?? "미지정";
+      const connected =
+        service.serviceId === focusedServiceId ||
+        connectedServiceIds.has(service.serviceId);
       laneSeen.set(lane, laneIndex + 1);
 
       return {
@@ -205,17 +318,24 @@ export function ServiceRelationFlow() {
           category: service.categoryPath.join(" / "),
           statusCode: service.statusCode,
           importanceCode: service.importanceCode ?? "NORMAL",
-          ownerGroup,
+          ownerGroup: ownerByServiceId.get(service.serviceId) ?? "미지정",
           serverCount: service.serverId ? 1 : 0,
           focused: service.serviceId === focusedServiceId,
+          connected,
+          compact: false,
+          dimmed: false,
+          relationCount: relationCountByServiceId.get(service.serviceId) ?? 0,
           lane,
         },
       };
     });
   }, [
     focusedServiceId,
+    connectedServiceIds,
+    graphMode,
     laneByServiceId,
-    owners,
+    ownerByServiceId,
+    relationCountByServiceId,
     services,
     statusFilter,
     visibleServiceIds,
@@ -233,13 +353,12 @@ export function ServiceRelationFlow() {
         .map((service) => service.serviceId)
     );
 
-    return relations
+    return activeRelations
       .filter(
         (relation) =>
-          relation.relationStatusCode === "ACTIVE" &&
           displayedServiceIds.has(relation.sourceServiceId) &&
           displayedServiceIds.has(relation.targetServiceId) &&
-          connectsAdjacentLane(relation, laneByServiceId)
+          (graphMode === "all" || connectsAdjacentLane(relation, laneByServiceId))
       )
       .map((relation) => {
         const directlyConnected =
@@ -256,31 +375,34 @@ export function ServiceRelationFlow() {
           id: String(relation.relationId),
           source: String(relation.sourceServiceId),
           target: String(relation.targetServiceId),
-          type: "default",
-          className: "chainview-flow-edge",
+          type: graphMode === "all" ? "smoothstep" : "default",
+          className: directlyConnected
+            ? "chainview-flow-edge chainview-flow-edge-active"
+            : "chainview-flow-edge chainview-flow-edge-muted",
           markerEnd: {
             type: MarkerType.ArrowClosed,
             color: stroke,
           },
           style: {
             stroke,
-            strokeWidth: directlyConnected ? 2.8 : 1.6,
-            opacity: directlyConnected ? 0.9 : 0.45,
+            strokeWidth: directlyConnected ? 2.6 : 1.15,
+            opacity: directlyConnected ? 0.9 : graphMode === "all" ? 0.16 : 0.45,
           },
         };
       });
   }, [
+    activeRelations,
     focusedServiceId,
+    graphMode,
     laneByServiceId,
-    relations,
     services,
     statusFilter,
     visibleServiceIds,
   ]);
 
-  const nodes = useMemo(
-    () => [...laneNodes, ...serviceNodes],
-    [laneNodes, serviceNodes]
+  const nodes = useMemo<Node<GraphNodeData>[]>(
+    () => (graphMode === "all" ? [...serviceNodes] : [...laneNodes, ...serviceNodes]),
+    [graphMode, laneNodes, serviceNodes]
   );
   const nodeTypes = useMemo(
     () => ({ laneNode: LaneNode, serviceNode: ServiceNode }),
@@ -294,14 +416,26 @@ export function ServiceRelationFlow() {
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
-      flowInstance?.setCenter(NODE_WIDTH / 2, 0, {
+      if (!flowInstance) {
+        return;
+      }
+
+      if (graphMode === "all") {
+        flowInstance.fitView({
+          padding: 0.18,
+          duration: 800,
+        });
+        return;
+      }
+
+      flowInstance.setCenter(NODE_WIDTH / 2, 0, {
         zoom: 0.86,
         duration: 800,
       });
     });
 
     return () => window.cancelAnimationFrame(frame);
-  }, [flowInstance, focusedServiceId, nodes]);
+  }, [flowInstance, focusedServiceId, graphMode, nodes]);
 
   return (
     <div className="min-h-[calc(100vh-136px)] space-y-5">
@@ -311,17 +445,57 @@ export function ServiceRelationFlow() {
             <div>
               <h3 className="text-2xl font-bold text-slate-950">서비스 관계도</h3>
               <p className="mt-1 text-sm text-slate-500">
-                선택 노드 기준 수신 서비스는 왼쪽, 송신 서비스는 오른쪽에 표시합니다.
+                {graphMode === "all"
+                  ? "전체 서비스를 간략 노드로 표시하고 선택 노드와 연결된 선만 강조합니다."
+                  : "선택 노드 기준 수신 서비스는 왼쪽, 송신 서비스는 오른쪽에 표시합니다."}
               </p>
             </div>
-            <button
-              onClick={() => setFiltersOpen((current) => !current)}
-              className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              {filtersOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-              {filtersOpen ? "검색 접기" : "검색 열기"}
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1">
+                <button
+                  onClick={() => setGraphMode("focused")}
+                  className={`rounded-md px-3 py-1.5 text-sm font-semibold transition ${
+                    graphMode === "focused"
+                      ? "bg-white text-blue-600 shadow-sm"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  기준 서비스 보기
+                </button>
+                <button
+                  onClick={() => setGraphMode("all")}
+                  className={`rounded-md px-3 py-1.5 text-sm font-semibold transition ${
+                    graphMode === "all"
+                      ? "bg-white text-blue-600 shadow-sm"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  전체 서비스 보기
+                </button>
+              </div>
+              <button
+                onClick={() => setFiltersOpen((current) => !current)}
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                {filtersOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                {filtersOpen ? "검색 접기" : "검색 열기"}
+              </button>
+            </div>
           </div>
+
+          {graphMode === "all" && (
+            <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold text-slate-500">
+              <span className="rounded-full bg-slate-100 px-3 py-1">
+                표시 서비스 {serviceNodes.length}
+              </span>
+              <span className="rounded-full bg-slate-100 px-3 py-1">
+                전체 관계 {edges.length}
+              </span>
+              <span className="rounded-full bg-blue-50 px-3 py-1 text-blue-600">
+                선택 연결 {connectedServiceIds.size}
+              </span>
+            </div>
+          )}
 
           {filtersOpen && (
             <>
@@ -392,8 +566,13 @@ export function ServiceRelationFlow() {
               edges={edges}
               nodeTypes={nodeTypes}
               onInit={(instance) => setFlowInstance(instance)}
-              onNodeClick={(_, node) => selectFocusedService(Number(node.id))}
-              minZoom={0.28}
+              onNodeClick={(_, node) => {
+                if (node.type !== "serviceNode") {
+                  return;
+                }
+                selectFocusedService(Number(node.id));
+              }}
+              minZoom={0.18}
               maxZoom={1.4}
               className="relative z-[1]"
             >
@@ -419,6 +598,23 @@ export function ServiceRelationFlow() {
           border-color: #2563eb;
           box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.15),
             0 14px 30px rgba(37, 99, 235, 0.16);
+        }
+
+        .chainview-flow-node-connected {
+          border-color: rgba(37, 99, 235, 0.45);
+        }
+
+        .chainview-flow-node-compact {
+          width: ${COMPACT_NODE_WIDTH}px;
+          min-height: 76px;
+          padding: 10px 12px;
+          border-radius: 10px;
+          box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
+        }
+
+        .chainview-flow-node-dimmed {
+          opacity: 0.46;
+          box-shadow: none;
         }
 
         .chainview-lane-node {
@@ -457,9 +653,13 @@ export function ServiceRelationFlow() {
           stroke-linecap: round;
         }
 
-        .chainview-flow-edge path {
+        .chainview-flow-edge-active path {
           stroke-dasharray: 12 10;
           animation: chainview-edge-flow 1.05s linear infinite;
+        }
+
+        .chainview-flow-edge-muted path {
+          stroke-dasharray: 2 8;
         }
 
         @keyframes chainview-edge-flow {
@@ -476,11 +676,43 @@ export function ServiceRelationFlow() {
 }
 
 function ServiceNode({ data }: { data: ServiceNodeData }) {
+  if (data.compact) {
+    return (
+      <div
+        className={`chainview-flow-node chainview-flow-node-compact ${
+          data.focused ? "chainview-flow-node-focused" : ""
+        } ${data.connected ? "chainview-flow-node-connected" : ""} ${
+          data.dimmed ? "chainview-flow-node-dimmed" : ""
+        }`}
+      >
+        <Handle type="target" position={Position.Left} />
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <div className="truncate text-xs font-black text-slate-950">
+              {data.label}
+            </div>
+            <div className="mt-1 truncate text-[11px] font-semibold text-blue-600">
+              {data.code}
+            </div>
+          </div>
+          <StatusPill statusCode={data.statusCode} compact />
+        </div>
+        <div className="mt-2 flex items-center justify-between gap-2 text-[10px] font-semibold text-slate-500">
+          <span className="truncate">{data.category.split(" / ")[0]}</span>
+          <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5">
+            관계 {data.relationCount}
+          </span>
+        </div>
+        <Handle type="source" position={Position.Right} />
+      </div>
+    );
+  }
+
   return (
     <div
       className={`chainview-flow-node ${
         data.focused ? "chainview-flow-node-focused" : ""
-      }`}
+      } ${data.connected ? "chainview-flow-node-connected" : ""}`}
     >
       <Handle type="target" position={Position.Left} />
       <div className="flex items-start justify-between gap-3">
@@ -528,7 +760,13 @@ function LaneNode({ data }: { data: LaneNodeData }) {
   );
 }
 
-function StatusPill({ statusCode }: { statusCode: ServiceStatusCode }) {
+function StatusPill({
+  statusCode,
+  compact = false,
+}: {
+  statusCode: ServiceStatusCode;
+  compact?: boolean;
+}) {
   const className =
     statusCode === "NORMAL"
       ? "border-emerald-200 bg-emerald-50 text-emerald-700"
@@ -537,7 +775,11 @@ function StatusPill({ statusCode }: { statusCode: ServiceStatusCode }) {
         : "border-amber-200 bg-amber-50 text-amber-700";
 
   return (
-    <span className={`shrink-0 rounded-md border px-2 py-1 text-[11px] font-semibold ${className}`}>
+    <span
+      className={`shrink-0 rounded-md border font-semibold ${className} ${
+        compact ? "px-1.5 py-0.5 text-[10px]" : "px-2 py-1 text-[11px]"
+      }`}
+    >
       {codeLabels.serviceStatus[statusCode]}
     </span>
   );
