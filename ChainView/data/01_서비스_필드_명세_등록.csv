@@ -1,0 +1,94 @@
+서비스명,필드명,표시명,타입,필수,자동생성,설명,FK참조
+서비스 관리,serviceCode,서비스 코드,string,Y,N,고유 식별자 (예: PAY-API-001),
+서비스 관리,serviceName,서비스명,string,Y,N,서비스 표시명,
+서비스 관리,categoryL1,대분류,string,Y,N,대분류,서비스 분류
+서비스 관리,categoryL2,중분류,string,N,N,중분류,서비스 분류
+서비스 관리,categoryL3,소분류,string,N,N,소분류,서비스 분류
+서비스 관리,serviceType,서비스 유형,enum,Y,N,API/WEB/BATCH,공통코드(SERVICE_TYPE)
+서비스 관리,importance,중요도,enum,Y,N,높음/중간/낮음,공통코드(IMPORTANCE)
+서비스 관리,status,상태,enum,Y,N,운영중/테스트/개발/중지,공통코드(STATUS)
+서비스 관리,endpointUrl,엔드포인트 URL,string,N,N,서비스 접근 URL,
+서비스 관리,description,설명,text,N,N,서비스 상세 설명,
+서비스 관리,createdAt,등록일,datetime,Y,Y,시스템 자동 생성,
+서비스 관리,createdBy,등록자,string,Y,Y,로그인 사용자 자동 설정,
+서비스 분류,categoryCode,분류 코드,string,Y,N,고유 식별자,
+서비스 분류,categoryName,분류명,string,Y,N,표시명,
+서비스 분류,level,레벨,number,Y,Y,1=대분류/2=중분류/3=소분류,
+서비스 분류,parentCode,상위 분류 코드,string,N,N,대분류는 null,서비스 분류(자기참조)
+서비스 분류,sortOrder,정렬순서,number,N,N,동일 레벨 내 순서,
+서비스 분류,isActive,사용여부,boolean,Y,Y,기본값: true,
+기술스택 마스터,id,ID,number,Y,Y,Auto Increment,
+기술스택 마스터,techType,기술 유형,enum,Y,N,언어/프레임워크/데이터베이스 등,공통코드(TECH_TYPE)
+기술스택 마스터,techName,기술명,string,Y,N,Java/Spring Boot/MySQL 등,
+기술스택 마스터,defaultVersion,기본 버전,string,N,N,권장 버전,
+기술스택 마스터,isActive,사용여부,boolean,Y,Y,기본값: true,
+서비스 기술스택,id,ID,number,Y,Y,Auto Increment,
+서비스 기술스택,serviceCode,서비스 코드,string,Y,N,서비스 선택,SERVICE
+서비스 기술스택,techStackId,기술스택 ID,number,Y,N,기술스택 선택,TECH_STACK_MASTER
+서비스 기술스택,appliedVersion,적용 버전,string,N,N,실제 적용 버전,
+서비스 기술스택,notes,비고,string,N,N,추가 설명,
+서버 관리,serverName,서버명,string,Y,N,고유 식별자,
+서버 관리,hostname,호스트명,string,Y,N,FQDN 또는 호스트명 (UK),
+서버 관리,ipAddress,IP 주소,string,Y,N,IPv4 또는 IPv6,
+서버 관리,environment,환경,enum,Y,N,Production/Test/Development,공통코드(ENVIRONMENT)
+서버 관리,osType,OS 유형,string,Y,N,Linux/Windows 등,공통코드(OS_TYPE)
+서버 관리,osVersion,OS 버전,string,N,N,CentOS 7.9/Windows Server 2019 등,
+서버 관리,status,상태,enum,Y,N,운영중/테스트/개발/중지,공통코드(STATUS)
+서버 관리,createdAt,등록일,datetime,Y,Y,시스템 자동 생성,
+배포 정보,id,ID,number,Y,Y,Auto Increment,
+배포 정보,serviceCode,서비스,string,Y,N,서비스 선택,SERVICE
+배포 정보,serverName,서버,string,Y,N,서버 선택,SERVER
+배포 정보,deployPath,배포 경로,string,N,N,/app/services/pay-api 등,
+배포 정보,port,포트,number,N,N,8080 등,
+배포 정보,instanceCount,인스턴스 수,number,N,N,기본값: 1,
+배포 정보,status,상태,enum,Y,N,Running/Stopped/Deploying 등,
+배포 정보,createdAt,등록일,datetime,Y,Y,시스템 자동 생성,
+서비스 관계,id,ID,number,Y,Y,Auto Increment,
+서비스 관계,sourceServiceCode,호출 서비스,string,Y,N,From 서비스,SERVICE
+서비스 관계,targetServiceCode,대상 서비스,string,Y,N,To 서비스,SERVICE
+서비스 관계,relationType,관계 유형,enum,Y,N,API 호출/DB 접근/메시지 구독 등,공통코드(RELATION_TYPE)
+서비스 관계,connectionStatus,연결 상태,enum,Y,N,정상/지연/장애,
+서비스 관계,isRequired,필수 여부,boolean,Y,N,장애 시 영향도 판단용,
+서비스 관계,description,설명,string,N,N,관계 상세 설명,
+서비스 관계,createdAt,등록일,datetime,Y,Y,시스템 자동 생성,
+사용자 관리,employeeNo,사번,string,Y,N,PK/고유 식별자,
+사용자 관리,name,이름,string,Y,N,,
+사용자 관리,organizationId,조직,string,Y,N,조직 선택,GROUP
+사용자 관리,departmentId,부서,string,Y,N,부서 선택,GROUP
+사용자 관리,role,역할,string,N,N,직책/담당업무,
+사용자 관리,phone,연락처,string,N,N,,
+사용자 관리,email,이메일,string,Y,N,UK/중복 불가,
+사용자 관리,isActive,활성 상태,boolean,Y,Y,기본값: true,
+사용자 관리,createdAt,등록일,datetime,Y,Y,시스템 자동 생성,
+그룹 관리,id,ID,number,Y,Y,Auto Increment,
+그룹 관리,groupName,그룹명,string,Y,N,,
+그룹 관리,groupType,그룹 유형,enum,Y,N,조직/부서/팀 등,
+그룹 관리,parentGroupId,상위 그룹,number,N,N,자기참조,GROUP
+그룹 관리,sortOrder,정렬순서,number,N,N,,
+그룹 관리,isActive,사용여부,boolean,Y,Y,기본값: true,
+서비스 담당자,id,ID,number,Y,Y,Auto Increment,
+서비스 담당자,serviceCode,서비스,string,Y,N,서비스 선택,SERVICE
+서비스 담당자,employeeNo,담당자,string,Y,N,담당자 선택,USER
+서비스 담당자,ownerRole,담당 역할,enum,Y,N,주담당자/부담당자/개발자/운영자 등,
+서비스 담당자,startDate,담당 시작일,date,N,N,,
+서비스 담당자,endDate,담당 종료일,date,N,N,null이면 현재 담당중,
+서비스 담당자,createdAt,등록일,datetime,Y,Y,시스템 자동 생성,
+인시던트 관리,id,인시던트 ID,number,Y,Y,Auto Increment,
+인시던트 관리,incidentType,유형,enum,Y,N,서비스 장애/서버 장애,공통코드(INCIDENT_TYPE)
+인시던트 관리,severity,심각도,enum,Y,N,CRITICAL/HIGH/MEDIUM/LOW/NOTICE,공통코드(SEVERITY)
+인시던트 관리,status,상태,enum,Y,N,OPEN/IN_PROGRESS/RESOLVED/CLOSED,
+인시던트 관리,targetType,대상 유형,enum,Y,N,SERVICE/SERVER,
+인시던트 관리,targetId,대상 ID,string,Y,N,서비스 또는 서버 선택,SERVICE 또는 SERVER
+인시던트 관리,title,제목,string,Y,N,인시던트 요약,
+인시던트 관리,description,상세 내용,text,N,N,,
+인시던트 관리,affectedServices,영향 서비스 수,number,N,Y,계산 필드 (서비스 관계 기반),
+인시던트 관리,occurredAt,발생 일시,datetime,Y,N,사용자 입력,
+인시던트 관리,resolvedAt,종료 일시,datetime,N,N,해결 시 입력,
+인시던트 관리,createdBy,등록자,string,Y,Y,로그인 사용자,
+인시던트 관리,createdAt,등록일,datetime,Y,Y,시스템 자동 생성,
+공통코드 관리,codeGroup,코드 그룹,string,Y,N,PK(복합)/SERVICE_TYPE 등,
+공통코드 관리,itemCode,코드,string,Y,N,PK(복합)/실제 저장값,
+공통코드 관리,codeName,코드명,string,Y,N,화면 표시명,
+공통코드 관리,sortOrder,정렬순서,number,N,N,동일 그룹 내 순서,
+공통코드 관리,isActive,사용여부,boolean,Y,Y,기본값: true,
+공통코드 관리,notes,비고,string,N,N,,

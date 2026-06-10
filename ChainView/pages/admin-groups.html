@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>그룹 관리 — ChainView Admin</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" />
+<link rel="stylesheet" href="admin-common.css" />
+<style>
+  .tree-cell{display:flex;align-items:center;gap:6px}
+  .tree-indent{display:inline-block;color:#cbd5e1}
+  .gt-org{background:#eef2ff;color:#3730a3}
+  .gt-dept{background:#fffbeb;color:#92400e}
+  .gt-team{background:#ecfdf5;color:#166534}
+</style>
+</head>
+<body data-menu="groups">
+<div class="app">
+  <aside class="lnb"></aside>
+
+  <main class="main">
+    <div class="crumb">
+      <a href="dashboard-proto.html">대시보드</a><span class="sep">/</span>
+      <span>소유권</span><span class="sep">/</span><span>그룹 관리</span>
+    </div>
+
+    <div class="page-head">
+      <div>
+        <h1 class="page-head__title">📁 그룹 관리 <small>GROUP (조직 트리)</small></h1>
+        <p class="page-head__desc">본부 → 부서 → 팀 계층 구조를 관리합니다. 사용자/담당자가 이 트리에 매핑됩니다.</p>
+      </div>
+      <div class="page-head__right">
+        <button class="btn">📥 CSV 내보내기</button>
+        <button class="btn btn--primary" data-modal-open="m-grp-create">＋ 그룹 등록</button>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <select><option>유형 · 전체</option><option>본부 (ORG)</option><option>부서 (DEPT)</option><option>팀 (TEAM)</option></select>
+      <select><option>활성 · 전체</option><option>활성</option><option>비활성</option></select>
+      <div class="search">🔍<input type="text" placeholder="그룹명, 그룹코드 검색…" /></div>
+      <div class="right"><button class="btn btn--ghost btn--sm">전체 펼치기</button></div>
+    </div>
+
+    <div class="card">
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th class="col-check"><input type="checkbox" class="chk" /></th>
+            <th>그룹 (트리)</th><th>groupCode</th><th>유형</th>
+            <th>상위 그룹</th><th>인원</th><th>정렬</th><th>활성</th>
+            <th class="col-actions">관리</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td class="tree-cell"><b>IT기획본부</b></td>
+            <td><code>ORG-001</code></td><td><span class="pill gt-org">ORG</span></td>
+            <td>-</td><td>32</td><td>1</td><td><span class="pill pill--ok">활성</span></td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-grp-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-grp-delete">🗑</button></div></td></tr>
+          <tr><td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td class="tree-cell"><span class="tree-indent">└─</span> 채널운영부</td>
+            <td><code>DEPT-001</code></td><td><span class="pill gt-dept">DEPT</span></td>
+            <td><code>ORG-001</code></td><td>18</td><td>1</td><td><span class="pill pill--ok">활성</span></td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-grp-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-grp-delete">🗑</button></div></td></tr>
+          <tr><td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td class="tree-cell"><span class="tree-indent">　　└─</span> 모니터링팀</td>
+            <td><code>TEAM-001</code></td><td><span class="pill gt-team">TEAM</span></td>
+            <td><code>DEPT-001</code></td><td>6</td><td>1</td><td><span class="pill pill--ok">활성</span></td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-grp-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-grp-delete">🗑</button></div></td></tr>
+          <tr><td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td class="tree-cell"><b>IT개발본부</b></td>
+            <td><code>ORG-002</code></td><td><span class="pill gt-org">ORG</span></td>
+            <td>-</td><td>54</td><td>2</td><td><span class="pill pill--ok">활성</span></td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-grp-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-grp-delete">🗑</button></div></td></tr>
+          <tr><td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td class="tree-cell"><span class="tree-indent">└─</span> 코어개발부</td>
+            <td><code>DEPT-002</code></td><td><span class="pill gt-dept">DEPT</span></td>
+            <td><code>ORG-002</code></td><td>22</td><td>1</td><td><span class="pill pill--ok">활성</span></td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-grp-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-grp-delete">🗑</button></div></td></tr>
+          <tr><td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td class="tree-cell"><span class="tree-indent">　　└─</span> 결제팀</td>
+            <td><code>TEAM-002</code></td><td><span class="pill gt-team">TEAM</span></td>
+            <td><code>DEPT-002</code></td><td>8</td><td>1</td><td><span class="pill pill--ok">활성</span></td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-grp-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-grp-delete">🗑</button></div></td></tr>
+          <tr><td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td class="tree-cell"><span class="tree-indent">　　└─</span> 계좌팀</td>
+            <td><code>TEAM-003</code></td><td><span class="pill gt-team">TEAM</span></td>
+            <td><code>DEPT-002</code></td><td>7</td><td>2</td><td><span class="pill pill--ok">활성</span></td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-grp-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-grp-delete">🗑</button></div></td></tr>
+          <tr><td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td class="tree-cell"><b>IT운영본부</b></td>
+            <td><code>ORG-003</code></td><td><span class="pill gt-org">ORG</span></td>
+            <td>-</td><td>28</td><td>3</td><td><span class="pill pill--ok">활성</span></td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-grp-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-grp-delete">🗑</button></div></td></tr>
+          <tr><td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td class="tree-cell"><span class="tree-indent">└─</span> 인프라운영부</td>
+            <td><code>DEPT-003</code></td><td><span class="pill gt-dept">DEPT</span></td>
+            <td><code>ORG-003</code></td><td>15</td><td>1</td><td><span class="pill pill--ok">활성</span></td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-grp-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-grp-delete">🗑</button></div></td></tr>
+          <tr><td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td class="tree-cell"><b>구.정보보호본부</b></td>
+            <td><code>ORG-099</code></td><td><span class="pill gt-org">ORG</span></td>
+            <td>-</td><td>0</td><td>99</td><td><span class="pill pill--idle">비활성</span></td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-grp-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-grp-delete">🗑</button></div></td></tr>
+        </tbody>
+      </table>
+      <div class="pager">
+        <div class="pager__info">전체 28건 · 1-10 / 3 페이지</div>
+        <div class="pager__nav"><button disabled>‹</button><button class="is-on">1</button><button>2</button><button>3</button><button>›</button></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="modal-backdrop" id="m-grp-create">
+  <div class="modal">
+    <div class="modal__head"><h3>＋ 그룹 등록</h3><button class="close" data-modal-close>×</button></div>
+    <div class="modal__body">
+      <div class="form-row"><label>groupCode<span class="req">*</span></label><input type="text" placeholder="예: TEAM-004" /><span class="help">고유 · 수정 불가</span></div>
+      <div class="form-row"><label>그룹명<span class="req">*</span></label><input type="text" placeholder="예: 인증팀" /></div>
+      <div class="form-row"><label>그룹 유형 (groupType)<span class="req">*</span></label>
+        <select><option>ORG (본부)</option><option>DEPT (부서)</option><option>TEAM (팀)</option></select></div>
+      <div class="form-row"><label>상위 그룹 (parentGroupId)</label>
+        <select><option>없음 (최상위)</option><option>ORG-001 IT기획본부</option><option>DEPT-001 채널운영부</option><option>DEPT-002 코어개발부</option></select></div>
+      <div class="form-row"><label>정렬 순서</label><input type="number" value="1" /></div>
+      <div class="form-row"><label>활성여부</label><select><option>활성</option><option>비활성</option></select></div>
+    </div>
+    <div class="modal__foot"><button class="btn" data-modal-close>취소</button><button class="btn btn--primary">등록</button></div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="m-grp-edit">
+  <div class="modal">
+    <div class="modal__head"><h3>✏️ 그룹 수정 — <code style="font-size:13px">DEPT-002</code></h3><button class="close" data-modal-close>×</button></div>
+    <div class="modal__body">
+      <div class="form-row"><label>groupCode</label><input type="text" value="DEPT-002" disabled /></div>
+      <div class="form-row"><label>그룹명</label><input type="text" value="코어개발부" /></div>
+      <div class="form-row"><label>그룹 유형</label><select><option>DEPT (부서)</option></select></div>
+      <div class="form-row"><label>상위 그룹</label><select><option>ORG-002 IT개발본부</option></select></div>
+      <div class="form-row"><label>정렬 순서</label><input type="number" value="1" /></div>
+      <div class="form-row"><label>활성여부</label><select><option>활성</option><option>비활성</option></select></div>
+    </div>
+    <div class="modal__foot"><button class="btn" data-modal-close>취소</button><button class="btn btn--primary">저장</button></div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="m-grp-delete">
+  <div class="modal confirm">
+    <div class="modal__head"><h3>🗑 그룹 삭제</h3><button class="close" data-modal-close>×</button></div>
+    <div class="modal__body">
+      <div class="confirm__icon">⚠</div>
+      <div class="confirm__msg"><b>DEPT-002 코어개발부</b>를 삭제하시겠습니까?</div>
+      <div class="confirm__note">하위 팀 2건, 소속 사용자 22명이 영향을 받습니다.<br/>※ 하위/소속이 있으면 비활성 처리만 가능합니다.</div>
+    </div>
+    <div class="modal__foot"><button class="btn" data-modal-close>취소</button><button class="btn btn--danger">삭제</button></div>
+  </div>
+</div>
+
+<script src="admin-common.js"></script>
+</body>
+</html>

@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>서버 관리 — ChainView Admin</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" />
+<link rel="stylesheet" href="admin-common.css" />
+</head>
+<body data-menu="servers">
+<div class="app">
+  <aside class="lnb"></aside>
+
+  <main class="main">
+    <div class="crumb">
+      <a href="dashboard-proto.html">대시보드</a><span class="sep">/</span>
+      <span>배포 인프라</span><span class="sep">/</span><span>서버 관리</span>
+    </div>
+
+    <div class="page-head">
+      <div>
+        <h1 class="page-head__title">🖥️ 서버 관리 <small>SERVER</small></h1>
+        <p class="page-head__desc">물리/가상 서버 인벤토리를 관리합니다. (운영 38 · 스테이징 12 · 개발 22)</p>
+      </div>
+      <div class="page-head__right">
+        <button class="btn">📥 CSV 내보내기</button>
+        <button class="btn btn--primary" data-modal-open="m-svr-create">＋ 서버 등록</button>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <select><option>환경 · 전체</option><option>운영</option><option>스테이징</option><option>개발</option><option>테스트</option></select>
+      <select><option>OS · 전체</option><option>Linux</option><option>Windows</option><option>AIX</option><option>Solaris</option></select>
+      <select><option>상태 · 전체</option><option>운영중</option><option>점검중</option><option>중지</option></select>
+      <div class="search">🔍<input type="text" placeholder="serverName, hostname, IP 검색…" /></div>
+      <div class="right"><button class="btn btn--ghost btn--sm">초기화</button></div>
+    </div>
+
+    <div class="card">
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th class="col-check"><input type="checkbox" class="chk" /></th>
+            <th>serverName</th><th>hostname</th><th>IP</th>
+            <th>환경</th><th>OS</th><th>버전</th>
+            <th>배포 서비스</th><th>상태</th>
+            <th class="col-actions">관리</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td><b>WAS-PRD-12</b></td><td><code>was-prd-12.bank.local</code></td><td><code>10.20.30.12</code></td>
+            <td><span class="pill pill--crit">운영</span></td><td>Linux</td><td>RHEL 8.9</td>
+            <td>4</td><td><span class="dot dot--warn"></span>운영중 (CPU 92%)</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-svr-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-svr-delete">🗑</button></div></td></tr>
+          <tr><td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td><b>WAS-PRD-13</b></td><td><code>was-prd-13.bank.local</code></td><td><code>10.20.30.13</code></td>
+            <td><span class="pill pill--crit">운영</span></td><td>Linux</td><td>RHEL 8.9</td>
+            <td>4</td><td><span class="dot"></span>운영중</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-svr-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-svr-delete">🗑</button></div></td></tr>
+          <tr><td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td><b>DB-PRD-01</b></td><td><code>db-prd-01.bank.local</code></td><td><code>10.20.40.1</code></td>
+            <td><span class="pill pill--crit">운영</span></td><td>Linux</td><td>Oracle Linux 8</td>
+            <td>2</td><td><span class="dot"></span>운영중</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-svr-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-svr-delete">🗑</button></div></td></tr>
+          <tr><td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td><b>WEB-PRD-01</b></td><td><code>web-prd-01.bank.local</code></td><td><code>10.20.10.1</code></td>
+            <td><span class="pill pill--crit">운영</span></td><td>Linux</td><td>RHEL 8.9</td>
+            <td>3</td><td><span class="dot"></span>운영중</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-svr-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-svr-delete">🗑</button></div></td></tr>
+          <tr><td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td><b>BATCH-PRD-01</b></td><td><code>batch-prd-01.bank.local</code></td><td><code>10.20.50.1</code></td>
+            <td><span class="pill pill--crit">운영</span></td><td>Linux</td><td>RHEL 8.9</td>
+            <td>6</td><td><span class="dot"></span>운영중</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-svr-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-svr-delete">🗑</button></div></td></tr>
+          <tr><td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td><b>WAS-STG-01</b></td><td><code>was-stg-01.bank.local</code></td><td><code>10.30.30.1</code></td>
+            <td><span class="pill pill--warn">스테이징</span></td><td>Linux</td><td>RHEL 8.9</td>
+            <td>5</td><td><span class="dot"></span>운영중</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-svr-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-svr-delete">🗑</button></div></td></tr>
+          <tr><td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td><b>WAS-DEV-01</b></td><td><code>was-dev-01.bank.local</code></td><td><code>10.40.30.1</code></td>
+            <td><span class="pill">개발</span></td><td>Linux</td><td>RHEL 8.9</td>
+            <td>7</td><td><span class="dot dot--idle"></span>점검중</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-svr-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-svr-delete">🗑</button></div></td></tr>
+          <tr><td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td><b>OLD-WAS-PRD-02</b></td><td><code>old-was-prd-02</code></td><td><code>10.20.30.2</code></td>
+            <td><span class="pill pill--crit">운영</span></td><td>AIX</td><td>7.2</td>
+            <td>0</td><td><span class="dot dot--idle"></span>중지</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-svr-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-svr-delete">🗑</button></div></td></tr>
+        </tbody>
+      </table>
+      <div class="pager">
+        <div class="pager__info">전체 72건 · 1-8 / 9 페이지</div>
+        <div class="pager__nav"><button disabled>‹</button><button class="is-on">1</button><button>2</button><button>3</button><button>…</button><button>9</button><button>›</button></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="modal-backdrop" id="m-svr-create">
+  <div class="modal modal--lg">
+    <div class="modal__head"><h3>＋ 서버 등록</h3><button class="close" data-modal-close>×</button></div>
+    <div class="modal__body">
+      <div class="form-grid">
+        <div class="form-row"><label>serverName<span class="req">*</span></label><input type="text" placeholder="예: WAS-PRD-14" /><span class="help">고유 · 명명규칙 준수</span></div>
+        <div class="form-row"><label>hostname<span class="req">*</span></label><input type="text" placeholder="예: was-prd-14.bank.local" /></div>
+        <div class="form-row"><label>IP 주소<span class="req">*</span></label><input type="text" placeholder="예: 10.20.30.14" /></div>
+        <div class="form-row"><label>환경 (ENVIRONMENT)<span class="req">*</span></label>
+          <select><option>운영</option><option>스테이징</option><option>개발</option><option>테스트</option></select></div>
+        <div class="form-row"><label>OS 유형 (OS_TYPE)<span class="req">*</span></label>
+          <select><option>Linux</option><option>Windows</option><option>AIX</option><option>Solaris</option></select></div>
+        <div class="form-row"><label>OS 버전</label><input type="text" placeholder="예: RHEL 8.9" /></div>
+        <div class="form-row"><label>상태</label><select><option>운영중</option><option>점검중</option><option>중지</option></select></div>
+        <div class="form-row"><label>위치/IDC</label><input type="text" placeholder="예: 분당IDC Rack-12" /></div>
+      </div>
+    </div>
+    <div class="modal__foot"><button class="btn" data-modal-close>취소</button><button class="btn btn--primary">등록</button></div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="m-svr-edit">
+  <div class="modal modal--lg">
+    <div class="modal__head"><h3>✏️ 서버 수정 — <b>WAS-PRD-12</b></h3><button class="close" data-modal-close>×</button></div>
+    <div class="modal__body">
+      <div class="form-grid">
+        <div class="form-row"><label>serverName</label><input type="text" value="WAS-PRD-12" disabled /></div>
+        <div class="form-row"><label>hostname</label><input type="text" value="was-prd-12.bank.local" /></div>
+        <div class="form-row"><label>IP 주소</label><input type="text" value="10.20.30.12" /></div>
+        <div class="form-row"><label>환경</label><select><option>운영</option></select></div>
+        <div class="form-row"><label>OS 유형</label><select><option>Linux</option></select></div>
+        <div class="form-row"><label>OS 버전</label><input type="text" value="RHEL 8.9" /></div>
+        <div class="form-row"><label>상태</label><select><option>운영중</option><option>점검중</option><option>중지</option></select></div>
+        <div class="form-row"><label>위치/IDC</label><input type="text" value="분당IDC Rack-12" /></div>
+      </div>
+    </div>
+    <div class="modal__foot"><button class="btn" data-modal-close>취소</button><button class="btn btn--primary">저장</button></div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="m-svr-delete">
+  <div class="modal confirm">
+    <div class="modal__head"><h3>🗑 서버 삭제</h3><button class="close" data-modal-close>×</button></div>
+    <div class="modal__body">
+      <div class="confirm__icon">⚠</div>
+      <div class="confirm__msg"><b>WAS-PRD-12</b>를 삭제하시겠습니까?</div>
+      <div class="confirm__note">이 서버에 배포된 서비스 4건의 배포정보가 함께 영향을 받습니다.<br/>※ 배포가 있으면 status='중지' 처리만 가능합니다.</div>
+    </div>
+    <div class="modal__foot"><button class="btn" data-modal-close>취소</button><button class="btn btn--danger">삭제</button></div>
+  </div>
+</div>
+
+<script src="admin-common.js"></script>
+</body>
+</html>

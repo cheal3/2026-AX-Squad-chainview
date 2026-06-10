@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>기술스택 마스터 — ChainView Admin</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" />
+<link rel="stylesheet" href="admin-common.css" />
+</head>
+<body data-menu="techstacks">
+<div class="app">
+  <aside class="lnb"></aside>
+
+  <main class="main">
+    <div class="crumb">
+      <a href="dashboard-proto.html">대시보드</a><span class="sep">/</span>
+      <span>서비스 카탈로그</span><span class="sep">/</span><span>기술스택 마스터</span>
+    </div>
+
+    <div class="page-head">
+      <div>
+        <h1 class="page-head__title">🧩 기술스택 마스터 <small>TECH_STACK</small></h1>
+        <p class="page-head__desc">언어/프레임워크/DB/MQ 등 기술 마스터를 관리합니다. 서비스에 부착하여 사용합니다.</p>
+      </div>
+      <div class="page-head__right">
+        <button class="btn">📥 CSV 내보내기</button>
+        <button class="btn btn--primary" data-modal-open="m-tech-create">＋ 기술스택 등록</button>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <select>
+        <option>유형 · 전체</option>
+        <option>LANGUAGE</option><option>FRAMEWORK</option><option>DATABASE</option>
+        <option>MESSAGE_QUEUE</option><option>CACHE</option><option>WAS</option><option>WEB_SERVER</option>
+      </select>
+      <select><option>활성 · 전체</option><option>활성</option><option>비활성</option></select>
+      <div class="search">🔍<input type="text" placeholder="기술명 검색…" /></div>
+      <div class="right"><button class="btn btn--ghost btn--sm">초기화</button></div>
+    </div>
+
+    <div class="card">
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th class="col-check"><input type="checkbox" class="chk" /></th>
+            <th>techCode</th><th>유형</th><th>기술명</th><th>기본버전</th>
+            <th>사용 서비스</th><th>활성</th><th>등록일</th>
+            <th class="col-actions">관리</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td><code>TECH-001</code></td><td><span class="pill">LANGUAGE</span></td><td>Java</td><td>17 (LTS)</td>
+            <td>28</td><td><span class="pill pill--ok">활성</span></td><td>2022-01-10</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-tech-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-tech-delete">🗑</button></div></td></tr>
+          <tr><td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td><code>TECH-002</code></td><td><span class="pill">FRAMEWORK</span></td><td>Spring Boot</td><td>3.2.5</td>
+            <td>26</td><td><span class="pill pill--ok">활성</span></td><td>2022-01-10</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-tech-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-tech-delete">🗑</button></div></td></tr>
+          <tr><td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td><code>TECH-003</code></td><td><span class="pill">DATABASE</span></td><td>Oracle</td><td>19c</td>
+            <td>15</td><td><span class="pill pill--ok">활성</span></td><td>2022-01-10</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-tech-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-tech-delete">🗑</button></div></td></tr>
+          <tr><td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td><code>TECH-004</code></td><td><span class="pill">DATABASE</span></td><td>PostgreSQL</td><td>15.4</td>
+            <td>9</td><td><span class="pill pill--ok">활성</span></td><td>2023-02-12</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-tech-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-tech-delete">🗑</button></div></td></tr>
+          <tr><td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td><code>TECH-005</code></td><td><span class="pill">MESSAGE_QUEUE</span></td><td>Kafka</td><td>3.7</td>
+            <td>11</td><td><span class="pill pill--ok">활성</span></td><td>2022-06-04</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-tech-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-tech-delete">🗑</button></div></td></tr>
+          <tr><td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td><code>TECH-006</code></td><td><span class="pill">CACHE</span></td><td>Redis</td><td>7.2</td>
+            <td>14</td><td><span class="pill pill--ok">활성</span></td><td>2022-06-04</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-tech-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-tech-delete">🗑</button></div></td></tr>
+          <tr><td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td><code>TECH-007</code></td><td><span class="pill">WAS</span></td><td>Tomcat</td><td>10.1</td>
+            <td>22</td><td><span class="pill pill--ok">활성</span></td><td>2022-01-10</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-tech-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-tech-delete">🗑</button></div></td></tr>
+          <tr><td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td><code>TECH-008</code></td><td><span class="pill">WEB_SERVER</span></td><td>Nginx</td><td>1.25</td>
+            <td>18</td><td><span class="pill pill--ok">활성</span></td><td>2022-01-10</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-tech-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-tech-delete">🗑</button></div></td></tr>
+          <tr><td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td><code>TECH-009</code></td><td><span class="pill">LANGUAGE</span></td><td>Python</td><td>3.11</td>
+            <td>4</td><td><span class="pill pill--ok">활성</span></td><td>2023-08-22</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-tech-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-tech-delete">🗑</button></div></td></tr>
+          <tr><td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td><code>TECH-010</code></td><td><span class="pill">FRAMEWORK</span></td><td>Node.js Express</td><td>4.19</td>
+            <td>0</td><td><span class="pill pill--idle">비활성</span></td><td>2024-09-01</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-tech-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-tech-delete">🗑</button></div></td></tr>
+        </tbody>
+      </table>
+      <div class="pager">
+        <div class="pager__info">전체 24건 · 1-10 / 3 페이지</div>
+        <div class="pager__nav"><button disabled>‹</button><button class="is-on">1</button><button>2</button><button>3</button><button>›</button></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="modal-backdrop" id="m-tech-create">
+  <div class="modal">
+    <div class="modal__head"><h3>＋ 기술스택 등록</h3><button class="close" data-modal-close>×</button></div>
+    <div class="modal__body">
+      <div class="form-row"><label>techCode<span class="req">*</span></label><input type="text" placeholder="예: TECH-011" /><span class="help">고유 식별자</span></div>
+      <div class="form-row"><label>유형 (TECH_TYPE)<span class="req">*</span></label>
+        <select><option>LANGUAGE</option><option>FRAMEWORK</option><option>DATABASE</option><option>MESSAGE_QUEUE</option><option>CACHE</option><option>WAS</option><option>WEB_SERVER</option></select></div>
+      <div class="form-row"><label>기술명<span class="req">*</span></label><input type="text" placeholder="예: Spring Boot" /></div>
+      <div class="form-row"><label>기본버전</label><input type="text" placeholder="예: 3.2.5" /></div>
+      <div class="form-row"><label>활성여부</label><select><option>활성</option><option>비활성</option></select></div>
+    </div>
+    <div class="modal__foot"><button class="btn" data-modal-close>취소</button><button class="btn btn--primary">등록</button></div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="m-tech-edit">
+  <div class="modal">
+    <div class="modal__head"><h3>✏️ 기술스택 수정 — <code style="font-size:13px">TECH-002</code></h3><button class="close" data-modal-close>×</button></div>
+    <div class="modal__body">
+      <div class="form-row"><label>techCode</label><input type="text" value="TECH-002" disabled /></div>
+      <div class="form-row"><label>유형</label><select><option>FRAMEWORK</option></select></div>
+      <div class="form-row"><label>기술명</label><input type="text" value="Spring Boot" /></div>
+      <div class="form-row"><label>기본버전</label><input type="text" value="3.2.5" /></div>
+      <div class="form-row"><label>활성여부</label><select><option>활성</option><option>비활성</option></select></div>
+    </div>
+    <div class="modal__foot"><button class="btn" data-modal-close>취소</button><button class="btn btn--primary">저장</button></div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="m-tech-delete">
+  <div class="modal confirm">
+    <div class="modal__head"><h3>🗑 기술스택 삭제</h3><button class="close" data-modal-close>×</button></div>
+    <div class="modal__body">
+      <div class="confirm__icon">⚠</div>
+      <div class="confirm__msg"><b>TECH-002 Spring Boot</b>를 삭제하시겠습니까?</div>
+      <div class="confirm__note">26개 서비스가 이 기술을 사용 중입니다. 사용 중인 경우 비활성 처리만 가능합니다.</div>
+    </div>
+    <div class="modal__foot"><button class="btn" data-modal-close>취소</button><button class="btn btn--danger">삭제</button></div>
+  </div>
+</div>
+
+<script src="admin-common.js"></script>
+</body>
+</html>

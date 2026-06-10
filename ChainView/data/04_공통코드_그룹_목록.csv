@@ -1,0 +1,10 @@
+그룹코드,그룹명,사용처,샘플코드
+SERVICE_TYPE,서비스 유형,서비스 등록,API/WEB/BATCH
+IMPORTANCE,중요도,서비스 등록,높음/중간/낮음
+STATUS,상태,서비스/서버 등,운영중/테스트/개발/중지
+ENVIRONMENT,환경,서버 등록,Production/Test/Development
+OS_TYPE,OS 유형,서버 등록,Linux/Windows
+RELATION_TYPE,관계 유형,서비스 관계,API 호출/DB 접근/메시지 구독/파일 참조
+INCIDENT_TYPE,인시던트 유형,인시던트 등록,서비스 장애/서버 장애
+SEVERITY,심각도,인시던트 등록,CRITICAL/HIGH/MEDIUM/LOW/NOTICE
+TECH_TYPE,기술 유형,기술스택 마스터,언어/프레임워크/데이터베이스/메시지큐

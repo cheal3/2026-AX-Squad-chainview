@@ -1,0 +1,76 @@
+서비스명,필드명,표시명,수정가능,비고
+서비스 관리,serviceCode,서비스 코드,N,PK/수정 불가
+서비스 관리,serviceName,서비스명,Y,
+서비스 관리,categoryL1,대분류,Y,
+서비스 관리,categoryL2,중분류,Y,
+서비스 관리,categoryL3,소분류,Y,
+서비스 관리,serviceType,서비스 유형,Y,
+서비스 관리,importance,중요도,Y,
+서비스 관리,status,상태,Y,
+서비스 관리,endpointUrl,엔드포인트 URL,Y,
+서비스 관리,description,설명,Y,
+서비스 관리,updatedAt,수정일,-,시스템 자동 갱신
+서비스 관리,updatedBy,수정자,-,로그인 사용자 자동 설정
+서비스 분류,categoryCode,분류 코드,N,PK/수정 불가
+서비스 분류,categoryName,분류명,Y,
+서비스 분류,parentCode,상위 분류,Y,변경 시 하위 분류도 이동
+서비스 분류,sortOrder,정렬순서,Y,
+서비스 분류,isActive,사용여부,Y,비활성화 시 서비스 등록에서 선택 불가
+기술스택 마스터,id,ID,N,PK
+기술스택 마스터,techType,기술 유형,Y,
+기술스택 마스터,techName,기술명,Y,
+기술스택 마스터,defaultVersion,기본 버전,Y,
+기술스택 마스터,isActive,사용여부,Y,
+서버 관리,serverName,서버명,N,PK/수정 불가
+서버 관리,hostname,호스트명,Y,UK/중복 체크 필요
+서버 관리,ipAddress,IP 주소,Y,
+서버 관리,environment,환경,Y,
+서버 관리,osType,OS 유형,Y,
+서버 관리,osVersion,OS 버전,Y,
+서버 관리,status,상태,Y,
+배포 정보,serviceCode,서비스,N,복합 PK 일부
+배포 정보,serverName,서버,N,복합 PK 일부
+배포 정보,deployPath,배포 경로,Y,
+배포 정보,port,포트,Y,
+배포 정보,instanceCount,인스턴스 수,Y,
+배포 정보,status,상태,Y,
+서비스 관계,sourceServiceCode,호출 서비스,N,
+서비스 관계,targetServiceCode,대상 서비스,N,
+서비스 관계,relationType,관계 유형,Y,
+서비스 관계,connectionStatus,연결 상태,Y,
+서비스 관계,isRequired,필수 여부,Y,
+서비스 관계,description,설명,Y,
+사용자 관리,employeeNo,사번,N,PK/수정 불가
+사용자 관리,name,이름,Y,
+사용자 관리,organizationId,조직,Y,
+사용자 관리,departmentId,부서,Y,
+사용자 관리,role,역할,Y,
+사용자 관리,phone,연락처,Y,
+사용자 관리,email,이메일,Y,UK/중복 체크
+사용자 관리,isActive,활성 상태,Y,비활성화 시 로그인 차단
+그룹 관리,id,ID,N,PK
+그룹 관리,groupName,그룹명,Y,
+그룹 관리,groupType,그룹 유형,Y,
+그룹 관리,parentGroupId,상위 그룹,Y,순환 참조 방지 필요
+그룹 관리,sortOrder,정렬순서,Y,
+그룹 관리,isActive,사용여부,Y,
+서비스 담당자,serviceCode,서비스,N,
+서비스 담당자,employeeNo,담당자,N,
+서비스 담당자,ownerRole,담당 역할,Y,
+서비스 담당자,startDate,담당 시작일,Y,
+서비스 담당자,endDate,담당 종료일,Y,설정 시 담당 이력으로 전환
+인시던트 관리,id,인시던트 ID,N,PK
+인시던트 관리,incidentType,유형,Y,
+인시던트 관리,severity,심각도,Y,
+인시던트 관리,status,상태,Y,OPEN → IN_PROGRESS → RESOLVED → CLOSED
+인시던트 관리,targetType,대상 유형,N,
+인시던트 관리,targetId,대상 ID,N,
+인시던트 관리,title,제목,Y,
+인시던트 관리,description,상세 내용,Y,
+인시던트 관리,resolvedAt,종료 일시,Y,status = RESOLVED/CLOSED 시 설정
+공통코드 관리,codeGroup,코드 그룹,N,PK
+공통코드 관리,itemCode,코드,N,PK
+공통코드 관리,codeName,코드명,Y,
+공통코드 관리,sortOrder,정렬순서,Y,
+공통코드 관리,isActive,사용여부,Y,비활성화 시 선택 불가
+공통코드 관리,notes,비고,Y,

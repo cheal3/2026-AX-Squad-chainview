@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>서비스 관계 관리 — ChainView Admin</title>
+  <link rel="stylesheet" href="../css/styles.css" />
+</head>
+<body>
+  <div class="cv-admin">
+    <aside id="admin-sidebar" class="cv-sidebar">
+      <div class="cv-sidebar__brand">
+        <div class="cv-sidebar__logo">CV</div>
+        <div class="cv-sidebar__titles">
+          <h2>ChainView</h2>
+          <p>Admin Console</p>
+        </div>
+      </div>
+      <nav class="cv-sidebar__nav">
+        <div class="cv-nav-group">
+          <button type="button" class="cv-nav-group__toggle" data-nav-group-toggle="g-overview">
+            <span>Overview</span>
+            <svg class="cv-icon cv-icon--sm cv-nav-group__chev is-open" data-chevron viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+          <div class="cv-nav-group__items" data-nav-group-items="g-overview">
+            <a class="cv-nav-link" href="dashboard.html">
+              <svg class="cv-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+              <span>Dashboard</span>
+            </a>
+          </div>
+        </div>
+        <div class="cv-nav-group">
+          <button type="button" class="cv-nav-group__toggle" data-nav-group-toggle="g-catalog">
+            <span>서비스 카탈로그</span>
+            <svg class="cv-icon cv-icon--sm cv-nav-group__chev is-open" data-chevron viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+          <div class="cv-nav-group__items" data-nav-group-items="g-catalog">
+            <a class="cv-nav-link" href="services.html">
+              <svg class="cv-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+              <span>서비스 관리</span>
+            </a>
+            <a class="cv-nav-link" href="service-categories.html">
+              <svg class="cv-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="M3.27 6.96 12 12.01 20.73 6.96"/><path d="M12 22.08V12"/></svg>
+              <span>서비스 분류 관리</span>
+            </a>
+            <a class="cv-nav-link" href="tech-stacks.html">
+              <svg class="cv-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m18 16 4-4-4-4"/><path d="m6 8-4 4 4 4"/><path d="m14.5 4-5 16"/></svg>
+              <span>기술스택 마스터</span>
+            </a>
+          </div>
+        </div>
+        <div class="cv-nav-group">
+          <button type="button" class="cv-nav-group__toggle" data-nav-group-toggle="g-infra">
+            <span>배포 인프라</span>
+            <svg class="cv-icon cv-icon--sm cv-nav-group__chev" data-chevron viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+          <div class="cv-nav-group__items is-hidden" data-nav-group-items="g-infra">
+            <a class="cv-nav-link" href="servers.html">
+              <svg class="cv-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><rect width="20" height="8" x="2" y="2" rx="2" ry="2"/><rect width="20" height="8" x="2" y="14" rx="2" ry="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/></svg>
+              <span>서버 관리</span>
+            </a>
+            <a class="cv-nav-link" href="deployments.html">
+              <svg class="cv-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m16 16-4-4-4 4"/></svg>
+              <span>서비스 배포 정보</span>
+            </a>
+          </div>
+        </div>
+        <div class="cv-nav-group">
+          <button type="button" class="cv-nav-group__toggle" data-nav-group-toggle="g-relation">
+            <span>서비스 관계</span>
+            <svg class="cv-icon cv-icon--sm cv-nav-group__chev is-open" data-chevron viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+          <div class="cv-nav-group__items" data-nav-group-items="g-relation">
+            <a class="cv-nav-link is-active" href="service-relations.html">
+              <svg class="cv-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 1 1 0 10h-2"/><line x1="8" x2="16" y1="12" y2="12"/></svg>
+              <span>서비스 관계 관리</span>
+            </a>
+            <a class="cv-nav-link" href="relation-graph.html">
+              <svg class="cv-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.41" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/></svg>
+              <span>관계 그래프</span>
+            </a>
+          </div>
+        </div>
+        <div class="cv-nav-group">
+          <button type="button" class="cv-nav-group__toggle" data-nav-group-toggle="g-ownership">
+            <span>소유권 관리</span>
+            <svg class="cv-icon cv-icon--sm cv-nav-group__chev" data-chevron viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+          <div class="cv-nav-group__items is-hidden" data-nav-group-items="g-ownership">
+            <a class="cv-nav-link" href="users.html">
+              <svg class="cv-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              <span>사용자 관리</span>
+            </a>
+            <a class="cv-nav-link" href="groups.html">
+              <svg class="cv-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg>
+              <span>그룹 관리</span>
+            </a>
+            <a class="cv-nav-link" href="service-owners.html">
+              <svg class="cv-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg>
+              <span>서비스 담당자 관리</span>
+            </a>
+          </div>
+        </div>
+        <div class="cv-nav-group">
+          <button type="button" class="cv-nav-group__toggle" data-nav-group-toggle="g-ops">
+            <span>운영 관리</span>
+            <svg class="cv-icon cv-icon--sm cv-nav-group__chev" data-chevron viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+          <div class="cv-nav-group__items is-hidden" data-nav-group-items="g-ops">
+            <a class="cv-nav-link" href="incidents.html">
+              <svg class="cv-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+              <span>인시던트 관리</span>
+            </a>
+          </div>
+        </div>
+        <div class="cv-nav-group">
+          <button type="button" class="cv-nav-group__toggle" data-nav-group-toggle="g-master">
+            <span>기준 정보</span>
+            <svg class="cv-icon cv-icon--sm cv-nav-group__chev" data-chevron viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+          <div class="cv-nav-group__items is-hidden" data-nav-group-items="g-master">
+            <a class="cv-nav-link" href="common-codes.html">
+              <svg class="cv-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><line x1="10" x2="21" y1="6" y2="6"/><line x1="10" x2="21" y1="12" y2="12"/><line x1="10" x2="21" y1="18" y2="18"/><path d="M4 6h1v4"/><path d="M4 10h2"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg>
+              <span>공통코드 관리</span>
+            </a>
+          </div>
+        </div>
+      </nav>
+    </aside>
+
+    <div class="cv-main">
+      <header class="cv-header">
+        <div class="cv-header__left">
+          <button type="button" class="cv-btn cv-btn--ghost cv-btn--icon cv-header__icon-btn" id="sidebar-toggle" aria-label="메뉴">
+            <svg id="sidebar-toggle-close" class="cv-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            <svg id="sidebar-toggle-menu" class="cv-icon is-hidden" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
+          </button>
+          <div class="cv-search-wrap">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            <input class="cv-input" type="search" placeholder="서비스명, 서비스 코드, 서버명, IP, 담당자 검색..." />
+          </div>
+        </div>
+        <div class="cv-header__right">
+          <button type="button" class="cv-btn cv-btn--ghost cv-btn--icon cv-header__icon-btn cv-notify-btn" aria-label="알림">
+            <svg class="cv-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+            <span class="cv-notify-badge">3</span>
+          </button>
+          <div class="cv-user-dd">
+            <button type="button" class="cv-user-trigger" id="user-menu-trigger">
+              <span class="cv-avatar">관</span>
+              <div class="cv-user-meta">
+                <strong>관리자</strong>
+                <span>admin@chainview.com</span>
+              </div>
+            </button>
+            <div class="cv-dropdown is-hidden" id="user-menu-panel">
+              <div class="cv-dropdown__label">내 계정</div>
+              <hr />
+              <button type="button">프로필 설정</button>
+              <button type="button">환경 설정</button>
+              <hr />
+              <button type="button" class="cv-dd-danger" id="user-menu-logout">로그아웃</button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main class="cv-content">
+        <div class="cv-page-head-row">
+          <div>
+            <h1 class="cv-page-title" style="margin-bottom:0.25rem">서비스 관계 관리</h1>
+            <p class="cv-page-desc" style="margin:0">서비스 간 의존 관계를 관리합니다</p>
+          </div>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center">
+            <a class="cv-btn cv-btn--outline cv-page-head-primary-btn" href="relation-graph.html" style="text-decoration:none;display:inline-flex">
+              <svg class="cv-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="6" height="6" x="16" y="16" rx="1"/><rect width="6" height="6" x="2" y="16" rx="1"/><rect width="6" height="6" x="9" y="2" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/></svg>
+              관계 그래프 보기
+            </a>
+            <button type="button" class="cv-btn cv-btn--primary cv-page-head-primary-btn" data-open-modal="relation-add">
+              <svg class="cv-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+              관계 등록
+            </button>
+          </div>
+        </div>
+
+        <div class="cv-card cv-spaced-below--md">
+          <div class="cv-card__body" style="padding:1rem">
+            <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem">
+              <div class="cv-search-wrap cv-search-wrap--lg" style="flex:1;min-width:12rem">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                <input class="cv-input" type="search" placeholder="출발 서비스, 대상 서비스 검색..." />
+              </div>
+              <button type="button" class="cv-btn cv-btn--outline" id="relations-filter-toggle">
+                <svg class="cv-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"/></svg>
+                고급 필터
+              </button>
+            </div>
+            <div id="relations-filter-panel" class="is-hidden">
+              <hr class="sep" style="margin-bottom:1rem" />
+              <div class="cv-relations-adv-grid">
+                <select class="cv-input" aria-label="관계 유형"><option value="">관계 유형</option><option>API 호출</option><option>메시지 큐</option><option>데이터베이스</option><option>이벤트 발행</option></select>
+                <select class="cv-input" aria-label="관계 상태"><option value="">관계 상태</option><option>정상</option><option>지연</option><option>오류</option></select>
+                <select class="cv-input" aria-label="필수 여부"><option value="">필수 여부</option><option>필수</option><option>선택</option></select>
+                <button type="button" class="cv-btn cv-btn--outline" id="relations-filter-reset">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                  필터 초기화
+                </button>
+              </div>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.875rem;flex-wrap:wrap;gap:0.5rem;margin-top:1rem;padding-top:0.25rem">
+              <p style="margin:0;color:var(--gray-600)">
+                총 <strong style="color:var(--gray-900)">5</strong>개 관계<span id="relations-selected-count" class="is-hidden" style="color:var(--blue);margin-left:0.5rem"></span>
+              </p>
+              <div id="relations-bulk-actions" class="is-hidden">
+                <button type="button" class="cv-btn cv-btn--danger cv-btn--sm">
+                  <svg class="cv-icon cv-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+                  선택 삭제
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="cv-card cv-card-plain">
+          <div class="cv-table-wrap">
+            <table class="cv-table cv-relations-table">
+              <thead>
+                <tr>
+                  <th class="cv-th-w-12"><input type="checkbox" id="relations-select-all" aria-label="전체 선택" /></th>
+                  <th>출발 서비스</th>
+                  <th class="cv-th-w-12" aria-hidden="true"></th>
+                  <th>대상 서비스</th>
+                  <th>관계 유형</th>
+                  <th>관계 상태</th>
+                  <th>필수 여부</th>
+                  <th>설명</th>
+                  <th class="cv-td-right">액션</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr data-relation-id="1" data-source-id="1" data-target-id="2" data-relation-type="API 호출" data-relation-status="정상" data-is-required="true" data-description="사용자 토큰 검증">
+                  <td><input type="checkbox" class="js-relation-row-cb" /></td>
+                  <td>
+                    <div><a class="cv-link-bold" href="service-detail.html">결제 API 서비스</a></div>
+                    <div class="mono" style="font-size:0.75rem;color:var(--gray-500)">PAY-API-001</div>
+                  </td>
+                  <td class="cv-td-arrow"><svg class="cv-muted-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></td>
+                  <td>
+                    <div><a class="cv-link-bold" href="service-detail.html">사용자 인증 서비스</a></div>
+                    <div class="mono" style="font-size:0.75rem;color:var(--gray-500)">AUTH-SVC-002</div>
+                  </td>
+                  <td><span class="cv-badge cv-badge--blue">API 호출</span></td>
+                  <td><span class="cv-badge cv-badge--green">정상</span></td>
+                  <td><span class="cv-badge cv-badge--required"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>필수</span></td>
+                  <td class="cv-muted" style="font-size:0.875rem">사용자 토큰 검증</td>
+                  <td class="cv-td-right">
+                    <div class="cv-cell-inline cv-relations-actions" style="justify-content:flex-end;flex-wrap:wrap">
+                      <button type="button" class="cv-btn cv-btn--ghost cv-btn--sm js-relation-edit" data-open-modal="relation-add"><svg class="cv-icon cv-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>수정</button>
+                      <button type="button" class="cv-btn cv-btn--ghost cv-btn--sm" style="color:#dc2626" title="삭제"><svg class="cv-icon cv-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>삭제</button>
+                    </div>
+                  </td>
+                </tr>
+                <tr data-relation-id="2" data-source-id="1" data-target-id="5" data-relation-type="API 호출" data-relation-status="정상" data-is-required="true" data-description="결제 승인 요청">
+                  <td><input type="checkbox" class="js-relation-row-cb" /></td>
+                  <td>
+                    <div><a class="cv-link-bold" href="service-detail.html">결제 API 서비스</a></div>
+                    <div class="mono" style="font-size:0.75rem;color:var(--gray-500)">PAY-API-001</div>
+                  </td>
+                  <td class="cv-td-arrow"><svg class="cv-muted-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></td>
+                  <td>
+                    <div><a class="cv-link-bold" href="service-detail.html">PG 게이트웨이</a></div>
+                    <div class="mono" style="font-size:0.75rem;color:var(--gray-500)">PG-GW-001</div>
+                  </td>
+                  <td><span class="cv-badge cv-badge--blue">API 호출</span></td>
+                  <td><span class="cv-badge cv-badge--green">정상</span></td>
+                  <td><span class="cv-badge cv-badge--required"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>필수</span></td>
+                  <td class="cv-muted" style="font-size:0.875rem">결제 승인 요청</td>
+                  <td class="cv-td-right">
+                    <div class="cv-cell-inline cv-relations-actions" style="justify-content:flex-end;flex-wrap:wrap">
+                      <button type="button" class="cv-btn cv-btn--ghost cv-btn--sm js-relation-edit" data-open-modal="relation-add"><svg class="cv-icon cv-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>수정</button>
+                      <button type="button" class="cv-btn cv-btn--ghost cv-btn--sm" style="color:#dc2626" title="삭제"><svg class="cv-icon cv-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>삭제</button>
+                    </div>
+                  </td>
+                </tr>
+                <tr data-relation-id="3" data-source-id="3" data-target-id="1" data-relation-type="API 호출" data-relation-status="정상" data-is-required="false" data-description="결제 정보 조회">
+                  <td><input type="checkbox" class="js-relation-row-cb" /></td>
+                  <td>
+                    <div><a class="cv-link-bold" href="service-detail.html">주문 관리 서비스</a></div>
+                    <div class="mono" style="font-size:0.75rem;color:var(--gray-500)">ORDER-SVC-001</div>
+                  </td>
+                  <td class="cv-td-arrow"><svg class="cv-muted-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></td>
+                  <td>
+                    <div><a class="cv-link-bold" href="service-detail.html">결제 API 서비스</a></div>
+                    <div class="mono" style="font-size:0.75rem;color:var(--gray-500)">PAY-API-001</div>
+                  </td>
+                  <td><span class="cv-badge cv-badge--blue">API 호출</span></td>
+                  <td><span class="cv-badge cv-badge--green">정상</span></td>
+                  <td><span class="cv-badge cv-badge--optional">선택</span></td>
+                  <td class="cv-muted" style="font-size:0.875rem">결제 정보 조회</td>
+                  <td class="cv-td-right">
+                    <div class="cv-cell-inline cv-relations-actions" style="justify-content:flex-end;flex-wrap:wrap">
+                      <button type="button" class="cv-btn cv-btn--ghost cv-btn--sm js-relation-edit" data-open-modal="relation-add"><svg class="cv-icon cv-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>수정</button>
+                      <button type="button" class="cv-btn cv-btn--ghost cv-btn--sm" style="color:#dc2626" title="삭제"><svg class="cv-icon cv-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>삭제</button>
+                    </div>
+                  </td>
+                </tr>
+                <tr data-relation-id="4" data-source-id="1" data-target-id="4" data-relation-type="메시지 큐" data-relation-status="정상" data-is-required="false" data-description="결제 완료 알림">
+                  <td><input type="checkbox" class="js-relation-row-cb" /></td>
+                  <td>
+                    <div><a class="cv-link-bold" href="service-detail.html">결제 API 서비스</a></div>
+                    <div class="mono" style="font-size:0.75rem;color:var(--gray-500)">PAY-API-001</div>
+                  </td>
+                  <td class="cv-td-arrow"><svg class="cv-muted-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></td>
+                  <td>
+                    <div><a class="cv-link-bold" href="service-detail.html">알림 발송 서비스</a></div>
+                    <div class="mono" style="font-size:0.75rem;color:var(--gray-500)">NOTI-SVC-003</div>
+                  </td>
+                  <td><span class="cv-badge cv-badge--purple">메시지 큐</span></td>
+                  <td><span class="cv-badge cv-badge--green">정상</span></td>
+                  <td><span class="cv-badge cv-badge--optional">선택</span></td>
+                  <td class="cv-muted" style="font-size:0.875rem">결제 완료 알림</td>
+                  <td class="cv-td-right">
+                    <div class="cv-cell-inline cv-relations-actions" style="justify-content:flex-end;flex-wrap:wrap">
+                      <button type="button" class="cv-btn cv-btn--ghost cv-btn--sm js-relation-edit" data-open-modal="relation-add"><svg class="cv-icon cv-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>수정</button>
+                      <button type="button" class="cv-btn cv-btn--ghost cv-btn--sm" style="color:#dc2626" title="삭제"><svg class="cv-icon cv-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>삭제</button>
+                    </div>
+                  </td>
+                </tr>
+                <tr data-relation-id="5" data-source-id="2" data-target-id="6" data-relation-type="데이터베이스" data-relation-status="정상" data-is-required="true" data-description="사용자 정보 조회">
+                  <td><input type="checkbox" class="js-relation-row-cb" /></td>
+                  <td>
+                    <div><a class="cv-link-bold" href="service-detail.html">사용자 인증 서비스</a></div>
+                    <div class="mono" style="font-size:0.75rem;color:var(--gray-500)">AUTH-SVC-002</div>
+                  </td>
+                  <td class="cv-td-arrow"><svg class="cv-muted-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></td>
+                  <td>
+                    <div><a class="cv-link-bold" href="service-detail.html">사용자 DB</a></div>
+                    <div class="mono" style="font-size:0.75rem;color:var(--gray-500)">USER-DB-001</div>
+                  </td>
+                  <td><span class="cv-badge cv-badge--green">데이터베이스</span></td>
+                  <td><span class="cv-badge cv-badge--green">정상</span></td>
+                  <td><span class="cv-badge cv-badge--required"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>필수</span></td>
+                  <td class="cv-muted" style="font-size:0.875rem">사용자 정보 조회</td>
+                  <td class="cv-td-right">
+                    <div class="cv-cell-inline cv-relations-actions" style="justify-content:flex-end;flex-wrap:wrap">
+                      <button type="button" class="cv-btn cv-btn--ghost cv-btn--sm js-relation-edit" data-open-modal="relation-add"><svg class="cv-icon cv-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>수정</button>
+                      <button type="button" class="cv-btn cv-btn--ghost cv-btn--sm" style="color:#dc2626" title="삭제"><svg class="cv-icon cv-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>삭제</button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <div id="modal-relation-add" class="cv-modal is-hidden" role="dialog" aria-modal="true">
+    <div class="cv-modal__backdrop" data-close-modal></div>
+    <div class="cv-modal__panel cv-modal__panel--md">
+      <div class="cv-modal__head">
+        <h2 class="cv-modal__title" id="modal-relation-title">서비스 관계 등록</h2>
+        <p class="cv-modal__desc" id="modal-relation-desc">새로운 서비스 관계를 등록합니다</p>
+      </div>
+      <div class="cv-modal__body">
+        <div class="cv-form-grid cv-relation-modal-form">
+          <div class="cv-field">
+            <label for="relation-form-source">출발 서비스 <span class="cv-req">*</span></label>
+            <select id="relation-form-source" class="cv-input">
+              <option value="">선택</option>
+              <option value="1">결제 API 서비스 (PAY-API-001)</option>
+              <option value="2">사용자 인증 서비스 (AUTH-SVC-002)</option>
+              <option value="3">주문 관리 서비스 (ORDER-SVC-001)</option>
+              <option value="4">알림 발송 서비스 (NOTI-SVC-003)</option>
+              <option value="5">PG 게이트웨이 (PG-GW-001)</option>
+              <option value="6">사용자 DB (USER-DB-001)</option>
+            </select>
+          </div>
+          <div class="cv-modal__arrow-rule" aria-hidden="true">
+            <span class="cv-modal__arrow-rule__line"></span>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            <span class="cv-modal__arrow-rule__line"></span>
+          </div>
+          <div class="cv-field">
+            <label for="relation-form-target">대상 서비스 <span class="cv-req">*</span></label>
+            <select id="relation-form-target" class="cv-input">
+              <option value="">선택</option>
+              <option value="1">결제 API 서비스 (PAY-API-001)</option>
+              <option value="2">사용자 인증 서비스 (AUTH-SVC-002)</option>
+              <option value="3">주문 관리 서비스 (ORDER-SVC-001)</option>
+              <option value="4">알림 발송 서비스 (NOTI-SVC-003)</option>
+              <option value="5">PG 게이트웨이 (PG-GW-001)</option>
+              <option value="6">사용자 DB (USER-DB-001)</option>
+            </select>
+          </div>
+          <hr class="sep" />
+          <div class="cv-field">
+            <label for="relation-form-type">관계 유형 <span class="cv-req">*</span></label>
+            <select id="relation-form-type" class="cv-input">
+              <option value="">선택</option>
+              <option value="API 호출">API 호출</option>
+              <option value="메시지 큐">메시지 큐</option>
+              <option value="데이터베이스">데이터베이스</option>
+              <option value="이벤트 발행">이벤트 발행</option>
+              <option value="배치 작업">배치 작업</option>
+            </select>
+          </div>
+          <div class="cv-field">
+            <label for="relation-form-status">관계 상태 <span class="cv-req">*</span></label>
+            <select id="relation-form-status" class="cv-input">
+              <option value="정상">정상</option>
+              <option value="지연">지연</option>
+              <option value="오류">오류</option>
+              <option value="중단">중단</option>
+            </select>
+          </div>
+          <div class="cv-field cv-field--required-relation">
+            <div class="cv-field--required-relation__text">
+              <svg class="cv-icon cv-relation-alert-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
+              <div>
+                <label for="relation-form-required" style="margin:0;font-weight:500;cursor:pointer">필수 관계</label>
+                <p style="margin:0.35rem 0 0;font-size:0.875rem;color:var(--gray-600)">필수 관계로 설정하면 장애 전파 분석 시 중요하게 표시됩니다</p>
+              </div>
+            </div>
+            <label class="cv-switch cv-switch--required-relation"><input type="checkbox" id="relation-form-required" /><span class="cv-switch__ui"></span></label>
+          </div>
+          <div class="cv-field">
+            <label for="relation-form-desc">설명</label>
+            <textarea id="relation-form-desc" class="cv-input" rows="3" placeholder="관계에 대한 설명을 입력하세요"></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="cv-modal__footer">
+        <button type="button" class="cv-btn cv-btn--outline" data-close-modal>취소</button>
+        <button type="button" class="cv-btn cv-btn--primary" id="modal-relation-submit">등록</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+  <script src="../js/main.js"></script>
+</body>
+</html>

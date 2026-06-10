@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>배포 정보 — ChainView Admin</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" />
+<link rel="stylesheet" href="admin-common.css" />
+</head>
+<body data-menu="deployments">
+<div class="app">
+  <aside class="lnb"></aside>
+
+  <main class="main">
+    <div class="crumb">
+      <a href="dashboard-proto.html">대시보드</a><span class="sep">/</span>
+      <span>배포 인프라</span><span class="sep">/</span><span>배포 정보</span>
+    </div>
+
+    <div class="page-head">
+      <div>
+        <h1 class="page-head__title">🚀 배포 정보 <small>DEPLOYMENT</small></h1>
+        <p class="page-head__desc">서비스가 어떤 서버에 배포되어 있는지(서비스↔서버 매핑)를 관리합니다.</p>
+      </div>
+      <div class="page-head__right">
+        <button class="btn">📥 CSV 내보내기</button>
+        <button class="btn btn--primary" data-modal-open="m-dep-create">＋ 배포 등록</button>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <select><option>서비스 · 전체</option><option>EXT-001</option><option>DEP-001</option><option>AUTH-001</option></select>
+      <select><option>환경 · 전체</option><option>운영</option><option>스테이징</option><option>개발</option><option>테스트</option></select>
+      <select><option>상태 · 전체</option><option>운영중</option><option>배포중</option><option>롤백</option><option>중지</option></select>
+      <div class="search">🔍<input type="text" placeholder="서비스, 서버, 경로 검색…" /></div>
+      <div class="right"><button class="btn btn--ghost btn--sm">초기화</button></div>
+    </div>
+
+    <div class="card">
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th class="col-check"><input type="checkbox" class="chk" /></th>
+            <th>deploymentId</th><th>서비스</th><th>서버</th>
+            <th>환경</th><th>배포 경로</th><th>포트</th><th>인스턴스</th>
+            <th>버전</th><th>상태</th>
+            <th class="col-actions">관리</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td><code>DPL-0001</code></td>
+            <td><code>EXT-001</code> 카드승인연계</td>
+            <td><b>WAS-PRD-12</b></td>
+            <td><span class="pill pill--crit">운영</span></td>
+            <td><code>/app/ext-card-auth</code></td><td>8443</td><td>2</td>
+            <td>v2.4.1</td><td><span class="dot dot--warn"></span>운영중</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-dep-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-dep-delete">🗑</button></div></td></tr>
+          <tr><td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td><code>DPL-0002</code></td>
+            <td><code>EXT-001</code> 카드승인연계</td>
+            <td><b>WAS-PRD-13</b></td>
+            <td><span class="pill pill--crit">운영</span></td>
+            <td><code>/app/ext-card-auth</code></td><td>8443</td><td>2</td>
+            <td>v2.4.1</td><td><span class="dot"></span>운영중</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-dep-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-dep-delete">🗑</button></div></td></tr>
+          <tr><td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td><code>DPL-0003</code></td>
+            <td><code>DEP-001</code> 예금이체</td>
+            <td><b>WAS-PRD-12</b></td>
+            <td><span class="pill pill--crit">운영</span></td>
+            <td><code>/app/deposit-transfer</code></td><td>8443</td><td>3</td>
+            <td>v3.1.0</td><td><span class="dot"></span>운영중</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-dep-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-dep-delete">🗑</button></div></td></tr>
+          <tr><td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td><code>DPL-0004</code></td>
+            <td><code>AUTH-001</code> 로그인인증</td>
+            <td><b>WAS-PRD-13</b></td>
+            <td><span class="pill pill--crit">운영</span></td>
+            <td><code>/app/auth-login</code></td><td>8080</td><td>4</td>
+            <td>v1.9.2</td><td><span class="dot"></span>운영중</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-dep-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-dep-delete">🗑</button></div></td></tr>
+          <tr><td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td><code>DPL-0005</code></td>
+            <td><code>BATCH-002</code> 이자계산배치</td>
+            <td><b>BATCH-PRD-01</b></td>
+            <td><span class="pill pill--crit">운영</span></td>
+            <td><code>/batch/interest-calc</code></td><td>-</td><td>1</td>
+            <td>v1.3.0</td><td><span class="dot"></span>운영중</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-dep-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-dep-delete">🗑</button></div></td></tr>
+          <tr><td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td><code>DPL-0006</code></td>
+            <td><code>NOTI-001</code> 알림서비스</td>
+            <td><b>WAS-PRD-12</b></td>
+            <td><span class="pill pill--crit">운영</span></td>
+            <td><code>/app/noti</code></td><td>8081</td><td>2</td>
+            <td>v2.0.8</td><td><span class="dot"></span>운영중</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-dep-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-dep-delete">🗑</button></div></td></tr>
+          <tr><td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td><code>DPL-0007</code></td>
+            <td><code>EXT-004</code> 카드취소연계</td>
+            <td><b>WAS-STG-01</b></td>
+            <td><span class="pill pill--warn">스테이징</span></td>
+            <td><code>/app/ext-card-cancel</code></td><td>8443</td><td>1</td>
+            <td>v2.5.0-RC1</td><td><span class="dot dot--warn"></span>배포중</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-dep-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-dep-delete">🗑</button></div></td></tr>
+          <tr><td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td><code>DPL-0008</code></td>
+            <td><code>TEST-001</code> 테스트.샘플API</td>
+            <td><b>WAS-DEV-01</b></td>
+            <td><span class="pill">개발</span></td>
+            <td><code>/app/test-sample</code></td><td>8080</td><td>1</td>
+            <td>v0.1.0</td><td><span class="dot dot--idle"></span>중지</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-dep-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-dep-delete">🗑</button></div></td></tr>
+        </tbody>
+      </table>
+      <div class="pager">
+        <div class="pager__info">전체 124건 · 1-8 / 16 페이지</div>
+        <div class="pager__nav"><button disabled>‹</button><button class="is-on">1</button><button>2</button><button>3</button><button>…</button><button>16</button><button>›</button></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="modal-backdrop" id="m-dep-create">
+  <div class="modal modal--lg">
+    <div class="modal__head"><h3>＋ 배포 등록</h3><button class="close" data-modal-close>×</button></div>
+    <div class="modal__body">
+      <div class="form-grid">
+        <div class="form-row"><label>deploymentId</label><input type="text" value="DPL-0125 (자동)" disabled /><span class="help">자동 채번</span></div>
+        <div class="form-row"><label>서비스 (serviceCode)<span class="req">*</span></label>
+          <select><option>선택</option><option>EXT-001 카드승인연계</option><option>DEP-001 예금이체</option></select></div>
+        <div class="form-row"><label>서버 (serverName)<span class="req">*</span></label>
+          <select><option>선택</option><option>WAS-PRD-12</option><option>WAS-PRD-13</option></select></div>
+        <div class="form-row"><label>환경</label>
+          <select><option>운영</option><option>스테이징</option><option>개발</option><option>테스트</option></select></div>
+        <div class="form-row"><label>배포 경로<span class="req">*</span></label><input type="text" placeholder="예: /app/svc-name" /></div>
+        <div class="form-row"><label>포트</label><input type="number" placeholder="8443" /></div>
+        <div class="form-row"><label>인스턴스 수</label><input type="number" value="1" /></div>
+        <div class="form-row"><label>버전</label><input type="text" placeholder="예: v1.0.0" /></div>
+        <div class="form-row"><label>상태</label>
+          <select><option>운영중</option><option>배포중</option><option>롤백</option><option>중지</option></select></div>
+        <div class="form-row full"><label>비고</label><input type="text" placeholder="구성/특이사항" /></div>
+      </div>
+    </div>
+    <div class="modal__foot"><button class="btn" data-modal-close>취소</button><button class="btn btn--primary">등록</button></div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="m-dep-edit">
+  <div class="modal modal--lg">
+    <div class="modal__head"><h3>✏️ 배포 수정 — <code style="font-size:13px">DPL-0001</code></h3><button class="close" data-modal-close>×</button></div>
+    <div class="modal__body">
+      <div class="form-grid">
+        <div class="form-row"><label>deploymentId</label><input type="text" value="DPL-0001" disabled /></div>
+        <div class="form-row"><label>서비스</label><input type="text" value="EXT-001 카드승인연계" disabled /></div>
+        <div class="form-row"><label>서버</label><input type="text" value="WAS-PRD-12" disabled /></div>
+        <div class="form-row"><label>환경</label><select><option>운영</option></select></div>
+        <div class="form-row"><label>배포 경로</label><input type="text" value="/app/ext-card-auth" /></div>
+        <div class="form-row"><label>포트</label><input type="number" value="8443" /></div>
+        <div class="form-row"><label>인스턴스 수</label><input type="number" value="2" /></div>
+        <div class="form-row"><label>버전</label><input type="text" value="v2.4.1" /></div>
+        <div class="form-row"><label>상태</label><select><option>운영중</option><option>배포중</option><option>롤백</option><option>중지</option></select></div>
+      </div>
+    </div>
+    <div class="modal__foot"><button class="btn" data-modal-close>취소</button><button class="btn btn--primary">저장</button></div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="m-dep-delete">
+  <div class="modal confirm">
+    <div class="modal__head"><h3>🗑 배포 삭제</h3><button class="close" data-modal-close>×</button></div>
+    <div class="modal__body">
+      <div class="confirm__icon">⚠</div>
+      <div class="confirm__msg"><b>DPL-0001 (EXT-001 @ WAS-PRD-12)</b> 배포를 삭제하시겠습니까?</div>
+      <div class="confirm__note">실 인스턴스 중지/해제는 별도로 진행해야 합니다. 대시보드 카운트가 변경됩니다.</div>
+    </div>
+    <div class="modal__foot"><button class="btn" data-modal-close>취소</button><button class="btn btn--danger">삭제</button></div>
+  </div>
+</div>
+
+<script src="admin-common.js"></script>
+</body>
+</html>

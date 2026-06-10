@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>서비스 분류 관리 — ChainView Admin</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" />
+<link rel="stylesheet" href="admin-common.css" />
+<style>
+  .tree-cell{display:flex;align-items:center;gap:6px}
+  .tree-indent{display:inline-block;color:#cbd5e1}
+  .lv-pill{font-size:10px;padding:1px 6px;border-radius:8px;background:#eef2ff;color:#3730a3;font-weight:700}
+  .lv-pill.l2{background:#fffbeb;color:#92400e}
+  .lv-pill.l3{background:#ecfdf5;color:#166534}
+</style>
+</head>
+<body data-menu="categories">
+<div class="app">
+  <aside class="lnb"></aside>
+
+  <main class="main">
+    <div class="crumb">
+      <a href="dashboard-proto.html">대시보드</a><span class="sep">/</span>
+      <span>서비스 카탈로그</span><span class="sep">/</span><span>서비스 분류 관리</span>
+    </div>
+
+    <div class="page-head">
+      <div>
+        <h1 class="page-head__title">🗂️ 서비스 분류 관리 <small>CATEGORY (3단계)</small></h1>
+        <p class="page-head__desc">서비스 카테고리 트리(대분류 → 중분류 → 소분류)를 관리합니다.</p>
+      </div>
+      <div class="page-head__right">
+        <button class="btn">📥 CSV 내보내기</button>
+        <button class="btn btn--primary" data-modal-open="m-cat-create">＋ 분류 등록</button>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <select><option>레벨 · 전체</option><option>L1 (대분류)</option><option>L2 (중분류)</option><option>L3 (소분류)</option></select>
+      <select><option>활성여부 · 전체</option><option>활성</option><option>비활성</option></select>
+      <div class="search">🔍<input type="text" placeholder="분류코드, 분류명 검색…" /></div>
+      <div class="right"><button class="btn btn--ghost btn--sm">전체 펼치기</button></div>
+    </div>
+
+    <div class="card">
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th class="col-check"><input type="checkbox" class="chk" /></th>
+            <th>분류 (트리)</th><th>분류코드</th><th>레벨</th>
+            <th>상위코드</th><th>정렬</th><th>활성</th><th>등록일</th>
+            <th class="col-actions">관리</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td class="tree-cell"><b>대외계</b></td>
+            <td><code>CAT-EXT</code></td><td><span class="lv-pill">L1</span></td>
+            <td>-</td><td>1</td><td><span class="pill pill--ok">활성</span></td><td>2022-01-10</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-cat-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-cat-delete">🗑</button>
+            </div></td>
+          </tr>
+          <tr>
+            <td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td class="tree-cell"><span class="tree-indent">└─</span> 결제</td>
+            <td><code>CAT-EXT-PAY</code></td><td><span class="lv-pill l2">L2</span></td>
+            <td><code>CAT-EXT</code></td><td>1</td><td><span class="pill pill--ok">활성</span></td><td>2022-01-10</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-cat-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-cat-delete">🗑</button>
+            </div></td>
+          </tr>
+          <tr>
+            <td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td class="tree-cell"><span class="tree-indent">　　└─</span> 승인</td>
+            <td><code>CAT-EXT-PAY-APV</code></td><td><span class="lv-pill l3">L3</span></td>
+            <td><code>CAT-EXT-PAY</code></td><td>1</td><td><span class="pill pill--ok">활성</span></td><td>2022-01-10</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-cat-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-cat-delete">🗑</button>
+            </div></td>
+          </tr>
+          <tr>
+            <td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td class="tree-cell"><span class="tree-indent">　　└─</span> 취소</td>
+            <td><code>CAT-EXT-PAY-CNL</code></td><td><span class="lv-pill l3">L3</span></td>
+            <td><code>CAT-EXT-PAY</code></td><td>2</td><td><span class="pill pill--ok">활성</span></td><td>2022-01-10</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-cat-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-cat-delete">🗑</button>
+            </div></td>
+          </tr>
+          <tr>
+            <td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td class="tree-cell"><b>기간계</b></td>
+            <td><code>CAT-CORE</code></td><td><span class="lv-pill">L1</span></td>
+            <td>-</td><td>2</td><td><span class="pill pill--ok">활성</span></td><td>2022-01-10</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-cat-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-cat-delete">🗑</button>
+            </div></td>
+          </tr>
+          <tr>
+            <td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td class="tree-cell"><span class="tree-indent">└─</span> 계좌</td>
+            <td><code>CAT-CORE-ACC</code></td><td><span class="lv-pill l2">L2</span></td>
+            <td><code>CAT-CORE</code></td><td>1</td><td><span class="pill pill--ok">활성</span></td><td>2022-01-10</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-cat-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-cat-delete">🗑</button>
+            </div></td>
+          </tr>
+          <tr>
+            <td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td class="tree-cell"><span class="tree-indent">　　└─</span> 이체</td>
+            <td><code>CAT-CORE-ACC-TRF</code></td><td><span class="lv-pill l3">L3</span></td>
+            <td><code>CAT-CORE-ACC</code></td><td>1</td><td><span class="pill pill--ok">활성</span></td><td>2022-01-10</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-cat-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-cat-delete">🗑</button>
+            </div></td>
+          </tr>
+          <tr>
+            <td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td class="tree-cell"><b>채널계</b></td>
+            <td><code>CAT-CHN</code></td><td><span class="lv-pill">L1</span></td>
+            <td>-</td><td>3</td><td><span class="pill pill--ok">활성</span></td><td>2022-01-10</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-cat-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-cat-delete">🗑</button>
+            </div></td>
+          </tr>
+          <tr>
+            <td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td class="tree-cell"><span class="tree-indent">└─</span> 인증</td>
+            <td><code>CAT-CHN-AUTH</code></td><td><span class="lv-pill l2">L2</span></td>
+            <td><code>CAT-CHN</code></td><td>1</td><td><span class="pill pill--ok">활성</span></td><td>2021-06-21</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-cat-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-cat-delete">🗑</button>
+            </div></td>
+          </tr>
+          <tr>
+            <td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td class="tree-cell"><b>테스트</b></td>
+            <td><code>CAT-TEST</code></td><td><span class="lv-pill">L1</span></td>
+            <td>-</td><td>99</td><td><span class="pill pill--idle">비활성</span></td><td>2025-03-20</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-cat-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-cat-delete">🗑</button>
+            </div></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="pager">
+        <div class="pager__info">전체 32건 · 1-10 / 4 페이지</div>
+        <div class="pager__nav"><button disabled>‹</button><button class="is-on">1</button><button>2</button><button>3</button><button>4</button><button>›</button></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- 등록 -->
+<div class="modal-backdrop" id="m-cat-create">
+  <div class="modal">
+    <div class="modal__head"><h3>＋ 분류 등록</h3><button class="close" data-modal-close>×</button></div>
+    <div class="modal__body">
+      <div class="form-row"><label>분류코드<span class="req">*</span></label><input type="text" placeholder="예: CAT-EXT-PAY-APV" /><span class="help">고유 식별자. 등록 후 수정 불가</span></div>
+      <div class="form-row"><label>분류명<span class="req">*</span></label><input type="text" placeholder="예: 승인" /></div>
+      <div class="form-row"><label>레벨<span class="req">*</span></label>
+        <select><option>L1 (대분류)</option><option>L2 (중분류)</option><option>L3 (소분류)</option></select></div>
+      <div class="form-row"><label>상위 분류 (parentCode)</label>
+        <select><option>없음 (L1인 경우)</option><option>CAT-EXT</option><option>CAT-EXT-PAY</option></select></div>
+      <div class="form-row"><label>정렬 순서</label><input type="number" value="1" /></div>
+      <div class="form-row"><label>활성여부</label>
+        <select><option>활성</option><option>비활성</option></select></div>
+    </div>
+    <div class="modal__foot"><button class="btn" data-modal-close>취소</button><button class="btn btn--primary">등록</button></div>
+  </div>
+</div>
+
+<!-- 수정 -->
+<div class="modal-backdrop" id="m-cat-edit">
+  <div class="modal">
+    <div class="modal__head"><h3>✏️ 분류 수정 — <code style="font-size:13px">CAT-EXT-PAY</code></h3><button class="close" data-modal-close>×</button></div>
+    <div class="modal__body">
+      <div class="form-row"><label>분류코드</label><input type="text" value="CAT-EXT-PAY" disabled /><span class="help">PK · 수정 불가</span></div>
+      <div class="form-row"><label>분류명<span class="req">*</span></label><input type="text" value="결제" /></div>
+      <div class="form-row"><label>레벨</label><select><option>L2 (중분류)</option></select></div>
+      <div class="form-row"><label>상위 분류</label><select><option>CAT-EXT (대외계)</option></select></div>
+      <div class="form-row"><label>정렬 순서</label><input type="number" value="1" /></div>
+      <div class="form-row"><label>활성여부</label><select><option>활성</option><option>비활성</option></select></div>
+    </div>
+    <div class="modal__foot"><button class="btn" data-modal-close>취소</button><button class="btn btn--primary">저장</button></div>
+  </div>
+</div>
+
+<!-- 삭제 -->
+<div class="modal-backdrop" id="m-cat-delete">
+  <div class="modal confirm">
+    <div class="modal__head"><h3>🗑 분류 삭제</h3><button class="close" data-modal-close>×</button></div>
+    <div class="modal__body">
+      <div class="confirm__icon">⚠</div>
+      <div class="confirm__msg"><b>CAT-EXT-PAY 결제</b>를 삭제하시겠습니까?</div>
+      <div class="confirm__note">하위 분류 2건, 연결된 서비스 12건이 영향을 받습니다.<br/>※ 하위/연결이 있으면 비활성 처리만 가능합니다.</div>
+    </div>
+    <div class="modal__foot"><button class="btn" data-modal-close>취소</button><button class="btn btn--danger">삭제</button></div>
+  </div>
+</div>
+
+<script src="admin-common.js"></script>
+</body>
+</html>

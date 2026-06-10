@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>인시던트 관리 — ChainView Admin</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" />
+<link rel="stylesheet" href="admin-common.css" />
+</head>
+<body data-menu="incidents">
+<div class="app">
+  <aside class="lnb"></aside>
+
+  <main class="main">
+    <div class="crumb">
+      <a href="dashboard-proto.html">대시보드</a><span class="sep">/</span>
+      <span>모니터링</span><span class="sep">/</span><span>인시던트 관리</span>
+    </div>
+
+    <div class="page-head">
+      <div>
+        <h1 class="page-head__title">🚨 인시던트 관리 <small>INCIDENT</small></h1>
+        <p class="page-head__desc">발생한 인시던트를 조회·수정·종결합니다. (OPEN 2 · IN_PROGRESS 1 · 오늘 신규 5)</p>
+      </div>
+      <div class="page-head__right">
+        <button class="btn">📥 CSV 내보내기</button>
+        <button class="btn btn--primary" data-modal-open="m-inc-create">＋ 인시던트 등록</button>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <select>
+        <option>상태 · 전체</option>
+        <option>OPEN</option><option>IN_PROGRESS</option><option>RESOLVED</option><option>CLOSED</option>
+      </select>
+      <select>
+        <option>심각도 · 전체</option>
+        <option>치명(CRITICAL)</option><option>높음(HIGH)</option><option>중간(MEDIUM)</option><option>낮음(LOW)</option><option>정보(INFO)</option>
+      </select>
+      <select>
+        <option>유형 · 전체</option>
+        <option>장애</option><option>성능저하</option><option>보안</option><option>장애예측</option><option>점검</option>
+      </select>
+      <select>
+        <option>대상유형 · 전체</option>
+        <option>SERVICE</option><option>SERVER</option><option>DEPLOYMENT</option>
+      </select>
+      <input type="date" />
+      <input type="date" />
+      <div class="search">🔍<input type="text" placeholder="ID, 제목, 대상 검색…" /></div>
+      <div class="right"><button class="btn btn--ghost btn--sm">초기화</button></div>
+    </div>
+
+    <div class="card">
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th class="col-check"><input type="checkbox" class="chk" /></th>
+            <th>ID</th><th>유형</th><th>심각도</th><th>상태</th>
+            <th>대상</th><th>제목</th><th>영향 서비스</th>
+            <th>발생시각</th><th>종료시각</th>
+            <th class="col-actions">관리</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td><code>INC-2026-0142</code></td>
+            <td><span class="pill pill--crit">장애</span></td>
+            <td><span class="pill pill--crit">치명</span></td>
+            <td><span class="dot dot--crit"></span>OPEN</td>
+            <td>SERVICE · <code>EXT-001</code></td>
+            <td>카드승인연계 응답지연 (P99 &gt; 3s)</td>
+            <td>4건</td>
+            <td>2026-06-01 14:02</td>
+            <td>-</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-inc-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-inc-delete">🗑</button>
+            </div></td>
+          </tr>
+          <tr>
+            <td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td><code>INC-2026-0141</code></td>
+            <td><span class="pill pill--warn">성능저하</span></td>
+            <td><span class="pill pill--warn">높음</span></td>
+            <td><span class="dot dot--warn"></span>IN_PROGRESS</td>
+            <td>SERVICE · <code>DEP-001</code></td>
+            <td>예금이체 TPS 30% 하락</td>
+            <td>3건</td>
+            <td>2026-06-01 13:48</td>
+            <td>-</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-inc-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-inc-delete">🗑</button>
+            </div></td>
+          </tr>
+          <tr>
+            <td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td><code>INC-2026-0140</code></td>
+            <td><span class="pill pill--warn">성능저하</span></td>
+            <td><span class="pill pill--warn">중간</span></td>
+            <td><span class="dot dot--warn"></span>OPEN</td>
+            <td>SERVER · <code>WAS-PRD-12</code></td>
+            <td>WAS CPU 사용률 92% 지속</td>
+            <td>2건</td>
+            <td>2026-06-01 13:25</td>
+            <td>-</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-inc-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-inc-delete">🗑</button>
+            </div></td>
+          </tr>
+          <tr>
+            <td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td><code>INC-2026-0139</code></td>
+            <td><span class="pill">점검</span></td>
+            <td><span class="pill pill--gray">정보</span></td>
+            <td><span class="dot"></span>RESOLVED</td>
+            <td>SERVICE · <code>NOTI-001</code></td>
+            <td>알림서비스 정기점검 완료</td>
+            <td>0건</td>
+            <td>2026-06-01 02:00</td>
+            <td>2026-06-01 03:10</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-inc-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-inc-delete">🗑</button>
+            </div></td>
+          </tr>
+          <tr>
+            <td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td><code>INC-2026-0138</code></td>
+            <td><span class="pill pill--crit">보안</span></td>
+            <td><span class="pill pill--warn">높음</span></td>
+            <td><span class="dot dot--idle"></span>CLOSED</td>
+            <td>SERVICE · <code>AUTH-001</code></td>
+            <td>비정상 로그인 시도 다발</td>
+            <td>1건</td>
+            <td>2026-05-31 22:14</td>
+            <td>2026-05-31 23:40</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-inc-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-inc-delete">🗑</button>
+            </div></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="pager">
+        <div class="pager__info">전체 142건 · 1-5 / 29 페이지</div>
+        <div class="pager__nav">
+          <button disabled>‹</button><button class="is-on">1</button>
+          <button>2</button><button>3</button><button>…</button><button>29</button><button>›</button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- 등록 -->
+<div class="modal-backdrop" id="m-inc-create">
+  <div class="modal modal--lg">
+    <div class="modal__head"><h3>＋ 인시던트 등록</h3><button class="close" data-modal-close>×</button></div>
+    <div class="modal__body">
+      <div class="form-grid">
+        <div class="form-row"><label>ID</label><input type="text" value="INC-2026-0143 (자동)" disabled /><span class="help">자동 채번 (PK)</span></div>
+        <div class="form-row"><label>유형 (INCIDENT_TYPE)<span class="req">*</span></label>
+          <select><option>장애</option><option>성능저하</option><option>보안</option><option>장애예측</option><option>점검</option></select></div>
+        <div class="form-row"><label>심각도 (SEVERITY)<span class="req">*</span></label>
+          <select><option>치명</option><option>높음</option><option>중간</option><option>낮음</option><option>정보</option></select></div>
+        <div class="form-row"><label>상태<span class="req">*</span></label>
+          <select><option>OPEN</option><option>IN_PROGRESS</option><option>RESOLVED</option><option>CLOSED</option></select></div>
+        <div class="form-row"><label>대상유형<span class="req">*</span></label>
+          <select><option>SERVICE</option><option>SERVER</option><option>DEPLOYMENT</option></select></div>
+        <div class="form-row"><label>대상 ID<span class="req">*</span></label><input type="text" placeholder="예: EXT-001 / WAS-PRD-12" /></div>
+        <div class="form-row full"><label>제목<span class="req">*</span></label><input type="text" placeholder="예: 카드승인연계 응답지연 (P99 > 3s)" /></div>
+        <div class="form-row full"><label>설명</label><textarea placeholder="현상, 영향, 원인 등"></textarea></div>
+        <div class="form-row"><label>발생시각<span class="req">*</span></label><input type="datetime-local" /></div>
+        <div class="form-row"><label>종료시각</label><input type="datetime-local" /></div>
+        <div class="form-row full"><label>영향 서비스 (콤마 구분)</label><input type="text" placeholder="EXT-001, PAY-API-001, ..." /></div>
+      </div>
+    </div>
+    <div class="modal__foot"><button class="btn" data-modal-close>취소</button><button class="btn btn--primary">등록</button></div>
+  </div>
+</div>
+
+<!-- 수정 -->
+<div class="modal-backdrop" id="m-inc-edit">
+  <div class="modal modal--lg">
+    <div class="modal__head"><h3>✏️ 인시던트 수정 — <code style="font-size:13px">INC-2026-0142</code></h3><button class="close" data-modal-close>×</button></div>
+    <div class="modal__body">
+      <div class="form-grid">
+        <div class="form-row"><label>ID</label><input type="text" value="INC-2026-0142" disabled /></div>
+        <div class="form-row"><label>유형</label><select><option>장애</option></select></div>
+        <div class="form-row"><label>심각도</label><select><option>치명</option><option>높음</option></select></div>
+        <div class="form-row"><label>상태</label><select><option>OPEN</option><option>IN_PROGRESS</option><option>RESOLVED</option><option>CLOSED</option></select></div>
+        <div class="form-row"><label>대상유형</label><select><option>SERVICE</option></select></div>
+        <div class="form-row"><label>대상 ID</label><input type="text" value="EXT-001" /></div>
+        <div class="form-row full"><label>제목</label><input type="text" value="카드승인연계 응답지연 (P99 > 3s)" /></div>
+        <div class="form-row full"><label>설명</label><textarea>외부 카드사 응답 지연으로 P99 3초 초과 지속</textarea></div>
+        <div class="form-row"><label>발생시각</label><input type="datetime-local" value="2026-06-01T14:02" /></div>
+        <div class="form-row"><label>종료시각</label><input type="datetime-local" /></div>
+      </div>
+    </div>
+    <div class="modal__foot"><button class="btn" data-modal-close>취소</button><button class="btn btn--primary">저장</button></div>
+  </div>
+</div>
+
+<!-- 삭제 -->
+<div class="modal-backdrop" id="m-inc-delete">
+  <div class="modal confirm">
+    <div class="modal__head"><h3>🗑 인시던트 삭제</h3><button class="close" data-modal-close>×</button></div>
+    <div class="modal__body">
+      <div class="confirm__icon">⚠</div>
+      <div class="confirm__msg"><b>INC-2026-0142</b>를 삭제하시겠습니까?</div>
+      <div class="confirm__note">감사로그는 보존되며, 종결 처리(CLOSED) 사용을 권장합니다.</div>
+    </div>
+    <div class="modal__foot"><button class="btn" data-modal-close>취소</button><button class="btn btn--danger">삭제</button></div>
+  </div>
+</div>
+
+<script src="admin-common.js"></script>
+</body>
+</html>

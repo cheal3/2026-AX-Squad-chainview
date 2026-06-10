@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>공통코드 관리 — ChainView Admin</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" />
+<link rel="stylesheet" href="admin-common.css" />
+<style>
+  .codes-layout{display:grid;grid-template-columns:280px 1fr;gap:14px}
+  .group-list{background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px;height:fit-content;position:sticky;top:18px}
+  .group-list h4{margin:6px 8px;font-size:11px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+  .group-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:6px;cursor:pointer;font-size:13px}
+  .group-item:hover{background:#f3f4f6}
+  .group-item.is-on{background:#eef2ff;color:#3730a3;font-weight:600}
+  .group-item .cnt{margin-left:auto;background:#f3f4f6;color:var(--muted);font-size:10px;padding:1px 7px;border-radius:8px;font-weight:700}
+  .group-item.is-on .cnt{background:#3730a3;color:#fff}
+</style>
+</head>
+<body data-menu="codes">
+<div class="app">
+  <aside class="lnb"></aside>
+
+  <main class="main">
+    <div class="crumb">
+      <a href="dashboard-proto.html">대시보드</a><span class="sep">/</span>
+      <span>시스템</span><span class="sep">/</span><span>공통코드 관리</span>
+    </div>
+
+    <div class="page-head">
+      <div>
+        <h1 class="page-head__title">⚙️ 공통코드 관리 <small>COMMON_CODE</small></h1>
+        <p class="page-head__desc">시스템 전반의 enum 값(코드그룹 + 코드항목)을 관리합니다.</p>
+      </div>
+      <div class="page-head__right">
+        <button class="btn">📥 CSV 내보내기</button>
+        <button class="btn" data-modal-open="m-cdg-create">＋ 코드그룹 등록</button>
+        <button class="btn btn--primary" data-modal-open="m-cd-create">＋ 코드항목 등록</button>
+      </div>
+    </div>
+
+    <div class="codes-layout">
+      <!-- 좌측: 그룹 리스트 -->
+      <aside class="group-list">
+        <h4>코드그룹 (9)</h4>
+        <div class="group-item is-on">📦 SERVICE_TYPE<span class="cnt">3</span></div>
+        <div class="group-item">⭐ IMPORTANCE<span class="cnt">3</span></div>
+        <div class="group-item">🔘 STATUS<span class="cnt">4</span></div>
+        <div class="group-item">🌐 ENVIRONMENT<span class="cnt">4</span></div>
+        <div class="group-item">💻 OS_TYPE<span class="cnt">4</span></div>
+        <div class="group-item">🔗 RELATION_TYPE<span class="cnt">5</span></div>
+        <div class="group-item">🚨 INCIDENT_TYPE<span class="cnt">5</span></div>
+        <div class="group-item">⚠️ SEVERITY<span class="cnt">5</span></div>
+        <div class="group-item">🧩 TECH_TYPE<span class="cnt">7</span></div>
+      </aside>
+
+      <!-- 우측: 선택된 그룹의 항목 테이블 -->
+      <section>
+        <div class="toolbar">
+          <div style="display:flex;align-items:center;gap:10px">
+            <b style="font-size:14px">📦 SERVICE_TYPE</b>
+            <span class="pill pill--gray">서비스 유형</span>
+            <span style="color:var(--muted);font-size:12px">시스템 사용 중 · 삭제 불가</span>
+          </div>
+          <div class="right">
+            <button class="btn btn--ghost btn--sm" data-modal-open="m-cdg-edit">✏️ 그룹 정보 수정</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th class="col-check"><input type="checkbox" class="chk" /></th>
+                <th>itemCode</th><th>코드명</th><th>설명</th>
+                <th>정렬</th><th>활성</th><th>수정일</th>
+                <th class="col-actions">관리</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="col-check"><input type="checkbox" class="chk" /></td>
+                <td><code>API</code></td><td>API 서비스</td>
+                <td>REST/SOAP 등 API 형태의 서비스</td>
+                <td>1</td><td><span class="pill pill--ok">활성</span></td><td>2022-01-10</td>
+                <td class="col-actions"><div class="row-actions">
+                  <button class="ibtn" data-modal-open="m-cd-edit">✏️</button>
+                  <button class="ibtn ibtn--danger" data-modal-open="m-cd-delete">🗑</button></div></td></tr>
+              <tr><td class="col-check"><input type="checkbox" class="chk" /></td>
+                <td><code>WEB</code></td><td>웹 서비스</td>
+                <td>사용자 대면 웹 화면 서비스</td>
+                <td>2</td><td><span class="pill pill--ok">활성</span></td><td>2022-01-10</td>
+                <td class="col-actions"><div class="row-actions">
+                  <button class="ibtn" data-modal-open="m-cd-edit">✏️</button>
+                  <button class="ibtn ibtn--danger" data-modal-open="m-cd-delete">🗑</button></div></td></tr>
+              <tr><td class="col-check"><input type="checkbox" class="chk" /></td>
+                <td><code>BATCH</code></td><td>배치 서비스</td>
+                <td>스케줄 기반 일괄 처리 서비스</td>
+                <td>3</td><td><span class="pill pill--ok">활성</span></td><td>2022-01-10</td>
+                <td class="col-actions"><div class="row-actions">
+                  <button class="ibtn" data-modal-open="m-cd-edit">✏️</button>
+                  <button class="ibtn ibtn--danger" data-modal-open="m-cd-delete">🗑</button></div></td></tr>
+            </tbody>
+          </table>
+          <div class="pager">
+            <div class="pager__info">전체 3건</div>
+            <div class="pager__nav"><button disabled>‹</button><button class="is-on">1</button><button disabled>›</button></div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<!-- 코드그룹 등록 -->
+<div class="modal-backdrop" id="m-cdg-create">
+  <div class="modal">
+    <div class="modal__head"><h3>＋ 코드그룹 등록</h3><button class="close" data-modal-close>×</button></div>
+    <div class="modal__body">
+      <div class="form-row"><label>codeGroup<span class="req">*</span></label><input type="text" placeholder="예: PAYMENT_METHOD" /><span class="help">대문자+언더스코어 권장 · 수정 불가</span></div>
+      <div class="form-row"><label>그룹명<span class="req">*</span></label><input type="text" placeholder="예: 결제 수단" /></div>
+      <div class="form-row"><label>설명</label><textarea placeholder="이 코드그룹의 용도, 사용 위치"></textarea></div>
+      <div class="form-row"><label>활성여부</label><select><option>활성</option><option>비활성</option></select></div>
+    </div>
+    <div class="modal__foot"><button class="btn" data-modal-close>취소</button><button class="btn btn--primary">등록</button></div>
+  </div>
+</div>
+
+<!-- 코드그룹 수정 -->
+<div class="modal-backdrop" id="m-cdg-edit">
+  <div class="modal">
+    <div class="modal__head"><h3>✏️ 코드그룹 수정 — <code style="font-size:13px">SERVICE_TYPE</code></h3><button class="close" data-modal-close>×</button></div>
+    <div class="modal__body">
+      <div class="form-row"><label>codeGroup</label><input type="text" value="SERVICE_TYPE" disabled /></div>
+      <div class="form-row"><label>그룹명</label><input type="text" value="서비스 유형" /></div>
+      <div class="form-row"><label>설명</label><textarea>서비스의 형태(API/WEB/BATCH)를 구분하는 코드</textarea></div>
+      <div class="form-row"><label>활성여부</label><select><option>활성</option><option>비활성</option></select></div>
+    </div>
+    <div class="modal__foot"><button class="btn" data-modal-close>취소</button><button class="btn btn--primary">저장</button></div>
+  </div>
+</div>
+
+<!-- 코드항목 등록 -->
+<div class="modal-backdrop" id="m-cd-create">
+  <div class="modal">
+    <div class="modal__head"><h3>＋ 코드항목 등록</h3><button class="close" data-modal-close>×</button></div>
+    <div class="modal__body">
+      <div class="form-row"><label>소속 코드그룹<span class="req">*</span></label>
+        <select><option>SERVICE_TYPE</option><option>IMPORTANCE</option><option>STATUS</option><option>ENVIRONMENT</option></select></div>
+      <div class="form-row"><label>itemCode<span class="req">*</span></label><input type="text" placeholder="예: STREAM" /><span class="help">그룹 내 고유 · 수정 불가</span></div>
+      <div class="form-row"><label>코드명<span class="req">*</span></label><input type="text" placeholder="예: 스트림 서비스" /></div>
+      <div class="form-row"><label>설명/메모</label><textarea placeholder="비즈니스 의미, 사용 예시"></textarea></div>
+      <div class="form-row"><label>정렬 순서</label><input type="number" value="1" /></div>
+      <div class="form-row"><label>활성여부</label><select><option>활성</option><option>비활성</option></select></div>
+    </div>
+    <div class="modal__foot"><button class="btn" data-modal-close>취소</button><button class="btn btn--primary">등록</button></div>
+  </div>
+</div>
+
+<!-- 코드항목 수정 -->
+<div class="modal-backdrop" id="m-cd-edit">
+  <div class="modal">
+    <div class="modal__head"><h3>✏️ 코드항목 수정 — <code style="font-size:13px">SERVICE_TYPE.API</code></h3><button class="close" data-modal-close>×</button></div>
+    <div class="modal__body">
+      <div class="form-row"><label>소속 그룹</label><input type="text" value="SERVICE_TYPE" disabled /></div>
+      <div class="form-row"><label>itemCode</label><input type="text" value="API" disabled /></div>
+      <div class="form-row"><label>코드명</label><input type="text" value="API 서비스" /></div>
+      <div class="form-row"><label>설명/메모</label><textarea>REST/SOAP 등 API 형태의 서비스</textarea></div>
+      <div class="form-row"><label>정렬 순서</label><input type="number" value="1" /></div>
+      <div class="form-row"><label>활성여부</label><select><option>활성</option><option>비활성</option></select></div>
+    </div>
+    <div class="modal__foot"><button class="btn" data-modal-close>취소</button><button class="btn btn--primary">저장</button></div>
+  </div>
+</div>
+
+<!-- 코드항목 삭제 -->
+<div class="modal-backdrop" id="m-cd-delete">
+  <div class="modal confirm">
+    <div class="modal__head"><h3>🗑 코드항목 삭제</h3><button class="close" data-modal-close>×</button></div>
+    <div class="modal__body">
+      <div class="confirm__icon">⚠</div>
+      <div class="confirm__msg"><b>SERVICE_TYPE.API</b>를 삭제하시겠습니까?</div>
+      <div class="confirm__note">이 코드를 사용 중인 서비스 28건이 영향을 받습니다.<br/>※ 사용 중이면 비활성 처리만 가능합니다.</div>
+    </div>
+    <div class="modal__foot"><button class="btn" data-modal-close>취소</button><button class="btn btn--danger">삭제</button></div>
+  </div>
+</div>
+
+<script src="admin-common.js"></script>
+<script>
+  // 좌측 그룹 선택 시 활성 표시 토글 (실제 데이터 로드는 모의)
+  document.querySelectorAll('.group-item').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      document.querySelectorAll('.group-item').forEach(e=>e.classList.remove('is-on'));
+      el.classList.add('is-on');
+    });
+  });
+</script>
+</body>
+</html>

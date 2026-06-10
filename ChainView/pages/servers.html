@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>서버 관리 — ChainView Admin</title>
+  <link rel="stylesheet" href="../css/styles.css" />
+</head>
+<body>
+  <div class="cv-admin">
+    <aside id="admin-sidebar" class="cv-sidebar">
+      <div class="cv-sidebar__brand">
+        <div class="cv-sidebar__logo">CV</div>
+        <div class="cv-sidebar__titles">
+          <h2>ChainView</h2>
+          <p>Admin Console</p>
+        </div>
+      </div>
+      <nav class="cv-sidebar__nav">
+        <div class="cv-nav-group">
+          <button type="button" class="cv-nav-group__toggle" data-nav-group-toggle="g-overview">
+            <span>Overview</span>
+            <svg class="cv-icon cv-icon--sm cv-nav-group__chev is-open" data-chevron viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+          <div class="cv-nav-group__items" data-nav-group-items="g-overview">
+            <a class="cv-nav-link" href="dashboard.html">
+              <svg class="cv-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+              <span>Dashboard</span>
+            </a>
+          </div>
+        </div>
+        <div class="cv-nav-group">
+          <button type="button" class="cv-nav-group__toggle" data-nav-group-toggle="g-catalog">
+            <span>서비스 카탈로그</span>
+            <svg class="cv-icon cv-icon--sm cv-nav-group__chev" data-chevron viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+          <div class="cv-nav-group__items is-hidden" data-nav-group-items="g-catalog">
+            <a class="cv-nav-link" href="services.html">
+              <svg class="cv-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+              <span>서비스 관리</span>
+            </a>
+            <a class="cv-nav-link" href="service-categories.html">
+              <svg class="cv-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="M3.27 6.96 12 12.01 20.73 6.96"/><path d="M12 22.08V12"/></svg>
+              <span>서비스 분류 관리</span>
+            </a>
+            <a class="cv-nav-link" href="tech-stacks.html">
+              <svg class="cv-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m18 16 4-4-4-4"/><path d="m6 8-4 4 4 4"/><path d="m14.5 4-5 16"/></svg>
+              <span>기술스택 마스터</span>
+            </a>
+          </div>
+        </div>
+        <div class="cv-nav-group">
+          <button type="button" class="cv-nav-group__toggle" data-nav-group-toggle="g-infra">
+            <span>배포 인프라</span>
+            <svg class="cv-icon cv-icon--sm cv-nav-group__chev is-open" data-chevron viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+          <div class="cv-nav-group__items" data-nav-group-items="g-infra">
+            <a class="cv-nav-link is-active" href="servers.html">
+              <svg class="cv-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><rect width="20" height="8" x="2" y="2" rx="2" ry="2"/><rect width="20" height="8" x="2" y="14" rx="2" ry="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/></svg>
+              <span>서버 관리</span>
+            </a>
+            <a class="cv-nav-link" href="deployments.html">
+              <svg class="cv-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m16 16-4-4-4 4"/></svg>
+              <span>서비스 배포 정보</span>
+            </a>
+          </div>
+        </div>
+        <div class="cv-nav-group">
+          <button type="button" class="cv-nav-group__toggle" data-nav-group-toggle="g-relation">
+            <span>서비스 관계</span>
+            <svg class="cv-icon cv-icon--sm cv-nav-group__chev" data-chevron viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+          <div class="cv-nav-group__items is-hidden" data-nav-group-items="g-relation">
+            <a class="cv-nav-link" href="service-relations.html">
+              <svg class="cv-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 1 1 0 10h-2"/><line x1="8" x2="16" y1="12" y2="12"/></svg>
+              <span>서비스 관계 관리</span>
+            </a>
+            <a class="cv-nav-link" href="relation-graph.html">
+              <svg class="cv-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.41" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/></svg>
+              <span>관계 그래프</span>
+            </a>
+          </div>
+        </div>
+        <div class="cv-nav-group">
+          <button type="button" class="cv-nav-group__toggle" data-nav-group-toggle="g-ownership">
+            <span>소유권 관리</span>
+            <svg class="cv-icon cv-icon--sm cv-nav-group__chev" data-chevron viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+          <div class="cv-nav-group__items is-hidden" data-nav-group-items="g-ownership">
+            <a class="cv-nav-link" href="users.html">
+              <svg class="cv-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              <span>사용자 관리</span>
+            </a>
+            <a class="cv-nav-link" href="groups.html">
+              <svg class="cv-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg>
+              <span>그룹 관리</span>
+            </a>
+            <a class="cv-nav-link" href="service-owners.html">
+              <svg class="cv-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg>
+              <span>서비스 담당자 관리</span>
+            </a>
+          </div>
+        </div>
+        <div class="cv-nav-group">
+          <button type="button" class="cv-nav-group__toggle" data-nav-group-toggle="g-ops">
+            <span>운영 관리</span>
+            <svg class="cv-icon cv-icon--sm cv-nav-group__chev" data-chevron viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+          <div class="cv-nav-group__items is-hidden" data-nav-group-items="g-ops">
+            <a class="cv-nav-link" href="incidents.html">
+              <svg class="cv-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+              <span>인시던트 관리</span>
+            </a>
+          </div>
+        </div>
+        <div class="cv-nav-group">
+          <button type="button" class="cv-nav-group__toggle" data-nav-group-toggle="g-master">
+            <span>기준 정보</span>
+            <svg class="cv-icon cv-icon--sm cv-nav-group__chev" data-chevron viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+          <div class="cv-nav-group__items is-hidden" data-nav-group-items="g-master">
+            <a class="cv-nav-link" href="common-codes.html">
+              <svg class="cv-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><line x1="10" x2="21" y1="6" y2="6"/><line x1="10" x2="21" y1="12" y2="12"/><line x1="10" x2="21" y1="18" y2="18"/><path d="M4 6h1v4"/><path d="M4 10h2"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg>
+              <span>공통코드 관리</span>
+            </a>
+          </div>
+        </div>
+      </nav>
+    </aside>
+
+    <div class="cv-main">
+      <header class="cv-header">
+        <div class="cv-header__left">
+          <button type="button" class="cv-btn cv-btn--ghost cv-btn--icon cv-header__icon-btn" id="sidebar-toggle" aria-label="메뉴">
+            <svg id="sidebar-toggle-close" class="cv-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            <svg id="sidebar-toggle-menu" class="cv-icon is-hidden" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
+          </button>
+          <div class="cv-search-wrap">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            <input class="cv-input" type="search" placeholder="서비스명, 서비스 코드, 서버명, IP, 담당자 검색..." />
+          </div>
+        </div>
+        <div class="cv-header__right">
+          <button type="button" class="cv-btn cv-btn--ghost cv-btn--icon cv-header__icon-btn cv-notify-btn" aria-label="알림">
+            <svg class="cv-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+            <span class="cv-notify-badge">3</span>
+          </button>
+          <div class="cv-user-dd">
+            <button type="button" class="cv-user-trigger" id="user-menu-trigger">
+              <span class="cv-avatar">관</span>
+              <div class="cv-user-meta">
+                <strong>관리자</strong>
+                <span>admin@chainview.com</span>
+              </div>
+            </button>
+            <div class="cv-dropdown is-hidden" id="user-menu-panel">
+              <div class="cv-dropdown__label">내 계정</div>
+              <hr />
+              <button type="button">프로필 설정</button>
+              <button type="button">환경 설정</button>
+              <hr />
+              <button type="button" class="cv-dd-danger" id="user-menu-logout">로그아웃</button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main class="cv-content">
+        <div class="cv-page-head-row">
+          <div>
+            <h1 class="cv-page-title" style="margin-bottom:0.25rem">서버 관리</h1>
+            <p class="cv-page-desc" style="margin:0">인프라 서버 정보를 관리합니다</p>
+          </div>
+          <button type="button" class="cv-btn cv-btn--primary cv-page-head-primary-btn" data-open-modal="server-add">
+            <svg class="cv-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+            서버 등록
+          </button>
+        </div>
+
+        <div class="cv-card cv-servers-filter-card" style="margin-bottom:1rem">
+          <div class="cv-card__body">
+            <div class="cv-servers-toolbar">
+              <div class="cv-servers-toolbar__search-row">
+                <div class="cv-search-wrap cv-search-wrap--lg">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                  <input class="cv-input" type="search" placeholder="서버명, 호스트명, IP 주소 검색..." />
+                </div>
+                <button type="button" class="cv-btn cv-btn--outline" id="servers-filter-toggle">
+                  <svg class="cv-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 20a1 1 0 0 0 .553.895l2 1A1 1 0 0 0 14 21v-7a2 2 0 0 1 .517-1.341L21.74 4.67A1 1 0 0 0 21 3H3a1 1 0 0 0-.742 1.67l7.225 7.989A2 2 0 0 1 10 14z"/></svg>
+                  고급 필터
+                </button>
+              </div>
+            <div id="servers-filter-panel" class="is-hidden">
+              <hr class="sep" />
+              <div class="cv-tech-adv-grid">
+                <select class="cv-input"><option value="">환경</option><option>Production</option><option>Test</option><option>Development</option></select>
+                <select class="cv-input"><option value="">OS 유형</option><option>Ubuntu</option><option>CentOS</option><option>Rocky Linux</option></select>
+                <select class="cv-input"><option value="">상태</option><option>운영중</option><option>테스트</option><option>개발</option><option>중지</option></select>
+                <button type="button" class="cv-btn cv-btn--outline" id="servers-filter-reset">
+                  <svg class="cv-icon cv-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                  필터 초기화
+                </button>
+              </div>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.875rem;flex-wrap:wrap;gap:0.5rem">
+              <span>총 <strong>5</strong>개 서버 <span id="servers-selected-count" class="is-hidden" style="color:var(--blue);margin-left:0.25rem"></span></span>
+              <div id="servers-bulk-actions" class="is-hidden" style="display:flex;gap:0.5rem;align-items:center">
+                <button type="button" class="cv-btn cv-btn--danger cv-btn--sm">
+                  <svg class="cv-icon cv-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+                  선택 삭제
+                </button>
+              </div>
+            </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="cv-card cv-card-plain">
+          <div class="cv-table-wrap">
+            <table class="cv-table">
+              <thead>
+                <tr>
+                  <th style="width:2rem"><input type="checkbox" id="servers-select-all" aria-label="전체 선택" /></th>
+                  <th>서버명</th>
+                  <th>호스트명</th>
+                  <th>IP 주소</th>
+                  <th>환경</th>
+                  <th>OS 유형</th>
+                  <th>OS 버전</th>
+                  <th>상태</th>
+                  <th>연결 서비스</th>
+                  <th class="cv-td-right">액션</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr data-srv-name="pay-api-01" data-srv-host="pay-api-01.internal" data-srv-ip="10.0.1.101" data-srv-env="Production" data-srv-os="Ubuntu" data-srv-osver="22.04 LTS" data-srv-status="운영중" data-srv-count="3">
+                  <td><input type="checkbox" class="js-server-row-cb" aria-label="행 선택" /></td>
+                  <td>
+                    <span class="cv-cell-inline">
+                      <svg class="cv-icon cv-icon--sm cv-muted-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="8" x="2" y="2" rx="2" ry="2"/><rect width="20" height="8" x="2" y="14" rx="2" ry="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/></svg>
+                      <strong>pay-api-01</strong>
+                    </span>
+                  </td>
+                  <td class="mono">pay-api-01.internal</td>
+                  <td class="mono">10.0.1.101</td>
+                  <td><span class="cv-badge cv-badge--red">Production</span></td>
+                  <td>Ubuntu</td>
+                  <td class="mono" style="color:var(--gray-600);font-size:0.8125rem">22.04 LTS</td>
+                  <td><span class="cv-badge cv-badge--green">운영중</span></td>
+                  <td>
+                    <span class="cv-cell-inline" title="연결된 서비스">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#16a34a" aria-hidden="true"><path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/></svg>
+                      <span style="font-size:0.875rem">3개</span>
+                    </span>
+                  </td>
+                  <td class="cv-td-right cv-td-actions">
+                    <button type="button" class="cv-btn cv-btn--ghost cv-btn--icon" data-row-actions-toggle="srv-1" aria-label="행 메뉴">
+                      <svg class="cv-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+                    </button>
+                    <div class="cv-row-menu is-hidden" data-row-actions-menu="srv-1">
+                      <div class="cv-row-menu__title">액션</div>
+                      <hr />
+                      <button type="button" data-open-modal="server-detail"><svg class="cv-icon cv-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>상세</button>
+                      <button type="button"><svg class="cv-icon cv-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>수정</button>
+                      <button type="button"><svg class="cv-icon cv-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>서비스 등록</button>
+                      <hr />
+                      <button type="button" class="cv-row-menu__danger"><svg class="cv-icon cv-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>삭제</button>
+                    </div>
+                  </td>
+                </tr>
+                <tr data-srv-name="pay-api-02" data-srv-host="pay-api-02.internal" data-srv-ip="10.0.1.102" data-srv-env="Production" data-srv-os="Ubuntu" data-srv-osver="22.04 LTS" data-srv-status="운영중" data-srv-count="3">
+                  <td><input type="checkbox" class="js-server-row-cb" aria-label="행 선택" /></td>
+                  <td><span class="cv-cell-inline"><svg class="cv-icon cv-icon--sm cv-muted-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="8" x="2" y="2" rx="2" ry="2"/><rect width="20" height="8" x="2" y="14" rx="2" ry="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/></svg><strong>pay-api-02</strong></span></td>
+                  <td class="mono">pay-api-02.internal</td>
+                  <td class="mono">10.0.1.102</td>
+                  <td><span class="cv-badge cv-badge--red">Production</span></td>
+                  <td>Ubuntu</td>
+                  <td class="mono" style="color:var(--gray-600);font-size:0.8125rem">22.04 LTS</td>
+                  <td><span class="cv-badge cv-badge--green">운영중</span></td>
+                  <td><span class="cv-cell-inline"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#16a34a" aria-hidden="true"><path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/></svg><span style="font-size:0.875rem">3개</span></span></td>
+                  <td class="cv-td-right cv-td-actions">
+                    <button type="button" class="cv-btn cv-btn--ghost cv-btn--icon" data-row-actions-toggle="srv-2" aria-label="행 메뉴"><svg class="cv-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
+                    <div class="cv-row-menu is-hidden" data-row-actions-menu="srv-2">
+                      <div class="cv-row-menu__title">액션</div>
+                      <hr />
+                      <button type="button" data-open-modal="server-detail"><svg class="cv-icon cv-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>상세</button>
+                      <button type="button"><svg class="cv-icon cv-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>수정</button>
+                      <button type="button"><svg class="cv-icon cv-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>서비스 등록</button>
+                      <hr />
+                      <button type="button" class="cv-row-menu__danger"><svg class="cv-icon cv-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>삭제</button>
+                    </div>
+                  </td>
+                </tr>
+                <tr data-srv-name="auth-svc-01" data-srv-host="auth-svc-01.internal" data-srv-ip="10.0.2.101" data-srv-env="Production" data-srv-os="CentOS" data-srv-osver="8.5" data-srv-status="운영중" data-srv-count="2">
+                  <td><input type="checkbox" class="js-server-row-cb" aria-label="행 선택" /></td>
+                  <td><span class="cv-cell-inline"><svg class="cv-icon cv-icon--sm cv-muted-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="8" x="2" y="2" rx="2" ry="2"/><rect width="20" height="8" x="2" y="14" rx="2" ry="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/></svg><strong>auth-svc-01</strong></span></td>
+                  <td class="mono">auth-svc-01.internal</td>
+                  <td class="mono">10.0.2.101</td>
+                  <td><span class="cv-badge cv-badge--red">Production</span></td>
+                  <td>CentOS</td>
+                  <td class="mono" style="color:var(--gray-600);font-size:0.8125rem">8.5</td>
+                  <td><span class="cv-badge cv-badge--green">운영중</span></td>
+                  <td><span class="cv-cell-inline"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#16a34a" aria-hidden="true"><path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/></svg><span style="font-size:0.875rem">2개</span></span></td>
+                  <td class="cv-td-right cv-td-actions">
+                    <button type="button" class="cv-btn cv-btn--ghost cv-btn--icon" data-row-actions-toggle="srv-3" aria-label="행 메뉴"><svg class="cv-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
+                    <div class="cv-row-menu is-hidden" data-row-actions-menu="srv-3">
+                      <div class="cv-row-menu__title">액션</div>
+                      <hr />
+                      <button type="button" data-open-modal="server-detail"><svg class="cv-icon cv-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>상세</button>
+                      <button type="button"><svg class="cv-icon cv-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>수정</button>
+                      <button type="button"><svg class="cv-icon cv-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>서비스 등록</button>
+                      <hr />
+                      <button type="button" class="cv-row-menu__danger"><svg class="cv-icon cv-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>삭제</button>
+                    </div>
+                  </td>
+                </tr>
+                <tr data-srv-name="test-web-01" data-srv-host="test-web-01.internal" data-srv-ip="10.0.3.101" data-srv-env="Test" data-srv-os="Ubuntu" data-srv-osver="22.04 LTS" data-srv-status="테스트" data-srv-count="5">
+                  <td><input type="checkbox" class="js-server-row-cb" aria-label="행 선택" /></td>
+                  <td><span class="cv-cell-inline"><svg class="cv-icon cv-icon--sm cv-muted-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="8" x="2" y="2" rx="2" ry="2"/><rect width="20" height="8" x="2" y="14" rx="2" ry="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/></svg><strong>test-web-01</strong></span></td>
+                  <td class="mono">test-web-01.internal</td>
+                  <td class="mono">10.0.3.101</td>
+                  <td><span class="cv-badge cv-badge--blue">Test</span></td>
+                  <td>Ubuntu</td>
+                  <td class="mono" style="color:var(--gray-600);font-size:0.8125rem">22.04 LTS</td>
+                  <td><span class="cv-badge cv-badge--blue">테스트</span></td>
+                  <td><span class="cv-cell-inline"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#16a34a" aria-hidden="true"><path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/></svg><span style="font-size:0.875rem">5개</span></span></td>
+                  <td class="cv-td-right cv-td-actions">
+                    <button type="button" class="cv-btn cv-btn--ghost cv-btn--icon" data-row-actions-toggle="srv-4" aria-label="행 메뉴"><svg class="cv-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
+                    <div class="cv-row-menu is-hidden" data-row-actions-menu="srv-4">
+                      <div class="cv-row-menu__title">액션</div>
+                      <hr />
+                      <button type="button" data-open-modal="server-detail"><svg class="cv-icon cv-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>상세</button>
+                      <button type="button"><svg class="cv-icon cv-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>수정</button>
+                      <button type="button"><svg class="cv-icon cv-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>서비스 등록</button>
+                      <hr />
+                      <button type="button" class="cv-row-menu__danger"><svg class="cv-icon cv-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>삭제</button>
+                    </div>
+                  </td>
+                </tr>
+                <tr data-srv-name="dev-db-01" data-srv-host="dev-db-01.internal" data-srv-ip="10.0.4.101" data-srv-env="Development" data-srv-os="Rocky Linux" data-srv-osver="9" data-srv-status="개발" data-srv-count="0">
+                  <td><input type="checkbox" class="js-server-row-cb" aria-label="행 선택" /></td>
+                  <td><span class="cv-cell-inline"><svg class="cv-icon cv-icon--sm cv-muted-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="8" x="2" y="2" rx="2" ry="2"/><rect width="20" height="8" x="2" y="14" rx="2" ry="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/></svg><strong>dev-db-01</strong></span></td>
+                  <td class="mono">dev-db-01.internal</td>
+                  <td class="mono">10.0.4.101</td>
+                  <td><span class="cv-badge cv-badge--gray">Development</span></td>
+                  <td>Rocky Linux</td>
+                  <td class="mono" style="color:var(--gray-600);font-size:0.8125rem">9</td>
+                  <td><span class="cv-badge cv-badge--gray">개발</span></td>
+                  <td>
+                    <span class="cv-cell-inline" title="미연결">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#ea580c" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                      <span style="font-size:0.875rem;color:var(--gray-500)">미연결</span>
+                    </span>
+                  </td>
+                  <td class="cv-td-right cv-td-actions">
+                    <button type="button" class="cv-btn cv-btn--ghost cv-btn--icon" data-row-actions-toggle="srv-5" aria-label="행 메뉴"><svg class="cv-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
+                    <div class="cv-row-menu is-hidden" data-row-actions-menu="srv-5">
+                      <div class="cv-row-menu__title">액션</div>
+                      <hr />
+                      <button type="button" data-open-modal="server-detail"><svg class="cv-icon cv-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>상세</button>
+                      <button type="button"><svg class="cv-icon cv-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>수정</button>
+                      <button type="button"><svg class="cv-icon cv-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>서비스 등록</button>
+                      <hr />
+                      <button type="button" class="cv-row-menu__danger"><svg class="cv-icon cv-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>삭제</button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <div id="modal-server-add" class="cv-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="modal-server-add-title">
+    <div class="cv-modal__backdrop" data-close-modal></div>
+    <div class="cv-modal__panel cv-modal__panel--lg">
+      <div class="cv-modal__head">
+        <h2 id="modal-server-add-title" class="cv-modal__title">서버 등록</h2>
+        <p class="cv-modal__desc">새로운 서버 정보를 등록합니다</p>
+      </div>
+      <div class="cv-modal__body cv-form-grid cv-form-grid--modal-2">
+        <div class="cv-field"><label>서버명 <span class="cv-req">*</span></label><input class="cv-input" type="text" placeholder="예: pay-api-01" /></div>
+        <div class="cv-field"><label>호스트명 <span class="cv-req">*</span></label><input class="cv-input" type="text" placeholder="예: pay-api-01.internal" /></div>
+        <div class="cv-field"><label>IP 주소 <span class="cv-req">*</span></label><input class="cv-input" type="text" placeholder="예: 10.0.1.101" /></div>
+        <div class="cv-field"><label>환경 <span class="cv-req">*</span></label><select class="cv-input"><option value="">선택</option><option>Production</option><option>Test</option><option>Development</option></select></div>
+        <div class="cv-field"><label>OS 유형 <span class="cv-req">*</span></label><select class="cv-input"><option value="">선택</option><option>Ubuntu</option><option>CentOS</option><option>Rocky Linux</option><option>Red Hat</option></select></div>
+        <div class="cv-field"><label>OS 버전 <span class="cv-req">*</span></label><input class="cv-input" type="text" placeholder="예: 22.04 LTS" /></div>
+      </div>
+      <div class="cv-modal__footer">
+        <button type="button" class="cv-btn cv-btn--outline" data-close-modal>취소</button>
+        <button type="button" class="cv-btn cv-btn--primary" data-close-modal>등록</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-server-detail" class="cv-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="modal-server-detail-title">
+    <div class="cv-modal__backdrop" data-close-modal></div>
+    <div class="cv-modal__panel cv-modal__panel--lg">
+      <div class="cv-modal__head">
+        <h2 id="modal-server-detail-title" class="cv-modal__title">서버 상세</h2>
+        <p id="server-detail-title-sub" class="cv-modal__desc">서버 정보 및 연결된 서비스</p>
+      </div>
+      <div class="cv-modal__body cv-server-detail-modal-body">
+        <div>
+          <h3 style="margin:0 0 0.75rem;font-size:0.9375rem;font-weight:500">서버 기본정보</h3>
+          <div class="cv-detail-grid-2">
+            <div>
+              <div style="font-size:0.875rem;font-weight:500;color:var(--gray-600)">서버명</div>
+              <p id="server-d-name" style="margin:0.25rem 0 0;font-weight:500">—</p>
+            </div>
+            <div>
+              <div style="font-size:0.875rem;font-weight:500;color:var(--gray-600)">호스트명</div>
+              <p id="server-d-host" class="mono" style="margin:0.25rem 0 0;font-size:0.875rem">—</p>
+            </div>
+            <div>
+              <div style="font-size:0.875rem;font-weight:500;color:var(--gray-600)">IP 주소</div>
+              <p id="server-d-ip" class="mono" style="margin:0.25rem 0 0;font-size:0.875rem">—</p>
+            </div>
+            <div>
+              <div style="font-size:0.875rem;font-weight:500;color:var(--gray-600)">환경</div>
+              <p id="server-d-env" style="margin:0.25rem 0 0">—</p>
+            </div>
+            <div>
+              <div style="font-size:0.875rem;font-weight:500;color:var(--gray-600)">OS</div>
+              <p id="server-d-os" style="margin:0.25rem 0 0">—</p>
+            </div>
+            <div>
+              <div style="font-size:0.875rem;font-weight:500;color:var(--gray-600)">상태</div>
+              <p id="server-d-status" style="margin:0.25rem 0 0">—</p>
+            </div>
+          </div>
+        </div>
+        <hr class="sep" />
+        <div>
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;margin-bottom:0.75rem">
+            <h3 style="margin:0;font-size:0.9375rem;font-weight:500">연결된 서비스</h3>
+            <a class="cv-btn cv-btn--primary cv-btn--sm" href="services.html" style="display:inline-flex;align-items:center;gap:0.25rem"><svg class="cv-icon cv-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>서비스 등록</a>
+          </div>
+        <div id="server-detail-services-list"></div>
+        <div id="server-detail-services-empty" class="is-hidden" style="text-align:center;padding:2rem 1rem;color:var(--gray-500)">
+          <svg class="cv-icon" style="width:2rem;height:2rem;color:var(--gray-300);margin:0 auto 0.5rem;display:block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="8" x="2" y="2" rx="2" ry="2"/><rect width="20" height="8" x="2" y="14" rx="2" ry="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/></svg>
+          <p style="margin:0;font-size:0.875rem">연결된 서비스가 없습니다</p>
+        </div>
+        </div>
+      </div>
+      <div class="cv-modal__footer">
+        <button type="button" class="cv-btn cv-btn--outline" data-close-modal>닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+  <script src="../js/main.js"></script>
+</body>
+</html>

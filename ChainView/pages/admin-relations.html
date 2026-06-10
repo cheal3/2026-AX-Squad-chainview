@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>서비스 관계 관리 — ChainView Admin</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" />
+<link rel="stylesheet" href="admin-common.css" />
+<style>
+  .arrow{color:var(--muted);margin:0 4px;font-weight:700}
+  .rt-sync{background:#eef2ff;color:#3730a3}
+  .rt-async{background:#ecfdf5;color:#166534}
+  .rt-data{background:#fffbeb;color:#92400e}
+  .rt-dep{background:#fef2f2;color:#991b1b}
+</style>
+</head>
+<body data-menu="relations">
+<div class="app">
+  <aside class="lnb"></aside>
+
+  <main class="main">
+    <div class="crumb">
+      <a href="dashboard-proto.html">대시보드</a><span class="sep">/</span>
+      <span>서비스 카탈로그</span><span class="sep">/</span><span>서비스 관계 관리</span>
+    </div>
+
+    <div class="page-head">
+      <div>
+        <h1 class="page-head__title">🔗 서비스 관계 관리 <small>SERVICE_RELATION</small></h1>
+        <p class="page-head__desc">서비스 간 호출/의존 관계(엣지)를 관리합니다. 토폴로지 그래프의 원천 데이터입니다.</p>
+      </div>
+      <div class="page-head__right">
+        <button class="btn">🗺️ 토폴로지 보기</button>
+        <button class="btn">📥 CSV 내보내기</button>
+        <button class="btn btn--primary" data-modal-open="m-rel-create">＋ 관계 등록</button>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <select>
+        <option>관계유형 · 전체</option>
+        <option>SYNC_CALL (동기 호출)</option><option>ASYNC_CALL (비동기 호출)</option>
+        <option>DATA_FLOW (데이터 전송)</option><option>DEPENDENCY (의존성)</option>
+        <option>SCHEDULED (스케줄)</option>
+      </select>
+      <select>
+        <option>연결상태 · 전체</option><option>정상</option><option>지연</option><option>장애</option><option>미사용</option>
+      </select>
+      <select><option>필수여부 · 전체</option><option>필수(Y)</option><option>선택(N)</option></select>
+      <div class="search">🔍<input type="text" placeholder="source/target serviceCode 검색…" /></div>
+      <div class="right"><button class="btn btn--ghost btn--sm">초기화</button></div>
+    </div>
+
+    <div class="card">
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th class="col-check"><input type="checkbox" class="chk" /></th>
+            <th>relationId</th><th>source → target</th><th>관계유형</th>
+            <th>연결상태</th><th>필수</th><th>설명</th><th>등록일</th>
+            <th class="col-actions">관리</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td><code>REL-0001</code></td>
+            <td><code>EXT-001</code><span class="arrow">→</span><code>DEP-001</code></td>
+            <td><span class="pill rt-sync">SYNC_CALL</span></td>
+            <td><span class="dot dot--crit"></span>장애</td>
+            <td><span class="pill pill--crit">필수</span></td>
+            <td>승인 결과 → 잔액 차감 호출</td>
+            <td>2022-04-12</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-rel-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-rel-delete">🗑</button></div></td></tr>
+          <tr><td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td><code>REL-0002</code></td>
+            <td><code>EXT-001</code><span class="arrow">→</span><code>NOTI-001</code></td>
+            <td><span class="pill rt-async">ASYNC_CALL</span></td>
+            <td><span class="dot"></span>정상</td>
+            <td><span class="pill pill--gray">선택</span></td>
+            <td>승인 완료 알림 발송</td>
+            <td>2023-01-08</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-rel-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-rel-delete">🗑</button></div></td></tr>
+          <tr><td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td><code>REL-0003</code></td>
+            <td><code>DEP-001</code><span class="arrow">→</span><code>AUTH-001</code></td>
+            <td><span class="pill rt-sync">SYNC_CALL</span></td>
+            <td><span class="dot"></span>정상</td>
+            <td><span class="pill pill--crit">필수</span></td>
+            <td>이체 트랜잭션 인증 토큰 검증</td>
+            <td>2022-11-03</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-rel-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-rel-delete">🗑</button></div></td></tr>
+          <tr><td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td><code>REL-0004</code></td>
+            <td><code>BATCH-002</code><span class="arrow">→</span><code>DEP-001</code></td>
+            <td><span class="pill rt-data">DATA_FLOW</span></td>
+            <td><span class="dot dot--warn"></span>지연</td>
+            <td><span class="pill pill--crit">필수</span></td>
+            <td>이자 계산 결과 적용</td>
+            <td>2022-02-15</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-rel-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-rel-delete">🗑</button></div></td></tr>
+          <tr><td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td><code>REL-0005</code></td>
+            <td><code>EXT-004</code><span class="arrow">→</span><code>DEP-001</code></td>
+            <td><span class="pill rt-sync">SYNC_CALL</span></td>
+            <td><span class="dot"></span>정상</td>
+            <td><span class="pill pill--crit">필수</span></td>
+            <td>카드취소 → 잔액 복원</td>
+            <td>2022-04-12</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-rel-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-rel-delete">🗑</button></div></td></tr>
+          <tr><td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td><code>REL-0006</code></td>
+            <td><code>AUTH-001</code><span class="arrow">→</span><code>NOTI-001</code></td>
+            <td><span class="pill rt-async">ASYNC_CALL</span></td>
+            <td><span class="dot dot--idle"></span>미사용</td>
+            <td><span class="pill pill--gray">선택</span></td>
+            <td>로그인 실패 알림 (현재 OFF)</td>
+            <td>2024-05-10</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-rel-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-rel-delete">🗑</button></div></td></tr>
+          <tr><td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td><code>REL-0007</code></td>
+            <td><code>NOTI-001</code><span class="arrow">→</span><code>EXT-SMS</code></td>
+            <td><span class="pill rt-dep">DEPENDENCY</span></td>
+            <td><span class="dot"></span>정상</td>
+            <td><span class="pill pill--crit">필수</span></td>
+            <td>외부 SMS 게이트웨이 의존</td>
+            <td>2023-01-08</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" data-modal-open="m-rel-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-rel-delete">🗑</button></div></td></tr>
+        </tbody>
+      </table>
+      <div class="pager">
+        <div class="pager__info">전체 86건 · 1-7 / 13 페이지</div>
+        <div class="pager__nav"><button disabled>‹</button><button class="is-on">1</button><button>2</button><button>3</button><button>…</button><button>13</button><button>›</button></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- 등록 -->
+<div class="modal-backdrop" id="m-rel-create">
+  <div class="modal">
+    <div class="modal__head"><h3>＋ 서비스 관계 등록</h3><button class="close" data-modal-close>×</button></div>
+    <div class="modal__body">
+      <div class="form-row"><label>source 서비스<span class="req">*</span></label>
+        <select><option>선택</option><option>EXT-001 카드승인연계</option><option>DEP-001 예금이체서비스</option></select>
+        <span class="help">호출하는 쪽</span></div>
+      <div class="form-row"><label>target 서비스<span class="req">*</span></label>
+        <select><option>선택</option><option>DEP-001 예금이체서비스</option><option>NOTI-001 알림서비스</option></select>
+        <span class="help">호출받는 쪽</span></div>
+      <div class="form-row"><label>관계 유형 (RELATION_TYPE)<span class="req">*</span></label>
+        <select><option>SYNC_CALL (동기 호출)</option><option>ASYNC_CALL (비동기 호출)</option><option>DATA_FLOW (데이터 전송)</option><option>DEPENDENCY (의존성)</option><option>SCHEDULED (스케줄)</option></select></div>
+      <div class="form-row"><label>연결 상태</label>
+        <select><option>정상</option><option>지연</option><option>장애</option><option>미사용</option></select></div>
+      <div class="form-row"><label>필수 여부 (isRequired)</label>
+        <select><option>Y (필수)</option><option>N (선택)</option></select></div>
+      <div class="form-row"><label>설명</label><textarea placeholder="이 관계가 어떤 비즈니스 흐름인지"></textarea></div>
+    </div>
+    <div class="modal__foot"><button class="btn" data-modal-close>취소</button><button class="btn btn--primary">등록</button></div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="m-rel-edit">
+  <div class="modal">
+    <div class="modal__head"><h3>✏️ 관계 수정 — <code style="font-size:13px">REL-0001</code></h3><button class="close" data-modal-close>×</button></div>
+    <div class="modal__body">
+      <div class="form-row"><label>source</label><input type="text" value="EXT-001 카드승인연계" disabled /></div>
+      <div class="form-row"><label>target</label><input type="text" value="DEP-001 예금이체서비스" disabled /></div>
+      <div class="form-row"><label>관계 유형</label><select><option>SYNC_CALL</option><option>ASYNC_CALL</option></select></div>
+      <div class="form-row"><label>연결 상태</label><select><option>장애</option><option>정상</option></select></div>
+      <div class="form-row"><label>필수 여부</label><select><option>Y (필수)</option><option>N (선택)</option></select></div>
+      <div class="form-row"><label>설명</label><textarea>승인 결과 → 잔액 차감 호출</textarea></div>
+    </div>
+    <div class="modal__foot"><button class="btn" data-modal-close>취소</button><button class="btn btn--primary">저장</button></div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="m-rel-delete">
+  <div class="modal confirm">
+    <div class="modal__head"><h3>🗑 관계 삭제</h3><button class="close" data-modal-close>×</button></div>
+    <div class="modal__body">
+      <div class="confirm__icon">⚠</div>
+      <div class="confirm__msg"><b>REL-0001 (EXT-001 → DEP-001)</b> 관계를 삭제하시겠습니까?</div>
+      <div class="confirm__note">토폴로지 그래프에서 즉시 제거됩니다. 영향도 분석이 변경됩니다.</div>
+    </div>
+    <div class="modal__foot"><button class="btn" data-modal-close>취소</button><button class="btn btn--danger">삭제</button></div>
+  </div>
+</div>
+
+<script src="admin-common.js"></script>
+</body>
+</html>

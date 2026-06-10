@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>서비스 분류 관리 — ChainView Admin</title>
+  <link rel="stylesheet" href="../css/styles.css" />
+</head>
+<body>
+  <div class="cv-admin">
+    <aside id="admin-sidebar" class="cv-sidebar">
+      <div class="cv-sidebar__brand">
+        <div class="cv-sidebar__logo">CV</div>
+        <div class="cv-sidebar__titles">
+          <h2>ChainView</h2>
+          <p>Admin Console</p>
+        </div>
+      </div>
+      <nav class="cv-sidebar__nav">
+        <div class="cv-nav-group">
+          <button type="button" class="cv-nav-group__toggle" data-nav-group-toggle="g-overview">
+            <span>Overview</span>
+            <svg class="cv-icon cv-icon--sm cv-nav-group__chev is-open" data-chevron viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+          <div class="cv-nav-group__items" data-nav-group-items="g-overview">
+            <a class="cv-nav-link" href="dashboard.html">
+              <svg class="cv-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+              <span>Dashboard</span>
+            </a>
+          </div>
+        </div>
+        <div class="cv-nav-group">
+          <button type="button" class="cv-nav-group__toggle" data-nav-group-toggle="g-catalog">
+            <span>서비스 카탈로그</span>
+            <svg class="cv-icon cv-icon--sm cv-nav-group__chev is-open" data-chevron viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+          <div class="cv-nav-group__items" data-nav-group-items="g-catalog">
+            <a class="cv-nav-link" href="services.html">
+              <svg class="cv-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+              <span>서비스 관리</span>
+            </a>
+            <a class="cv-nav-link is-active" href="service-categories.html">
+              <svg class="cv-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-2.5a1 1 0 0 1-.8-.4l-.9-1.2A1 1 0 0 0 15 3h-2a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M20 21a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1h-2.9a1 1 0 0 1-.88-.55l-.42-.85a1 1 0 0 0-.92-.6H13a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M3 5a2 2 0 0 0 2 2h3"/><path d="M3 3v13a2 2 0 0 0 2 2h3"/></svg>
+              <span>서비스 분류 관리</span>
+            </a>
+            <a class="cv-nav-link" href="tech-stacks.html">
+              <svg class="cv-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m18 16 4-4-4-4"/><path d="m6 8-4 4 4 4"/><path d="m14.5 4-5 16"/></svg>
+              <span>기술스택 마스터</span>
+            </a>
+          </div>
+        </div>
+        <div class="cv-nav-group">
+          <button type="button" class="cv-nav-group__toggle" data-nav-group-toggle="g-infra">
+            <span>배포 인프라</span>
+            <svg class="cv-icon cv-icon--sm cv-nav-group__chev" data-chevron viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+          <div class="cv-nav-group__items is-hidden" data-nav-group-items="g-infra">
+            <a class="cv-nav-link" href="servers.html">
+              <svg class="cv-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><rect width="20" height="8" x="2" y="2" rx="2" ry="2"/><rect width="20" height="8" x="2" y="14" rx="2" ry="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/></svg>
+              <span>서버 관리</span>
+            </a>
+            <a class="cv-nav-link" href="deployments.html">
+              <svg class="cv-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m16 16-4-4-4 4"/></svg>
+              <span>서비스 배포 정보</span>
+            </a>
+          </div>
+        </div>
+        <div class="cv-nav-group">
+          <button type="button" class="cv-nav-group__toggle" data-nav-group-toggle="g-relation">
+            <span>서비스 관계</span>
+            <svg class="cv-icon cv-icon--sm cv-nav-group__chev" data-chevron viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+          <div class="cv-nav-group__items is-hidden" data-nav-group-items="g-relation">
+            <a class="cv-nav-link" href="service-relations.html">
+              <svg class="cv-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 1 1 0 10h-2"/><line x1="8" x2="16" y1="12" y2="12"/></svg>
+              <span>서비스 관계 관리</span>
+            </a>
+            <a class="cv-nav-link" href="relation-graph.html">
+              <svg class="cv-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.41" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/></svg>
+              <span>관계 그래프</span>
+            </a>
+          </div>
+        </div>
+        <div class="cv-nav-group">
+          <button type="button" class="cv-nav-group__toggle" data-nav-group-toggle="g-ownership">
+            <span>소유권 관리</span>
+            <svg class="cv-icon cv-icon--sm cv-nav-group__chev" data-chevron viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+          <div class="cv-nav-group__items is-hidden" data-nav-group-items="g-ownership">
+            <a class="cv-nav-link" href="users.html">
+              <svg class="cv-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              <span>사용자 관리</span>
+            </a>
+            <a class="cv-nav-link" href="groups.html">
+              <svg class="cv-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg>
+              <span>그룹 관리</span>
+            </a>
+            <a class="cv-nav-link" href="service-owners.html">
+              <svg class="cv-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg>
+              <span>서비스 담당자 관리</span>
+            </a>
+          </div>
+        </div>
+        <div class="cv-nav-group">
+          <button type="button" class="cv-nav-group__toggle" data-nav-group-toggle="g-ops">
+            <span>운영 관리</span>
+            <svg class="cv-icon cv-icon--sm cv-nav-group__chev" data-chevron viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+          <div class="cv-nav-group__items is-hidden" data-nav-group-items="g-ops">
+            <a class="cv-nav-link" href="incidents.html">
+              <svg class="cv-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+              <span>인시던트 관리</span>
+            </a>
+          </div>
+        </div>
+        <div class="cv-nav-group">
+          <button type="button" class="cv-nav-group__toggle" data-nav-group-toggle="g-master">
+            <span>기준 정보</span>
+            <svg class="cv-icon cv-icon--sm cv-nav-group__chev" data-chevron viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+          <div class="cv-nav-group__items is-hidden" data-nav-group-items="g-master">
+            <a class="cv-nav-link" href="common-codes.html">
+              <svg class="cv-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><line x1="10" x2="21" y1="6" y2="6"/><line x1="10" x2="21" y1="12" y2="12"/><line x1="10" x2="21" y1="18" y2="18"/><path d="M4 6h1v4"/><path d="M4 10h2"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg>
+              <span>공통코드 관리</span>
+            </a>
+          </div>
+        </div>
+      </nav>
+    </aside>
+
+    <div class="cv-main">
+      <header class="cv-header">
+        <div class="cv-header__left">
+          <button type="button" class="cv-btn cv-btn--ghost cv-btn--icon cv-header__icon-btn" id="sidebar-toggle" aria-label="메뉴">
+            <svg id="sidebar-toggle-close" class="cv-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            <svg id="sidebar-toggle-menu" class="cv-icon is-hidden" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
+          </button>
+          <div class="cv-search-wrap">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            <input class="cv-input" type="search" placeholder="서비스명, 서비스 코드, 서버명, IP, 담당자 검색..." />
+          </div>
+        </div>
+        <div class="cv-header__right">
+          <button type="button" class="cv-btn cv-btn--ghost cv-btn--icon cv-header__icon-btn cv-notify-btn" aria-label="알림">
+            <svg class="cv-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+            <span class="cv-notify-badge">3</span>
+          </button>
+          <div class="cv-user-dd">
+            <button type="button" class="cv-user-trigger" id="user-menu-trigger">
+              <span class="cv-avatar">관</span>
+              <div class="cv-user-meta">
+                <strong>관리자</strong>
+                <span>admin@chainview.com</span>
+              </div>
+            </button>
+            <div class="cv-dropdown is-hidden" id="user-menu-panel">
+              <div class="cv-dropdown__label">내 계정</div>
+              <hr />
+              <button type="button">프로필 설정</button>
+              <button type="button">환경 설정</button>
+              <hr />
+              <button type="button" class="cv-dd-danger" id="user-menu-logout">로그아웃</button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main class="cv-content">
+        <div class="cv-page-head-row">
+          <div>
+            <h1 class="cv-page-title" style="margin-bottom:0.25rem">서비스 분류 관리</h1>
+            <p class="cv-page-desc" style="margin:0">서비스 카탈로그 분류 체계를 관리합니다</p>
+          </div>
+          <button type="button" class="cv-btn cv-btn--primary cv-page-head-primary-btn" data-open-modal="svccat-add">
+            <svg class="cv-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+            대분류 추가
+          </button>
+        </div>
+
+        <div class="cv-split-grid cv-split-grid--13">
+          <div class="cv-card">
+            <div class="cv-card__body">
+              <h3 class="cv-card__title--panel" style="margin:0 0 0.25rem">분류 트리</h3>
+              <p class="cv-muted" style="margin:0 0 0.75rem;font-size:0.8125rem">분류를 선택하여 상세 정보를 확인하세요</p>
+              <div class="cv-scroll-area">
+                <div class="cv-svccat-tree-row group" data-svccat-tree-row>
+                  <button type="button" class="cv-tree-chev-btn" data-tree-toggle="t1" aria-label="핵심 서비스 하위 펼치기">
+                    <span class="cv-tree-chev is-open" data-tree-chev><svg class="cv-icon cv-icon--sm cv-tree-chev-icon cv-tree-chev-icon--collapsed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg><svg class="cv-icon cv-icon--sm cv-tree-chev-icon cv-tree-chev-icon--expanded" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span>
+                  </button>
+                  <button type="button" class="cv-svccat-pick cv-svccat-pick--tree" data-svccat-pick data-name="핵심 서비스" data-code="CORE" data-level="1" data-count="156" data-sort="1">
+                    <span class="cv-svccat-pick__row">
+                      <svg class="cv-icon cv-icon--sm" style="color:rgb(37 99 235);flex-shrink:0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-2.5a1 1 0 0 1-.8-.4l-.9-1.2A1 1 0 0 0 15 3h-2a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M20 21a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1h-2.9a1 1 0 0 1-.88-.55l-.42-.85a1 1 0 0 0-.92-.6H13a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M3 5a2 2 0 0 0 2 2h3"/><path d="M3 3v13a2 2 0 0 0 2 2h3"/></svg>
+                      <span class="cv-svccat-pick__name">핵심 서비스</span>
+                    </span>
+                    <span class="cv-badge cv-badge--outline">156</span>
+                  </button>
+                <div class="cv-svccat-tree-row__add"><button type="button" class="cv-svccat-quick-add" data-open-modal="svccat-add" aria-label="하위 분류 추가"><svg class="cv-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg></button></div>
+                </div>
+                <div data-tree-children="t1" class="cv-tree-indent">
+                  <div class="cv-svccat-tree-row group" data-svccat-tree-row>
+                    <button type="button" class="cv-tree-chev-btn" data-tree-toggle="t1a" aria-label="결제 하위 펼치기">
+                      <span class="cv-tree-chev is-open" data-tree-chev><svg class="cv-icon cv-icon--sm cv-tree-chev-icon cv-tree-chev-icon--collapsed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg><svg class="cv-icon cv-icon--sm cv-tree-chev-icon cv-tree-chev-icon--expanded" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span>
+                    </button>
+                    <button type="button" class="cv-svccat-pick cv-svccat-pick--tree" data-svccat-pick data-name="결제" data-code="CORE-PAY" data-level="2" data-count="23" data-sort="1">
+                      <span class="cv-svccat-pick__row">
+                        <svg class="cv-icon cv-icon--sm" style="color:rgb(37 99 235);flex-shrink:0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-2.5a1 1 0 0 1-.8-.4l-.9-1.2A1 1 0 0 0 15 3h-2a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M20 21a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1h-2.9a1 1 0 0 1-.88-.55l-.42-.85a1 1 0 0 0-.92-.6H13a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M3 5a2 2 0 0 0 2 2h3"/><path d="M3 3v13a2 2 0 0 0 2 2h3"/></svg>
+                        <span class="cv-svccat-pick__name">결제</span>
+                      </span>
+                      <span class="cv-badge cv-badge--outline">23</span>
+                    </button>
+                  <div class="cv-svccat-tree-row__add"><button type="button" class="cv-svccat-quick-add" data-open-modal="svccat-add" aria-label="하위 분류 추가"><svg class="cv-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg></button></div>
+                  </div>
+                  <div data-tree-children="t1a" class="cv-tree-indent">
+                    <div class="cv-svccat-tree-row group" data-svccat-tree-row>
+                      <span class="cv-tree-chev-spacer"></span>
+                      <button type="button" class="cv-svccat-pick cv-svccat-pick--tree" data-svccat-pick data-name="API" data-code="CORE-PAY-API" data-level="3" data-count="15" data-sort="1">
+                        <span class="cv-svccat-pick__row">
+                          <svg class="cv-icon cv-icon--sm" style="color:rgb(37 99 235);flex-shrink:0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-2.5a1 1 0 0 1-.8-.4l-.9-1.2A1 1 0 0 0 15 3h-2a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M20 21a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1h-2.9a1 1 0 0 1-.88-.55l-.42-.85a1 1 0 0 0-.92-.6H13a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M3 5a2 2 0 0 0 2 2h3"/><path d="M3 3v13a2 2 0 0 0 2 2h3"/></svg>
+                          <span class="cv-svccat-pick__name">API</span>
+                        </span>
+                        <span class="cv-badge cv-badge--outline">15</span>
+                      </button>
+                    <div class="cv-svccat-tree-row__add"><button type="button" class="cv-svccat-quick-add" data-open-modal="svccat-add" aria-label="하위 분류 추가"><svg class="cv-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg></button></div>
+                    </div>
+                    <div class="cv-svccat-tree-row group" data-svccat-tree-row>
+                      <span class="cv-tree-chev-spacer"></span>
+                      <button type="button" class="cv-svccat-pick cv-svccat-pick--tree" data-svccat-pick data-name="배치" data-code="CORE-PAY-BATCH" data-level="3" data-count="8" data-sort="2">
+                        <span class="cv-svccat-pick__row">
+                          <svg class="cv-icon cv-icon--sm" style="color:rgb(37 99 235);flex-shrink:0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-2.5a1 1 0 0 1-.8-.4l-.9-1.2A1 1 0 0 0 15 3h-2a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M20 21a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1h-2.9a1 1 0 0 1-.88-.55l-.42-.85a1 1 0 0 0-.92-.6H13a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M3 5a2 2 0 0 0 2 2h3"/><path d="M3 3v13a2 2 0 0 0 2 2h3"/></svg>
+                          <span class="cv-svccat-pick__name">배치</span>
+                        </span>
+                        <span class="cv-badge cv-badge--outline">8</span>
+                      </button>
+                    <div class="cv-svccat-tree-row__add"><button type="button" class="cv-svccat-quick-add" data-open-modal="svccat-add" aria-label="하위 분류 추가"><svg class="cv-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg></button></div>
+                    </div>
+                  </div>
+                  <div class="cv-svccat-tree-row group" data-svccat-tree-row>
+                    <button type="button" class="cv-tree-chev-btn" data-tree-toggle="t1b" aria-label="보안 하위 펼치기">
+                      <span class="cv-tree-chev is-open" data-tree-chev><svg class="cv-icon cv-icon--sm cv-tree-chev-icon cv-tree-chev-icon--collapsed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg><svg class="cv-icon cv-icon--sm cv-tree-chev-icon cv-tree-chev-icon--expanded" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span>
+                    </button>
+                    <button type="button" class="cv-svccat-pick cv-svccat-pick--tree" data-svccat-pick data-name="보안" data-code="CORE-SEC" data-level="2" data-count="18" data-sort="2">
+                      <span class="cv-svccat-pick__row">
+                        <svg class="cv-icon cv-icon--sm" style="color:rgb(37 99 235);flex-shrink:0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-2.5a1 1 0 0 1-.8-.4l-.9-1.2A1 1 0 0 0 15 3h-2a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M20 21a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1h-2.9a1 1 0 0 1-.88-.55l-.42-.85a1 1 0 0 0-.92-.6H13a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M3 5a2 2 0 0 0 2 2h3"/><path d="M3 3v13a2 2 0 0 0 2 2h3"/></svg>
+                        <span class="cv-svccat-pick__name">보안</span>
+                      </span>
+                      <span class="cv-badge cv-badge--outline">18</span>
+                    </button>
+                  <div class="cv-svccat-tree-row__add"><button type="button" class="cv-svccat-quick-add" data-open-modal="svccat-add" aria-label="하위 분류 추가"><svg class="cv-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg></button></div>
+                  </div>
+                  <div data-tree-children="t1b" class="cv-tree-indent">
+                    <div class="cv-svccat-tree-row group" data-svccat-tree-row>
+                      <span class="cv-tree-chev-spacer"></span>
+                      <button type="button" class="cv-svccat-pick cv-svccat-pick--tree" data-svccat-pick data-name="인증" data-code="CORE-SEC-AUTH" data-level="3" data-count="10" data-sort="1">
+                        <span class="cv-svccat-pick__row">
+                          <svg class="cv-icon cv-icon--sm" style="color:rgb(37 99 235);flex-shrink:0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-2.5a1 1 0 0 1-.8-.4l-.9-1.2A1 1 0 0 0 15 3h-2a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M20 21a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1h-2.9a1 1 0 0 1-.88-.55l-.42-.85a1 1 0 0 0-.92-.6H13a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M3 5a2 2 0 0 0 2 2h3"/><path d="M3 3v13a2 2 0 0 0 2 2h3"/></svg>
+                          <span class="cv-svccat-pick__name">인증</span>
+                        </span>
+                        <span class="cv-badge cv-badge--outline">10</span>
+                      </button>
+                    <div class="cv-svccat-tree-row__add"><button type="button" class="cv-svccat-quick-add" data-open-modal="svccat-add" aria-label="하위 분류 추가"><svg class="cv-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg></button></div>
+                    </div>
+                    <div class="cv-svccat-tree-row group" data-svccat-tree-row>
+                      <span class="cv-tree-chev-spacer"></span>
+                      <button type="button" class="cv-svccat-pick cv-svccat-pick--tree" data-svccat-pick data-name="암호화" data-code="CORE-SEC-ENCRYPT" data-level="3" data-count="8" data-sort="2">
+                        <span class="cv-svccat-pick__row">
+                          <svg class="cv-icon cv-icon--sm" style="color:rgb(37 99 235);flex-shrink:0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-2.5a1 1 0 0 1-.8-.4l-.9-1.2A1 1 0 0 0 15 3h-2a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M20 21a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1h-2.9a1 1 0 0 1-.88-.55l-.42-.85a1 1 0 0 0-.92-.6H13a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M3 5a2 2 0 0 0 2 2h3"/><path d="M3 3v13a2 2 0 0 0 2 2h3"/></svg>
+                          <span class="cv-svccat-pick__name">암호화</span>
+                        </span>
+                        <span class="cv-badge cv-badge--outline">8</span>
+                      </button>
+                    <div class="cv-svccat-tree-row__add"><button type="button" class="cv-svccat-quick-add" data-open-modal="svccat-add" aria-label="하위 분류 추가"><svg class="cv-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg></button></div>
+                    </div>
+                  </div>
+                  <div class="cv-svccat-tree-row group" data-svccat-tree-row>
+                    <span class="cv-tree-chev-spacer"></span>
+                    <button type="button" class="cv-svccat-pick cv-svccat-pick--tree" data-svccat-pick data-name="프론트엔드" data-code="CORE-FE" data-level="2" data-count="45" data-sort="3">
+                      <span class="cv-svccat-pick__row">
+                        <svg class="cv-icon cv-icon--sm" style="color:rgb(37 99 235);flex-shrink:0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-2.5a1 1 0 0 1-.8-.4l-.9-1.2A1 1 0 0 0 15 3h-2a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M20 21a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1h-2.9a1 1 0 0 1-.88-.55l-.42-.85a1 1 0 0 0-.92-.6H13a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M3 5a2 2 0 0 0 2 2h3"/><path d="M3 3v13a2 2 0 0 0 2 2h3"/></svg>
+                        <span class="cv-svccat-pick__name">프론트엔드</span>
+                      </span>
+                      <span class="cv-badge cv-badge--outline">45</span>
+                    </button>
+                  <div class="cv-svccat-tree-row__add"><button type="button" class="cv-svccat-quick-add" data-open-modal="svccat-add" aria-label="하위 분류 추가"><svg class="cv-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg></button></div>
+                  </div>
+                </div>
+
+                <div class="cv-svccat-tree-row group" data-svccat-tree-row>
+                  <button type="button" class="cv-tree-chev-btn" data-tree-toggle="t2" aria-label="부가 서비스 하위 펼치기">
+                    <span class="cv-tree-chev is-open" data-tree-chev><svg class="cv-icon cv-icon--sm cv-tree-chev-icon cv-tree-chev-icon--collapsed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg><svg class="cv-icon cv-icon--sm cv-tree-chev-icon cv-tree-chev-icon--expanded" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span>
+                  </button>
+                  <button type="button" class="cv-svccat-pick cv-svccat-pick--tree" data-svccat-pick data-name="부가 서비스" data-code="ADDON" data-level="1" data-count="67" data-sort="2">
+                    <span class="cv-svccat-pick__row">
+                      <svg class="cv-icon cv-icon--sm" style="color:rgb(37 99 235);flex-shrink:0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-2.5a1 1 0 0 1-.8-.4l-.9-1.2A1 1 0 0 0 15 3h-2a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M20 21a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1h-2.9a1 1 0 0 1-.88-.55l-.42-.85a1 1 0 0 0-.92-.6H13a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M3 5a2 2 0 0 0 2 2h3"/><path d="M3 3v13a2 2 0 0 0 2 2h3"/></svg>
+                      <span class="cv-svccat-pick__name">부가 서비스</span>
+                    </span>
+                    <span class="cv-badge cv-badge--outline">67</span>
+                  </button>
+                <div class="cv-svccat-tree-row__add"><button type="button" class="cv-svccat-quick-add" data-open-modal="svccat-add" aria-label="하위 분류 추가"><svg class="cv-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg></button></div>
+                </div>
+                <div data-tree-children="t2" class="cv-tree-indent">
+                  <div class="cv-svccat-tree-row group" data-svccat-tree-row>
+                    <span class="cv-tree-chev-spacer"></span>
+                    <button type="button" class="cv-svccat-pick cv-svccat-pick--tree" data-svccat-pick data-name="알림" data-code="ADDON-NOTI" data-level="2" data-count="12" data-sort="1">
+                      <span class="cv-svccat-pick__row">
+                        <svg class="cv-icon cv-icon--sm" style="color:rgb(37 99 235);flex-shrink:0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-2.5a1 1 0 0 1-.8-.4l-.9-1.2A1 1 0 0 0 15 3h-2a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M20 21a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1h-2.9a1 1 0 0 1-.88-.55l-.42-.85a1 1 0 0 0-.92-.6H13a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M3 5a2 2 0 0 0 2 2h3"/><path d="M3 3v13a2 2 0 0 0 2 2h3"/></svg>
+                        <span class="cv-svccat-pick__name">알림</span>
+                      </span>
+                      <span class="cv-badge cv-badge--outline">12</span>
+                    </button>
+                  <div class="cv-svccat-tree-row__add"><button type="button" class="cv-svccat-quick-add" data-open-modal="svccat-add" aria-label="하위 분류 추가"><svg class="cv-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg></button></div>
+                  </div>
+                  <div class="cv-svccat-tree-row group" data-svccat-tree-row>
+                    <span class="cv-tree-chev-spacer"></span>
+                    <button type="button" class="cv-svccat-pick cv-svccat-pick--tree" data-svccat-pick data-name="리포트" data-code="ADDON-REPORT" data-level="2" data-count="8" data-sort="2">
+                      <span class="cv-svccat-pick__row">
+                        <svg class="cv-icon cv-icon--sm" style="color:rgb(37 99 235);flex-shrink:0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-2.5a1 1 0 0 1-.8-.4l-.9-1.2A1 1 0 0 0 15 3h-2a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M20 21a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1h-2.9a1 1 0 0 1-.88-.55l-.42-.85a1 1 0 0 0-.92-.6H13a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M3 5a2 2 0 0 0 2 2h3"/><path d="M3 3v13a2 2 0 0 0 2 2h3"/></svg>
+                        <span class="cv-svccat-pick__name">리포트</span>
+                      </span>
+                      <span class="cv-badge cv-badge--outline">8</span>
+                    </button>
+                  <div class="cv-svccat-tree-row__add"><button type="button" class="cv-svccat-quick-add" data-open-modal="svccat-add" aria-label="하위 분류 추가"><svg class="cv-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg></button></div>
+                  </div>
+                </div>
+
+                <div class="cv-svccat-tree-row group" data-svccat-tree-row>
+                  <button type="button" class="cv-tree-chev-btn" data-tree-toggle="t3" aria-label="인프라 서비스 하위 펼치기">
+                    <span class="cv-tree-chev is-open" data-tree-chev><svg class="cv-icon cv-icon--sm cv-tree-chev-icon cv-tree-chev-icon--collapsed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg><svg class="cv-icon cv-icon--sm cv-tree-chev-icon cv-tree-chev-icon--expanded" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span>
+                  </button>
+                  <button type="button" class="cv-svccat-pick cv-svccat-pick--tree" data-svccat-pick data-name="인프라 서비스" data-code="INFRA" data-level="1" data-count="24" data-sort="3">
+                    <span class="cv-svccat-pick__row">
+                      <svg class="cv-icon cv-icon--sm" style="color:rgb(37 99 235);flex-shrink:0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-2.5a1 1 0 0 1-.8-.4l-.9-1.2A1 1 0 0 0 15 3h-2a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M20 21a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1h-2.9a1 1 0 0 1-.88-.55l-.42-.85a1 1 0 0 0-.92-.6H13a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M3 5a2 2 0 0 0 2 2h3"/><path d="M3 3v13a2 2 0 0 0 2 2h3"/></svg>
+                      <span class="cv-svccat-pick__name">인프라 서비스</span>
+                    </span>
+                    <span class="cv-badge cv-badge--outline">24</span>
+                  </button>
+                <div class="cv-svccat-tree-row__add"><button type="button" class="cv-svccat-quick-add" data-open-modal="svccat-add" aria-label="하위 분류 추가"><svg class="cv-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg></button></div>
+                </div>
+                <div data-tree-children="t3" class="cv-tree-indent">
+                  <div class="cv-svccat-tree-row group" data-svccat-tree-row>
+                    <span class="cv-tree-chev-spacer"></span>
+                    <button type="button" class="cv-svccat-pick cv-svccat-pick--tree" data-svccat-pick data-name="모니터링" data-code="INFRA-MON" data-level="2" data-count="15" data-sort="1">
+                      <span class="cv-svccat-pick__row">
+                        <svg class="cv-icon cv-icon--sm" style="color:rgb(37 99 235);flex-shrink:0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-2.5a1 1 0 0 1-.8-.4l-.9-1.2A1 1 0 0 0 15 3h-2a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M20 21a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1h-2.9a1 1 0 0 1-.88-.55l-.42-.85a1 1 0 0 0-.92-.6H13a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M3 5a2 2 0 0 0 2 2h3"/><path d="M3 3v13a2 2 0 0 0 2 2h3"/></svg>
+                        <span class="cv-svccat-pick__name">모니터링</span>
+                      </span>
+                      <span class="cv-badge cv-badge--outline">15</span>
+                    </button>
+                  <div class="cv-svccat-tree-row__add"><button type="button" class="cv-svccat-quick-add" data-open-modal="svccat-add" aria-label="하위 분류 추가"><svg class="cv-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg></button></div>
+                  </div>
+                  <div class="cv-svccat-tree-row group" data-svccat-tree-row>
+                    <span class="cv-tree-chev-spacer"></span>
+                    <button type="button" class="cv-svccat-pick cv-svccat-pick--tree" data-svccat-pick data-name="백업" data-code="INFRA-BACKUP" data-level="2" data-count="9" data-sort="2">
+                      <span class="cv-svccat-pick__row">
+                        <svg class="cv-icon cv-icon--sm" style="color:rgb(37 99 235);flex-shrink:0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-2.5a1 1 0 0 1-.8-.4l-.9-1.2A1 1 0 0 0 15 3h-2a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M20 21a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1h-2.9a1 1 0 0 1-.88-.55l-.42-.85a1 1 0 0 0-.92-.6H13a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M3 5a2 2 0 0 0 2 2h3"/><path d="M3 3v13a2 2 0 0 0 2 2h3"/></svg>
+                        <span class="cv-svccat-pick__name">백업</span>
+                      </span>
+                      <span class="cv-badge cv-badge--outline">9</span>
+                    </button>
+                  <div class="cv-svccat-tree-row__add"><button type="button" class="cv-svccat-quick-add" data-open-modal="svccat-add" aria-label="하위 분류 추가"><svg class="cv-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg></button></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="cv-card">
+            <div class="cv-card__body">
+              <h3 class="cv-card__title--panel" style="margin:0 0 0.25rem">분류 상세</h3>
+              <p class="cv-muted" style="margin:0 0 1rem;font-size:0.8125rem">선택한 분류의 상세 정보</p>
+              <div id="svccat-detail-empty" class="cv-svccat-empty">
+                <svg class="cv-icon" style="width:3rem;height:3rem;color:var(--gray-300);margin-bottom:1rem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-2.5a1 1 0 0 1-.8-.4l-.9-1.2A1 1 0 0 0 15 3h-2a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M20 21a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1h-2.9a1 1 0 0 1-.88-.55l-.42-.85a1 1 0 0 0-.92-.6H13a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M3 5a2 2 0 0 0 2 2h3"/><path d="M3 3v13a2 2 0 0 0 2 2h3"/></svg>
+                <p style="margin:0;font-size:1rem">좌측에서 분류를 선택하세요</p>
+                <p class="cv-muted" style="margin:0.35rem 0 0;font-size:0.875rem">선택한 분류의 상세 정보가 표시됩니다</p>
+              </div>
+              <div id="svccat-detail-body" class="cv-svccat-detail-body is-hidden">
+                <div class="cv-detail-grid-2">
+                  <div>
+                    <div style="font-size:0.875rem;font-weight:500;color:var(--gray-600)">분류 레벨</div>
+                    <p style="margin:0.25rem 0 0"><span class="cv-badge cv-badge--outline">Level <span id="svccat-d-level-num">1</span></span></p>
+                  </div>
+                  <div>
+                    <div style="font-size:0.875rem;font-weight:500;color:var(--gray-600)">분류 코드</div>
+                    <p class="mono" style="margin:0.25rem 0 0" id="svccat-d-code">—</p>
+                  </div>
+                  <div>
+                    <div style="font-size:0.875rem;font-weight:500;color:var(--gray-600)">분류명</div>
+                    <p id="svccat-d-name" style="margin:0.25rem 0 0;font-size:1.125rem;font-weight:500">—</p>
+                  </div>
+                  <div>
+                    <div style="font-size:0.875rem;font-weight:500;color:var(--gray-600)">정렬순서</div>
+                    <p style="margin:0.25rem 0 0" id="svccat-d-sort">—</p>
+                  </div>
+                  <div style="grid-column:1/-1">
+                    <div style="font-size:0.875rem;font-weight:500;color:var(--gray-600)">연결된 서비스</div>
+                    <p style="margin:0.25rem 0 0">
+                      <span id="svccat-d-svc-badge" class="cv-badge" style="background:#dbeafe;color:#1e3a8a;border:1px solid #93c5fd;font-size:1rem;padding:0.35rem 0.75rem">0개</span>
+                    </p>
+                  </div>
+                </div>
+                <hr class="sep" />
+                <div class="cv-svccat-detail-actions">
+                  <button type="button" class="cv-btn cv-btn--outline" data-open-modal="svccat-add">
+                    <svg class="cv-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+                    하위 분류 추가
+                  </button>
+                  <button type="button" class="cv-btn cv-btn--outline">
+                    <svg class="cv-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+                    수정
+                  </button>
+                  <button type="button" class="cv-btn cv-btn--danger" id="svccat-btn-delete" disabled>
+                    <svg class="cv-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+                    삭제
+                  </button>
+                </div>
+                <div id="svccat-delete-warn" class="cv-callout--yellow is-hidden">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#ca8a04;flex-shrink:0;margin-top:0.1rem" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
+                  <div>
+                    <p class="cv-callout__title">삭제 불가</p>
+                    <p id="svccat-delete-warn-msg" style="margin:0;font-size:0.875rem;color:#854d0e"></p>
+                  </div>
+                </div>
+                <div id="svccat-children-block" class="is-hidden">
+                  <hr class="sep" />
+                  <h3 style="margin:0 0 0.75rem;font-size:0.9375rem;font-weight:500">하위 분류 목록</h3>
+                  <div id="svccat-children-list"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <div id="modal-svccat-add" class="cv-modal is-hidden" role="dialog" aria-modal="true">
+    <div class="cv-modal__backdrop" data-close-modal></div>
+    <div class="cv-modal__panel">
+      <div class="cv-modal__head">
+        <h2 class="cv-modal__title">분류 등록</h2>
+        <p class="cv-modal__desc">새로운 서비스 분류를 등록합니다</p>
+      </div>
+      <div class="cv-modal__body cv-form-grid">
+        <div class="cv-field"><label>분류 레벨</label><select class="cv-input"><option value="1">1단계 (대분류)</option><option value="2">2단계 (중분류)</option><option value="3">3단계 (소분류)</option></select></div>
+        <div class="cv-field"><label>분류 코드 <span class="cv-req">*</span></label><input class="cv-input" type="text" placeholder="예: CORE-PAY-API" /></div>
+        <div class="cv-field"><label>분류명 <span class="cv-req">*</span></label><input class="cv-input" type="text" placeholder="예: API" /></div>
+        <div class="cv-field"><label>정렬순서</label><input class="cv-input" type="number" value="1" /></div>
+      </div>
+      <div class="cv-modal__footer">
+        <button type="button" class="cv-btn cv-btn--outline" data-close-modal>취소</button>
+        <button type="button" class="cv-btn cv-btn--primary" data-close-modal>등록</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-svccat-delete" class="cv-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="svccat-delete-title">
+    <div class="cv-modal__backdrop" data-close-modal></div>
+    <div class="cv-modal__panel cv-modal__panel--alert">
+      <div class="cv-modal__head">
+        <h2 class="cv-modal__title" id="svccat-delete-title">분류 삭제 확인</h2>
+        <p class="cv-modal__desc" id="svccat-delete-desc"></p>
+      </div>
+      <div class="cv-modal__footer">
+        <button type="button" class="cv-btn cv-btn--outline" data-close-modal>취소</button>
+        <button type="button" class="cv-btn cv-btn--danger-solid" id="svccat-delete-confirm">삭제</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+  <script src="../js/main.js"></script>
+</body>
+</html>

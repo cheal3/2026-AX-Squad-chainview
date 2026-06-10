@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>서비스 상태 대시보드 | ChainView</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" />
+  <link rel="stylesheet" href="css/dashboard_styles.css" />
+</head>
+<body>
+  <div class="dashboard-layout">
+    <!-- LNB 사이드바 -->
+    <aside id="dashboard-sidebar" class="dashboard-sidebar">
+      <div class="sidebar-brand">
+        <div class="sidebar-brand__logo">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+            <path d="M2 17l10 5 10-5"/>
+            <path d="M2 12l10 5 10-5"/>
+          </svg>
+        </div>
+        <div class="sidebar-brand__text">
+          <h2>ChainView</h2>
+          <p>Service Monitor</p>
+        </div>
+        <button type="button" class="sidebar-toggle" id="sidebar-toggle" title="사이드바 접기">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M11 17l-5-5 5-5M18 17l-5-5 5-5"/>
+          </svg>
+        </button>
+      </div>
+
+      <nav class="sidebar-nav">
+        <!-- 모니터링 -->
+        <div class="nav-group">
+          <button type="button" class="nav-group__toggle is-open" data-nav-toggle="g-monitor">
+            <span class="nav-group__label">모니터링</span>
+            <svg class="nav-group__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="m9 18 6-6-6-6"/>
+            </svg>
+          </button>
+          <div class="nav-group__items" data-nav-items="g-monitor">
+            <a class="nav-link is-active" href="dashboard_index.html">
+              <svg class="nav-link__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect width="7" height="9" x="3" y="3" rx="1"/>
+                <rect width="7" height="5" x="14" y="3" rx="1"/>
+                <rect width="7" height="9" x="14" y="12" rx="1"/>
+                <rect width="7" height="5" x="3" y="16" rx="1"/>
+              </svg>
+              <span>전체 현황</span>
+            </a>
+            <a class="nav-link" href="dashboard_realtime.html">
+              <svg class="nav-link__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+              </svg>
+              <span>실시간 모니터링</span>
+            </a>
+            <a class="nav-link" href="dashboard_topology.html">
+              <svg class="nav-link__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="18" cy="5" r="3"/>
+                <circle cx="6" cy="12" r="3"/>
+                <circle cx="18" cy="19" r="3"/>
+                <line x1="8.59" x2="15.41" y1="13.51" y2="17.49"/>
+                <line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/>
+              </svg>
+              <span>서비스 토폴로지</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- 서비스 상태 -->
+        <div class="nav-group">
+          <button type="button" class="nav-group__toggle" data-nav-toggle="g-service">
+            <span class="nav-group__label">서비스 상태</span>
+            <svg class="nav-group__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="m9 18 6-6-6-6"/>
+            </svg>
+          </button>
+          <div class="nav-group__items is-hidden" data-nav-items="g-service">
+            <a class="nav-link" href="dashboard_services.html">
+              <svg class="nav-link__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/>
+                <path d="m3.3 7 8.7 5 8.7-5"/>
+                <path d="M12 22V12"/>
+              </svg>
+              <span>서비스 목록</span>
+            </a>
+            <a class="nav-link" href="dashboard_health.html">
+              <svg class="nav-link__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
+              </svg>
+              <span>헬스체크</span>
+            </a>
+            <a class="nav-link" href="dashboard_dependencies.html">
+              <svg class="nav-link__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 17H7A5 5 0 0 1 7 7h2"/>
+                <path d="M15 7h2a5 5 0 1 1 0 10h-2"/>
+                <line x1="8" x2="16" y1="12" y2="12"/>
+              </svg>
+              <span>의존성 현황</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- 인프라 상태 -->
+        <div class="nav-group">
+          <button type="button" class="nav-group__toggle" data-nav-toggle="g-infra">
+            <span class="nav-group__label">인프라 상태</span>
+            <svg class="nav-group__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="m9 18 6-6-6-6"/>
+            </svg>
+          </button>
+          <div class="nav-group__items is-hidden" data-nav-items="g-infra">
+            <a class="nav-link" href="dashboard_servers.html">
+              <svg class="nav-link__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect width="20" height="8" x="2" y="2" rx="2" ry="2"/>
+                <rect width="20" height="8" x="2" y="14" rx="2" ry="2"/>
+                <line x1="6" x2="6.01" y1="6" y2="6"/>
+                <line x1="6" x2="6.01" y1="18" y2="18"/>
+              </svg>
+              <span>서버 현황</span>
+            </a>
+            <a class="nav-link" href="dashboard_instances.html">
+              <svg class="nav-link__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="4" y="4" width="16" height="16" rx="2" ry="2"/>
+                <rect x="9" y="9" width="6" height="6"/>
+                <line x1="9" y1="1" x2="9" y2="4"/>
+                <line x1="15" y1="1" x2="15" y2="4"/>
+                <line x1="9" y1="20" x2="9" y2="23"/>
+                <line x1="15" y1="20" x2="15" y2="23"/>
+                <line x1="20" y1="9" x2="23" y2="9"/>
+                <line x1="20" y1="14" x2="23" y2="14"/>
+                <line x1="1" y1="9" x2="4" y2="9"/>
+                <line x1="1" y1="14" x2="4" y2="14"/>
+              </svg>
+              <span>인스턴스 모니터링</span>
+            </a>
+            <a class="nav-link" href="dashboard_resources.html">
+              <svg class="nav-link__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 20V10"/>
+                <path d="M12 20V4"/>
+                <path d="M6 20v-6"/>
+              </svg>
+              <span>리소스 사용량</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- 알림/인시던트 -->
+        <div class="nav-group">
+          <button type="button" class="nav-group__toggle" data-nav-toggle="g-alert">
+            <span class="nav-group__label">알림 / 인시던트</span>
+            <svg class="nav-group__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="m9 18 6-6-6-6"/>
+            </svg>
+          </button>
+          <div class="nav-group__items is-hidden" data-nav-items="g-alert">
+            <a class="nav-link" href="dashboard_incidents.html">
+              <svg class="nav-link__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+              <span>인시던트 현황</span>
+              <span class="nav-link__badge">3</span>
+            </a>
+            <a class="nav-link" href="dashboard_alerts.html">
+              <svg class="nav-link__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/>
+                <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>
+              </svg>
+              <span>알림 센터</span>
+              <span class="nav-link__badge nav-link__badge--warning">12</span>
+            </a>
+            <a class="nav-link" href="dashboard_alert_rules.html">
+              <svg class="nav-link__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+              </svg>
+              <span>알림 규칙 설정</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- 리포트 -->
+        <div class="nav-group">
+          <button type="button" class="nav-group__toggle" data-nav-toggle="g-report">
+            <span class="nav-group__label">리포트</span>
+            <svg class="nav-group__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="m9 18 6-6-6-6"/>
+            </svg>
+          </button>
+          <div class="nav-group__items is-hidden" data-nav-items="g-report">
+            <a class="nav-link" href="dashboard_uptime.html">
+              <svg class="nav-link__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <polyline points="12,6 12,12 16,14"/>
+              </svg>
+              <span>업타임 리포트</span>
+            </a>
+            <a class="nav-link" href="dashboard_trends.html">
+              <svg class="nav-link__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 3v18h18"/>
+                <path d="m19 9-5 5-4-4-3 3"/>
+              </svg>
+              <span>트렌드 분석</span>
+            </a>
+            <a class="nav-link" href="dashboard_sla.html">
+              <svg class="nav-link__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/>
+                <line x1="16" y1="17" x2="8" y2="17"/>
+                <polyline points="10 9 9 9 8 9"/>
+              </svg>
+              <span>SLA 현황</span>
+            </a>
+          </div>
+        </div>
+      </nav>
+
+      <!-- 하단 링크 -->
+      <div class="sidebar-footer">
+        <a class="nav-link" href="../ChainView/pages/dashboard.html" target="_blank">
+          <svg class="nav-link__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+            <polyline points="15 3 21 3 21 9"/>
+            <line x1="10" y1="14" x2="21" y2="3"/>
+          </svg>
+          <span>ChainView Admin</span>
+        </a>
+      </div>
+    </aside>
+
+    <!-- 메인 컨텐츠 영역 -->
+    <div class="dashboard-main">
+      <!-- 헤더 -->
+      <header class="dashboard-header">
+      <div class="dashboard-header__left">
+        <h1 class="dashboard-header__title">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+            <path d="M2 17l10 5 10-5"/>
+            <path d="M2 12l10 5 10-5"/>
+          </svg>
+          서비스 상태 대시보드
+        </h1>
+        <span class="dashboard-header__subtitle">ChainView Service Monitor</span>
+      </div>
+      <div class="dashboard-header__right">
+        <div class="dashboard-header__refresh">
+          <button id="btn-refresh" class="btn btn--icon" title="새로고침">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+            </svg>
+          </button>
+          <span class="dashboard-header__time" id="last-updated">최근 갱신: --:--:--</span>
+        </div>
+        <div class="dashboard-header__auto-refresh">
+          <label class="toggle">
+            <input type="checkbox" id="auto-refresh" checked />
+            <span class="toggle__slider"></span>
+          </label>
+          <span>자동 갱신 (30s)</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 요약 카드 -->
+    <section class="dashboard-summary">
+      <div class="summary-card summary-card--total">
+        <div class="summary-card__icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+            <line x1="9" y1="9" x2="15" y2="9"/>
+            <line x1="9" y1="15" x2="15" y2="15"/>
+          </svg>
+        </div>
+        <div class="summary-card__content">
+          <span class="summary-card__value" id="total-services">247</span>
+          <span class="summary-card__label">전체 서비스</span>
+        </div>
+      </div>
+      <div class="summary-card summary-card--running">
+        <div class="summary-card__icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <polyline points="12,6 12,12 16,14"/>
+          </svg>
+        </div>
+        <div class="summary-card__content">
+          <span class="summary-card__value" id="running-services">218</span>
+          <span class="summary-card__label">운영중</span>
+        </div>
+      </div>
+      <div class="summary-card summary-card--warning">
+        <div class="summary-card__icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+        </div>
+        <div class="summary-card__content">
+          <span class="summary-card__value" id="warning-services">12</span>
+          <span class="summary-card__label">주의</span>
+        </div>
+      </div>
+      <div class="summary-card summary-card--critical">
+        <div class="summary-card__icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="15" y1="9" x2="9" y2="15"/>
+            <line x1="9" y1="9" x2="15" y2="15"/>
+          </svg>
+        </div>
+        <div class="summary-card__content">
+          <span class="summary-card__value" id="critical-services">3</span>
+          <span class="summary-card__label">장애</span>
+        </div>
+      </div>
+      <div class="summary-card summary-card--stopped">
+        <div class="summary-card__icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <rect x="9" y="9" width="6" height="6"/>
+          </svg>
+        </div>
+        <div class="summary-card__content">
+          <span class="summary-card__value" id="stopped-services">14</span>
+          <span class="summary-card__label">중지</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 필터 바 -->
+    <section class="dashboard-filters">
+      <div class="filter-group">
+        <label class="filter-label">분류</label>
+        <select id="filter-category" class="filter-select">
+          <option value="">전체</option>
+          <option value="core">핵심 서비스</option>
+          <option value="addon">부가 서비스</option>
+          <option value="infra">인프라 서비스</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label class="filter-label">상태</label>
+        <div class="filter-chips" id="filter-status">
+          <button class="chip chip--active" data-status="">전체</button>
+          <button class="chip" data-status="running">운영중</button>
+          <button class="chip" data-status="warning">주의</button>
+          <button class="chip" data-status="critical">장애</button>
+          <button class="chip" data-status="stopped">중지</button>
+        </div>
+      </div>
+      <div class="filter-group">
+        <label class="filter-label">중요도</label>
+        <select id="filter-importance" class="filter-select">
+          <option value="">전체</option>
+          <option value="high">높음</option>
+          <option value="medium">중간</option>
+          <option value="low">낮음</option>
+        </select>
+      </div>
+      <div class="filter-group filter-group--search">
+        <label class="filter-label">검색</label>
+        <div class="search-input">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input type="text" id="filter-search" placeholder="서비스명 또는 코드 검색..." />
+        </div>
+      </div>
+      <div class="filter-group">
+        <label class="filter-label">보기</label>
+        <div class="view-toggle">
+          <button class="view-btn view-btn--active" data-view="grid" title="그리드 보기">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+              <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
+            </svg>
+          </button>
+          <button class="view-btn" data-view="list" title="리스트 보기">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/>
+              <line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/>
+              <line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 서비스 그리드 -->
+    <section class="dashboard-content">
+      <div class="service-grid" id="service-grid">
+        <!-- 서비스 카드들이 JS로 렌더링됩니다 -->
+      </div>
+    </section>
+
+    <!-- 서비스 상세 모달 -->
+    <div class="modal" id="modal-service-detail">
+      <div class="modal__backdrop"></div>
+      <div class="modal__container">
+        <div class="modal__header">
+          <h2 class="modal__title" id="modal-service-name">서비스명</h2>
+          <button class="modal__close" data-modal-close>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+        <div class="modal__body">
+          <!-- 상태 헤더 -->
+          <div class="detail-status" id="detail-status">
+            <span class="status-badge status-badge--running">운영중</span>
+            <span class="detail-uptime">업타임: 99.97%</span>
+          </div>
+
+          <!-- 기본 정보 -->
+          <div class="detail-section">
+            <h3 class="detail-section__title">기본 정보</h3>
+            <dl class="detail-info">
+              <div class="detail-info__row">
+                <dt>서비스 코드</dt>
+                <dd id="detail-code">PAY-API-001</dd>
+              </div>
+              <div class="detail-info__row">
+                <dt>분류</dt>
+                <dd id="detail-category">핵심 서비스 > 결제 > 결제 API</dd>
+              </div>
+              <div class="detail-info__row">
+                <dt>유형</dt>
+                <dd id="detail-type">API</dd>
+              </div>
+              <div class="detail-info__row">
+                <dt>중요도</dt>
+                <dd id="detail-importance">높음</dd>
+              </div>
+              <div class="detail-info__row">
+                <dt>엔드포인트</dt>
+                <dd id="detail-endpoint">https://api.example.com/pay</dd>
+              </div>
+            </dl>
+          </div>
+
+          <!-- 서버/인스턴스 -->
+          <div class="detail-section">
+            <h3 class="detail-section__title">서버 / 인스턴스</h3>
+            <div class="instance-list" id="detail-instances">
+              <!-- JS로 렌더링 -->
+            </div>
+          </div>
+
+          <!-- 의존 서비스 -->
+          <div class="detail-section">
+            <h3 class="detail-section__title">의존 서비스</h3>
+            <div class="dependency-list" id="detail-dependencies">
+              <!-- JS로 렌더링 -->
+            </div>
+          </div>
+
+          <!-- 최근 인시던트 -->
+          <div class="detail-section">
+            <h3 class="detail-section__title">최근 인시던트</h3>
+            <div class="incident-list" id="detail-incidents">
+              <!-- JS로 렌더링 -->
+            </div>
+          </div>
+
+          <!-- 담당자 -->
+          <div class="detail-section">
+            <h3 class="detail-section__title">담당자</h3>
+            <div class="owner-list" id="detail-owners">
+              <!-- JS로 렌더링 -->
+            </div>
+          </div>
+        </div>
+        <div class="modal__footer">
+          <a href="#" class="btn btn--outline" id="link-chainview">ChainView에서 보기</a>
+          <button class="btn btn--primary" data-modal-close>닫기</button>
+        </div>
+      </div>
+    </div>
+    </div>
+  </div>
+
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="js/dashboard_data.js"></script>
+  <script src="js/dashboard_main.js"></script>
+</body>
+</html>

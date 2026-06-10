@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>서비스 관리 — ChainView Admin</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" />
+<link rel="stylesheet" href="admin-common.css" />
+</head>
+<body data-menu="services">
+<div class="app">
+  <aside class="lnb"></aside>
+
+  <main class="main">
+    <div class="crumb">
+      <a href="dashboard-proto.html">대시보드</a>
+      <span class="sep">/</span>
+      <span>서비스 카탈로그</span>
+      <span class="sep">/</span>
+      <span>서비스 관리</span>
+    </div>
+
+    <div class="page-head">
+      <div>
+        <h1 class="page-head__title">📦 서비스 관리 <small>SERVICE</small></h1>
+        <p class="page-head__desc">시스템 내 등록된 서비스를 조회·등록·수정·삭제합니다. (총 50건)</p>
+      </div>
+      <div class="page-head__right">
+        <button class="btn">📥 CSV 내보내기</button>
+        <button class="btn btn--primary" data-modal-open="m-svc-create">＋ 서비스 등록</button>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <select>
+        <option>대분류 · 전체</option>
+        <option>핵심 서비스</option><option>부가 서비스</option><option>인프라 서비스</option>
+      </select>
+      <select>
+        <option>중분류 · 전체</option><option>결제</option><option>인증</option><option>계좌</option>
+      </select>
+      <select>
+        <option>유형 · 전체</option><option>API</option><option>WEB</option><option>BATCH</option>
+      </select>
+      <select>
+        <option>중요도 · 전체</option><option>높음</option><option>중간</option><option>낮음</option>
+      </select>
+      <select>
+        <option>상태 · 전체</option><option>운영중</option><option>테스트</option><option>개발</option><option>중지</option>
+      </select>
+      <div class="search">🔍<input type="text" placeholder="서비스명, 코드, 엔드포인트 검색…" /></div>
+      <div class="right">
+        <button class="btn btn--ghost btn--sm">필터 초기화</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th class="col-check"><input type="checkbox" class="chk" /></th>
+            <th>serviceCode</th>
+            <th>서비스명</th>
+            <th>분류 (L1 / L2 / L3)</th>
+            <th>유형</th>
+            <th>중요도</th>
+            <th>상태</th>
+            <th>엔드포인트</th>
+            <th>등록일</th>
+            <th class="col-actions">관리</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td><code>EXT-001</code></td>
+            <td><a href="dashboard-proto-detail.html">카드승인연계</a></td>
+            <td><span class="tag">대외계</span><span class="tag">결제</span><span class="tag">승인</span></td>
+            <td><span class="pill">API</span></td>
+            <td><span class="pill pill--crit">높음</span></td>
+            <td><span class="dot dot--crit"></span>운영중</td>
+            <td><code>https://ext.bank.com/v2/card/auth</code></td>
+            <td>2023-04-12</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" title="상세" onclick="location.href='dashboard-proto-detail.html'">🔍</button>
+              <button class="ibtn" title="수정" data-modal-open="m-svc-edit">✏️</button>
+              <button class="ibtn ibtn--danger" title="삭제" data-modal-open="m-svc-delete">🗑</button>
+            </div></td>
+          </tr>
+          <tr>
+            <td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td><code>EXT-004</code></td>
+            <td>카드취소연계</td>
+            <td><span class="tag">대외계</span><span class="tag">결제</span><span class="tag">취소</span></td>
+            <td><span class="pill">API</span></td>
+            <td><span class="pill pill--crit">높음</span></td>
+            <td><span class="dot dot--crit"></span>운영중</td>
+            <td><code>https://ext.bank.com/v2/card/cancel</code></td>
+            <td>2023-04-12</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn" title="상세">🔍</button>
+              <button class="ibtn" title="수정" data-modal-open="m-svc-edit">✏️</button>
+              <button class="ibtn ibtn--danger" title="삭제" data-modal-open="m-svc-delete">🗑</button>
+            </div></td>
+          </tr>
+          <tr>
+            <td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td><code>DEP-001</code></td>
+            <td>예금이체서비스</td>
+            <td><span class="tag">기간계</span><span class="tag">계좌</span><span class="tag">이체</span></td>
+            <td><span class="pill">API</span></td>
+            <td><span class="pill pill--crit">높음</span></td>
+            <td><span class="dot dot--warn"></span>운영중</td>
+            <td><code>https://core.bank.com/dep/transfer</code></td>
+            <td>2022-11-03</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn">🔍</button>
+              <button class="ibtn" data-modal-open="m-svc-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-svc-delete">🗑</button>
+            </div></td>
+          </tr>
+          <tr>
+            <td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td><code>AUTH-001</code></td>
+            <td>로그인인증</td>
+            <td><span class="tag">채널계</span><span class="tag">인증</span></td>
+            <td><span class="pill">API</span></td>
+            <td><span class="pill pill--crit">높음</span></td>
+            <td><span class="dot"></span>운영중</td>
+            <td><code>https://auth.bank.com/login</code></td>
+            <td>2021-06-21</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn">🔍</button>
+              <button class="ibtn" data-modal-open="m-svc-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-svc-delete">🗑</button>
+            </div></td>
+          </tr>
+          <tr>
+            <td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td><code>BATCH-002</code></td>
+            <td>이자계산배치</td>
+            <td><span class="tag">기간계</span><span class="tag">계좌</span></td>
+            <td><span class="pill">BATCH</span></td>
+            <td><span class="pill pill--warn">중간</span></td>
+            <td><span class="dot dot--warn"></span>운영중</td>
+            <td><code>-</code></td>
+            <td>2022-02-15</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn">🔍</button>
+              <button class="ibtn" data-modal-open="m-svc-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-svc-delete">🗑</button>
+            </div></td>
+          </tr>
+          <tr>
+            <td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td><code>NOTI-001</code></td>
+            <td>알림서비스</td>
+            <td><span class="tag">부가</span><span class="tag">알림</span></td>
+            <td><span class="pill">API</span></td>
+            <td><span class="pill pill--warn">중간</span></td>
+            <td><span class="dot"></span>운영중</td>
+            <td><code>https://noti.bank.com/send</code></td>
+            <td>2023-01-08</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn">🔍</button>
+              <button class="ibtn" data-modal-open="m-svc-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-svc-delete">🗑</button>
+            </div></td>
+          </tr>
+          <tr>
+            <td class="col-check"><input type="checkbox" class="chk" /></td>
+            <td><code>TEST-001</code></td>
+            <td>테스트.샘플API</td>
+            <td><span class="tag">테스트</span></td>
+            <td><span class="pill">API</span></td>
+            <td><span class="pill pill--idle">낮음</span></td>
+            <td><span class="dot dot--idle"></span>중지</td>
+            <td><code>-</code></td>
+            <td>2025-03-20</td>
+            <td class="col-actions"><div class="row-actions">
+              <button class="ibtn">🔍</button>
+              <button class="ibtn" data-modal-open="m-svc-edit">✏️</button>
+              <button class="ibtn ibtn--danger" data-modal-open="m-svc-delete">🗑</button>
+            </div></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="pager">
+        <div class="pager__info">전체 50건 · 1-7 / 8 페이지</div>
+        <div class="pager__nav">
+          <button disabled>‹</button>
+          <button class="is-on">1</button>
+          <button>2</button><button>3</button><button>…</button><button>8</button>
+          <button>›</button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- 등록 모달 -->
+<div class="modal-backdrop" id="m-svc-create">
+  <div class="modal modal--lg">
+    <div class="modal__head">
+      <h3>＋ 서비스 등록</h3>
+      <button class="close" data-modal-close>×</button>
+    </div>
+    <div class="modal__body">
+      <div class="form-grid">
+        <div class="form-row">
+          <label>serviceCode<span class="req">*</span></label>
+          <input type="text" placeholder="예: PAY-API-001" />
+          <span class="help">고유 식별자. 등록 후 수정 불가</span>
+        </div>
+        <div class="form-row">
+          <label>서비스명<span class="req">*</span></label>
+          <input type="text" placeholder="예: 결제 API" />
+        </div>
+        <div class="form-row">
+          <label>대분류 (categoryL1)<span class="req">*</span></label>
+          <select><option>선택</option><option>핵심 서비스</option><option>부가 서비스</option><option>인프라 서비스</option></select>
+        </div>
+        <div class="form-row">
+          <label>중분류 (categoryL2)</label>
+          <select><option>선택</option><option>결제</option><option>인증</option></select>
+        </div>
+        <div class="form-row">
+          <label>소분류 (categoryL3)</label>
+          <select><option>선택</option><option>승인</option><option>취소</option></select>
+        </div>
+        <div class="form-row">
+          <label>서비스 유형 (SERVICE_TYPE)<span class="req">*</span></label>
+          <select><option>API</option><option>WEB</option><option>BATCH</option></select>
+        </div>
+        <div class="form-row">
+          <label>중요도 (IMPORTANCE)<span class="req">*</span></label>
+          <select><option>높음</option><option>중간</option><option>낮음</option></select>
+        </div>
+        <div class="form-row">
+          <label>상태 (STATUS)<span class="req">*</span></label>
+          <select><option>운영중</option><option>테스트</option><option>개발</option><option>중지</option></select>
+        </div>
+        <div class="form-row full">
+          <label>엔드포인트 URL</label>
+          <input type="text" placeholder="https://..." />
+        </div>
+        <div class="form-row full">
+          <label>설명</label>
+          <textarea placeholder="서비스 상세 설명"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal__foot">
+      <button class="btn" data-modal-close>취소</button>
+      <button class="btn btn--primary">등록</button>
+    </div>
+  </div>
+</div>
+
+<!-- 수정 모달 (간단히 동일 폼) -->
+<div class="modal-backdrop" id="m-svc-edit">
+  <div class="modal modal--lg">
+    <div class="modal__head">
+      <h3>✏️ 서비스 수정 — <code style="font-size:13px">EXT-001</code></h3>
+      <button class="close" data-modal-close>×</button>
+    </div>
+    <div class="modal__body">
+      <div class="form-grid">
+        <div class="form-row">
+          <label>serviceCode</label>
+          <input type="text" value="EXT-001" disabled />
+          <span class="help">PK · 수정 불가</span>
+        </div>
+        <div class="form-row">
+          <label>서비스명<span class="req">*</span></label>
+          <input type="text" value="카드승인연계" />
+        </div>
+        <div class="form-row">
+          <label>대분류</label>
+          <select><option>대외계</option></select>
+        </div>
+        <div class="form-row">
+          <label>중분류</label>
+          <select><option>결제</option></select>
+        </div>
+        <div class="form-row">
+          <label>소분류</label>
+          <select><option>승인</option></select>
+        </div>
+        <div class="form-row">
+          <label>서비스 유형</label>
+          <select><option>API</option></select>
+        </div>
+        <div class="form-row">
+          <label>중요도</label>
+          <select><option>높음</option></select>
+        </div>
+        <div class="form-row">
+          <label>상태</label>
+          <select><option>운영중</option></select>
+        </div>
+        <div class="form-row full">
+          <label>엔드포인트 URL</label>
+          <input type="text" value="https://ext.bank.com/v2/card/auth" />
+        </div>
+        <div class="form-row full">
+          <label>설명</label>
+          <textarea>외부 카드사 승인 요청 중계 API</textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal__foot">
+      <button class="btn" data-modal-close>취소</button>
+      <button class="btn btn--primary">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 삭제 확인 -->
+<div class="modal-backdrop" id="m-svc-delete">
+  <div class="modal confirm">
+    <div class="modal__head">
+      <h3>🗑 서비스 삭제</h3>
+      <button class="close" data-modal-close>×</button>
+    </div>
+    <div class="modal__body">
+      <div class="confirm__icon">⚠</div>
+      <div class="confirm__msg">
+        <b>EXT-001 카드승인연계</b>를 삭제하시겠습니까?
+      </div>
+      <div class="confirm__note">
+        연결된 배포 정보 3건, 서비스 관계 6건, 담당자 3명, 인시던트 12건이 함께 처리됩니다.<br/>
+        ※ 논리 삭제(status='중지') 권장
+      </div>
+    </div>
+    <div class="modal__foot">
+      <button class="btn" data-modal-close>취소</button>
+      <button class="btn btn--danger">삭제</button>
+    </div>
+  </div>
+</div>
+
+<script src="admin-common.js"></script>
+</body>
+</html>
