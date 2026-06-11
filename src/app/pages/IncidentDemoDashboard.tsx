@@ -13,6 +13,7 @@ import {
   AlertTriangle,
   ArrowRight,
   Clock3,
+  FileText,
   Filter,
   GitBranch,
   Monitor,
@@ -43,17 +44,20 @@ const LazyServiceRelationFlow = lazy(() =>
   }))
 );
 
-export function Dashboard() {
+export function IncidentDemoDashboard() {
   const { services, relations, owners, incidents } = usePortalData();
   const [query, setQuery] = useState("");
   const [view, setView] = useState<DashboardView>("cards");
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [incidentDemoOpen, setIncidentDemoOpen] = useState(true);
+  const [analysisReportOpen, setAnalysisReportOpen] = useState(false);
   const [statusOverrides, setStatusOverrides] = useState<
     Record<number, ServiceStatusCode>
   >({});
   const incidentSectionRef = useRef<HTMLElement | null>(null);
   const warningSectionRef = useRef<HTMLElement | null>(null);
   const operationsSectionRef = useRef<HTMLElement | null>(null);
+  const relationSectionRef = useRef<HTMLElement | null>(null);
 
   const scrollToSection = (sectionRef: RefObject<HTMLElement | null>) => {
     sectionRef.current?.scrollIntoView({
@@ -157,6 +161,7 @@ export function Dashboard() {
     );
   }, [criticalServices, incidents, services, statusOverrides]);
 
+  const primaryIncidentCard = incidentCards[0];
   const displayedIncidentCount = criticalServices.length;
 
   const ownerByServiceId = useMemo(() => {
@@ -198,18 +203,43 @@ export function Dashboard() {
       service.deploymentStatusCode === "STOPPED"
     );
   });
+  const showIncidentRelations = () => {
+    setView("relations");
+    window.setTimeout(() => scrollToSection(relationSectionRef), 0);
+  };
+
   return (
     <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-5">
       <PageHeader
-        description="서비스 상태, 장애 영향, 운영 현황을 한 번에 확인합니다."
+        description="장애 발생부터 영향도 확인, 분석 보고, 알림 전파까지 시연합니다."
         icon={<Monitor size={22} />}
-        title="실시간 대시보드"
+        title="장애 시연 대시보드"
         actions={
-          <div className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-600 shadow-sm">
-            장애 {criticalServices.length} · 주의 {warningServices.length}
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setIncidentDemoOpen((current) => !current)}
+              className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#3182f6] px-4 text-sm font-black text-white shadow-sm transition hover:bg-[#1b64da]"
+            >
+              <Siren size={16} />
+              장애 시연 보기
+            </button>
+            <div className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-600 shadow-sm">
+              장애 {criticalServices.length} · 주의 {warningServices.length}
+            </div>
           </div>
         }
       />
+
+      {incidentDemoOpen && primaryIncidentCard ? (
+        <IncidentDemoPanel
+          incident={primaryIncidentCard.incident}
+          relationCountByServiceId={relationCountByServiceId}
+          service={primaryIncidentCard.service}
+          onOpenImpact={showIncidentRelations}
+          onOpenReport={() => setAnalysisReportOpen(true)}
+        />
+      ) : null}
 
       <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <MetricPanel
@@ -253,7 +283,7 @@ export function Dashboard() {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="서비스명, 코드, 담당자, 태그 검색"
-              className="h-11 w-full rounded-lg border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-[#86b7ff] focus:bg-white focus:ring-4 focus:ring-[#edf5ff]"
+              className="h-11 w-full rounded-lg border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-slate-400 focus:bg-white focus:ring-4 focus:ring-slate-100"
             />
           </label>
 
@@ -302,11 +332,11 @@ export function Dashboard() {
         <>
           <section
             ref={incidentSectionRef}
-            className="scroll-mt-6 rounded-xl border border-[#ffd1d6] bg-white p-4 shadow-sm"
+            className="scroll-mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
           >
             <div className="mb-3 flex items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-2">
-                <Siren size={17} className="shrink-0 text-[#ff4d5a]" />
+                <Siren size={17} className="shrink-0 text-[#f04452]" />
                 <h2 className="truncate text-base font-black text-slate-950">
                   진행 중 장애
                 </h2>
@@ -331,6 +361,8 @@ export function Dashboard() {
                     service={service}
                     services={services}
                     ownerNames={ownerByServiceId.get(service.serviceId) ?? []}
+                    onOpenImpact={showIncidentRelations}
+                    onOpenReport={() => setAnalysisReportOpen(true)}
                     onDemote={() =>
                       updateDashboardStatus(service.serviceId, "IMPACTED")
                     }
@@ -346,10 +378,10 @@ export function Dashboard() {
 
           <section
             ref={warningSectionRef}
-            className="scroll-mt-6 rounded-xl border border-[#ffd978] bg-white p-4 shadow-sm"
+            className="scroll-mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
           >
             <SectionTitle
-              icon={<AlertTriangle size={17} className="text-[#f08c00]" />}
+              icon={<AlertTriangle size={17} className="text-slate-500" />}
               title="주의 서비스"
               count={warningServices.length}
             />
@@ -391,6 +423,7 @@ export function Dashboard() {
 
       {view === "relations" ? (
         <section
+          ref={relationSectionRef}
           className="scroll-mt-6 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
         >
           <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3">
@@ -402,7 +435,7 @@ export function Dashboard() {
                 현재 필터 기준의 서비스 관계도를 확인합니다.
               </p>
             </div>
-            <span className="rounded-full bg-[#f2f7ff] px-3 py-1 text-xs font-black text-[#1f6feb]">
+            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600">
               React Flow
             </span>
           </div>
@@ -414,11 +447,129 @@ export function Dashboard() {
                 </div>
               }
             >
-              <LazyServiceRelationFlow embedded />
+              <LazyServiceRelationFlow
+                embedded
+                incidentMode
+                initialServiceId={primaryIncidentCard?.service.serviceId}
+              />
             </Suspense>
           </div>
         </section>
       ) : null}
+
+      {analysisReportOpen && primaryIncidentCard ? (
+        <IncidentAnalysisReport
+          incident={primaryIncidentCard.incident}
+          relationCountByServiceId={relationCountByServiceId}
+          service={primaryIncidentCard.service}
+          onClose={() => setAnalysisReportOpen(false)}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function IncidentDemoPanel({
+  incident,
+  onOpenImpact,
+  onOpenReport,
+  relationCountByServiceId,
+  service,
+}: {
+  incident?: IncidentRecord;
+  onOpenImpact: () => void;
+  onOpenReport: () => void;
+  relationCountByServiceId: Map<number, { incoming: number; outgoing: number }>;
+  service: ServiceRecord;
+}) {
+  const relationCount = relationCountByServiceId.get(service.serviceId) ?? {
+    incoming: 0,
+    outgoing: 0,
+  };
+
+  return (
+    <section className="rounded-xl border border-[#d9e8ff] bg-[#f6fafc] p-4 shadow-sm">
+      <div className="grid gap-4 xl:grid-cols-[1fr_1.05fr_0.85fr]">
+        <div className="rounded-lg border border-slate-200 bg-white p-4">
+          <div className="flex items-center gap-2 text-sm font-black text-[#f04452]">
+            <Siren size={17} />
+            메인 장애 발생
+          </div>
+          <h2 className="mt-2 text-xl font-black text-slate-950">
+            {incident?.title ?? `${service.serviceName} 장애 감지`}
+          </h2>
+          <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+            {incident?.description ??
+              "서비스 헬스체크 실패와 외부 연계 응답 지연이 감지되었습니다."}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <span className="rounded-full bg-[#ff4d5a] px-3 py-1 text-xs font-black text-white">
+              CRITICAL
+            </span>
+            <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-black text-slate-700">
+              경과 00:14:32
+            </span>
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-slate-200 bg-white p-4">
+          <div className="flex items-center gap-2 text-sm font-black text-[#1f6feb]">
+            <GitBranch size={17} />
+            영향도 자동 계산
+          </div>
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            <ImpactMiniMetric label="수신" value={relationCount.incoming} />
+            <ImpactMiniMetric label="송신" value={relationCount.outgoing} />
+            <ImpactMiniMetric
+              label="우선 조치"
+              value={Math.max(1, relationCount.incoming + relationCount.outgoing)}
+            />
+          </div>
+          <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
+            장애 서비스 기준으로 직접/간접 연계 서비스를 자동 검색하고,
+            관련 서비스 클릭 시 서비스 정보와 영향도를 함께 확인합니다.
+          </p>
+        </div>
+
+        <div className="rounded-lg border border-slate-200 bg-white p-4">
+          <div className="flex items-center gap-2 text-sm font-black text-slate-700">
+            <BellIcon />
+            전파/기록 상태
+          </div>
+          <div className="mt-3 space-y-2 text-xs font-bold text-slate-600">
+            <div>14:08 영향 범위 계산 완료</div>
+            <div>14:09 Slack · SMS · Email 발송 완료</div>
+            <div>14:10 운영자 확인 이력 기록</div>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={onOpenImpact}
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#3182f6] px-3 text-xs font-black text-white transition hover:bg-[#1b64da]"
+            >
+              영향도 보기
+              <ArrowRight size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={onOpenReport}
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 transition hover:bg-slate-50"
+            >
+              <FileText size={14} />
+              분석 보고서
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ImpactMiniMetric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+      <div className="text-xs font-black text-slate-400">{label}</div>
+      <div className="mt-1 text-2xl font-black text-slate-950">{value}</div>
     </div>
   );
 }
@@ -445,13 +596,13 @@ function MetricPanel({
     },
     amber: {
       border: "border-[#ffd978]",
-      icon: "bg-[#fff0b8] text-[#f08c00]",
+      icon: "bg-[#fff8df] text-[#f08c00]",
       value: "text-[#f08c00]",
       line: "bg-[#ffd978]",
     },
     emerald: {
       border: "border-[#a7efd8]",
-      icon: "bg-[#c9f7e6] text-[#20c997]",
+      icon: "bg-[#ecfff8] text-[#20c997]",
       value: "text-[#20c997]",
       line: "bg-[#a7efd8]",
     },
@@ -467,7 +618,7 @@ function MetricPanel({
     <button
       type="button"
       onClick={onClick}
-      className={`min-h-[132px] rounded-xl border bg-white px-5 py-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-4 focus:ring-[#d9e8ff] ${styles.border}`}
+      className={`min-h-[132px] rounded-xl border bg-white px-5 py-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-4 focus:ring-slate-100 ${styles.border}`}
     >
       <div className="flex h-full flex-col justify-between gap-5">
         <div className="flex items-center justify-between">
@@ -576,7 +727,7 @@ function OperationalServiceItem({
 }) {
   return (
     <div className="flex min-w-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm">
-      <span className="h-3 w-3 shrink-0 rounded-full bg-[#20c997]" />
+      <span className="h-3 w-3 shrink-0 rounded-full bg-slate-500" />
       <span className="min-w-0 flex-1 truncate text-sm font-black text-slate-900">
         {service.serviceName}
       </span>
@@ -594,6 +745,8 @@ function IncidentCard({
   index,
   incident,
   onDemote,
+  onOpenImpact,
+  onOpenReport,
   ownerNames,
   relations,
   service,
@@ -602,6 +755,8 @@ function IncidentCard({
   index: number;
   incident?: IncidentRecord;
   onDemote: () => void;
+  onOpenImpact: () => void;
+  onOpenReport: () => void;
   ownerNames: string[];
   relations: {
     sourceServiceId: number;
@@ -673,7 +828,7 @@ function IncidentCard({
   ];
 
   return (
-    <article className="flex h-full flex-col rounded-lg border border-[#ffd1d6] bg-white p-4 shadow-sm ring-1 ring-[#fff5f6]">
+    <article className="flex h-full flex-col rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -696,7 +851,7 @@ function IncidentCard({
           <button
             type="button"
             onClick={onDemote}
-            className="inline-flex h-7 items-center rounded-md border border-[#ffd978] bg-[#fff8df] px-2.5 text-[11px] font-black text-[#e67700] transition hover:bg-[#fff0b8]"
+            className="inline-flex h-7 items-center rounded-md border border-slate-200 bg-slate-50 px-2.5 text-[11px] font-black text-slate-600 transition hover:bg-slate-100"
           >
             주의로 하향
           </button>
@@ -704,7 +859,7 @@ function IncidentCard({
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-3 text-xs font-bold text-slate-600">
-        <span className="text-[#1f6feb]">ID INC-2026-{String(312 + index).padStart(4, "0")}</span>
+        <span className="text-slate-500">ID INC-2026-{String(312 + index).padStart(4, "0")}</span>
         <span>
           <Clock3 size={13} className="mr-1 inline" />
           경과 <b className="text-slate-950">{elapsed}</b>
@@ -716,7 +871,7 @@ function IncidentCard({
         </span>
       </div>
 
-      <div className="mt-3 rounded-lg border border-dashed border-[#ffb8c0] bg-[#fff5f6] px-3 py-2 text-xs font-black text-[#f04452]">
+      <div className="mt-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-xs font-black text-slate-700">
         현상{" "}
         {incident?.description ||
           (incoming.length
@@ -751,6 +906,22 @@ function IncidentCard({
       </div>
 
       <div className="mt-auto flex flex-wrap justify-end gap-2 pt-3">
+        <button
+          type="button"
+          onClick={onOpenImpact}
+          className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-slate-50 px-3 text-xs font-black text-slate-700 transition hover:bg-slate-100"
+        >
+          영향도 보기
+          <ArrowRight size={14} />
+        </button>
+        <button
+          type="button"
+          onClick={onOpenReport}
+          className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 transition hover:bg-slate-50"
+        >
+          <FileText size={14} />
+          분석 보고서
+        </button>
         <Link
           to={`/services/${service.serviceId}`}
           className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 transition hover:bg-slate-50"
@@ -760,13 +931,122 @@ function IncidentCard({
         </Link>
         <Link
           to={incident ? `/incidents/${incident.incidentId}` : "/incidents"}
-          className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-[#ff4d5a] px-3 text-xs font-black text-white shadow-sm transition hover:bg-[#e43f4b]"
+          className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-[#3182f6] px-3 text-xs font-black text-white shadow-sm transition hover:bg-[#1b64da]"
         >
           장애 상세보기
           <ArrowRight size={14} />
         </Link>
       </div>
     </article>
+  );
+}
+
+function IncidentAnalysisReport({
+  incident,
+  onClose,
+  relationCountByServiceId,
+  service,
+}: {
+  incident?: IncidentRecord;
+  onClose: () => void;
+  relationCountByServiceId: Map<number, { incoming: number; outgoing: number }>;
+  service: ServiceRecord;
+}) {
+  const relationCount = relationCountByServiceId.get(service.serviceId) ?? {
+    incoming: 0,
+    outgoing: 0,
+  };
+  const impactTotal = Math.max(1, relationCount.incoming + relationCount.outgoing);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4">
+      <section className="max-h-[88vh] w-full max-w-3xl overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-2xl">
+        <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
+          <div>
+            <div className="flex items-center gap-2 text-sm font-black text-slate-700">
+              <FileText size={17} />
+              영향도 분석 결과
+            </div>
+            <h2 className="mt-1 text-xl font-black text-slate-950">
+              {incident?.title ?? `${service.serviceName} 장애 분석 보고`}
+            </h2>
+            <p className="mt-1 text-sm font-semibold text-slate-500">
+              장애 영향도 확인과 전파 이력을 시연하기 위한 보고서 묵업입니다.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-black text-slate-600 transition hover:bg-slate-50"
+          >
+            닫기
+          </button>
+        </div>
+
+        <div className="space-y-4 p-5">
+          <div className="grid gap-3 md:grid-cols-3">
+            <ReportMetric label="장애 서비스" value={service.serviceName} />
+            <ReportMetric label="영향 서비스" value={`${impactTotal}개`} />
+            <ReportMetric label="전파 상태" value="발송 완료" />
+          </div>
+
+          <ReportBlock
+            title="분석 요약"
+            items={[
+              `${service.serviceName} 응답 지연으로 직접 연계 서비스의 처리 지연 가능성이 높습니다.`,
+              "필수 관계와 담당 그룹을 기준으로 우선 전파 대상이 자동 산출되었습니다.",
+              "현재 조치 이력은 운영 히스토리에 누적되어 이후 장애 지침서로 재사용됩니다.",
+            ]}
+          />
+          <ReportBlock
+            title="우선 조치"
+            items={[
+              "장애 중심 서비스의 헬스체크, 최근 배포, 외부 연계 응답 시간을 우선 확인합니다.",
+              "직접 영향 서비스 담당자에게 처리 지연 가능성을 먼저 전파합니다.",
+              "복구 후 모니터링 상태로 전환하고 타임라인에 조치 결과를 기록합니다.",
+            ]}
+          />
+          <ReportBlock
+            title="전파 결과"
+            items={[
+              "Slack 운영 채널 알림 발송 완료",
+              "SMS 긴급 담당자 알림 발송 완료",
+              "Email 상세 분석 보고 발송 완료",
+            ]}
+          />
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function ReportMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+      <div className="text-xs font-black text-slate-400">{label}</div>
+      <div className="mt-1 truncate text-sm font-black text-slate-900">
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function ReportBlock({ items, title }: { items: string[]; title: string }) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-4">
+      <h3 className="text-sm font-black text-slate-950">{title}</h3>
+      <div className="mt-3 space-y-2">
+        {items.map((item) => (
+          <div
+            key={item}
+            className="flex items-start gap-2 text-sm font-semibold leading-6 text-slate-600"
+          >
+            <ArrowRight size={14} className="mt-1 shrink-0 text-slate-400" />
+            <span>{item}</span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -781,8 +1061,8 @@ function RelationChip({
     <span
       className={`inline-flex max-w-[150px] items-center rounded-full border px-2.5 py-1 text-xs font-black ${
         active
-          ? "border-[#ff4d5a] bg-[#ff4d5a] text-white"
-          : "border-[#ffd1d6] bg-[#fff5f6] text-[#f04452]"
+          ? "border-[#3182f6] bg-[#3182f6] text-white"
+          : "border-slate-200 bg-slate-50 text-slate-600"
       }`}
     >
       <span className="truncate">{children}</span>
@@ -803,11 +1083,11 @@ function TimelineRow({
     color === "red"
       ? "bg-[#ff4d5a]"
       : color === "blue"
-        ? "bg-[#3182f6]"
+        ? "bg-slate-500"
       : color === "amber"
-        ? "bg-[#f59f00]"
+        ? "bg-slate-400"
         : color === "emerald"
-          ? "bg-[#00b386]"
+          ? "bg-slate-600"
           : "bg-slate-300";
 
   return (
@@ -866,7 +1146,7 @@ function ServiceMiniCard({
         <button
           type="button"
           onClick={onPromote}
-          className="mt-2 inline-flex h-8 items-center rounded-md border border-[#ffd1d6] bg-white px-3 text-xs font-black text-[#f04452] transition hover:bg-[#fff5f6]"
+          className="mt-2 inline-flex h-8 items-center rounded-md border border-slate-300 bg-white px-3 text-xs font-black text-slate-700 transition hover:bg-slate-50"
         >
           장애로 상향
         </button>
@@ -905,7 +1185,7 @@ function TopologyPanel({
             {index < services.length - 1 ? (
               <div className="absolute -right-4 top-1/2 hidden h-px w-4 bg-slate-300 md:block" />
             ) : null}
-            <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-white text-[#1f6feb] shadow-sm">
+            <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-white text-slate-600 shadow-sm">
               <GitBranch size={17} />
             </div>
             <div className="truncate text-sm font-black text-slate-900">
@@ -927,10 +1207,10 @@ function TopologyPanel({
 function StatusBadge({ status }: { status: ServiceStatusCode }) {
   const className =
     status === "NORMAL"
-      ? "border-[#a7efd8] bg-[#ecfff8] text-[#00a77d]"
+      ? "border-slate-200 bg-slate-50 text-slate-700"
       : status === "INCIDENT" || status === "INACTIVE"
         ? "border-[#ffd1d6] bg-[#fff5f6] text-[#f04452]"
-        : "border-[#ffd978] bg-[#fff8df] text-[#e67700]";
+        : "border-slate-200 bg-slate-50 text-slate-600";
 
   return (
     <span
@@ -942,5 +1222,5 @@ function StatusBadge({ status }: { status: ServiceStatusCode }) {
 }
 
 function BellIcon() {
-  return <ShieldAlert size={16} className="text-[#f08c00]" />;
+  return <ShieldAlert size={16} className="text-slate-500" />;
 }

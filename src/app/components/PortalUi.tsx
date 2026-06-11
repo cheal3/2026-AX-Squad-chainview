@@ -69,7 +69,7 @@ export function Input({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#86b7ff]"
       />
     </label>
   );
@@ -95,7 +95,7 @@ export function Select({
         <select
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          className="w-full appearance-none rounded-lg border border-slate-300 bg-white py-2 pl-4 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full appearance-none rounded-lg border border-slate-300 bg-white py-2 pl-4 pr-10 focus:outline-none focus:ring-2 focus:ring-[#86b7ff]"
         >
           {Object.entries(options).map(([code, labelText]) => (
             <option key={code} value={code}>
@@ -128,7 +128,7 @@ export function SelectBox({
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full appearance-none rounded-lg border border-slate-300 bg-white py-2 pl-3 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="w-full appearance-none rounded-lg border border-slate-300 bg-white py-2 pl-3 pr-10 focus:outline-none focus:ring-2 focus:ring-[#86b7ff]"
       >
         {Object.entries(options).map(([code, labelText]) => (
           <option key={code} value={code}>
@@ -184,7 +184,7 @@ export function ActionPanel({
   return (
     <div className="rounded-lg border border-gray-200 p-4">
       <div className="mb-3 flex items-center gap-2">
-        <Icon size={17} className="text-blue-600" />
+        <Icon size={17} className="text-[#1f6feb]" />
         <h5 className="font-semibold text-gray-900">{title}</h5>
       </div>
       {children}

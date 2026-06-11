@@ -14,6 +14,7 @@ import "@xyflow/react/dist/style.css";
 import {
   ChevronDown,
   ChevronRight,
+  FileText,
   GitBranch,
   PanelRightOpen,
   Search,
@@ -26,6 +27,7 @@ import { PageHeader } from "../components/PageHeader";
 import {
   codeLabels,
   type ImportanceCode,
+  type IncidentRecord,
   type ServerRecord,
   type ServiceRelationRecord,
   type ServiceRecord,
@@ -114,16 +116,37 @@ function enforceVerticalGap(
   return result;
 }
 
-export function ServiceRelationFlow({ embedded = false }: { embedded?: boolean } = {}) {
-  const { services, relations, owners, servers, techStacks } = usePortalData();
+export function ServiceRelationFlow({
+  embedded = false,
+  incidentMode = false,
+  initialServiceId,
+}: {
+  embedded?: boolean;
+  incidentMode?: boolean;
+  initialServiceId?: number;
+} = {}) {
+  const { services, relations, owners, servers, techStacks, incidents } =
+    usePortalData();
+  const activeIncident = useMemo<IncidentRecord | undefined>(() => {
+    return (
+      incidents.find(
+        (incident) =>
+          incident.incidentStatusCode !== "RESOLVED" &&
+          (initialServiceId ? incident.serviceId === initialServiceId : true)
+      ) ??
+      incidents.find((incident) => incident.incidentStatusCode !== "RESOLVED")
+    );
+  }, [incidents, initialServiceId]);
+  const initialFocusedServiceId =
+    initialServiceId ?? activeIncident?.serviceId ?? services[0]?.serviceId ?? 0;
   const [focusedServiceId, setFocusedServiceId] = useState<number>(
-    services[0]?.serviceId ?? 0
+    initialFocusedServiceId
   );
   const [query, setQuery] = useState("");
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailPanelWide, setDetailPanelWide] = useState(false);
   const [detailServiceId, setDetailServiceId] = useState<number>(
-    services[0]?.serviceId ?? 0
+    initialFocusedServiceId
   );
   const [relationDepth, setRelationDepth] = useState(1);
   const [topControlMode, setTopControlMode] =
@@ -177,6 +200,20 @@ export function ServiceRelationFlow({ embedded = false }: { embedded?: boolean }
       ),
     [relations]
   );
+  const activeIncidentServiceId =
+    activeIncident?.serviceId ?? initialFocusedServiceId;
+  const activeIncidentConnectedServiceIds = useMemo(() => {
+    const connected = new Set<number>();
+    activeRelations.forEach((relation) => {
+      if (relation.sourceServiceId === activeIncidentServiceId) {
+        connected.add(relation.targetServiceId);
+      }
+      if (relation.targetServiceId === activeIncidentServiceId) {
+        connected.add(relation.sourceServiceId);
+      }
+    });
+    return connected;
+  }, [activeIncidentServiceId, activeRelations]);
 
   const connectedServiceIds = useMemo(() => {
     const connected = new Set<number>();
@@ -583,6 +620,22 @@ export function ServiceRelationFlow({ embedded = false }: { embedded?: boolean }
   const directOutgoingCount = activeRelations.filter(
     (relation) => relation.sourceServiceId === detailService?.serviceId
   ).length;
+  const detailInIncidentScope =
+    incidentMode && detailService
+      ? detailService.serviceId === activeIncidentServiceId ||
+        activeIncidentConnectedServiceIds.has(detailService.serviceId)
+      : false;
+
+  useEffect(() => {
+    if (!incidentMode && !initialServiceId) {
+      return;
+    }
+
+    setFocusedServiceId(initialFocusedServiceId);
+    setDetailServiceId(initialFocusedServiceId);
+    setDetailOpen(true);
+    setRelationDepth(2);
+  }, [incidentMode, initialFocusedServiceId, initialServiceId]);
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -614,7 +667,7 @@ export function ServiceRelationFlow({ embedded = false }: { embedded?: boolean }
         <PageHeader
           description="선택 서비스를 기준으로 송신/수신 관계와 주변 depth를 확인합니다."
           icon={<GitBranch size={22} />}
-          title="관계 그래프"
+          title={incidentMode ? "장애 영향도 그래프" : "관계 그래프"}
         />
       )}
 
@@ -651,6 +704,9 @@ export function ServiceRelationFlow({ embedded = false }: { embedded?: boolean }
             <RelationServiceDetailPanel
               open={detailOpen}
               incomingCount={directIncomingCount}
+              incidentMode={detailInIncidentScope}
+              incidentTitle={activeIncident?.title}
+              impactCount={activeIncidentConnectedServiceIds.size}
               outgoingCount={directOutgoingCount}
               owners={detailOwners}
               server={detailServer}
@@ -911,7 +967,7 @@ function RelationTopControl({
                         }
                         className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left transition ${
                           selected
-                            ? "bg-blue-50 text-blue-700"
+                            ? "bg-[#f2f7ff] text-[#1f6feb]"
                             : "text-slate-800 hover:bg-slate-50"
                         }`}
                       >
@@ -921,7 +977,7 @@ function RelationTopControl({
                         <span
                           className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-black ${
                             selected
-                              ? "bg-blue-100 text-blue-700"
+                              ? "bg-white/15 text-white"
                               : "bg-slate-100 text-slate-500"
                           }`}
                         >
@@ -964,9 +1020,9 @@ function RelationTopControl({
                         <button
                           key={service.serviceId}
                           onClick={() => selectSearchResult(service.serviceId)}
-                          className="flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left hover:bg-blue-50"
+                          className="flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left hover:bg-slate-50"
                         >
-                          <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-cyan-100 text-cyan-600">
+                          <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600">
                             <GitBranch size={15} />
                           </span>
                           <span className="min-w-0 flex-1">
@@ -994,7 +1050,7 @@ function RelationTopControl({
           <button
             type="button"
             onClick={switchMode}
-            className="flex h-11 shrink-0 items-center gap-2 rounded-full bg-blue-600 px-4 text-sm font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-blue-700"
+            className="flex h-11 shrink-0 items-center gap-2 rounded-full bg-[#3182f6] px-4 text-sm font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-[#1b64da]"
             title={mode === "select" ? "검색 모드로 변경" : "분류 모드로 변경"}
           >
             {mode === "select" ? <Search size={17} /> : <GitBranch size={17} />}
@@ -1023,8 +1079,8 @@ function RelationDepthToggle({
         onClick={() => onDepthChange(nextDepth)}
         className={`pointer-events-auto flex h-11 min-w-[132px] items-center justify-center gap-2 rounded-full border px-5 text-sm font-black shadow-sm transition-all duration-200 hover:-translate-y-0.5 ${
           expanded
-            ? "border-blue-600 bg-blue-600 text-white hover:bg-blue-700"
-            : "border-slate-200 bg-white/95 text-slate-800 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600"
+            ? "border-[#3182f6] bg-[#3182f6] text-white hover:bg-[#1b64da]"
+            : "border-slate-200 bg-white/95 text-slate-800 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
         }`}
       >
         <span>{expanded ? "Depth 축소" : "Depth 확장"}</span>
@@ -1036,6 +1092,9 @@ function RelationDepthToggle({
 function RelationServiceDetailPanel({
   open,
   incomingCount,
+  incidentMode,
+  incidentTitle,
+  impactCount,
   outgoingCount,
   owners,
   server,
@@ -1046,6 +1105,9 @@ function RelationServiceDetailPanel({
 }: {
   open: boolean;
   incomingCount: number;
+  incidentMode?: boolean;
+  incidentTitle?: string;
+  impactCount: number;
   outgoingCount: number;
   owners: string[];
   server?: ServerRecord;
@@ -1096,7 +1158,7 @@ function RelationServiceDetailPanel({
       className={`absolute right-4 top-4 z-30 flex origin-top-right transform-gpu flex-col overflow-hidden border border-slate-200 bg-white/96 text-slate-900 transition-[width,max-height,box-shadow,border-radius,transform] ease-out ${
         panelTall
           ? "rounded-2xl shadow-xl"
-          : "rounded-[22px] shadow-sm hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md"
+          : "rounded-[22px] shadow-sm hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
       } ${open ? "" : "cursor-pointer"}`}
       style={{
         width: panelWide ? RELATION_DETAIL_WIDTH : RELATION_COLLAPSED_WIDTH,
@@ -1117,7 +1179,7 @@ function RelationServiceDetailPanel({
           panelTall ? "opacity-0" : "opacity-100"
         }`}
       >
-        <PanelRightOpen size={15} className="shrink-0 text-blue-600" />
+        <PanelRightOpen size={15} className="shrink-0 text-slate-600" />
         <span>상세</span>
       </div>
 
@@ -1128,7 +1190,7 @@ function RelationServiceDetailPanel({
       >
       <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-200 px-4 py-4">
         <div className="min-w-0">
-          <div className="text-xs font-bold text-blue-600">선택 서비스 상세</div>
+          <div className="text-xs font-bold text-slate-600">선택 서비스 상세</div>
           <h3 className="mt-1 break-words text-lg font-black leading-tight">
             {service.serviceName}
           </h3>
@@ -1141,7 +1203,7 @@ function RelationServiceDetailPanel({
             event.stopPropagation();
             onOpenChange(false);
           }}
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200"
           title="상세 접기"
         >
           <ChevronRight size={18} />
@@ -1224,9 +1286,50 @@ function RelationServiceDetailPanel({
             {service.description || "등록된 설명이 없습니다."}
           </p>
         </div>
+
+        {incidentMode ? (
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <div className="flex items-center gap-2 text-xs font-black text-slate-700">
+              <ShieldAlert size={14} />
+              장애 영향 감지
+            </div>
+            <div className="mt-2 text-sm font-black leading-5 text-slate-950">
+              {incidentTitle ?? `${service.serviceName} 장애 영향 분석`}
+            </div>
+            <p className="mt-2 text-xs font-semibold leading-5 text-slate-600">
+              연계 관계 기준 직접/간접 영향 서비스 {impactCount}개가
+              감지되었습니다. 서비스 처리 지연, 알림 전파, 담당자 ACK 상태를
+              함께 확인해야 합니다.
+            </p>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <ImpactBox label="직접 수신" value={incomingCount} />
+              <ImpactBox label="직접 송신" value={outgoingCount} />
+            </div>
+            <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
+              <div className="mb-2 flex items-center gap-2 text-xs font-black text-slate-700">
+                <FileText size={14} />
+                영향도 분석 결과
+              </div>
+              <div className="space-y-1.5 text-xs font-semibold leading-5 text-slate-600">
+                <div>원인 추정: 장애 중심 서비스 응답 지연</div>
+                <div>사용자 영향: 로그인/조회/배치 처리 지연 가능</div>
+                <div>조치 방향: 담당 그룹 알림 후 타임라인에 조치 기록</div>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
       </div>
     </aside>
+  );
+}
+
+function ImpactBox({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+      <div className="text-[11px] font-black text-slate-400">{label}</div>
+      <div className="mt-1 text-lg font-black text-slate-950">{value}</div>
+    </div>
   );
 }
 
@@ -1262,7 +1365,7 @@ function ServiceNode({ data }: { data: ServiceNodeData }) {
           <div className="truncate text-sm font-semibold text-slate-950">
             {data.label}
           </div>
-          <div className="mt-1 truncate text-xs font-medium text-blue-600">
+          <div className="mt-1 truncate text-xs font-medium text-slate-500">
             {data.code}
           </div>
         </div>
@@ -1293,7 +1396,7 @@ function ServiceNode({ data }: { data: ServiceNodeData }) {
             event.stopPropagation();
             data.onOpenDetail(data.serviceId);
           }}
-          className="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-blue-100 bg-blue-50 px-2 text-[11px] font-black text-blue-600 transition hover:bg-blue-100"
+          className="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 text-[11px] font-black text-slate-700 transition hover:bg-slate-100"
         >
           <PanelRightOpen size={13} />
           상세보기
@@ -1305,7 +1408,7 @@ function ServiceNode({ data }: { data: ServiceNodeData }) {
             event.stopPropagation();
             data.onMoveToFocus(data.serviceId);
           }}
-          className="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-black text-slate-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600"
+          className="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-black text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
         >
           <ChevronRight size={13} />
           이동
@@ -1335,10 +1438,10 @@ function StatusPill({
 }) {
   const className =
     statusCode === "NORMAL"
-      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+      ? "border-slate-200 bg-slate-50 text-slate-700"
       : statusCode === "INCIDENT" || statusCode === "INACTIVE"
-        ? "border-red-200 bg-red-50 text-red-700"
-        : "border-amber-200 bg-amber-50 text-amber-700";
+        ? "border-[#ffd1d6] bg-[#fff5f6] text-[#f04452]"
+        : "border-slate-200 bg-slate-50 text-slate-600";
 
   return (
     <span

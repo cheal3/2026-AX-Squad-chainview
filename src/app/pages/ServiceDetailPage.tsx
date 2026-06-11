@@ -87,7 +87,7 @@ export function ServiceDetailPage() {
           </div>
           <Link
             to="/service-catalog/relations"
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-black text-white shadow-sm transition hover:bg-blue-700"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#3182f6] px-4 text-sm font-black text-white shadow-sm transition hover:bg-[#1b64da]"
           >
             <GitBranch size={16} />
             관계도 보기
@@ -195,10 +195,10 @@ export function ServiceDetailPage() {
                 <Link
                   key={incident.incidentId}
                   to={`/incidents/${incident.incidentId}`}
-                  className="rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm font-bold text-red-700 transition hover:bg-red-100"
+                  className="rounded-lg border border-[#ffe5e8] bg-[#fff5f6] px-3 py-2 text-sm font-bold text-[#f04452] transition hover:bg-[#ffe5e8]"
                 >
                   {incident.title}
-                  <div className="mt-1 text-xs font-black text-red-500">
+                  <div className="mt-1 text-xs font-black text-[#ff4d5a]">
                     {incident.startedAt} ·{" "}
                     {codeLabels.incidentStatus[incident.incidentStatusCode]}
                   </div>
@@ -247,7 +247,7 @@ function DetailPanel({
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="mb-4 flex items-center gap-2">
-        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#f2f7ff] text-[#1f6feb]">
           {icon}
         </span>
         <h2 className="text-base font-black text-slate-950">{title}</h2>
@@ -329,10 +329,10 @@ function RelationList({
 function StatusBadge({ status }: { status: ServiceStatusCode }) {
   const className =
     status === "NORMAL"
-      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+      ? "border-[#a7efd8] bg-[#ecfff8] text-[#00a77d]"
       : status === "INCIDENT" || status === "INACTIVE"
-        ? "border-red-200 bg-red-50 text-red-700"
-        : "border-amber-200 bg-amber-50 text-amber-700";
+        ? "border-[#ffd1d6] bg-[#fff5f6] text-[#f04452]"
+        : "border-[#ffd978] bg-[#fff8df] text-[#e67700]";
 
   return (
     <span

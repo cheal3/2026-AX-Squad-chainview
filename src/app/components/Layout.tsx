@@ -48,6 +48,12 @@ export function Layout() {
           icon: LayoutDashboard,
           badge: incidentCount,
         },
+        {
+          path: "/incident-demo-dashboard",
+          label: "장애 시연 대시보드",
+          icon: AlertTriangle,
+          badge: incidentCount,
+        },
         { path: "/incidents", label: "인시던트 관리", icon: AlertTriangle },
       ],
     },
@@ -83,7 +89,7 @@ export function Layout() {
   ];
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#f6f7fb] text-slate-900">
+    <div className="flex h-screen overflow-hidden bg-[#f8fafc] text-slate-900">
       <aside
         className={`relative flex shrink-0 flex-col border-r border-slate-200 bg-white transition-[width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
           sidebarCollapsed ? "w-[82px]" : "w-[252px]"
@@ -95,7 +101,7 @@ export function Layout() {
           }`}
         >
           <div
-            className={`flex shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-900 font-black text-white transition-all duration-300 ${
+            className={`flex shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#3182f6] font-black text-white transition-all duration-300 ${
               sidebarCollapsed
                 ? "h-0 w-0 scale-75 opacity-0"
                 : "h-10 w-10 scale-100 text-sm opacity-100"
@@ -168,7 +174,7 @@ export function Layout() {
                           : "gap-2 px-3"
                       } ${
                         active
-                          ? "bg-indigo-50 text-indigo-700"
+                          ? "bg-[#f2f7ff] text-[#1f6feb] ring-1 ring-[#c7dbff]"
                           : "text-slate-700 hover:bg-slate-50 hover:text-slate-950"
                       }`}
                     >
@@ -184,7 +190,7 @@ export function Layout() {
                       </span>
                       {item.badge ? (
                         <span
-                          className={`flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-xs font-black text-white transition-all duration-300 ${
+                          className={`flex h-5 min-w-5 items-center justify-center rounded-full bg-[#ff4d5a] px-1 text-xs font-black text-white transition-all duration-300 ${
                             sidebarCollapsed
                               ? "absolute right-1 top-1 scale-90"
                               : "relative scale-100"

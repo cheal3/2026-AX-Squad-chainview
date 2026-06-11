@@ -1,23 +1,16 @@
+import type { ComponentType } from "react";
 import { createBrowserRouter, Navigate } from "react-router";
 import { Layout } from "./components/Layout";
-import { Dashboard } from "./pages/Dashboard";
-import { IncidentImpact, IncidentListPage } from "./pages/IncidentImpact";
-import { IncidentStatusDashboard } from "./pages/IncidentStatusDashboard";
-import {
-  CommonCodesPage,
-  DeploymentsPage,
-  GroupsPage,
-  ServiceCategoryPage,
-  ServiceOwnersPage,
-  ServiceRelationsAdminPage,
-  TechStackPage,
-  UsersPage,
-} from "./pages/MonitorAdminPages";
-import { ServerPortal } from "./pages/ServerPortal";
-import { ServerWorldMap } from "./pages/ServerWorldMap";
-import { ServiceDetailPage } from "./pages/ServiceDetailPage";
-import { ServicePortal } from "./pages/ServicePortal";
-import { ServiceRelationFlow } from "./pages/ServiceRelationFlow";
+
+function lazyPage<TModule extends Record<string, ComponentType>>(
+  importer: () => Promise<TModule>,
+  exportName: keyof TModule
+) {
+  return async () => {
+    const module = await importer();
+    return { Component: module[exportName] };
+  };
+}
 
 export const router = createBrowserRouter(
   [
@@ -26,8 +19,24 @@ export const router = createBrowserRouter(
       Component: Layout,
       children: [
         { index: true, element: <Navigate to="/dashboard" replace /> },
-        { path: "dashboard", Component: Dashboard },
-        { path: "service-catalog/relations", Component: ServiceRelationFlow },
+        {
+          path: "dashboard",
+          lazy: lazyPage(() => import("./pages/Dashboard"), "Dashboard"),
+        },
+        {
+          path: "incident-demo-dashboard",
+          lazy: lazyPage(
+            () => import("./pages/IncidentDemoDashboard"),
+            "IncidentDemoDashboard"
+          ),
+        },
+        {
+          path: "service-catalog/relations",
+          lazy: lazyPage(
+            () => import("./pages/ServiceRelationFlow"),
+            "ServiceRelationFlow"
+          ),
+        },
         {
           path: "relations",
           element: <Navigate to="/service-catalog/relations" replace />,
@@ -36,21 +45,84 @@ export const router = createBrowserRouter(
           path: "relation-graph",
           element: <Navigate to="/service-catalog/relations" replace />,
         },
-        { path: "incidents", Component: IncidentListPage },
-        { path: "incidents/:incidentId", Component: IncidentImpact },
-        { path: "incident-status", Component: IncidentStatusDashboard },
-        { path: "world-map", Component: ServerWorldMap },
-        { path: "servers", Component: ServerPortal },
-        { path: "services", Component: ServicePortal },
-        { path: "services/:serviceId", Component: ServiceDetailPage },
-        { path: "service-relations", Component: ServiceRelationsAdminPage },
-        { path: "service-categories", Component: ServiceCategoryPage },
-        { path: "tech-stacks", Component: TechStackPage },
-        { path: "deployments", Component: DeploymentsPage },
-        { path: "users", Component: UsersPage },
-        { path: "groups", Component: GroupsPage },
-        { path: "service-owners", Component: ServiceOwnersPage },
-        { path: "common-codes", Component: CommonCodesPage },
+        {
+          path: "incidents",
+          lazy: lazyPage(() => import("./pages/IncidentImpact"), "IncidentListPage"),
+        },
+        {
+          path: "incidents/:incidentId",
+          lazy: lazyPage(() => import("./pages/IncidentImpact"), "IncidentImpact"),
+        },
+        {
+          path: "incident-status",
+          lazy: lazyPage(
+            () => import("./pages/IncidentStatusDashboard"),
+            "IncidentStatusDashboard"
+          ),
+        },
+        {
+          path: "world-map",
+          lazy: lazyPage(() => import("./pages/ServerWorldMap"), "ServerWorldMap"),
+        },
+        {
+          path: "servers",
+          lazy: lazyPage(() => import("./pages/ServerPortal"), "ServerPortal"),
+        },
+        {
+          path: "services",
+          lazy: lazyPage(() => import("./pages/ServicePortal"), "ServicePortal"),
+        },
+        {
+          path: "services/:serviceId",
+          lazy: lazyPage(
+            () => import("./pages/ServiceDetailPage"),
+            "ServiceDetailPage"
+          ),
+        },
+        {
+          path: "service-relations",
+          lazy: lazyPage(
+            () => import("./pages/MonitorAdminPages"),
+            "ServiceRelationsAdminPage"
+          ),
+        },
+        {
+          path: "service-categories",
+          lazy: lazyPage(
+            () => import("./pages/MonitorAdminPages"),
+            "ServiceCategoryPage"
+          ),
+        },
+        {
+          path: "tech-stacks",
+          lazy: lazyPage(() => import("./pages/MonitorAdminPages"), "TechStackPage"),
+        },
+        {
+          path: "deployments",
+          lazy: lazyPage(() => import("./pages/MonitorAdminPages"), "DeploymentsPage"),
+        },
+        {
+          path: "users",
+          lazy: lazyPage(() => import("./pages/MonitorAdminPages"), "UsersPage"),
+        },
+        {
+          path: "groups",
+          lazy: lazyPage(() => import("./pages/MonitorAdminPages"), "GroupsPage"),
+        },
+        {
+          path: "service-owners",
+          lazy: lazyPage(
+            () => import("./pages/MonitorAdminPages"),
+            "ServiceOwnersPage"
+          ),
+        },
+        {
+          path: "common-codes",
+          lazy: lazyPage(
+            () => import("./pages/MonitorAdminPages"),
+            "CommonCodesPage"
+          ),
+        },
         { path: "portal", element: <Navigate to="/dashboard" replace /> },
         {
           path: "portal/dependencies",

@@ -236,7 +236,7 @@ export function IncidentImpact() {
         title="인시던트 상세"
         actions={
           <div className="flex items-center gap-2">
-            <div className="inline-flex h-10 items-center gap-2 rounded-lg border border-red-100 bg-red-50 px-4 text-sm font-black text-red-700 shadow-sm">
+            <div className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#ffe5e8] bg-[#fff5f6] px-4 text-sm font-black text-[#f04452] shadow-sm">
               <Clock size={16} />
               경과 {elapsed}
             </div>
@@ -254,7 +254,7 @@ export function IncidentImpact() {
               onClick={() => setActiveTab(tab)}
               className={`h-11 rounded-lg text-sm font-black transition ${
                 activeTab === tab
-                  ? "bg-red-50 text-red-700 shadow-sm"
+                  ? "bg-[#fff5f6] text-[#f04452] shadow-sm"
                   : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
               }`}
             >
@@ -333,7 +333,7 @@ function ProgressIncidentCard({
   targetService?: ServiceRecord;
 }) {
   return (
-    <section className="rounded-xl border border-red-200 bg-white p-5 shadow-sm ring-1 ring-red-50">
+    <section className="rounded-xl border border-[#ffd1d6] bg-white p-5 shadow-sm ring-1 ring-[#fff5f6]">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -350,15 +350,15 @@ function ProgressIncidentCard({
             {incident.description}
           </p>
         </div>
-        <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-700 lg:min-w-[260px]">
+        <div className="rounded-xl border border-[#ffe5e8] bg-[#fff5f6] px-4 py-3 text-sm font-bold text-[#f04452] lg:min-w-[260px]">
           <div className="flex items-center gap-2 text-base font-black">
             <Clock size={18} />
             경과 {elapsed}
           </div>
-          <div className="mt-2 text-red-600">
+          <div className="mt-2 text-[#f04452]">
             대상: {targetService?.serviceName ?? "-"}
           </div>
-          <div className="mt-1 text-red-600">
+          <div className="mt-1 text-[#f04452]">
             유형: {codeLabels.incidentType[incident.incidentTypeCode]}
           </div>
         </div>
@@ -399,15 +399,15 @@ function ImpactScopeSection({
       </div>
 
       <div className="mt-5 grid grid-cols-1 gap-4 xl:grid-cols-[280px_1fr]">
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4">
-          <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-red-500 text-white">
+        <div className="rounded-xl border border-[#ffd1d6] bg-[#fff5f6] p-4">
+          <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-[#ff4d5a] text-white">
             <ShieldAlert size={21} />
           </div>
-          <div className="text-xs font-black text-red-500">장애 중심</div>
+          <div className="text-xs font-black text-[#ff4d5a]">장애 중심</div>
           <div className="mt-1 text-lg font-black text-slate-950">
             {targetService?.serviceName ?? "-"}
           </div>
-          <p className="mt-2 text-sm font-semibold text-red-700">
+          <p className="mt-2 text-sm font-semibold text-[#f04452]">
             {targetService?.description || "등록된 서비스 설명이 없습니다."}
           </p>
         </div>
@@ -458,8 +458,8 @@ function ImpactServiceCard({
         <span
           className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-black ${
             impact.directYn === "Y"
-              ? "border-red-200 bg-red-50 text-red-700"
-              : "border-blue-200 bg-blue-50 text-blue-700"
+              ? "border-[#ffd1d6] bg-[#fff5f6] text-[#f04452]"
+              : "border-[#c7dbff] bg-[#f2f7ff] text-[#1f6feb]"
           }`}
         >
           {impact.directYn === "Y" ? "직접 영향" : "간접 영향"}
@@ -477,7 +477,7 @@ function ImpactServiceCard({
               key={item}
               className="flex items-start gap-2 text-sm font-bold text-slate-700"
             >
-              <ArrowRight size={14} className="mt-0.5 shrink-0 text-red-400" />
+              <ArrowRight size={14} className="mt-0.5 shrink-0 text-[#d46b73]" />
               <span>{item}</span>
             </div>
           ))}
@@ -555,7 +555,7 @@ function IncidentHistorySection({ rows }: { rows: IncidentHistoryRow[] }) {
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="mb-4 flex items-center gap-2">
-        <Bell size={18} className="text-amber-500" />
+        <Bell size={18} className="text-[#f08c00]" />
         <h3 className="text-lg font-black text-slate-950">인시던트이력</h3>
       </div>
       <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
@@ -588,11 +588,11 @@ function IncidentMetric({
 }) {
   const toneClassName =
     tone === "red"
-      ? "bg-red-50 text-red-600 border-red-100"
+      ? "bg-[#fff5f6] text-[#f04452] border-[#ffe5e8]"
       : tone === "blue"
-        ? "bg-blue-50 text-blue-600 border-blue-100"
+        ? "bg-[#f2f7ff] text-[#1f6feb] border-[#d9e8ff]"
         : tone === "amber"
-          ? "bg-amber-50 text-amber-600 border-amber-100"
+          ? "bg-[#fff8df] text-[#f08c00] border-[#ffe6a3]"
           : "bg-slate-50 text-slate-600 border-slate-100";
 
   return (
@@ -638,12 +638,12 @@ function InfoTile({ label, value }: { label: string; value: string }) {
 function SeverityBadge({ severity }: { severity: SeverityCode }) {
   const className =
     severity === "CRITICAL"
-      ? "border-red-200 bg-red-50 text-red-700"
+      ? "border-[#ffd1d6] bg-[#fff5f6] text-[#f04452]"
       : severity === "MAJOR"
-        ? "border-orange-200 bg-orange-50 text-orange-700"
-        : severity === "MINOR"
-          ? "border-amber-200 bg-amber-50 text-amber-700"
-          : "border-blue-200 bg-blue-50 text-blue-700";
+        ? "border-[#ffd7a3] bg-[#fff3e0] text-[#ff8a00]"
+      : severity === "MINOR"
+        ? "border-[#ffd978] bg-[#fff8df] text-[#e67700]"
+        : "border-[#f7c8d6] bg-[#fff0f5] text-[#e84870]";
 
   return (
     <span
@@ -657,10 +657,10 @@ function SeverityBadge({ severity }: { severity: SeverityCode }) {
 function IncidentStatusBadge({ status }: { status: IncidentStatusCode }) {
   const className =
     status === "OPEN"
-      ? "border-red-200 bg-red-50 text-red-700"
+      ? "border-[#ffd1d6] bg-[#fff5f6] text-[#f04452]"
       : status === "MONITORING"
-        ? "border-blue-200 bg-blue-50 text-blue-700"
-        : "border-emerald-200 bg-emerald-50 text-emerald-700";
+        ? "border-[#c7dbff] bg-[#f2f7ff] text-[#1f6feb]"
+        : "border-[#a7efd8] bg-[#ecfff8] text-[#00a77d]";
 
   return (
     <span
@@ -688,13 +688,13 @@ function TimelineRow({
 }) {
   const dotClassName =
     color === "red"
-      ? "bg-red-500"
+      ? "bg-[#ff4d5a]"
       : color === "blue"
-        ? "bg-blue-500"
+        ? "bg-[#3182f6]"
         : color === "amber"
-          ? "bg-amber-500"
+          ? "bg-[#f59f00]"
           : color === "emerald"
-            ? "bg-emerald-500"
+            ? "bg-[#00b386]"
             : "bg-slate-300";
 
   return (

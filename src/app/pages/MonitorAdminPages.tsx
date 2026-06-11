@@ -93,13 +93,13 @@ function AdminShell({
 function SummaryCard({ item }: { item: SummaryItem }) {
   const toneClassName =
     item.tone === "red"
-      ? "text-red-600 bg-red-50 border-red-100"
+      ? "text-[#f04452] bg-[#fff5f6] border-[#ffe5e8]"
       : item.tone === "amber"
-        ? "text-amber-600 bg-amber-50 border-amber-100"
+        ? "text-[#f08c00] bg-[#fff8df] border-[#ffe6a3]"
         : item.tone === "emerald"
-          ? "text-emerald-600 bg-emerald-50 border-emerald-100"
+          ? "text-[#20c997] bg-[#ecfff8] border-[#c9f7e6]"
           : item.tone === "indigo"
-            ? "text-indigo-600 bg-indigo-50 border-indigo-100"
+            ? "text-[#1f6feb] bg-[#f2f7ff] border-[#d9e8ff]"
             : "text-slate-600 bg-slate-50 border-slate-100";
 
   return (
@@ -145,7 +145,7 @@ function DataPanel<T>({
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder={placeholder}
-            className="h-10 w-full rounded-lg border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-indigo-300 focus:bg-white focus:ring-4 focus:ring-indigo-50"
+            className="h-10 w-full rounded-lg border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-[#86b7ff] focus:bg-white focus:ring-4 focus:ring-[#edf5ff]"
           />
         </label>
         <button
@@ -223,13 +223,13 @@ function Badge({
 }) {
   const className =
     tone === "red"
-      ? "border-red-200 bg-red-50 text-red-700"
+      ? "border-[#ffd1d6] bg-[#fff5f6] text-[#f04452]"
       : tone === "amber"
-        ? "border-amber-200 bg-amber-50 text-amber-700"
+        ? "border-[#ffd978] bg-[#fff8df] text-[#e67700]"
         : tone === "emerald"
-          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+          ? "border-[#a7efd8] bg-[#ecfff8] text-[#00a77d]"
           : tone === "indigo"
-            ? "border-indigo-200 bg-indigo-50 text-indigo-700"
+            ? "border-[#c7dbff] bg-[#f2f7ff] text-[#1f6feb]"
             : "border-slate-200 bg-slate-50 text-slate-600";
 
   return (
@@ -601,30 +601,30 @@ function getCategoryDepthVisual(level: number) {
   if (level === 0) {
     return {
       Icon: Layers3,
-      className: "bg-slate-900 text-white ring-slate-200",
+      className: "bg-[#3182f6] text-white ring-[#d9e8ff]",
     };
   }
   if (level === 1) {
     return {
       Icon: FolderTree,
-      className: "bg-indigo-50 text-indigo-600 ring-indigo-100",
+      className: "bg-[#f2f7ff] text-[#1f6feb] ring-[#d9e8ff]",
     };
   }
   if (level === 2) {
     return {
       Icon: Folder,
-      className: "bg-cyan-50 text-cyan-600 ring-cyan-100",
+      className: "bg-[#effbff] text-[#168aa0] ring-[#d7f4fb]",
     };
   }
   if (level === 3) {
     return {
       Icon: Tags,
-      className: "bg-amber-50 text-amber-600 ring-amber-100",
+      className: "bg-[#fff3e0] text-[#ff8a00] ring-[#ffd7a3]",
     };
   }
   return {
     Icon: Tag,
-    className: "bg-emerald-50 text-emerald-600 ring-emerald-100",
+    className: "bg-[#f8eaff] text-[#b517d4] ring-[#edc8ff]",
   };
 }
 
@@ -872,7 +872,7 @@ export function ServiceCategoryPage() {
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="분류명, 경로 검색..."
-              className="h-10 w-full rounded-lg border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-indigo-300 focus:bg-white focus:ring-4 focus:ring-indigo-50"
+              className="h-10 w-full rounded-lg border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-[#86b7ff] focus:bg-white focus:ring-4 focus:ring-[#edf5ff]"
             />
           </label>
           <button
@@ -1087,7 +1087,7 @@ function CategoryTreeItem({
                 }
               }}
               autoFocus
-              className="h-9 min-w-0 flex-1 rounded-lg border border-indigo-200 bg-white px-3 text-sm font-black text-slate-900 outline-none ring-4 ring-indigo-50"
+              className="h-9 min-w-0 flex-1 rounded-lg border border-[#c7dbff] bg-white px-3 text-sm font-black text-slate-900 outline-none ring-4 ring-[#edf5ff]"
             />
           ) : (
             <div className="min-w-0">
@@ -1154,7 +1154,7 @@ function CategoryTreeItem({
       >
         <div className="chainview-category-children-inner">
           {adding ? (
-            <div className="border-t border-dashed border-indigo-100 bg-indigo-50/30 px-5 py-3">
+            <div className="border-t border-dashed border-[#d9e8ff] bg-[#f2f7ff]/30 px-5 py-3">
               <div
                 className="space-y-2"
                 style={{ paddingLeft: (node.level + 1) * 28 + 34 }}
@@ -1171,7 +1171,7 @@ function CategoryTreeItem({
                         onChangeCandidateSearch(event.target.value)
                       }
                       placeholder="등록 서비스 분류에서 불러오기..."
-                      className="h-9 w-full rounded-lg border border-indigo-100 bg-white pl-9 pr-3 text-xs font-bold text-slate-700 outline-none transition focus:border-indigo-300 focus:ring-4 focus:ring-indigo-50"
+                      className="h-9 w-full rounded-lg border border-[#d9e8ff] bg-white pl-9 pr-3 text-xs font-bold text-slate-700 outline-none transition focus:border-[#86b7ff] focus:ring-4 focus:ring-[#edf5ff]"
                     />
                   </div>
                   <button
@@ -1194,7 +1194,7 @@ function CategoryTreeItem({
                         className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black transition ${
                           candidate.existing
                             ? "cursor-not-allowed border-slate-200 bg-white text-slate-300"
-                            : "border-indigo-200 bg-white text-indigo-700 hover:border-indigo-300 hover:bg-indigo-50"
+                            : "border-[#c7dbff] bg-white text-[#1f6feb] hover:border-[#a9c8ff] hover:bg-[#f2f7ff]"
                         }`}
                       >
                         <span>{candidate.name}</span>

@@ -217,7 +217,7 @@ export function ServicePortal() {
         actions={
           <button
             onClick={() => setShowCreate(true)}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-black text-white shadow-sm transition hover:bg-indigo-700"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#3182f6] px-4 text-sm font-black text-white shadow-sm transition hover:bg-[#1b64da]"
           >
             <Plus size={16} />
             서비스 등록
@@ -236,7 +236,7 @@ export function ServicePortal() {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="서비스명, 코드, 분류, 서버 검색"
-              className="h-10 w-full rounded-lg border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-indigo-300 focus:bg-white focus:ring-4 focus:ring-indigo-50"
+              className="h-10 w-full rounded-lg border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-[#86b7ff] focus:bg-white focus:ring-4 focus:ring-[#edf5ff]"
             />
           </label>
           <SelectBox
@@ -627,7 +627,7 @@ function ServiceForm({
           저장하면서 현재 서비스 기준 관계도 함께 등록
         </label>
         {useRelation && (
-          <div className="space-y-4 rounded-lg border border-blue-100 bg-blue-50/40 p-4">
+          <div className="space-y-4 rounded-lg border border-[#d9e8ff] bg-[#f2f7ff]/40 p-4">
             <Select
               label="관계 방향"
               value={relationDirection}
@@ -760,7 +760,7 @@ function ServiceDetail({
           <div className="flex flex-wrap gap-2">
             <Link
               to="/service-catalog/relations"
-              className="rounded-lg border border-blue-200 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50"
+              className="rounded-lg border border-[#c7dbff] px-3 py-2 text-sm font-medium text-[#1f6feb] hover:bg-[#f2f7ff]"
             >
               관계도 보기
             </Link>
@@ -884,7 +884,7 @@ function ServiceDetail({
       <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="rounded-lg border border-gray-200 p-4">
           <h5 className="mb-3 font-semibold text-gray-900">장애 이력</h5>
-          <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-800">
+          <div className="rounded-lg bg-[#fff5f6] px-4 py-3 text-sm text-[#e43f4b]">
             최근 장애 이력은 AI 영향 분석 결과와 함께 표시될 예정입니다.
           </div>
         </div>

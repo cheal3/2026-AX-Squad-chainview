@@ -149,7 +149,7 @@ export function IncidentStatusDashboard() {
         icon={<Siren size={22} />}
         title="장애 현황 대시보드"
         actions={
-          <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-2 text-sm font-black text-red-700">
+          <div className="rounded-lg border border-[#ffe5e8] bg-[#fff5f6] px-4 py-2 text-sm font-black text-[#f04452]">
             최근 1시간 +{growth}개 서비스 영향
           </div>
         }
@@ -173,7 +173,7 @@ export function IncidentStatusDashboard() {
                   onClick={() => setTimeStep(step)}
                   className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
                     timeStep === step
-                      ? "bg-white text-blue-600 shadow-sm"
+                      ? "bg-white text-[#1f6feb] shadow-sm"
                       : "text-slate-500 hover:text-slate-900"
                   }`}
                 >
@@ -252,7 +252,7 @@ export function IncidentStatusDashboard() {
                   onChange={(event) =>
                     setSelectedImpactServiceId(Number(event.target.value))
                   }
-                  className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-[#86b7ff] focus:ring-2 focus:ring-[#edf5ff]"
                 >
                   {incidentImpactSummaries.map(({ service, analysis }) => (
                     <option key={service.serviceId} value={service.serviceId}>
@@ -274,7 +274,7 @@ export function IncidentStatusDashboard() {
                   <div className="text-[11px] font-medium text-slate-500">
                     장애
                   </div>
-                  <div className="mt-0.5 text-sm font-bold text-red-600">
+                  <div className="mt-0.5 text-sm font-bold text-[#f04452]">
                     {downCount}
                   </div>
                 </div>
@@ -282,7 +282,7 @@ export function IncidentStatusDashboard() {
                   <div className="text-[11px] font-medium text-slate-500">
                     저하
                   </div>
-                  <div className="mt-0.5 text-sm font-bold text-amber-600">
+                  <div className="mt-0.5 text-sm font-bold text-[#f08c00]">
                     {degradedCount}
                   </div>
                 </div>
@@ -310,7 +310,7 @@ export function IncidentStatusDashboard() {
               <div
                 key={service.serviceId}
                 className={`grid w-full grid-cols-1 gap-3 px-6 py-4 text-left md:grid-cols-[minmax(260px,1fr)_140px_120px_120px] ${
-                  selected ? "bg-blue-50/70" : ""
+                  selected ? "bg-[#f2f7ff]/70" : ""
                 }`}
               >
                 <div>
@@ -898,8 +898,8 @@ function StatusBadge({
     <span
       className={`inline-flex w-fit rounded-md border px-3 py-1 text-xs font-semibold ${
         critical
-          ? "border-red-200 bg-red-50 text-red-700"
-          : "border-amber-200 bg-amber-50 text-amber-700"
+          ? "border-[#ffd1d6] bg-[#fff5f6] text-[#f04452]"
+          : "border-[#ffd978] bg-[#fff8df] text-[#e67700]"
       }`}
     >
       {status}

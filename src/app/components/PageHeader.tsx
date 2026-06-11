@@ -14,7 +14,7 @@ export function PageHeader({
   return (
     <section className="flex flex-wrap items-start justify-between gap-4">
       <div className="flex min-w-0 items-center gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-[#1f6feb] shadow-sm ring-1 ring-slate-200">
           {icon}
         </div>
         <div className="min-w-0">

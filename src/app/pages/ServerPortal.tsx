@@ -72,7 +72,7 @@ export function ServerPortal() {
         actions={
           <button
             onClick={() => setShowCreate(true)}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-black text-white shadow-sm transition hover:bg-indigo-700"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#3182f6] px-4 text-sm font-black text-white shadow-sm transition hover:bg-[#1b64da]"
           >
             <Plus size={16} />
             서버 등록
@@ -91,7 +91,7 @@ export function ServerPortal() {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="서버명, 호스트명, IP 검색"
-              className="h-10 w-full rounded-lg border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-indigo-300 focus:bg-white focus:ring-4 focus:ring-indigo-50"
+              className="h-10 w-full rounded-lg border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-[#86b7ff] focus:bg-white focus:ring-4 focus:ring-[#edf5ff]"
             />
           </label>
           <SelectBox

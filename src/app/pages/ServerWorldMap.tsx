@@ -1908,7 +1908,7 @@ export function ServerWorldMap() {
               event.stopPropagation();
               setDetailPanelOpen(true);
             }}
-            className="absolute right-0 top-1/2 z-40 flex -translate-y-1/2 items-center gap-2 rounded-l-full border border-r-0 border-slate-200 bg-white px-3 py-3 text-sm font-black text-slate-700 shadow-lg hover:text-[#f60]"
+            className="absolute right-0 top-1/2 z-40 flex -translate-y-1/2 items-center gap-2 rounded-l-full border border-r-0 border-slate-200 bg-white px-3 py-3 text-sm font-black text-slate-700 shadow-lg hover:text-[#ff8a00]"
             title="서비스 상세 펼치기"
           >
             <ChevronLeft size={18} />
@@ -1930,7 +1930,7 @@ export function ServerWorldMap() {
           .chainview-selected-service-card {
             position: relative;
             overflow: hidden;
-            border-color: #f60 !important;
+            border-color: #ff8a00 !important;
             background: rgba(255, 247, 237, 0.94);
             box-shadow: 0 0 0 3px rgba(255, 102, 0, 0.12);
           }
@@ -1957,7 +1957,7 @@ export function ServerWorldMap() {
           }
 
           .chainview-impact-root-service-card {
-            border-color: #f60 !important;
+            border-color: #ff8a00 !important;
             box-shadow:
               0 0 0 3px rgba(255, 102, 0, 0.18),
               0 10px 24px rgba(255, 102, 0, 0.12);
@@ -2201,12 +2201,12 @@ function StatusPill({
   onClick?: () => void;
 }) {
   const iconClass = danger
-    ? "bg-red-100 text-red-500"
+    ? "bg-[#ffe5e8] text-[#ff4d5a]"
     : tone === "favorite"
       ? "bg-yellow-100 text-yellow-500"
       : tone === "impact"
         ? "bg-fuchsia-100 text-fuchsia-500"
-      : "bg-cyan-100 text-cyan-500";
+      : "bg-[#d7f4fb] text-[#1fa7bd]";
   const content = (
     <>
       <div
@@ -2237,7 +2237,7 @@ function StatusPill({
         onClick={onClick}
         className={`group flex shrink-0 transform-gpu items-center gap-2 rounded-full border bg-white px-3 py-1.5 text-slate-900 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:scale-[1.02] hover:shadow-md active:translate-y-0 active:scale-[0.99] ${
           active
-            ? "border-[#f60] shadow-md"
+            ? "border-[#ff8a00] shadow-md"
             : "border-slate-200 hover:border-slate-200"
         }`}
       >
@@ -2830,7 +2830,7 @@ function MapNavigationPanel({
       className={`absolute left-4 top-4 z-30 flex origin-top-left transform-gpu flex-col overflow-hidden border border-slate-200 bg-white/95 text-slate-900 transition-[width,max-height,box-shadow,border-radius,transform] ease-out ${
         panelTall
           ? "rounded-2xl shadow-sm"
-          : "rounded-[22px] shadow-sm hover:-translate-y-0.5 hover:border-[#f60] hover:shadow-md"
+          : "rounded-[22px] shadow-sm hover:-translate-y-0.5 hover:border-[#ff8a00] hover:shadow-md"
       } ${open ? "" : "cursor-pointer"}`}
       style={{
         width: panelWide ? 300 : NAVIGATION_COLLAPSED_WIDTH,
@@ -2846,7 +2846,7 @@ function MapNavigationPanel({
           panelTall ? "opacity-0" : "opacity-100"
         }`}
       >
-        <MapPin size={18} className="shrink-0 text-[#f60]" />
+        <MapPin size={18} className="shrink-0 text-[#ff8a00]" />
         <span>네비게이션</span>
       </div>
       <div
@@ -2857,7 +2857,7 @@ function MapNavigationPanel({
       <div className="border-b border-slate-200 p-4">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <div className="text-xs font-bold text-[#f60]">네비게이션</div>
+            <div className="text-xs font-bold text-[#ff8a00]">네비게이션</div>
             <div className="mt-1 text-lg font-black">
               {currentCount} / {totalCount}
             </div>
@@ -2874,7 +2874,7 @@ function MapNavigationPanel({
             )}
             <button
               onClick={() => onOpenChange(false)}
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-50 text-[#f60] hover:bg-orange-100"
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-[#fff3e0] text-[#ff8a00] hover:bg-[#ffe2bf]"
               title="네비게이션 접기"
             >
               <ChevronLeft size={19} />
@@ -2886,7 +2886,7 @@ function MapNavigationPanel({
           <div className="mt-4 flex min-w-0 flex-nowrap items-center gap-1 overflow-hidden text-xs font-black">
           <button
             onClick={onOverviewSelect}
-            className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-slate-600 hover:bg-orange-50 hover:text-[#f60]"
+            className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-slate-600 hover:bg-[#fff3e0] hover:text-[#ff8a00]"
           >
             전체
           </button>
@@ -2895,7 +2895,7 @@ function MapNavigationPanel({
               <ChevronRight size={14} className="shrink-0 text-slate-300" />
               <button
                 onClick={() => onRegionSelect(activeRegion)}
-                className="max-w-[96px] shrink-0 truncate rounded-full bg-orange-50 px-2.5 py-1 text-[#f60] hover:bg-orange-100"
+                className="max-w-[96px] shrink-0 truncate rounded-full bg-[#fff3e0] px-2.5 py-1 text-[#ff8a00] hover:bg-[#ffe2bf]"
               >
                 {activeRegion.name}
               </button>
@@ -2906,7 +2906,7 @@ function MapNavigationPanel({
               <ChevronRight size={14} className="shrink-0 text-slate-300" />
               <button
                 onClick={() => onServerSelect(focusedServer)}
-                className="min-w-0 flex-1 truncate rounded-full bg-slate-900 px-2.5 py-1 text-white"
+                className="min-w-0 flex-1 truncate rounded-full bg-[#3182f6] px-2.5 py-1 text-white"
               >
                 {focusedServer.serverName}
               </button>
@@ -2915,7 +2915,7 @@ function MapNavigationPanel({
           </div>
         )}
 
-        <label className="mt-4 flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 focus-within:border-[#f60] focus-within:bg-white">
+        <label className="mt-4 flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 focus-within:border-[#ff8a00] focus-within:bg-white">
           <Search size={17} className="shrink-0 text-slate-400" />
           <input
             value={searchValue}
@@ -2983,7 +2983,7 @@ function MapNavigationPanel({
               onClick={() => onRegionSelect(region)}
               className="mb-1 flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-3 text-left hover:border-slate-200 hover:bg-slate-50"
             >
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-orange-50 text-[#f60]">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#fff3e0] text-[#ff8a00]">
                 <MapPin size={17} />
               </span>
               <span className="min-w-0 flex-1">
@@ -3168,13 +3168,13 @@ function NavigationImpactServiceRow({
       onClick={onSelect}
       className={`mb-1 flex w-full items-start gap-3 rounded-xl border border-transparent px-3 py-2.5 text-left ${
         outgoing
-          ? "hover:border-red-100 hover:bg-red-50"
-          : "hover:border-cyan-100 hover:bg-cyan-50"
+          ? "hover:border-[#ffe5e8] hover:bg-[#fff5f6]"
+          : "hover:border-[#d7f4fb] hover:bg-[#effbff]"
       }`}
     >
       <span
         className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-          outgoing ? "bg-red-100 text-red-500" : "bg-cyan-100 text-cyan-500"
+          outgoing ? "bg-[#ffe5e8] text-[#ff4d5a]" : "bg-[#d7f4fb] text-[#1fa7bd]"
         }`}
       >
         <GitBranch size={15} />
@@ -3182,7 +3182,7 @@ function NavigationImpactServiceRow({
       <span className="min-w-0 flex-1">
         <span
           className={`block text-[11px] font-black ${
-            outgoing ? "text-red-500" : "text-cyan-600"
+            outgoing ? "text-[#ff4d5a]" : "text-[#168aa0]"
           }`}
         >
           {outgoing ? "수신 서비스" : "송신 서비스"}
@@ -3211,9 +3211,9 @@ function NavigationIncidentServiceRow({
   return (
     <button
       onClick={onSelect}
-      className="mb-1 flex w-full items-start gap-3 rounded-xl border border-transparent px-3 py-2.5 text-left hover:border-red-100 hover:bg-red-50"
+      className="mb-1 flex w-full items-start gap-3 rounded-xl border border-transparent px-3 py-2.5 text-left hover:border-[#ffe5e8] hover:bg-[#fff5f6]"
     >
-      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-red-500 text-xs font-black text-white">
+      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#ff4d5a] text-xs font-black text-white">
         !
       </span>
       <span className="min-w-0 flex-1">
@@ -3241,9 +3241,9 @@ function NavigationNormalServiceRow({
   return (
     <button
       onClick={onSelect}
-      className="mb-1 flex w-full items-start gap-3 rounded-xl border border-transparent px-3 py-2.5 text-left hover:border-cyan-100 hover:bg-cyan-50"
+      className="mb-1 flex w-full items-start gap-3 rounded-xl border border-transparent px-3 py-2.5 text-left hover:border-[#d7f4fb] hover:bg-[#effbff]"
     >
-      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-cyan-100 text-cyan-500">
+      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#d7f4fb] text-[#1fa7bd]">
         <Sparkles size={15} fill="currentColor" />
       </span>
       <span className="min-w-0 flex-1">
@@ -3280,10 +3280,10 @@ function NavigationServerRow({
       <span
         className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
           hasIncident
-            ? "bg-red-500 text-white"
+            ? "bg-[#ff4d5a] text-white"
             : server.statusCode === "MAINTENANCE"
               ? "bg-yellow-400 text-slate-900"
-              : "bg-cyan-100 text-slate-800"
+              : "bg-[#d7f4fb] text-slate-800"
         }`}
       >
         {hasIncident ? "!" : <Server size={16} />}
@@ -3320,10 +3320,10 @@ function NavigationServiceRow({
       <span
         className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
           danger
-            ? "bg-red-500 text-white"
+            ? "bg-[#ff4d5a] text-white"
             : service.statusCode === "MAINTENANCE"
               ? "bg-yellow-400 text-slate-900"
-              : "bg-cyan-100 text-slate-800"
+              : "bg-[#d7f4fb] text-slate-800"
         }`}
       >
         {danger ? "!" : <AppWindow size={14} />}
@@ -3367,7 +3367,7 @@ function RegionArea({
       data-region-area
       data-region-name={region.name}
       className={`absolute cursor-pointer rounded-[28px] border-2 bg-white/42 ${
-        active ? "border-solid border-[#f60]" : "border-dashed border-slate-300"
+        active ? "border-solid border-[#ff8a00]" : "border-dashed border-slate-300"
       }`}
       style={{
         left: region.x - region.width / 2,
@@ -3398,7 +3398,7 @@ function RegionArea({
             서비스 {region.serviceCount}
           </span>
           {region.incidentCount > 0 && (
-            <span className="rounded-full border border-red-200 bg-red-50 px-3 py-1 text-red-600">
+            <span className="rounded-full border border-[#ffd1d6] bg-[#fff5f6] px-3 py-1 text-[#f04452]">
               장애 {region.incidentCount}
             </span>
           )}
@@ -3513,7 +3513,7 @@ function ServerMarker({
       <div
         className={`absolute inset-0 rounded-[24px] border bg-white/88 ${
           highlighted || routeRootOnServer
-            ? "border-[#f60] border-solid"
+            ? "border-[#ff8a00] border-solid"
             : "border-dashed border-slate-300"
         }`}
       />
@@ -3526,7 +3526,7 @@ function ServerMarker({
             event.stopPropagation();
             onCloseFocus();
           }}
-          className="absolute right-4 top-4 z-20 flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm hover:border-[#f60] hover:text-[#f60]"
+          className="absolute right-4 top-4 z-20 flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm hover:border-[#ff8a00] hover:text-[#ff8a00]"
           title="3뎁스 닫기"
         >
           <X size={17} />
@@ -3534,13 +3534,13 @@ function ServerMarker({
       )}
       <button
         className={`absolute left-1/2 top-3 flex -translate-x-1/2 flex-col items-center ${
-          highlighted ? "text-[#f60]" : "text-slate-800"
+          highlighted ? "text-[#ff8a00]" : "text-slate-800"
         }`}
         type="button"
       >
         <span
           className={`relative flex h-11 w-11 items-center justify-center rounded-full border-[4px] border-white shadow-md ${
-            highlighted ? "bg-[#f60] text-white" : "bg-sky-300 text-slate-900"
+            highlighted ? "bg-[#ff8a00] text-white" : "bg-sky-300 text-slate-900"
           }`}
         >
           <Server size={20} />
@@ -3553,14 +3553,14 @@ function ServerMarker({
           {!serverHasIncident &&
             !serverHasMaintenance &&
             server.services.length > 0 && (
-            <span className="absolute -right-2 -top-2 flex h-6 min-w-6 items-center justify-center rounded-full border-2 border-white bg-slate-900 px-1 text-[10px] font-black text-white">
+            <span className="absolute -right-2 -top-2 flex h-6 min-w-6 items-center justify-center rounded-full border-2 border-white bg-[#3182f6] px-1 text-[10px] font-black text-white">
               {server.services.length}
             </span>
           )}
         </span>
         <span
           className={`mt-4 max-w-[190px] truncate rounded-full border bg-white px-3 py-1 text-xs font-black shadow-sm ${
-            highlighted ? "border-orange-200" : "border-slate-200"
+            highlighted ? "border-[#ffd7a3]" : "border-slate-200"
           }`}
         >
           {server.serverName}
@@ -3607,7 +3607,7 @@ function ServerMarker({
                   event.stopPropagation();
                   onServiceClick(service.serviceId);
                 }}
-                className={`flex min-h-[88px] min-w-0 items-start gap-3 rounded-[22px] border-2 border-dashed border-slate-300 bg-white/90 p-3 text-left text-xs font-bold text-slate-800 transition hover:border-[#f60] hover:bg-orange-50 ${
+                className={`flex min-h-[88px] min-w-0 items-start gap-3 rounded-[22px] border-2 border-dashed border-slate-300 bg-white/90 p-3 text-left text-xs font-bold text-slate-800 transition hover:border-[#ff8a00] hover:bg-[#fff3e0] ${
                   serviceSelected ? "chainview-selected-service-card" : ""
                 } ${
                   serviceRouteRoot ? "chainview-impact-root-service-card" : ""
@@ -3617,10 +3617,10 @@ function ServerMarker({
                 <span
                   className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
                     ["INCIDENT", "IMPACTED"].includes(service.statusCode)
-                      ? "bg-red-500 text-white"
+                      ? "bg-[#ff4d5a] text-white"
                       : service.statusCode === "MAINTENANCE"
                         ? "bg-yellow-400 text-slate-900"
-                        : "bg-cyan-400 text-slate-950"
+                        : "bg-[#4cc9e0] text-slate-950"
                   }`}
                 >
                   {["INCIDENT", "IMPACTED"].includes(service.statusCode) ? (
@@ -3656,7 +3656,7 @@ function ServerMarker({
 function MapExclamation() {
   return (
     <div className="absolute -right-3 -top-4">
-      <div className="relative flex h-9 w-9 items-center justify-center rounded-full border-[3px] border-white bg-red-500 text-xl font-black text-white shadow-lg">
+      <div className="relative flex h-9 w-9 items-center justify-center rounded-full border-[3px] border-white bg-[#ff4d5a] text-xl font-black text-white shadow-lg">
         !
       </div>
     </div>
@@ -3681,7 +3681,7 @@ function ServiceSidePanel({
     >
       <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-200 px-4 py-4">
         <div className="min-w-0">
-          <div className="text-xs font-semibold text-[#f60]">서비스 상세</div>
+          <div className="text-xs font-semibold text-[#ff8a00]">서비스 상세</div>
           <h3 className="mt-1 break-words text-xl font-black leading-tight">
             {service.serviceName}
           </h3>
@@ -3718,7 +3718,7 @@ function ServiceSidePanel({
         />
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
           <div className="mb-2 flex items-center gap-2 text-xs font-bold text-slate-700">
-            <ChevronsRight size={15} className="text-[#f60]" />
+            <ChevronsRight size={15} className="text-[#ff8a00]" />
             설명
           </div>
           <p className="text-xs leading-5 text-slate-600">
@@ -3736,16 +3736,16 @@ function PanelStatus({ service }: { service: ServiceRecord }) {
     <div
       className={`rounded-xl border p-3 ${
         danger
-          ? "border-red-200 bg-red-50"
+          ? "border-[#ffd1d6] bg-[#fff5f6]"
           : service.statusCode === "MAINTENANCE"
             ? "border-yellow-200 bg-yellow-50"
-            : "border-cyan-200 bg-cyan-50"
+            : "border-[#bddde1] bg-[#effbff]"
       }`}
     >
       <div className="flex items-center gap-3">
         <div
           className={`flex h-9 w-9 items-center justify-center rounded-full ${
-            danger ? "bg-red-500 text-white" : "bg-cyan-400 text-slate-950"
+            danger ? "bg-[#ff4d5a] text-white" : "bg-[#4cc9e0] text-slate-950"
           }`}
         >
           {danger ? <AlertTriangle size={18} /> : <CircleDot size={18} />}
