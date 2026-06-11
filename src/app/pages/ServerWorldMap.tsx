@@ -21,9 +21,17 @@ import {
   Sparkles,
   Star,
   X,
+  GitBranch,
+  type LucideIcon,
 } from "lucide-react";
 import { usePortalData } from "../PortalDataStore";
-import { codeLabels, type ServerRecord, type ServiceRecord } from "../mockData";
+import { PageHeader } from "../components/PageHeader";
+import {
+  codeLabels,
+  type ServerRecord,
+  type ServiceRecord,
+  type ServiceRelationRecord,
+} from "../mockData";
 
 type Region = {
   name: string;
@@ -62,6 +70,21 @@ type MapView = {
   };
 };
 
+type ImpactRouteLink = {
+  id: string;
+  direction: "incoming" | "outgoing";
+  sourceServer: PointServer;
+  targetServer: PointServer;
+  sourceService: ServiceRecord;
+  targetService: ServiceRecord;
+  depth: number;
+};
+
+type RoutePoint = {
+  x: number;
+  y: number;
+};
+
 type FavoriteItem =
   | {
       key: string;
@@ -88,8 +111,14 @@ type FavoriteItem =
       service: ServiceRecord;
     };
 
-type NavigationListMode = "default" | "favorites" | "incidents" | "normal";
+type NavigationListMode =
+  | "default"
+  | "favorites"
+  | "impact"
+  | "incidents"
+  | "normal";
 
+const IMPACT_ROUTE_MAX_DEPTH = 1;
 const MAP_WIDTH = 12000;
 const MAP_HEIGHT = 8000;
 const REGION_OFFSET_X = 3800;
@@ -105,6 +134,15 @@ const SERVICE_DRILL_GRACE_MS = 700;
 const WHEEL_BOUNDARY_THRESHOLD = 140;
 const WHEEL_SEQUENCE_TIMEOUT = 520;
 const WHEEL_ZOOM_SPEED = 0.001;
+const MAP_SAFE_GAP = 24;
+const NAVIGATION_PANEL_LEFT = 16;
+const NAVIGATION_PANEL_WIDTH = 300;
+const NAVIGATION_COLLAPSED_WIDTH = 138;
+const NAVIGATION_COLLAPSED_HEIGHT = 44;
+const NAVIGATION_WIDTH_ANIMATION_MS = 180;
+const NAVIGATION_HEIGHT_ANIMATION_MS = 300;
+const DETAIL_PANEL_MIN_WIDTH = 300;
+const DETAIL_PANEL_MAX_WIDTH = 340;
 const MAX_SERVICE_MARKERS = 16;
 const MAP_TRANSITION = "transform 620ms cubic-bezier(0.16, 1, 0.3, 1)";
 
@@ -180,13 +218,14 @@ const regions: Region[] = [
 }));
 
 export function ServerWorldMap() {
-  const { servers, services } = usePortalData();
+  const { servers, services, relations } = usePortalData();
   const [scale, setScale] = useState(INITIAL_SCALE);
   const [offset, setOffset] = useState({ ...INITIAL_OFFSET });
   const [dragging, setDragging] = useState(false);
   const [selectedServiceId, setSelectedServiceId] = useState<number | null>(
     null
   );
+  const [detailPanelOpen, setDetailPanelOpen] = useState(false);
   const [focusedRegionName, setFocusedRegionName] = useState<string | null>(
     null
   );
@@ -194,6 +233,9 @@ export function ServerWorldMap() {
   const [drillingServerId, setDrillingServerId] = useState<number | null>(null);
   const [finderOpen, setFinderOpen] = useState(true);
   const [favoriteKeys, setFavoriteKeys] = useState<string[]>([]);
+  const [impactRootServiceId, setImpactRootServiceId] = useState<number | null>(
+    null
+  );
   const [navigationListMode, setNavigationListMode] =
     useState<NavigationListMode>("default");
   const [serverSearch, setServerSearch] = useState("");
@@ -214,6 +256,13 @@ export function ServerWorldMap() {
   const regionFocusedAtRef = useRef(0);
   const wheelLockedUntilRef = useRef(0);
   const dragFrameRef = useRef<number | null>(null);
+  const viewStateFrameRef = useRef<number | null>(null);
+  const safeLayoutRef = useRef({
+    detailOpen: false,
+    finderOpen: true,
+    height: 720,
+    width: 1280,
+  });
   const dragMovedRef = useRef(false);
   const pendingFocusCloseRef = useRef(false);
   const pendingRegionNameRef = useRef<string | null>(null);
@@ -254,6 +303,9 @@ export function ServerWorldMap() {
       }
       if (dragFrameRef.current) {
         window.cancelAnimationFrame(dragFrameRef.current);
+      }
+      if (viewStateFrameRef.current) {
+        window.cancelAnimationFrame(viewStateFrameRef.current);
       }
     };
   }, []);
@@ -470,6 +522,128 @@ export function ServerWorldMap() {
       ),
     [services]
   );
+  const activeRelations = useMemo(
+    () =>
+      relations.filter(
+        (relation) =>
+          relation.relationStatusCode === "ACTIVE" &&
+          relation.sourceServiceId !== relation.targetServiceId
+      ),
+    [relations]
+  );
+  const activeRelationsByService = useMemo(
+    () => groupRelationsByService(activeRelations),
+    [activeRelations]
+  );
+  const impactCandidates = useMemo(
+    () =>
+      incidentServices
+        .map((service) => ({
+          service,
+          count: countConnectedServices(
+            service.serviceId,
+            activeRelationsByService,
+            IMPACT_ROUTE_MAX_DEPTH
+          ),
+        }))
+        .sort((first, second) => second.count - first.count)
+        .slice(0, 8),
+    [activeRelationsByService, incidentServices]
+  );
+  const impactRootService =
+    impactRootServiceId !== null
+      ? serviceById.get(impactRootServiceId)
+      : impactCandidates[0]?.service;
+  const impactRouteLinks = useMemo(
+    () =>
+      impactRootService
+        ? buildImpactRouteLinks({
+            maxDepth: IMPACT_ROUTE_MAX_DEPTH,
+            pointServerById,
+            relationsByService: activeRelationsByService,
+            rootServiceId: impactRootService.serviceId,
+            serviceById,
+          })
+        : [],
+    [activeRelationsByService, impactRootService, pointServerById, serviceById]
+  );
+  const activeRouteServerId = focusedServerId ?? drillingServerId;
+  const visibleImpactRouteLinks = useMemo(() => {
+    if (!activeRouteServerId) {
+      return impactRouteLinks;
+    }
+
+    const activeServer = pointServerById.get(activeRouteServerId);
+    if (!activeServer) {
+      return impactRouteLinks;
+    }
+
+    const activeServerServiceIds = new Set(
+      activeServer.services.map((service) => service.serviceId)
+    );
+
+    return impactRouteLinks.filter(
+      (link) =>
+        activeServerServiceIds.has(link.sourceService.serviceId) ||
+        activeServerServiceIds.has(link.targetService.serviceId)
+    );
+  }, [activeRouteServerId, impactRouteLinks, pointServerById]);
+  const impactRouteServiceIds = useMemo(() => {
+    const serviceIds = new Set<number>();
+
+    if (!activeRouteServerId && impactRootService) {
+      serviceIds.add(impactRootService.serviceId);
+    }
+
+    if (
+      activeRouteServerId &&
+      impactRootService?.serverId === activeRouteServerId
+    ) {
+      serviceIds.add(impactRootService.serviceId);
+    }
+
+    if (
+      activeRouteServerId &&
+      selectedService?.serverId === activeRouteServerId
+    ) {
+      serviceIds.add(selectedService.serviceId);
+    }
+
+    visibleImpactRouteLinks.forEach((link) => {
+      serviceIds.add(link.sourceService.serviceId);
+      serviceIds.add(link.targetService.serviceId);
+    });
+
+    return serviceIds;
+  }, [
+    activeRouteServerId,
+    impactRootService,
+    selectedService,
+    visibleImpactRouteLinks,
+  ]);
+  const impactRouteServerIds = useMemo(() => {
+    const serverIds = new Set<number>();
+
+    if (!activeRouteServerId && impactRootService) {
+      serverIds.add(impactRootService.serverId);
+    }
+
+    if (activeRouteServerId) {
+      serverIds.add(activeRouteServerId);
+    }
+
+    visibleImpactRouteLinks.forEach((link) => {
+      serverIds.add(link.sourceServer.serverId);
+      serverIds.add(link.targetServer.serverId);
+    });
+
+    return serverIds;
+  }, [activeRouteServerId, impactRootService, visibleImpactRouteLinks]);
+  const impactRouteAvailable = Boolean(impactRootService);
+  const impactRouteScopeEnabled =
+    impactRouteAvailable &&
+    navigationListMode === "impact" &&
+    Boolean(impactRootService);
   const normalServices = useMemo(
     () => services.filter((service) => service.statusCode === "NORMAL"),
     [services]
@@ -481,6 +655,14 @@ export function ServerWorldMap() {
       normalServices: normalServices.length,
     };
   }, [incidentServices.length, normalServices.length]);
+
+  useEffect(() => {
+    if (impactRootServiceId !== null && serviceById.has(impactRootServiceId)) {
+      return;
+    }
+
+    setImpactRootServiceId(impactCandidates[0]?.service.serviceId ?? null);
+  }, [impactCandidates, impactRootServiceId, serviceById]);
 
   const serverLayerOpacity = clamp(
     (scale - SERVER_FADE_START) / (SERVER_ZOOM - SERVER_FADE_START),
@@ -561,23 +743,50 @@ export function ServerWorldMap() {
     return pointServers.filter((server) => server.regionName === activeRegionName);
   }, [activeRegionName, pointServers]);
   const visiblePointServers = useMemo(() => {
-    if (serverLayerOpacity <= 0.02) {
+    if (impactRouteScopeEnabled) {
+      return pointServers.filter((server) =>
+        impactRouteServerIds.has(server.serverId)
+      );
+    }
+
+    if (focusedServerId || drillingServerId) {
+      return pointServers.filter(
+        (server) =>
+          server.serverId === focusedServerId ||
+          server.serverId === drillingServerId
+      );
+    }
+
+    if (serverLayerOpacity <= 0.02 && !focusedServerId && !drillingServerId) {
       return [];
     }
 
     return pointServers.filter(
       (server) =>
-        (!activeRegionName || server.regionName === activeRegionName) &&
-        isServerInBounds(server, mapBounds)
+        ((!activeRegionName || server.regionName === activeRegionName) &&
+          isServerInBounds(server, mapBounds)) ||
+        server.serverId === focusedServerId ||
+        server.serverId === drillingServerId
     );
-  }, [activeRegionName, mapBounds, pointServers, serverLayerOpacity]);
+  }, [
+    activeRegionName,
+    drillingServerId,
+    focusedServerId,
+    impactRouteScopeEnabled,
+    impactRouteServerIds,
+    mapBounds,
+    pointServers,
+    serverLayerOpacity,
+  ]);
 
-  const screenFocus = (reserveFinder = finderOpen) => {
+  const screenFocus = (reserveFinder = finderOpen, reserveDetailPanel = false) => {
     const leftReserved = reserveFinder ? 370 : 0;
+    const rightReserved = reserveDetailPanel ? 360 : 0;
+    const usableWidth = viewportSize.width - leftReserved - rightReserved;
     return {
-      x: leftReserved + (viewportSize.width - leftReserved) / 2,
+      x: leftReserved + usableWidth * (reserveDetailPanel ? 0.38 : 0.42),
       y: viewportSize.height / 2,
-      width: Math.max(320, viewportSize.width - leftReserved),
+      width: Math.max(320, usableWidth),
       height: viewportSize.height,
     };
   };
@@ -641,9 +850,197 @@ export function ServerWorldMap() {
       nextOffset,
       animated
     );
-    setScale(nextScale);
-    setOffset(nextOffset);
+
+    if (viewStateFrameRef.current) {
+      window.cancelAnimationFrame(viewStateFrameRef.current);
+    }
+
+    viewStateFrameRef.current = window.requestAnimationFrame(() => {
+      viewStateFrameRef.current = null;
+      setScale(nextScale);
+      setOffset(nextOffset);
+    });
   };
+
+  const keepFocusedServerVisible = (
+    animated = true,
+    mode: "contain" | "center" = "contain"
+  ) => {
+    const serverId = focusedServerId ?? drillingServerId;
+    const server = serverId ? pointServerById.get(serverId) : undefined;
+
+    if (!server || dragging) {
+      return;
+    }
+
+    const currentView = viewRef.current;
+    const focusedFootprint = getServerFootprint(server.services.length, true);
+    const detailPanelVisible = detailPanelOpen && Boolean(selectedServiceId);
+    const detailPanelWidth = detailPanelVisible
+      ? Math.min(
+          DETAIL_PANEL_MAX_WIDTH,
+          Math.max(DETAIL_PANEL_MIN_WIDTH, viewportSize.width * 0.3)
+        )
+      : 0;
+    const safeLeft = finderOpen
+      ? NAVIGATION_PANEL_LEFT + NAVIGATION_PANEL_WIDTH + MAP_SAFE_GAP
+      : MAP_SAFE_GAP;
+    const safeRight = Math.max(
+      safeLeft + 260,
+      viewportSize.width - detailPanelWidth - MAP_SAFE_GAP
+    );
+    const safeTop = 112;
+    const safeBottom = Math.max(safeTop + 220, viewportSize.height - 48);
+
+    const targetRect = (() => {
+      const baseRect = {
+        left: -focusedFootprint.width / 2,
+        top: -focusedFootprint.height / 2,
+        right: focusedFootprint.width / 2,
+        bottom: focusedFootprint.height / 2,
+      };
+
+      if (!selectedServiceId) {
+        return baseRect;
+      }
+
+      const visibleServices = server.services.slice(0, MAX_SERVICE_MARKERS);
+      const selectedIndex = visibleServices.findIndex(
+        (service) => service.serviceId === selectedServiceId
+      );
+
+      if (selectedIndex < 0) {
+        return baseRect;
+      }
+
+      const columns = focusedFootprint.columns;
+      const rows = Math.max(1, Math.ceil(visibleServices.length / columns));
+      const gap = 16;
+      const gridLeft = 34;
+      const gridTop = 132;
+      const gridRight = 34;
+      const gridBottom = 30;
+      const gridWidth = focusedFootprint.width - gridLeft - gridRight;
+      const gridHeight = focusedFootprint.height - gridTop - gridBottom;
+      const columnWidth = Math.max(
+        140,
+        (gridWidth - gap * (columns - 1)) / columns
+      );
+      const rowHeight = Math.max(
+        88,
+        (gridHeight - gap * (rows - 1)) / rows
+      );
+      const column = selectedIndex % columns;
+      const row = Math.floor(selectedIndex / columns);
+      const left = -focusedFootprint.width / 2 + gridLeft + column * (columnWidth + gap);
+      const top = -focusedFootprint.height / 2 + gridTop + row * (rowHeight + gap);
+
+      return {
+        left,
+        top,
+        right: left + columnWidth,
+        bottom: top + rowHeight,
+      };
+    })();
+
+    const scaleValue = currentView.scale;
+    const focusPadding = selectedServiceId ? 36 : 56;
+    const screenRect = {
+      left:
+        (server.mapX + targetRect.left) * scaleValue +
+        currentView.offset.x -
+        focusPadding,
+      top:
+        (server.mapY + targetRect.top) * scaleValue +
+        currentView.offset.y -
+        focusPadding,
+      right:
+        (server.mapX + targetRect.right) * scaleValue +
+        currentView.offset.x +
+        focusPadding,
+      bottom:
+        (server.mapY + targetRect.bottom) * scaleValue +
+        currentView.offset.y +
+        focusPadding,
+    };
+
+    const nudgeAxis = (
+      rectStart: number,
+      rectEnd: number,
+      safeStart: number,
+      safeEnd: number
+    ) => {
+      const rectSize = rectEnd - rectStart;
+      const safeSize = safeEnd - safeStart;
+      const rectCenter = rectStart + rectSize / 2;
+      const safeCenter = safeStart + safeSize / 2;
+
+      if (mode === "center" || rectSize >= safeSize) {
+        return safeCenter - rectCenter;
+      }
+
+      if (rectStart < safeStart) {
+        return safeStart - rectStart;
+      }
+
+      if (rectEnd > safeEnd) {
+        return safeEnd - rectEnd;
+      }
+
+      return 0;
+    };
+
+    const deltaX = nudgeAxis(screenRect.left, screenRect.right, safeLeft, safeRight);
+    const deltaY = nudgeAxis(screenRect.top, screenRect.bottom, safeTop, safeBottom);
+
+    if (Math.abs(deltaX) < 1 && Math.abs(deltaY) < 1) {
+      return;
+    }
+
+    commitMapView(
+      scaleValue,
+      {
+        x: currentView.offset.x + deltaX,
+        y: currentView.offset.y + deltaY,
+      },
+      animated
+    );
+  };
+
+  useEffect(() => {
+    if (!focusedServerId && !drillingServerId) {
+      return;
+    }
+
+    const nextSafeLayout = {
+      detailOpen: detailPanelOpen && Boolean(selectedServiceId),
+      finderOpen,
+      height: viewportSize.height,
+      width: viewportSize.width,
+    };
+    const previousSafeLayout = safeLayoutRef.current;
+    const layoutChanged =
+      previousSafeLayout.finderOpen !== nextSafeLayout.finderOpen ||
+      previousSafeLayout.detailOpen !== nextSafeLayout.detailOpen ||
+      Math.abs(previousSafeLayout.width - nextSafeLayout.width) > 2 ||
+      Math.abs(previousSafeLayout.height - nextSafeLayout.height) > 2;
+
+    safeLayoutRef.current = nextSafeLayout;
+
+    const timer = window.setTimeout(() => {
+      keepFocusedServerVisible(true, layoutChanged ? "center" : "contain");
+    }, layoutChanged ? 120 : 60);
+
+    return () => window.clearTimeout(timer);
+  }, [
+    drillingServerId,
+    detailPanelOpen,
+    finderOpen,
+    focusedServerId,
+    selectedServiceId,
+    viewportSize.height,
+    viewportSize.width,
+  ]);
 
   const resetMapFocus = () => {
     if (serverFocusTimerRef.current) {
@@ -655,6 +1052,7 @@ export function ServerWorldMap() {
     setFocusedServerId(null);
     setDrillingServerId(null);
     setSelectedServiceId(null);
+    setDetailPanelOpen(false);
     commitMapView(INITIAL_SCALE, { ...INITIAL_OFFSET });
   };
 
@@ -677,6 +1075,7 @@ export function ServerWorldMap() {
     setFocusedServerId(null);
     setDrillingServerId(null);
     setSelectedServiceId(null);
+    setDetailPanelOpen(false);
     commitMapView(nextScale, {
       x: focus.x - region.x * nextScale,
       y: focus.y - region.y * nextScale,
@@ -694,7 +1093,7 @@ export function ServerWorldMap() {
       window.clearTimeout(serverFocusTimerRef.current);
       serverFocusTimerRef.current = null;
     }
-    const focus = screenFocus(!instant);
+    const focus = screenFocus(!instant && finderOpen);
     const focusedFootprint = getServerFootprint(server.services.length, openServices);
     const fittedScale = openServices
       ? Math.min(
@@ -728,6 +1127,7 @@ export function ServerWorldMap() {
       openServices && instant ? server.serverId : openServices ? null : server.serverId
     );
     setSelectedServiceId(null);
+    setDetailPanelOpen(false);
     if (openServices) {
       lockWheel(instant ? 760 : 980);
     }
@@ -746,7 +1146,7 @@ export function ServerWorldMap() {
   };
 
   const focusServer = (server: PointServer, openServices = true) => {
-    const focus = screenFocus(true);
+    const focus = screenFocus(finderOpen);
     focusServerAtAnchor(server, focus.x, focus.y, openServices);
   };
 
@@ -755,11 +1155,106 @@ export function ServerWorldMap() {
 
     if (!server) {
       setSelectedServiceId(service.serviceId);
+      setDetailPanelOpen(true);
+      setImpactRootServiceId(service.serviceId);
       return;
     }
 
-    const focus = screenFocus(true);
-    focusServerAtAnchor(server, focus.x, focus.y, true);
+    focusServerForServiceSelection(server);
+    setSelectedServiceId(service.serviceId);
+    setDetailPanelOpen(true);
+    setImpactRootServiceId(service.serviceId);
+  };
+
+  const focusServerForServiceSelection = (
+    server: PointServer,
+    reserveDetailPanel = true
+  ) => {
+    if (serverFocusTimerRef.current) {
+      window.clearTimeout(serverFocusTimerRef.current);
+      serverFocusTimerRef.current = null;
+    }
+
+    const focus = screenFocus(finderOpen, reserveDetailPanel);
+    const focusedFootprint = getServerFootprint(server.services.length, true);
+    const fittedScale = Math.min(
+      (focus.width - 120) / focusedFootprint.width,
+      (focus.height - 130) / focusedFootprint.height
+    );
+    const nextScale = clamp(fittedScale * 1.04, 0.44, FOCUS_MAX_SCALE);
+
+    setFocusedRegionName(server.regionName);
+    setFocusedServerId(server.serverId);
+    setDrillingServerId(null);
+    lockWheel(760);
+    commitMapView(nextScale, {
+      x: focus.x - server.mapX * nextScale,
+      y: focus.y - server.mapY * nextScale,
+    });
+  };
+
+  const selectServiceOnMap = (serviceId: number) => {
+    const service = serviceById.get(serviceId);
+    const server = service ? pointServerById.get(service.serverId) : undefined;
+
+    if (service && server && server.serverId !== focusedServerId) {
+      focusServerForServiceSelection(server);
+    }
+
+    setSelectedServiceId(serviceId);
+    setDetailPanelOpen(true);
+    if (navigationListMode !== "impact") {
+      setImpactRootServiceId(serviceId);
+    }
+  };
+
+  const activateImpactRouteMode = (serviceId?: number) => {
+    const nextRootServiceId =
+      serviceId ?? impactRootService?.serviceId ?? selectedServiceId ?? null;
+    const nextRootService =
+      nextRootServiceId !== null ? serviceById.get(nextRootServiceId) : undefined;
+    const rootServer = nextRootService
+      ? pointServerById.get(nextRootService.serverId)
+      : undefined;
+    const focus = screenFocus(true, false);
+    const overviewOffset = rootServer
+      ? {
+          x: focus.x - rootServer.mapX * INITIAL_SCALE,
+          y: focus.y - rootServer.mapY * INITIAL_SCALE,
+        }
+      : { ...INITIAL_OFFSET };
+
+    if (nextRootServiceId !== null) {
+      setImpactRootServiceId(nextRootServiceId);
+      setSelectedServiceId(nextRootServiceId);
+    }
+
+    if (serverFocusTimerRef.current) {
+      window.clearTimeout(serverFocusTimerRef.current);
+      serverFocusTimerRef.current = null;
+    }
+
+    setFocusedRegionName(null);
+    setFocusedServerId(null);
+    setDrillingServerId(null);
+    setDetailPanelOpen(false);
+    setNavigationListMode("impact");
+    setFinderOpen(true);
+    lockWheel(520);
+    commitMapView(INITIAL_SCALE, overviewOffset);
+  };
+
+  const focusImpactRouteService = (service: ServiceRecord) => {
+    const server = pointServerById.get(service.serverId);
+
+    if (server) {
+      focusServerForServiceSelection(server, false);
+    }
+
+    setSelectedServiceId(service.serviceId);
+    setDetailPanelOpen(false);
+    setNavigationListMode("impact");
+    setFinderOpen(true);
   };
 
   const toggleFavorite = (key: string) => {
@@ -785,8 +1280,25 @@ export function ServerWorldMap() {
   };
 
   const showNavigationList = (mode: NavigationListMode) => {
-    setNavigationListMode((current) => (current === mode ? "default" : mode));
-    setFinderOpen(true);
+    if (mode === "impact") {
+      if (navigationListMode === "impact") {
+        setNavigationListMode("default");
+        return;
+      }
+
+      activateImpactRouteMode();
+      return;
+    }
+
+    setNavigationListMode((current) => {
+      const nextMode = current === mode ? "default" : mode;
+
+      if (nextMode !== "default") {
+        setFinderOpen(true);
+      }
+
+      return nextMode;
+    });
   };
 
   const resetToOverview = () => {
@@ -909,6 +1421,7 @@ export function ServerWorldMap() {
     setFocusedServerId(null);
     setDrillingServerId(null);
     setSelectedServiceId(null);
+    setDetailPanelOpen(false);
   };
 
   const zoomAt = (nextScale: number, anchorX: number, anchorY: number) => {
@@ -1097,11 +1610,17 @@ export function ServerWorldMap() {
       pendingRegionNameRef.current = null;
       setFocusedRegionName(null);
       setSelectedServiceId(null);
+      setDetailPanelOpen(false);
       return;
     }
     setSelectedServiceId(null);
+    setDetailPanelOpen(false);
     setDragging(true);
     dragMovedRef.current = false;
+    if (viewStateFrameRef.current) {
+      window.cancelAnimationFrame(viewStateFrameRef.current);
+      viewStateFrameRef.current = null;
+    }
     event.currentTarget.setPointerCapture(event.pointerId);
     const currentView = viewRef.current;
     dragStartRef.current = {
@@ -1168,6 +1687,10 @@ export function ServerWorldMap() {
       nextView.offset,
       false
     );
+    if (viewStateFrameRef.current) {
+      window.cancelAnimationFrame(viewStateFrameRef.current);
+      viewStateFrameRef.current = null;
+    }
     setScale(nextView.scale);
     setOffset(nextView.offset);
     setDragging(false);
@@ -1201,8 +1724,15 @@ export function ServerWorldMap() {
   };
 
   return (
-    <div className="h-[calc(100vh-88px)] min-h-[520px] overflow-hidden rounded-xl border border-slate-300 bg-slate-100 shadow-sm">
-      <div
+    <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-5">
+      <PageHeader
+        description="업무 영역, 서버, 서비스 배치와 장애 영향 경로를 맵에서 확인합니다."
+        icon={<MapPin size={22} />}
+        title="서버 맵"
+      />
+
+      <div className="h-[calc(100vh-188px)] min-h-[520px] overflow-hidden rounded-xl border border-slate-300 bg-slate-100 shadow-sm">
+        <div
         ref={viewportRef}
         data-world-map-viewport
         className={`relative h-full select-none overflow-hidden ${
@@ -1217,6 +1747,8 @@ export function ServerWorldMap() {
           activeMode={navigationListMode}
           favoriteCount={favoriteItems.length}
           finderOpen={finderOpen}
+          impactRouteCount={impactRouteLinks.length}
+          impactRouteVisible={impactRouteAvailable}
           stats={stats}
           onModeSelect={showNavigationList}
         />
@@ -1229,6 +1761,8 @@ export function ServerWorldMap() {
           favoriteItems={favoriteItems}
           favoriteKeys={favoriteKeySet}
           focusedServer={focusedServer}
+          impactLinks={impactRouteLinks}
+          impactRootService={impactRootService}
           incidentServices={incidentServices}
           listMode={navigationListMode}
           normalServices={normalServices}
@@ -1239,13 +1773,14 @@ export function ServerWorldMap() {
           onOpenChange={setFinderOpen}
           onFavoriteSelect={focusFavorite}
           onFavoriteToggle={toggleFavorite}
+          onImpactServiceSelect={focusImpactRouteService}
           onIncidentServiceSelect={focusService}
           onNormalServiceSelect={focusService}
           onOverviewSelect={resetToOverview}
           onRegionSelect={focusRegion}
           onSearchChange={setServerSearch}
           onServerSelect={focusServer}
-          onServiceSelect={setSelectedServiceId}
+          onServiceSelect={selectServiceOnMap}
         />
 
         <div
@@ -1278,33 +1813,60 @@ export function ServerWorldMap() {
                 />
               ))}
 
-            {serverLayerOpacity > 0.02 &&
-              visiblePointServers.map((server) => (
-                <ServerMarker
-                  key={server.serverId}
-                  dimmed={
-                    Boolean(activeRegionName && server.regionName !== activeRegionName) ||
-                    Boolean(focusedServerId && server.serverId !== focusedServerId) ||
-                    Boolean(drillingServerId && server.serverId !== drillingServerId)
-                  }
-                  drilling={server.serverId === drillingServerId}
-                  server={server}
-                  focused={server.serverId === focusedServerId}
-                  layerOpacity={serverLayerOpacity}
-                  serviceInteractive={
-                    server.serverId === focusedServerId
-                      ? true
-                      : serviceLayerInteractive
-                  }
-                  serviceLayerOpacity={
-                    server.serverId === focusedServerId ? 1 : serviceLayerOpacity
-                  }
-                  serverInteractive={serverLayerInteractive}
-                  onCloseFocus={closeServerFocus}
-                  onServerClick={() => focusServer(server)}
-                  onServiceClick={(serviceId) => setSelectedServiceId(serviceId)}
-                />
-              ))}
+            {(impactRouteScopeEnabled ||
+              serverLayerOpacity > 0.02 ||
+              focusedServerId ||
+              drillingServerId) &&
+              visiblePointServers.map((server) => {
+                const forcedVisible =
+                  impactRouteScopeEnabled ||
+                  server.serverId === focusedServerId ||
+                  server.serverId === drillingServerId;
+                const routeRelated =
+                  impactRouteScopeEnabled &&
+                  impactRouteServerIds.has(server.serverId);
+
+                return (
+                  <ServerMarker
+                    key={server.serverId}
+                    dimmed={
+                      !routeRelated &&
+                      (Boolean(activeRegionName && server.regionName !== activeRegionName) ||
+                        Boolean(focusedServerId && server.serverId !== focusedServerId) ||
+                        Boolean(drillingServerId && server.serverId !== drillingServerId))
+                    }
+                    drilling={server.serverId === drillingServerId}
+                    server={server}
+                    focused={server.serverId === focusedServerId}
+                    layerOpacity={forcedVisible ? 1 : serverLayerOpacity}
+                    routeRootServiceId={
+                      impactRouteScopeEnabled ? impactRootService?.serviceId ?? null : null
+                    }
+                    routeServiceIds={
+                      routeRelated ? impactRouteServiceIds : null
+                    }
+                    selectedServiceId={selectedServiceId}
+                    serviceInteractive={
+                      forcedVisible ? true : serviceLayerInteractive
+                    }
+                    serviceLayerOpacity={
+                      server.serverId === focusedServerId ? 1 : serviceLayerOpacity
+                    }
+                    serverInteractive={forcedVisible ? true : serverLayerInteractive}
+                    onCloseFocus={closeServerFocus}
+                    onServerClick={() => focusServer(server)}
+                    onServiceClick={selectServiceOnMap}
+                  />
+                );
+              })}
+
+            {impactRouteScopeEnabled && impactRootService && (
+              <ImpactRouteOverlay
+                expandedServerId={focusedServerId ?? drillingServerId}
+                links={visibleImpactRouteLinks}
+                routeServiceIds={impactRouteServiceIds}
+              />
+            )}
           </div>
         </div>
 
@@ -1337,13 +1899,86 @@ export function ServerWorldMap() {
           </button>
         </div>
 
-        {selectedService && (
+        {selectedService && !detailPanelOpen && (
+          <button
+            data-map-panel
+            type="button"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              setDetailPanelOpen(true);
+            }}
+            className="absolute right-0 top-1/2 z-40 flex -translate-y-1/2 items-center gap-2 rounded-l-full border border-r-0 border-slate-200 bg-white px-3 py-3 text-sm font-black text-slate-700 shadow-lg hover:text-[#f60]"
+            title="서비스 상세 펼치기"
+          >
+            <ChevronLeft size={18} />
+            상세
+          </button>
+        )}
+
+        {selectedService && detailPanelOpen && (
           <ServiceSidePanel
             service={selectedService}
             server={selectedServer}
-            onClose={() => setSelectedServiceId(null)}
+            onCollapse={() => setDetailPanelOpen(false)}
+            onShowImpactRoute={() =>
+              activateImpactRouteMode(selectedService.serviceId)
+            }
           />
         )}
+        <style>{`
+          .chainview-selected-service-card {
+            position: relative;
+            overflow: hidden;
+            border-color: #f60 !important;
+            background: rgba(255, 247, 237, 0.94);
+            box-shadow: 0 0 0 3px rgba(255, 102, 0, 0.12);
+          }
+
+          .chainview-selected-service-card::before {
+            content: "";
+            position: absolute;
+            inset: -45%;
+            z-index: 0;
+            pointer-events: none;
+            background:
+              repeating-linear-gradient(
+                120deg,
+                rgba(255, 102, 0, 0.1) 0,
+                rgba(255, 102, 0, 0.1) 18px,
+                rgba(255, 255, 255, 0.5) 18px,
+                rgba(255, 255, 255, 0.5) 36px
+              );
+          }
+
+          .chainview-selected-service-card > * {
+            position: relative;
+            z-index: 1;
+          }
+
+          .chainview-impact-root-service-card {
+            border-color: #f60 !important;
+            box-shadow:
+              0 0 0 3px rgba(255, 102, 0, 0.18),
+              0 10px 24px rgba(255, 102, 0, 0.12);
+          }
+
+          .chainview-impact-route {
+            stroke-dasharray: 18 16;
+            vector-effect: non-scaling-stroke;
+            animation: chainview-impact-route-flow 1.25s linear infinite;
+          }
+
+          @keyframes chainview-impact-route-flow {
+            from {
+              stroke-dashoffset: 34;
+            }
+            to {
+              stroke-dashoffset: 0;
+            }
+          }
+        `}</style>
+        </div>
       </div>
     </div>
   );
@@ -1353,12 +1988,16 @@ function MapTopBar({
   activeMode,
   favoriteCount,
   finderOpen,
+  impactRouteCount,
+  impactRouteVisible,
   stats,
   onModeSelect,
 }: {
   activeMode: NavigationListMode;
   favoriteCount: number;
   finderOpen: boolean;
+  impactRouteCount: number;
+  impactRouteVisible: boolean;
   stats: {
     incidentServices: number;
     normalServices: number;
@@ -1371,6 +2010,22 @@ function MapTopBar({
         finderOpen ? "left-[342px]" : "left-5"
       }`}
     >
+      {impactRouteVisible && (
+        <div
+          data-map-panel
+          className="pointer-events-auto relative"
+          onPointerDown={(event) => event.stopPropagation()}
+        >
+          <StatusPill
+            icon={GitBranch}
+            label="영향 경로"
+            value={impactRouteCount}
+            active={activeMode === "impact"}
+            tone="impact"
+            onClick={() => onModeSelect("impact")}
+          />
+        </div>
+      )}
       <div
         data-map-panel
         className="pointer-events-auto relative"
@@ -1417,6 +2072,117 @@ function MapTopBar({
   );
 }
 
+function ImpactRouteOverlay({
+  expandedServerId,
+  links,
+  routeServiceIds,
+}: {
+  expandedServerId: number | null;
+  links: ImpactRouteLink[];
+  routeServiceIds: Set<number> | null;
+}) {
+  if (links.length === 0) {
+    return null;
+  }
+
+  const endpointPoints = new Map<number, RoutePoint>();
+  const rememberEndpoint = (service: ServiceRecord, server: PointServer) => {
+    endpointPoints.set(
+      service.serviceId,
+      getImpactRoutePoint(
+        service,
+        server,
+        expandedServerId,
+        routeServiceIds
+      )
+    );
+  };
+
+  links.forEach((link) => {
+    rememberEndpoint(link.sourceService, link.sourceServer);
+    rememberEndpoint(link.targetService, link.targetServer);
+  });
+
+  return (
+    <svg
+      className="pointer-events-none absolute inset-0 z-[18]"
+      width={MAP_WIDTH}
+      height={MAP_HEIGHT}
+      viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`}
+      aria-hidden="true"
+    >
+      <defs>
+        <marker
+          id="impact-route-arrow-outgoing"
+          markerHeight="6"
+          markerUnits="strokeWidth"
+          markerWidth="6"
+          orient="auto"
+          refX="5.4"
+          refY="3"
+        >
+          <path d="M 0 0 L 6 3 L 0 6 z" fill="rgba(244, 63, 94, 0.9)" />
+        </marker>
+        <marker
+          id="impact-route-arrow-incoming"
+          markerHeight="6"
+          markerUnits="strokeWidth"
+          markerWidth="6"
+          orient="auto"
+          refX="5.4"
+          refY="3"
+        >
+          <path d="M 0 0 L 6 3 L 0 6 z" fill="rgba(6, 182, 212, 0.86)" />
+        </marker>
+      </defs>
+      {links.map((link, index) => {
+        const sourcePoint =
+          endpointPoints.get(link.sourceService.serviceId) ??
+          getImpactRoutePoint(
+            link.sourceService,
+            link.sourceServer,
+            expandedServerId,
+            routeServiceIds
+          );
+        const targetPoint =
+          endpointPoints.get(link.targetService.serviceId) ??
+          getImpactRoutePoint(
+            link.targetService,
+            link.targetServer,
+            expandedServerId,
+            routeServiceIds
+          );
+        const path = createImpactArcPath(link, index, sourcePoint, targetPoint);
+        const color = getImpactRouteColor(link.direction);
+
+        return (
+          <g key={link.id}>
+            <path
+              d={path}
+              fill="none"
+              stroke={color.glow}
+              strokeLinecap="round"
+              strokeWidth={10 - link.depth}
+              opacity={0.12}
+            />
+            <path
+              className="chainview-impact-route"
+              d={path}
+              fill="none"
+              markerEnd={`url(#impact-route-arrow-${link.direction})`}
+              stroke={color.stroke}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={Math.max(2, 4 - link.depth * 0.45)}
+              style={{ opacity: Math.max(0.72, 0.96 - index * 0.035) }}
+            />
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
 function StatusPill({
   icon: Icon,
   label,
@@ -1426,18 +2192,20 @@ function StatusPill({
   tone = "default",
   onClick,
 }: {
-  icon: typeof ShieldAlert;
+  icon: LucideIcon;
   label: string;
   value: number;
   active?: boolean;
   danger?: boolean;
-  tone?: "default" | "favorite" | "normal";
+  tone?: "default" | "favorite" | "normal" | "impact";
   onClick?: () => void;
 }) {
   const iconClass = danger
     ? "bg-red-100 text-red-500"
     : tone === "favorite"
       ? "bg-yellow-100 text-yellow-500"
+      : tone === "impact"
+        ? "bg-fuchsia-100 text-fuchsia-500"
       : "bg-cyan-100 text-cyan-500";
   const content = (
     <>
@@ -1446,7 +2214,11 @@ function StatusPill({
       >
         <Icon
           size={18}
-          fill={tone === "favorite" || tone === "normal" ? "currentColor" : "none"}
+          fill={
+            tone === "favorite" || tone === "normal" || tone === "impact"
+              ? "currentColor"
+              : "none"
+          }
         />
       </div>
       <span className="whitespace-nowrap text-sm font-semibold text-slate-500 transition-colors duration-200 group-hover:text-slate-700">
@@ -1533,6 +2305,234 @@ function applyMapView(
   }
 }
 
+function countConnectedServices(
+  rootServiceId: number,
+  relationsByService: Map<number, ServiceRelationRecord[]>,
+  maxDepth: number
+) {
+  const visited = new Set<number>([rootServiceId]);
+  const queue = [{ serviceId: rootServiceId, depth: 0 }];
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current || current.depth >= maxDepth) {
+      continue;
+    }
+
+    (relationsByService.get(current.serviceId) ?? []).forEach((relation) => {
+      const nextServiceId =
+        relation.sourceServiceId === current.serviceId
+          ? relation.targetServiceId
+          : relation.sourceServiceId;
+
+      if (visited.has(nextServiceId)) {
+        return;
+      }
+
+      visited.add(nextServiceId);
+      queue.push({
+        serviceId: nextServiceId,
+        depth: current.depth + 1,
+      });
+    });
+  }
+
+  return Math.max(0, visited.size - 1);
+}
+
+function buildImpactRouteLinks({
+  maxDepth,
+  pointServerById,
+  relationsByService,
+  rootServiceId,
+  serviceById,
+}: {
+  maxDepth: number;
+  pointServerById: Map<number, PointServer>;
+  relationsByService: Map<number, ServiceRelationRecord[]>;
+  rootServiceId: number;
+  serviceById: Map<number, ServiceRecord>;
+}) {
+  const visitedDepth = new Map<number, number>([[rootServiceId, 0]]);
+  const visitedRouteKeys = new Set<string>();
+  const links: ImpactRouteLink[] = [];
+  const queue: Array<{ depth: number; pathIds: number[]; serviceId: number }> = [
+    { depth: 0, pathIds: [rootServiceId], serviceId: rootServiceId },
+  ];
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current || current.depth >= maxDepth) {
+      continue;
+    }
+
+    (relationsByService.get(current.serviceId) ?? []).forEach((relation) => {
+      const direction =
+        relation.sourceServiceId === current.serviceId ? "outgoing" : "incoming";
+      const nextServiceId =
+        direction === "outgoing"
+          ? relation.targetServiceId
+          : relation.sourceServiceId;
+      const nextDepth = current.depth + 1;
+
+      if (current.pathIds.includes(nextServiceId)) {
+        return;
+      }
+
+      const routeKey = `${relation.sourceServiceId}-${relation.targetServiceId}-${direction}`;
+      if (visitedRouteKeys.has(routeKey)) {
+        return;
+      }
+
+      const sourceService = serviceById.get(relation.sourceServiceId);
+      const targetService = serviceById.get(relation.targetServiceId);
+      const sourceServer = sourceService
+        ? pointServerById.get(sourceService.serverId)
+        : undefined;
+      const targetServer = targetService
+        ? pointServerById.get(targetService.serverId)
+        : undefined;
+
+      if (!sourceService || !targetService || !sourceServer || !targetServer) {
+        return;
+      }
+
+      const previousDepth = visitedDepth.get(nextServiceId);
+      if (previousDepth === undefined || previousDepth > nextDepth) {
+        visitedDepth.set(nextServiceId, nextDepth);
+        queue.push({
+          serviceId: nextServiceId,
+          depth: nextDepth,
+          pathIds: [...current.pathIds, nextServiceId],
+        });
+      }
+
+      visitedRouteKeys.add(routeKey);
+      links.push({
+        id: `${relation.relationId}-${direction}-${nextDepth}`,
+        depth: nextDepth,
+        direction,
+        sourceServer,
+        sourceService,
+        targetServer,
+        targetService,
+      });
+    });
+  }
+
+  return links;
+}
+
+function groupRelationsByService(relations: ServiceRelationRecord[]) {
+  const relationsByService = new Map<number, ServiceRelationRecord[]>();
+  relations.forEach((relation) => {
+    const sourceRelations = relationsByService.get(relation.sourceServiceId) ?? [];
+    sourceRelations.push(relation);
+    relationsByService.set(relation.sourceServiceId, sourceRelations);
+
+    if (relation.sourceServiceId === relation.targetServiceId) {
+      return;
+    }
+
+    const targetRelations = relationsByService.get(relation.targetServiceId) ?? [];
+    targetRelations.push(relation);
+    relationsByService.set(relation.targetServiceId, targetRelations);
+  });
+  return relationsByService;
+}
+
+function getImpactRoutePoint(
+  service: ServiceRecord,
+  server: PointServer,
+  expandedServerId: number | null,
+  routeServiceIds: Set<number> | null
+): RoutePoint {
+  if (server.serverId !== expandedServerId) {
+    return {
+      x: server.mapX,
+      y: server.mapY,
+    };
+  }
+
+  const visibleServices = server.services
+    .filter((visibleService) =>
+      routeServiceIds ? routeServiceIds.has(visibleService.serviceId) : true
+    )
+    .slice(0, MAX_SERVICE_MARKERS);
+  const serviceIndex = visibleServices.findIndex(
+    (visibleService) => visibleService.serviceId === service.serviceId
+  );
+
+  if (serviceIndex < 0) {
+    return {
+      x: server.mapX,
+      y: server.mapY,
+    };
+  }
+
+  const footprint = getServerFootprint(visibleServices.length, true);
+  const columns = footprint.columns;
+  const rows = Math.max(1, Math.ceil(visibleServices.length / columns));
+  const gap = 16;
+  const gridLeft = 34;
+  const gridTop = 132;
+  const gridRight = 34;
+  const gridBottom = 30;
+  const gridWidth = footprint.width - gridLeft - gridRight;
+  const gridHeight = footprint.height - gridTop - gridBottom;
+  const columnWidth = Math.max(
+    140,
+    (gridWidth - gap * (columns - 1)) / columns
+  );
+  const rowHeight = Math.max(88, (gridHeight - gap * (rows - 1)) / rows);
+  const column = serviceIndex % columns;
+  const row = Math.floor(serviceIndex / columns);
+  const left = server.mapX - footprint.width / 2 + gridLeft + column * (columnWidth + gap);
+  const top = server.mapY - footprint.height / 2 + gridTop + row * (rowHeight + gap);
+  const cardPadding = 12;
+  const serviceIconRadius = 16;
+
+  return {
+    x: left + cardPadding + serviceIconRadius,
+    y: top + cardPadding + serviceIconRadius,
+  };
+}
+
+function createImpactArcPath(
+  link: ImpactRouteLink,
+  index: number,
+  sourcePoint: RoutePoint,
+  targetPoint: RoutePoint
+) {
+  const startX = sourcePoint.x;
+  const startY = sourcePoint.y;
+  const endX = targetPoint.x;
+  const endY = targetPoint.y;
+  const dx = endX - startX;
+  const dy = endY - startY;
+  const distance = Math.max(1, Math.hypot(dx, dy));
+  const arcLift = clamp(distance * (0.22 + link.depth * 0.06), 140, 680);
+  const sideOffset = ((index % 5) - 2) * 34;
+  const midX = (startX + endX) / 2 + sideOffset;
+  const midY = Math.min(startY, endY) - arcLift;
+
+  return `M ${startX} ${startY} Q ${midX} ${midY} ${endX} ${endY}`;
+}
+
+function getImpactRouteColor(direction: ImpactRouteLink["direction"]) {
+  if (direction === "outgoing") {
+    return {
+      glow: "rgba(244, 63, 94, 0.7)",
+      stroke: "rgba(244, 63, 94, 0.86)",
+    };
+  }
+
+  return {
+    glow: "rgba(34, 211, 238, 0.62)",
+    stroke: "rgba(6, 182, 212, 0.8)",
+  };
+}
+
 function MapNavigationPanel({
   activeRegion,
   activeRegionServers,
@@ -1541,6 +2541,8 @@ function MapNavigationPanel({
   favoriteItems,
   favoriteKeys,
   focusedServer,
+  impactLinks,
+  impactRootService,
   incidentServices,
   listMode,
   normalServices,
@@ -1552,6 +2554,7 @@ function MapNavigationPanel({
   onFavoriteSelect,
   onOverviewSelect,
   onFavoriteToggle,
+  onImpactServiceSelect,
   onIncidentServiceSelect,
   onNormalServiceSelect,
   onRegionSelect,
@@ -1566,6 +2569,8 @@ function MapNavigationPanel({
   favoriteItems: FavoriteItem[];
   favoriteKeys: Set<string>;
   focusedServer?: PointServer;
+  impactLinks: ImpactRouteLink[];
+  impactRootService?: ServiceRecord;
   incidentServices: ServiceRecord[];
   listMode: NavigationListMode;
   normalServices: ServiceRecord[];
@@ -1577,6 +2582,7 @@ function MapNavigationPanel({
   onFavoriteSelect: (item: FavoriteItem) => void;
   onOverviewSelect: () => void;
   onFavoriteToggle: (key: string) => void;
+  onImpactServiceSelect: (service: ServiceRecord) => void;
   onIncidentServiceSelect: (service: ServiceRecord) => void;
   onNormalServiceSelect: (service: ServiceRecord) => void;
   onRegionSelect: (region: LayoutRegion) => void;
@@ -1584,7 +2590,42 @@ function MapNavigationPanel({
   onServerSelect: (server: PointServer) => void;
   onServiceSelect: (serviceId: number) => void;
 }) {
+  const [panelWide, setPanelWide] = useState(open);
+  const [panelTall, setPanelTall] = useState(open);
   const keyword = searchValue.trim().toLowerCase();
+
+  useEffect(() => {
+    let frame = 0;
+    let widthTimer = 0;
+    let heightTimer = 0;
+
+    if (open) {
+      frame = window.requestAnimationFrame(() => {
+        setPanelWide(true);
+        heightTimer = window.setTimeout(() => {
+          setPanelTall(true);
+        }, NAVIGATION_WIDTH_ANIMATION_MS);
+      });
+    } else {
+      setPanelTall(false);
+      widthTimer = window.setTimeout(() => {
+        setPanelWide(false);
+      }, NAVIGATION_HEIGHT_ANIMATION_MS);
+    }
+
+    return () => {
+      if (frame) {
+        window.cancelAnimationFrame(frame);
+      }
+      if (widthTimer) {
+        window.clearTimeout(widthTimer);
+      }
+      if (heightTimer) {
+        window.clearTimeout(heightTimer);
+      }
+    };
+  }, [open]);
+
   const filteredFavoriteItems = keyword
     ? favoriteItems.filter((item) =>
         [
@@ -1598,6 +2639,77 @@ function MapNavigationPanel({
           .includes(keyword)
       )
     : favoriteItems;
+  const impactRouteItemByKey = new Map<
+    string,
+    {
+      direction: ImpactRouteLink["direction"];
+      key: string;
+      service: ServiceRecord;
+      server: PointServer;
+    }
+  >();
+
+  if (impactRootService) {
+    impactLinks.forEach((link) => {
+      const rootIsSource =
+        link.sourceService.serviceId === impactRootService.serviceId;
+      const service = rootIsSource ? link.targetService : link.sourceService;
+      const server = rootIsSource ? link.targetServer : link.sourceServer;
+      const direction: ImpactRouteLink["direction"] = rootIsSource
+        ? "outgoing"
+        : "incoming";
+      const key = `${direction}-${service.serviceId}`;
+
+      if (!impactRouteItemByKey.has(key)) {
+        impactRouteItemByKey.set(key, {
+          direction,
+          key,
+          service,
+          server,
+        });
+      }
+    });
+  }
+
+  const impactRouteItems = Array.from(impactRouteItemByKey.values()).sort(
+    (first, second) => {
+      const firstDirectionRank = first.direction === "incoming" ? 0 : 1;
+      const secondDirectionRank = second.direction === "incoming" ? 0 : 1;
+      const directionDiff = firstDirectionRank - secondDirectionRank;
+
+      if (directionDiff !== 0) {
+        return directionDiff;
+      }
+
+      const statusDiff =
+        getServiceStatusRank(first.service.statusCode) -
+        getServiceStatusRank(second.service.statusCode);
+
+      if (statusDiff !== 0) {
+        return statusDiff;
+      }
+
+      return [
+        first.server.regionName.localeCompare(second.server.regionName, "ko"),
+        first.server.serverName.localeCompare(second.server.serverName, "ko"),
+        first.service.serviceName.localeCompare(second.service.serviceName, "ko"),
+      ].find((diff) => diff !== 0) ?? 0;
+    }
+  );
+  const filteredImpactRouteItems = keyword
+    ? impactRouteItems.filter((item) =>
+        [
+          item.service.serviceName,
+          item.service.serviceCode,
+          item.server.serverName,
+          item.server.regionName,
+          item.direction === "outgoing" ? "수신 서비스" : "송신 서비스",
+        ]
+          .join(" ")
+          .toLowerCase()
+          .includes(keyword)
+      )
+    : impactRouteItems;
   const filteredIncidentServices = keyword
     ? incidentServices.filter((service) => {
         const server = serverById.get(service.serverId);
@@ -1621,15 +2733,17 @@ function MapNavigationPanel({
   const depthLabel =
     listMode === "favorites"
       ? "즐겨찾기 목록"
-      : listMode === "incidents"
-        ? "장애 서비스 목록"
-        : listMode === "normal"
-          ? "정상 서비스 목록"
-          : currentDepth === 1
-            ? "영역 목록"
-            : currentDepth === 2
-              ? "서버 목록"
-              : "서비스 목록";
+      : listMode === "impact"
+        ? "영향 경로 목록"
+        : listMode === "incidents"
+          ? "장애 서비스 목록"
+          : listMode === "normal"
+            ? "정상 서비스 목록"
+            : currentDepth === 1
+              ? "영역 목록"
+              : currentDepth === 2
+                ? "서버 목록"
+                : "서비스 목록";
   const filteredRegions = keyword
     ? regions.filter((region) => region.name.toLowerCase().includes(keyword))
     : regions;
@@ -1665,61 +2779,81 @@ function MapNavigationPanel({
   const currentCount =
     listMode === "favorites"
       ? filteredFavoriteItems.length
-      : listMode === "incidents"
-        ? filteredIncidentServices.length
-        : listMode === "normal"
-          ? filteredNormalServices.length
-          : currentDepth === 1
-            ? filteredRegions.length
-            : currentDepth === 2
-              ? filteredServers.length
-              : filteredServices.length;
+      : listMode === "impact"
+        ? filteredImpactRouteItems.length
+        : listMode === "incidents"
+          ? filteredIncidentServices.length
+          : listMode === "normal"
+            ? filteredNormalServices.length
+            : currentDepth === 1
+              ? filteredRegions.length
+              : currentDepth === 2
+                ? filteredServers.length
+                : filteredServices.length;
   const totalCount =
     listMode === "favorites"
       ? favoriteItems.length
-      : listMode === "incidents"
-        ? incidentServices.length
-        : listMode === "normal"
-          ? normalServices.length
-          : currentDepth === 1
-            ? regions.length
-            : currentDepth === 2
-              ? activeRegionServers.length
-              : serverServices.length;
+      : listMode === "impact"
+        ? impactRouteItems.length
+        : listMode === "incidents"
+          ? incidentServices.length
+          : listMode === "normal"
+            ? normalServices.length
+            : currentDepth === 1
+              ? regions.length
+              : currentDepth === 2
+                ? activeRegionServers.length
+                : serverServices.length;
   const searchPlaceholder =
     listMode === "favorites"
       ? "즐겨찾기 검색"
-      : listMode === "incidents"
-        ? "장애 서비스 검색"
-        : listMode === "normal"
-          ? "정상 서비스 검색"
-          : currentDepth === 1
-            ? "영역명 검색"
-            : currentDepth === 2
-              ? "서버명, 호스트명, IP 검색"
-              : "서비스명, 코드, 상태 검색";
-
-  if (!open) {
-    return (
-      <button
-        data-map-panel
-        onClick={() => onOpenChange(true)}
-        className="absolute left-4 top-4 z-30 flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-black text-slate-800 shadow-sm hover:border-[#f60] hover:text-[#f60]"
-      >
-        <MapPin size={18} className="text-[#f60]" />
-        네비게이션
-        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">
-          {totalCount}
-        </span>
-      </button>
-    );
-  }
+      : listMode === "impact"
+        ? "서비스명, 코드, 서버명 검색"
+        : listMode === "incidents"
+          ? "장애 서비스 검색"
+          : listMode === "normal"
+            ? "정상 서비스 검색"
+            : currentDepth === 1
+              ? "영역명 검색"
+              : currentDepth === 2
+                ? "서버명, 호스트명, IP 검색"
+                : "서비스명, 코드, 상태 검색";
 
   return (
     <aside
       data-map-panel
-      className="absolute left-4 top-4 z-30 flex max-h-[calc(100%-104px)] w-[300px] flex-col rounded-2xl border border-slate-200 bg-white/95 text-slate-900 shadow-sm"
+      onClick={() => {
+        if (!open) {
+          onOpenChange(true);
+        }
+      }}
+      className={`absolute left-4 top-4 z-30 flex origin-top-left transform-gpu flex-col overflow-hidden border border-slate-200 bg-white/95 text-slate-900 transition-[width,max-height,box-shadow,border-radius,transform] ease-out ${
+        panelTall
+          ? "rounded-2xl shadow-sm"
+          : "rounded-[22px] shadow-sm hover:-translate-y-0.5 hover:border-[#f60] hover:shadow-md"
+      } ${open ? "" : "cursor-pointer"}`}
+      style={{
+        width: panelWide ? 300 : NAVIGATION_COLLAPSED_WIDTH,
+        maxHeight: panelTall
+          ? "calc(100% - 104px)"
+          : NAVIGATION_COLLAPSED_HEIGHT,
+        transitionDuration: `${panelWide && !panelTall ? NAVIGATION_HEIGHT_ANIMATION_MS : NAVIGATION_WIDTH_ANIMATION_MS}ms`,
+      }}
     >
+      <div
+        aria-hidden="true"
+        className={`pointer-events-none absolute left-0 top-0 flex h-11 w-[138px] items-center justify-center gap-2 px-4 text-sm font-black text-slate-800 transition-opacity duration-150 ${
+          panelTall ? "opacity-0" : "opacity-100"
+        }`}
+      >
+        <MapPin size={18} className="shrink-0 text-[#f60]" />
+        <span>네비게이션</span>
+      </div>
+      <div
+        className={`flex min-h-0 min-w-[300px] flex-1 flex-col transition-opacity duration-150 ${
+          panelTall ? "opacity-100" : "opacity-0"
+        }`}
+      >
       <div className="border-b border-slate-200 p-4">
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -1799,6 +2933,25 @@ function MapNavigationPanel({
               key={item.key}
               item={item}
               onSelect={() => onFavoriteSelect(item)}
+            />
+          ))}
+
+        {listMode === "impact" && impactRootService && (
+          <NavigationImpactRootRow
+            server={serverById.get(impactRootService.serverId)}
+            service={impactRootService}
+            onSelect={() => onImpactServiceSelect(impactRootService)}
+          />
+        )}
+
+        {listMode === "impact" &&
+          filteredImpactRouteItems.map((item) => (
+            <NavigationImpactServiceRow
+              key={item.key}
+              direction={item.direction}
+              server={item.server}
+              service={item.service}
+              onSelect={() => onImpactServiceSelect(item.service)}
             />
           ))}
 
@@ -1886,6 +3039,13 @@ function MapNavigationPanel({
           </div>
         )}
       </div>
+      <div
+        aria-hidden="true"
+        className={`pointer-events-none absolute inset-x-4 bottom-0 h-4 rounded-full bg-gradient-to-b from-transparent to-slate-200/70 transition-opacity duration-200 ${
+          panelTall ? "opacity-40" : "opacity-80"
+        }`}
+      />
+      </div>
     </aside>
   );
 }
@@ -1953,6 +3113,88 @@ function NavigationFavoriteRow({
         </span>
       </span>
       <ChevronRight size={16} className="mt-2 shrink-0 text-slate-400" />
+    </button>
+  );
+}
+
+function NavigationImpactRootRow({
+  service,
+  server,
+  onSelect,
+}: {
+  service: ServiceRecord;
+  server?: ServerRecord;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      onClick={onSelect}
+      className="mb-2 flex w-full items-start gap-3 rounded-xl border border-fuchsia-100 bg-fuchsia-50/70 px-3 py-3 text-left hover:border-fuchsia-200 hover:bg-fuchsia-50"
+    >
+      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-fuchsia-100 text-fuchsia-500">
+        <GitBranch size={15} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[11px] font-black text-fuchsia-500">
+          기준 서비스
+        </span>
+        <span className="mt-0.5 block truncate text-sm font-black text-slate-900">
+          {service.serviceName}
+        </span>
+        <span className="mt-0.5 block truncate text-xs font-semibold text-slate-500">
+          {service.serviceCode} · {server?.serverName ?? "서버 미지정"}
+        </span>
+      </span>
+      <ChevronRight size={16} className="mt-3 shrink-0 text-slate-400" />
+    </button>
+  );
+}
+
+function NavigationImpactServiceRow({
+  direction,
+  service,
+  server,
+  onSelect,
+}: {
+  direction: ImpactRouteLink["direction"];
+  service: ServiceRecord;
+  server?: ServerRecord;
+  onSelect: () => void;
+}) {
+  const outgoing = direction === "outgoing";
+
+  return (
+    <button
+      onClick={onSelect}
+      className={`mb-1 flex w-full items-start gap-3 rounded-xl border border-transparent px-3 py-2.5 text-left ${
+        outgoing
+          ? "hover:border-red-100 hover:bg-red-50"
+          : "hover:border-cyan-100 hover:bg-cyan-50"
+      }`}
+    >
+      <span
+        className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+          outgoing ? "bg-red-100 text-red-500" : "bg-cyan-100 text-cyan-500"
+        }`}
+      >
+        <GitBranch size={15} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span
+          className={`block text-[11px] font-black ${
+            outgoing ? "text-red-500" : "text-cyan-600"
+          }`}
+        >
+          {outgoing ? "수신 서비스" : "송신 서비스"}
+        </span>
+        <span className="mt-0.5 block truncate text-sm font-black text-slate-800">
+          {service.serviceName}
+        </span>
+        <span className="mt-0.5 block truncate text-xs font-semibold text-slate-500">
+          {service.serviceCode} · {server?.serverName ?? "서버 미지정"}
+        </span>
+      </span>
+      <ChevronRight size={16} className="mt-3 shrink-0 text-slate-400" />
     </button>
   );
 }
@@ -2172,6 +3414,9 @@ function ServerMarker({
   server,
   focused,
   layerOpacity,
+  routeRootServiceId,
+  routeServiceIds,
+  selectedServiceId,
   serverInteractive,
   serviceInteractive,
   serviceLayerOpacity,
@@ -2184,6 +3429,9 @@ function ServerMarker({
   server: PointServer;
   focused: boolean;
   layerOpacity: number;
+  routeRootServiceId: number | null;
+  routeServiceIds: Set<number> | null;
+  selectedServiceId?: number | null;
   serverInteractive: boolean;
   serviceInteractive: boolean;
   serviceLayerOpacity: number;
@@ -2197,10 +3445,23 @@ function ServerMarker({
   const hasMaintenance = server.services.some(
     (service) => service.statusCode === "MAINTENANCE"
   );
+  const serverHasIncident = hasIncident || server.statusCode === "INCIDENT";
+  const serverHasMaintenance =
+    !serverHasIncident &&
+    (hasMaintenance || server.statusCode === "MAINTENANCE");
   const showServices = focused && serviceLayerOpacity > 0.02;
-  const footprint = getServerFootprint(server.services.length, showServices);
-  const visibleServices = server.services.slice(0, MAX_SERVICE_MARKERS);
-  const hiddenServiceCount = Math.max(0, server.services.length - MAX_SERVICE_MARKERS);
+  const routeFilteredServices = routeServiceIds
+    ? server.services.filter((service) => routeServiceIds.has(service.serviceId))
+    : server.services;
+  const footprint = getServerFootprint(routeFilteredServices.length, showServices);
+  const visibleServices = routeFilteredServices.slice(0, MAX_SERVICE_MARKERS);
+  const hiddenServiceCount = Math.max(
+    0,
+    routeFilteredServices.length - MAX_SERVICE_MARKERS
+  );
+  const routeRootOnServer =
+    routeRootServiceId !== null &&
+    server.services.some((service) => service.serviceId === routeRootServiceId);
   const effectiveLayerOpacity = dimmed ? layerOpacity * 0.16 : layerOpacity;
   const highlighted = focused || drilling;
   const serverStatusLabel =
@@ -2246,12 +3507,12 @@ function ServerMarker({
           ? "none"
           : "width 460ms cubic-bezier(0.16, 1, 0.3, 1), height 460ms cubic-bezier(0.16, 1, 0.3, 1), opacity 200ms ease",
         willChange: "width, height, opacity",
-        zIndex: focused ? 8 : hasIncident || server.statusCode === "INCIDENT" ? 4 : 2,
+        zIndex: focused ? 8 : serverHasIncident ? 4 : 2,
       }}
     >
       <div
         className={`absolute inset-0 rounded-[24px] border bg-white/88 ${
-          highlighted
+          highlighted || routeRootOnServer
             ? "border-[#f60] border-solid"
             : "border-dashed border-slate-300"
         }`}
@@ -2283,15 +3544,15 @@ function ServerMarker({
           }`}
         >
           <Server size={20} />
-          {(hasIncident || server.statusCode === "INCIDENT") && (
-            <MapExclamation />
-          )}
-          {!hasIncident && hasMaintenance && (
+          {serverHasIncident && <MapExclamation />}
+          {serverHasMaintenance && (
             <span className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-yellow-400 text-xs font-black text-slate-900">
               !
             </span>
           )}
-          {!hasIncident && !hasMaintenance && server.services.length > 0 && (
+          {!serverHasIncident &&
+            !serverHasMaintenance &&
+            server.services.length > 0 && (
             <span className="absolute -right-2 -top-2 flex h-6 min-w-6 items-center justify-center rounded-full border-2 border-white bg-slate-900 px-1 text-[10px] font-black text-white">
               {server.services.length}
             </span>
@@ -2333,45 +3594,54 @@ function ServerMarker({
             contain: "layout paint style",
           }}
         >
-          {visibleServices.map((service) => (
-            <button
-              key={service.serviceId}
-              data-service-marker
-              onPointerDown={(event) => event.stopPropagation()}
-              onClick={(event) => {
-                event.stopPropagation();
-                onServiceClick(service.serviceId);
-              }}
-              className="flex min-h-[88px] min-w-0 items-start gap-3 rounded-[22px] border-2 border-dashed border-slate-300 bg-white/90 p-3 text-left text-xs font-bold text-slate-800 transition hover:border-[#f60] hover:bg-orange-50"
-              title={`${service.serviceName} (${service.serviceCode})`}
-            >
-              <span
-                className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                  ["INCIDENT", "IMPACTED"].includes(service.statusCode)
-                    ? "bg-red-500 text-white"
-                    : service.statusCode === "MAINTENANCE"
-                      ? "bg-yellow-400 text-slate-900"
-                      : "bg-cyan-400 text-slate-950"
+          {visibleServices.map((service) => {
+            const serviceSelected = service.serviceId === selectedServiceId;
+            const serviceRouteRoot = service.serviceId === routeRootServiceId;
+
+            return (
+              <button
+                key={service.serviceId}
+                data-service-marker
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onServiceClick(service.serviceId);
+                }}
+                className={`flex min-h-[88px] min-w-0 items-start gap-3 rounded-[22px] border-2 border-dashed border-slate-300 bg-white/90 p-3 text-left text-xs font-bold text-slate-800 transition hover:border-[#f60] hover:bg-orange-50 ${
+                  serviceSelected ? "chainview-selected-service-card" : ""
+                } ${
+                  serviceRouteRoot ? "chainview-impact-root-service-card" : ""
                 }`}
+                title={`${service.serviceName} (${service.serviceCode})`}
               >
-                {["INCIDENT", "IMPACTED"].includes(service.statusCode) ? (
-                  "!"
-                ) : (
-                  <AppWindow size={13} />
-                )}
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate">{service.serviceName}</span>
-                <span className="mt-0.5 block truncate text-[10px] font-semibold text-slate-500">
-                  {service.serviceCode} ·{" "}
-                  {codeLabels.serviceStatus[service.statusCode]}
+                <span
+                  className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+                    ["INCIDENT", "IMPACTED"].includes(service.statusCode)
+                      ? "bg-red-500 text-white"
+                      : service.statusCode === "MAINTENANCE"
+                        ? "bg-yellow-400 text-slate-900"
+                        : "bg-cyan-400 text-slate-950"
+                  }`}
+                >
+                  {["INCIDENT", "IMPACTED"].includes(service.statusCode) ? (
+                    "!"
+                  ) : (
+                    <AppWindow size={13} />
+                  )}
                 </span>
-                <span className="mt-2 inline-flex rounded-full bg-slate-100 px-2 py-1 text-[10px] font-black text-slate-500">
-                  {codeLabels.serviceType[service.serviceTypeCode]}
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate">{service.serviceName}</span>
+                  <span className="mt-0.5 block truncate text-[10px] font-semibold text-slate-500">
+                    {service.serviceCode} ·{" "}
+                    {codeLabels.serviceStatus[service.statusCode]}
+                  </span>
+                  <span className="mt-2 inline-flex rounded-full bg-slate-100 px-2 py-1 text-[10px] font-black text-slate-500">
+                    {codeLabels.serviceType[service.serviceTypeCode]}
+                  </span>
                 </span>
-              </span>
-            </button>
-          ))}
+              </button>
+            );
+          })}
           {hiddenServiceCount > 0 && (
             <div className="flex min-h-[88px] items-center justify-center rounded-[22px] border-2 border-dashed border-slate-300 bg-slate-100 text-sm font-black text-slate-600">
               +{hiddenServiceCount}
@@ -2396,11 +3666,13 @@ function MapExclamation() {
 function ServiceSidePanel({
   service,
   server,
-  onClose,
+  onCollapse,
+  onShowImpactRoute,
 }: {
   service: ServiceRecord;
   server?: ServerRecord;
-  onClose: () => void;
+  onCollapse: () => void;
+  onShowImpactRoute: () => void;
 }) {
   return (
     <aside
@@ -2414,12 +3686,23 @@ function ServiceSidePanel({
             {service.serviceName}
           </h3>
         </div>
-        <button
-          onClick={onClose}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200"
-        >
-          <X size={19} />
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            onClick={onShowImpactRoute}
+            className="flex h-9 items-center gap-1.5 rounded-full border border-fuchsia-100 bg-fuchsia-50 px-3 text-xs font-black text-fuchsia-600 hover:border-fuchsia-200 hover:bg-fuchsia-100"
+            title="이 서비스를 기준으로 영향 경로 보기"
+          >
+            <GitBranch size={15} />
+            영향 경로
+          </button>
+          <button
+            onClick={onCollapse}
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200"
+            title="서비스 상세 접기"
+          >
+            <ChevronRight size={19} />
+          </button>
+        </div>
       </div>
 
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
@@ -2547,6 +3830,22 @@ function favoriteTypeLabel(type: FavoriteItem["type"]) {
   }
 
   return "서비스";
+}
+
+function getServiceStatusRank(statusCode: ServiceRecord["statusCode"]) {
+  if (statusCode === "INCIDENT" || statusCode === "IMPACTED") {
+    return 0;
+  }
+
+  if (statusCode === "MAINTENANCE") {
+    return 1;
+  }
+
+  if (statusCode === "NORMAL") {
+    return 2;
+  }
+
+  return 3;
 }
 
 function clamp(value: number, min: number, max: number) {

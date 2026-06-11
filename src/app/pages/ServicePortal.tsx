@@ -4,10 +4,11 @@ import { Link } from "react-router";
 import {
   Activity,
   ArrowRight,
+  Box,
   CheckCircle2,
-  Edit2,
   Eye,
   Link2,
+  Pencil,
   Plus,
   Search,
   Trash2,
@@ -26,6 +27,8 @@ import {
   type ServiceStatusCode,
   type ServiceTypeCode,
 } from "../mockData";
+import { PageHeader } from "../components/PageHeader";
+import { TableActionButton } from "../components/TableActionButton";
 import {
   ActionPanel,
   Badge,
@@ -197,14 +200,6 @@ export function ServicePortal() {
 
   const getServer = (service: ServiceRecord) =>
     servers.find((server) => server.serverId === service.serverId);
-  const getRelationCount = (serviceId: number) =>
-    relations.filter(
-      (relation) =>
-        relation.sourceServiceId === serviceId ||
-        relation.targetServiceId === serviceId
-    ).length;
-  const getOwnerGroup = (serviceId: number) =>
-    owners.find((owner) => owner.serviceId === serviceId)?.ownerName ?? "미지정";
 
   const handleDelete = (service: ServiceRecord) => {
     deleteService(service.serviceId);
@@ -214,37 +209,34 @@ export function ServicePortal() {
   };
 
   return (
-    <div className="space-y-5">
-      <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900">서비스</h3>
-            <p className="mt-1 text-sm text-gray-500">
-              목록에서 서비스를 찾고 상세보기, 수정, 삭제를 바로 실행합니다.
-            </p>
-          </div>
+    <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-5">
+      <PageHeader
+        description="목록에서 서비스를 찾고 상세보기, 수정, 삭제를 바로 실행합니다."
+        icon={<Box size={22} />}
+        title="서비스 관리"
+        actions={
           <button
             onClick={() => setShowCreate(true)}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#2563eb] px-4 py-2 text-white hover:bg-[#1d4ed8]"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-black text-white shadow-sm transition hover:bg-indigo-700"
           >
-            <Plus size={18} />
+            <Plus size={16} />
             서비스 등록
           </button>
-        </div>
-      </section>
+        }
+      />
 
-      <section className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-        <div className="grid grid-cols-1 gap-3 border-b border-gray-200 p-4 xl:grid-cols-[minmax(260px,1fr)_170px_170px_150px_150px_180px_170px]">
+      <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="grid grid-cols-1 gap-3 border-b border-slate-100 p-4 xl:grid-cols-[minmax(260px,1fr)_170px_170px_150px_150px_180px_170px]">
           <label className="relative block">
             <Search
               size={18}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
             />
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="서비스명, 코드, 분류, 서버 검색"
-              className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-[#2563eb]"
+              className="h-10 w-full rounded-lg border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-indigo-300 focus:bg-white focus:ring-4 focus:ring-indigo-50"
             />
           </label>
           <SelectBox
@@ -299,35 +291,30 @@ export function ServicePortal() {
           />
         </div>
 
-        <div className="overflow-auto">
-          <table className="w-full min-w-[1780px]">
-            <thead className="border-b border-gray-200 bg-gray-50">
+        <div className="overflow-hidden">
+          <table className="w-full table-fixed">
+            <thead className="border-b border-slate-100 bg-slate-50 text-xs font-black text-slate-400">
               <tr>
-                <Th className="w-[280px]">서비스명</Th>
-                <Th className="w-[420px]">분류</Th>
-                <Th className="w-[140px]">상태</Th>
-                <Th className="w-[140px]">중요도</Th>
-                <Th className="w-[240px]">담당 그룹</Th>
-                <Th align="right" className="w-[120px]">서버 수</Th>
-                <Th className="w-[130px]">유형</Th>
-                <Th align="right" className="w-[100px]">관계</Th>
-                <Th className="w-[180px]">최근 수정일</Th>
-                <Th align="right" className="sticky right-0 z-10 w-[260px] bg-gray-50 shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.35)]">작업</Th>
+                <Th className="w-[25%]">서비스명</Th>
+                <Th className="w-[39%]">분류</Th>
+                <Th className="w-[12%]">상태</Th>
+                <Th className="w-[12%]">중요도</Th>
+                <Th align="right" className="w-[210px] bg-slate-50 px-3">작업</Th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
+            <tbody className="divide-y divide-slate-100">
               {filteredServices.map((service) => {
                 return (
-                  <tr key={service.serviceId} className="group hover:bg-gray-50">
+                  <tr key={service.serviceId} className="group hover:bg-slate-50/70">
                     <td className="whitespace-nowrap px-5 py-4">
-                      <div className="font-semibold text-gray-900">
+                      <div className="truncate font-semibold text-slate-900">
                         {service.serviceName}
                       </div>
-                      <div className="text-sm text-gray-500">
+                      <div className="truncate text-sm text-slate-500">
                         {service.serviceCode}
                       </div>
                     </td>
-                    <td className="whitespace-nowrap px-5 py-4 text-sm text-gray-700">
+                    <td className="truncate whitespace-nowrap px-5 py-4 text-sm text-slate-700">
                       {service.categoryPath.join(" / ")}
                     </td>
                     <td className="whitespace-nowrap px-5 py-4">
@@ -340,42 +327,27 @@ export function ServicePortal() {
                         {codeLabels.importance[service.importanceCode ?? "NORMAL"]}
                       </BadgeText>
                     </td>
-                    <td className="whitespace-nowrap px-5 py-4 text-sm text-gray-700">
-                      {getOwnerGroup(service.serviceId)}
-                    </td>
-                    <td className="whitespace-nowrap px-5 py-4 text-right text-sm font-semibold">
-                      {service.serverId ? 1 : 0}
-                    </td>
-                    <td className="whitespace-nowrap px-5 py-4 text-sm text-gray-700">
-                      {codeLabels.serviceType[service.serviceTypeCode]}
-                    </td>
-                    <td className="whitespace-nowrap px-5 py-4 text-right text-sm font-semibold">
-                      {getRelationCount(service.serviceId)}
-                    </td>
-                    <td className="whitespace-nowrap px-5 py-4 text-sm text-gray-500">
-                      {service.updatedAt}
-                    </td>
-                    <td className="sticky right-0 z-10 whitespace-nowrap bg-white px-5 py-4 shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.35)] group-hover:bg-gray-50">
-                      <div className="flex flex-nowrap justify-end gap-2">
+                    <td className="w-[210px] whitespace-nowrap bg-white px-3 py-4 group-hover:bg-slate-50/70">
+                      <div className="flex flex-nowrap justify-end gap-1.5">
                         <ActionButton
                           onClick={() => setDetailServiceId(service.serviceId)}
                         >
-                          <Eye size={15} />
+                          <Eye size={14} />
                           상세
                         </ActionButton>
                         <ActionButton
                           onClick={() => setEditServiceId(service.serviceId)}
                         >
-                          <Edit2 size={15} />
+                          <Pencil size={14} />
                           수정
                         </ActionButton>
-                        <button
+                        <TableActionButton
                           onClick={() => handleDelete(service)}
-                          className="inline-flex min-w-[70px] items-center justify-center gap-1 whitespace-nowrap rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 hover:bg-red-100"
+                          tone="danger"
                         >
-                          <Trash2 size={15} />
+                          <Trash2 size={14} />
                           삭제
-                        </button>
+                        </TableActionButton>
                       </div>
                     </td>
                   </tr>
@@ -787,7 +759,7 @@ function ServiceDetail({
           <h5 className="font-semibold text-gray-900">서비스 정보</h5>
           <div className="flex flex-wrap gap-2">
             <Link
-              to="/relations"
+              to="/service-catalog/relations"
               className="rounded-lg border border-blue-200 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50"
             >
               관계도 보기
@@ -1132,12 +1104,13 @@ function RelationList({
                       {relation.description}
                     </p>
                   </div>
-                  <button
+                  <TableActionButton
                     onClick={() => onRemove(relation.relationId)}
-                    className="shrink-0 whitespace-nowrap rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 hover:bg-red-100"
+                    tone="danger"
                   >
+                    <Trash2 size={14} />
                     삭제
-                  </button>
+                  </TableActionButton>
                 </div>
               </div>
             );
@@ -1159,7 +1132,7 @@ function Th({
 }) {
   return (
     <th
-      className={`whitespace-nowrap px-5 py-3 text-xs font-medium uppercase text-gray-500 ${
+      className={`whitespace-nowrap px-5 py-3 text-xs font-black text-slate-400 ${
         align === "right" ? "text-right" : "text-left"
       } ${className}`}
     >
@@ -1176,18 +1149,15 @@ function ActionButton({
   onClick: () => void;
 }) {
   return (
-    <button
-      onClick={onClick}
-      className="inline-flex min-w-[70px] items-center justify-center gap-1 whitespace-nowrap rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-700 hover:bg-gray-200"
-    >
+    <TableActionButton onClick={onClick} tone="neutral">
       {children}
-    </button>
+    </TableActionButton>
   );
 }
 
 function BadgeText({ children }: { children: ReactNode }) {
   return (
-    <span className="rounded-full border border-gray-200 bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700">
+    <span className="inline-flex min-w-fit whitespace-nowrap break-keep rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-bold leading-none text-slate-700">
       {children}
     </span>
   );

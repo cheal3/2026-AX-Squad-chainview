@@ -157,7 +157,7 @@ export function Info({ label, value }: { label: string; value: string }) {
 
 export function Badge({ children }: { children: ReactNode }) {
   return (
-    <span className="inline-flex rounded-full border border-gray-200 bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700">
+    <span className="inline-flex min-w-fit whitespace-nowrap break-keep rounded-full border border-gray-200 bg-gray-100 px-3 py-1 text-xs font-medium leading-none text-gray-700">
       {children}
     </span>
   );

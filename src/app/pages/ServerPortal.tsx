@@ -1,7 +1,9 @@
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { Edit2, Eye, Plus, Search, Trash2 } from "lucide-react";
+import { Eye, Pencil, Plus, Search, Server as ServerIcon, Trash2 } from "lucide-react";
 import { usePortalData } from "../PortalDataStore";
+import { PageHeader } from "../components/PageHeader";
+import { TableActionButton } from "../components/TableActionButton";
 import {
   codeLabels,
   type EnvCode,
@@ -62,37 +64,34 @@ export function ServerPortal() {
   };
 
   return (
-    <div className="space-y-5">
-      <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900">서버</h3>
-            <p className="mt-1 text-sm text-gray-500">
-              목록에서 서버를 찾고 상세보기, 수정, 삭제를 바로 실행합니다.
-            </p>
-          </div>
+    <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-5">
+      <PageHeader
+        description="목록에서 서버를 찾고 상세보기, 수정, 삭제를 바로 실행합니다."
+        icon={<ServerIcon />}
+        title="서버 관리"
+        actions={
           <button
             onClick={() => setShowCreate(true)}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#2563eb] px-4 py-2 text-white hover:bg-[#1d4ed8]"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-black text-white shadow-sm transition hover:bg-indigo-700"
           >
-            <Plus size={18} />
+            <Plus size={16} />
             서버 등록
           </button>
-        </div>
-      </section>
+        }
+      />
 
-      <section className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-        <div className="grid grid-cols-1 gap-3 border-b border-gray-200 p-4 lg:grid-cols-[minmax(260px,1fr)_180px_180px]">
+      <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="grid grid-cols-1 gap-3 border-b border-slate-100 p-4 lg:grid-cols-[minmax(260px,1fr)_180px_180px]">
           <label className="relative block">
             <Search
               size={18}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
             />
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="서버명, 호스트명, IP 검색"
-              className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-[#2563eb]"
+              className="h-10 w-full rounded-lg border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-indigo-300 focus:bg-white focus:ring-4 focus:ring-indigo-50"
             />
           </label>
           <SelectBox
@@ -109,7 +108,7 @@ export function ServerPortal() {
 
         <div className="overflow-auto">
           <table className="w-full min-w-[1320px]">
-            <thead className="border-b border-gray-200 bg-gray-50">
+            <thead className="border-b border-slate-100 bg-slate-50 text-xs font-black text-slate-400">
               <tr>
                 <Th className="w-[260px]">서버명</Th>
                 <Th className="w-[340px]">호스트/IP</Th>
@@ -117,7 +116,7 @@ export function ServerPortal() {
                 <Th className="w-[260px]">OS</Th>
                 <Th className="w-[130px]">상태</Th>
                 <Th align="right" className="w-[110px]">서비스 수</Th>
-                <Th align="right" className="sticky right-0 z-10 w-[260px] bg-gray-50 shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.35)]">작업</Th>
+                <Th align="right" className="sticky right-0 z-10 w-[210px] bg-slate-50 px-3 shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.35)]">작업</Th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -147,23 +146,23 @@ export function ServerPortal() {
                   <td className="whitespace-nowrap px-5 py-4 text-right text-sm font-semibold">
                     {getServiceCount(server.serverId)}
                   </td>
-                  <td className="sticky right-0 z-10 whitespace-nowrap bg-white px-5 py-4 shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.35)] group-hover:bg-gray-50">
-                    <div className="flex flex-nowrap justify-end gap-2">
+                  <td className="sticky right-0 z-10 w-[210px] whitespace-nowrap bg-white px-3 py-4 shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.35)] group-hover:bg-gray-50">
+                    <div className="flex flex-nowrap justify-end gap-1.5">
                       <ActionButton onClick={() => setDetailServerId(server.serverId)}>
-                        <Eye size={15} />
+                        <Eye size={14} />
                         상세
                       </ActionButton>
                       <ActionButton onClick={() => setEditServerId(server.serverId)}>
-                        <Edit2 size={15} />
+                        <Pencil size={14} />
                         수정
                       </ActionButton>
-                      <button
+                      <TableActionButton
                         onClick={() => handleDelete(server)}
-                        className="inline-flex min-w-[70px] items-center justify-center gap-1 whitespace-nowrap rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 hover:bg-red-100"
+                        tone="danger"
                       >
-                        <Trash2 size={15} />
+                        <Trash2 size={14} />
                         삭제
-                      </button>
+                      </TableActionButton>
                     </div>
                   </td>
                 </tr>
@@ -386,7 +385,7 @@ function Th({
 }) {
   return (
     <th
-      className={`whitespace-nowrap px-5 py-3 text-xs font-medium uppercase text-gray-500 ${
+      className={`whitespace-nowrap px-5 py-3 text-xs font-black text-slate-400 ${
         align === "right" ? "text-right" : "text-left"
       } ${className}`}
     >
@@ -403,18 +402,15 @@ function ActionButton({
   onClick: () => void;
 }) {
   return (
-    <button
-      onClick={onClick}
-      className="inline-flex min-w-[70px] items-center justify-center gap-1 whitespace-nowrap rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-700 hover:bg-gray-200"
-    >
+    <TableActionButton onClick={onClick} tone="neutral">
       {children}
-    </button>
+    </TableActionButton>
   );
 }
 
 function BadgeText({ children }: { children: ReactNode }) {
   return (
-    <span className="rounded-full border border-gray-200 bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700">
+    <span className="inline-flex min-w-fit whitespace-nowrap break-keep rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-bold leading-none text-slate-700">
       {children}
     </span>
   );

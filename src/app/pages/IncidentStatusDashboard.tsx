@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { TrendingUp } from "lucide-react";
+import { Siren, TrendingUp } from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -10,9 +10,11 @@ import {
   YAxis,
 } from "recharts";
 import { usePortalData } from "../PortalDataStore";
+import { PageHeader } from "../components/PageHeader";
 import {
   codeLabels,
   type IncidentRecord,
+  type ServiceRelationRecord,
   type ServiceRecord,
 } from "../mockData";
 
@@ -27,15 +29,82 @@ const hourlyIncidentData = [
   { time: "16:00", count: 29, degraded: 18, down: 11 },
 ];
 
+const INCIDENT_IMPACT_DEPTH = 1;
+
+type IncidentImpactSummary = {
+  service: ServiceRecord;
+  analysis: ImpactAnalysis;
+};
+
 export function IncidentStatusDashboard() {
-  const { services, incidents, relations } = usePortalData();
+  const { services, incidents, relations, owners } = usePortalData();
   const [timeStep, setTimeStep] = useState(1);
-  const incidentServices = services.filter(
-    (service) =>
-      service.statusCode === "INCIDENT" ||
-      service.statusCode === "IMPACTED" ||
-      service.statusCode === "MAINTENANCE" ||
-      service.statusCode === "INACTIVE"
+  const incidentServices = useMemo(
+    () =>
+      services.filter(
+        (service) =>
+          service.statusCode === "INCIDENT" ||
+          service.statusCode === "IMPACTED" ||
+          service.statusCode === "MAINTENANCE" ||
+          service.statusCode === "INACTIVE"
+      ),
+    [services]
+  );
+  const [selectedImpactServiceId, setSelectedImpactServiceId] = useState<
+    number | null
+  >(incidentServices[0]?.serviceId ?? null);
+  const serviceById = useMemo(
+    () => new Map(services.map((service) => [service.serviceId, service])),
+    [services]
+  );
+  const ownerByServiceId = useMemo(
+    () =>
+      new Map(
+        owners.map((owner) => [owner.serviceId, owner.ownerName])
+      ),
+    [owners]
+  );
+  const activeRelations = useMemo(
+    () =>
+      relations.filter(
+        (relation) =>
+          relation.relationStatusCode === "ACTIVE" &&
+          relation.sourceServiceId !== relation.targetServiceId
+      ),
+    [relations]
+  );
+  const incidentImpactSummaries = useMemo<IncidentImpactSummary[]>(
+    () =>
+      incidentServices
+        .map((service) => ({
+          service,
+          analysis: buildImpactAnalysis(
+            service.serviceId,
+            serviceById,
+            activeRelations,
+            ownerByServiceId,
+            INCIDENT_IMPACT_DEPTH
+          ),
+        }))
+        .sort((first, second) => {
+          const criticalDelta =
+            second.analysis.criticalCount - first.analysis.criticalCount;
+          if (criticalDelta !== 0) {
+            return criticalDelta;
+          }
+
+          const impactDelta =
+            second.analysis.items.length - first.analysis.items.length;
+          if (impactDelta !== 0) {
+            return impactDelta;
+          }
+
+          return (
+            getStatusRiskRank(second.service.statusCode) -
+            getStatusRiskRank(first.service.statusCode)
+          );
+        }),
+    [activeRelations, incidentServices, ownerByServiceId, serviceById]
   );
   const downCount = services.filter(
     (service) =>
@@ -48,7 +117,9 @@ export function IncidentStatusDashboard() {
   const latestCount = hourlyIncidentData[hourlyIncidentData.length - 1].count;
   const previousCount = hourlyIncidentData[hourlyIncidentData.length - 2].count;
   const growth = latestCount - previousCount;
-  const topIncidentServices = incidentServices.slice(0, 18);
+  const topIncidentServices = incidentImpactSummaries
+    .slice(0, 10)
+    .map((summary) => summary.service);
   const chartData = useMemo(
     () =>
       hourlyIncidentData.filter(
@@ -58,21 +129,31 @@ export function IncidentStatusDashboard() {
     [timeStep]
   );
 
+  useEffect(() => {
+    if (
+      selectedImpactServiceId !== null &&
+      serviceById.has(selectedImpactServiceId)
+    ) {
+      return;
+    }
+
+    setSelectedImpactServiceId(
+      incidentImpactSummaries[0]?.service.serviceId ?? null
+    );
+  }, [incidentImpactSummaries, selectedImpactServiceId, serviceById]);
+
   return (
-    <div className="-m-8 min-h-[calc(100vh-72px)] space-y-6 bg-slate-50/50 p-8">
-      <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <h1 className="text-4xl font-bold tracking-tight text-slate-950">
-            장애 현황 대시보드
-          </h1>
-          <p className="mt-3 text-base text-slate-500">
-            시간별 장애 증가 추이와 현재 장애 서비스의 누적 상태를 확인합니다.
-          </p>
-        </div>
-        <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
-          최근 1시간 +{growth}개 서비스 영향
-        </div>
-      </section>
+    <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-5">
+      <PageHeader
+        description="시간별 장애 증가 추이와 현재 장애 서비스의 누적 상태를 확인합니다."
+        icon={<Siren size={22} />}
+        title="장애 현황 대시보드"
+        actions={
+          <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-2 text-sm font-black text-red-700">
+            최근 1시간 +{growth}개 서비스 영향
+          </div>
+        }
+      />
 
       <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="mb-4 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
@@ -163,29 +244,47 @@ export function IncidentStatusDashboard() {
                 장애 경과 시간에 따라 크기와 테두리 색상을 표시합니다.
               </p>
             </div>
-            <div className="grid w-full grid-cols-3 overflow-hidden rounded-lg border border-slate-200 bg-slate-50 text-center xl:w-[260px]">
-              <div className="px-3 py-2">
-                <div className="text-[11px] font-medium text-slate-500">
-                  표시
+            <div className="flex w-full flex-col gap-3 xl:w-[520px]">
+              <label className="grid gap-1 text-xs font-bold text-slate-500">
+                분석 기준 서비스
+                <select
+                  value={selectedImpactServiceId ?? ""}
+                  onChange={(event) =>
+                    setSelectedImpactServiceId(Number(event.target.value))
+                  }
+                  className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                >
+                  {incidentImpactSummaries.map(({ service, analysis }) => (
+                    <option key={service.serviceId} value={service.serviceId}>
+                      {service.serviceName} · 영향 {analysis.items.length}개
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="grid grid-cols-3 overflow-hidden rounded-lg border border-slate-200 bg-slate-50 text-center">
+                <div className="px-3 py-2">
+                  <div className="text-[11px] font-medium text-slate-500">
+                    표시
+                  </div>
+                  <div className="mt-0.5 text-sm font-bold text-slate-950">
+                    {topIncidentServices.length}
+                  </div>
                 </div>
-                <div className="mt-0.5 text-sm font-bold text-slate-950">
-                  {topIncidentServices.length}
+                <div className="border-x border-slate-200 px-3 py-2">
+                  <div className="text-[11px] font-medium text-slate-500">
+                    장애
+                  </div>
+                  <div className="mt-0.5 text-sm font-bold text-red-600">
+                    {downCount}
+                  </div>
                 </div>
-              </div>
-              <div className="border-x border-slate-200 px-3 py-2">
-                <div className="text-[11px] font-medium text-slate-500">
-                  장애
-                </div>
-                <div className="mt-0.5 text-sm font-bold text-red-600">
-                  {downCount}
-                </div>
-              </div>
-              <div className="px-3 py-2">
-                <div className="text-[11px] font-medium text-slate-500">
-                  저하
-                </div>
-                <div className="mt-0.5 text-sm font-bold text-amber-600">
-                  {degradedCount}
+                <div className="px-3 py-2">
+                  <div className="text-[11px] font-medium text-slate-500">
+                    저하
+                  </div>
+                  <div className="mt-0.5 text-sm font-bold text-amber-600">
+                    {degradedCount}
+                  </div>
                 </div>
               </div>
             </div>
@@ -193,6 +292,7 @@ export function IncidentStatusDashboard() {
           <PhysicsIncidentCloud
             services={topIncidentServices}
             incidents={incidents}
+            selectedServiceId={selectedImpactServiceId}
           />
         </div>
       </section>
@@ -202,15 +302,16 @@ export function IncidentStatusDashboard() {
           <h3 className="font-semibold text-slate-950">장애 서비스 목록</h3>
         </div>
         <div className="divide-y divide-slate-200">
-          {incidentServices.slice(0, 8).map((service) => {
-            const impactedCount = relations.filter(
-              (relation) => relation.targetServiceId === service.serviceId
-            ).length;
+          {incidentImpactSummaries.slice(0, 6).map(({ service, analysis }) => {
+            const impactedCount = analysis.items.length;
+            const selected = service.serviceId === selectedImpactServiceId;
 
             return (
               <div
                 key={service.serviceId}
-                className="grid grid-cols-1 gap-3 px-6 py-4 md:grid-cols-[minmax(260px,1fr)_140px_120px_120px]"
+                className={`grid w-full grid-cols-1 gap-3 px-6 py-4 text-left md:grid-cols-[minmax(260px,1fr)_140px_120px_120px] ${
+                  selected ? "bg-blue-50/70" : ""
+                }`}
               >
                 <div>
                   <div className="font-semibold text-slate-950">
@@ -264,6 +365,11 @@ export function IncidentStatusDashboard() {
           z-index: 999 !important;
         }
 
+        .incident-ball-active {
+          outline: 3px solid rgba(37, 99, 235, 0.34);
+          outline-offset: 4px;
+        }
+
         .incident-ball span {
           display: -webkit-box;
           overflow: hidden;
@@ -313,6 +419,132 @@ export function IncidentStatusDashboard() {
   );
 }
 
+type ImpactItem = {
+  service: ServiceRecord;
+  depth: number;
+  pathIds: number[];
+  pathCodes: string[];
+  relations: ServiceRelationRecord[];
+};
+
+type ImpactAnalysis = {
+  items: ImpactItem[];
+  byDepth: Array<{ depth: number; items: ImpactItem[] }>;
+  criticalCount: number;
+  ownerGroups: string[];
+  upstreamCount: number;
+};
+
+function buildImpactAnalysis(
+  rootServiceId: number,
+  serviceById: Map<number, ServiceRecord>,
+  relations: ServiceRelationRecord[],
+  ownerByServiceId: Map<number, string>,
+  maxDepth: number
+): ImpactAnalysis {
+  const outgoingBySource = new Map<number, ServiceRelationRecord[]>();
+  relations.forEach((relation) => {
+    const list = outgoingBySource.get(relation.sourceServiceId) ?? [];
+    list.push(relation);
+    outgoingBySource.set(relation.sourceServiceId, list);
+  });
+
+  const items: ImpactItem[] = [];
+  const visitedDepth = new Map<number, number>([[rootServiceId, 0]]);
+  const queue: Array<{
+    depth: number;
+    pathIds: number[];
+    relations: ServiceRelationRecord[];
+    serviceId: number;
+  }> = [{ serviceId: rootServiceId, depth: 0, pathIds: [rootServiceId], relations: [] }];
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current || current.depth >= maxDepth) {
+      continue;
+    }
+
+    const outgoing = outgoingBySource.get(current.serviceId) ?? [];
+    outgoing.forEach((relation) => {
+      const nextServiceId = relation.targetServiceId;
+      const nextDepth = current.depth + 1;
+
+      if (current.pathIds.includes(nextServiceId)) {
+        return;
+      }
+
+      const previousDepth = visitedDepth.get(nextServiceId);
+      if (previousDepth !== undefined && previousDepth <= nextDepth) {
+        return;
+      }
+
+      const service = serviceById.get(nextServiceId);
+      if (!service) {
+        return;
+      }
+
+      const nextPathIds = [...current.pathIds, nextServiceId];
+      const nextRelations = [...current.relations, relation];
+      visitedDepth.set(nextServiceId, nextDepth);
+      items.push({
+        service,
+        depth: nextDepth,
+        pathIds: nextPathIds,
+        pathCodes: nextPathIds.map(
+          (serviceId) => serviceById.get(serviceId)?.serviceCode ?? String(serviceId)
+        ),
+        relations: nextRelations,
+      });
+      queue.push({
+        serviceId: nextServiceId,
+        depth: nextDepth,
+        pathIds: nextPathIds,
+        relations: nextRelations,
+      });
+    });
+  }
+
+  const byDepth = [1, 2, 3].map((depth) => ({
+    depth,
+    items: items.filter((item) => item.depth === depth),
+  }));
+  const criticalCount = items.filter(
+    (item) =>
+      item.service.statusCode === "INCIDENT" ||
+      item.service.statusCode === "INACTIVE" ||
+      item.service.importanceCode === "CRITICAL" ||
+      item.service.importanceCode === "HIGH"
+  ).length;
+  const upstreamCount = relations.filter(
+    (relation) => relation.targetServiceId === rootServiceId
+  ).length;
+  const ownerGroups = Array.from(
+    new Set(
+      items
+        .map((item) => ownerByServiceId.get(item.service.serviceId))
+        .filter((owner): owner is string => Boolean(owner))
+    )
+  ).sort((first, second) => first.localeCompare(second, "ko"));
+
+  return {
+    items,
+    byDepth,
+    criticalCount,
+    ownerGroups,
+    upstreamCount,
+  };
+}
+
+function getStatusRiskRank(statusCode: ServiceRecord["statusCode"]) {
+  if (statusCode === "INCIDENT" || statusCode === "INACTIVE") {
+    return 3;
+  }
+  if (statusCode === "IMPACTED" || statusCode === "MAINTENANCE") {
+    return 2;
+  }
+  return 1;
+}
+
 type PhysicsBall = {
   id: number;
   label: string;
@@ -332,9 +564,11 @@ type PhysicsBall = {
 function PhysicsIncidentCloud({
   services,
   incidents,
+  selectedServiceId,
 }: {
   services: ServiceRecord[];
   incidents: IncidentRecord[];
+  selectedServiceId: number | null;
 }) {
   const fieldRef = useRef<HTMLDivElement | null>(null);
   const ballsRef = useRef<PhysicsBall[]>([]);
@@ -536,7 +770,9 @@ function PhysicsIncidentCloud({
       {balls.map((ball) => (
         <div
           key={ball.id}
-          className="incident-ball"
+          className={`incident-ball ${
+            ball.id === selectedServiceId ? "incident-ball-active" : ""
+          }`}
           style={{
             width: ball.radius * 2,
             height: ball.radius * 2,

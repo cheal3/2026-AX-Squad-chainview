@@ -286,7 +286,7 @@ const baseServices: ServiceRecord[] = [
   },
 ];
 
-const generatedServices = Array.from({ length: 160 }, (_, index) => {
+const generatedServices = Array.from({ length: 48 }, (_, index) => {
   const serviceId = index + 3;
   const categories = [
     ["기간계/업무계", "계약", "조회"],
@@ -298,6 +298,8 @@ const generatedServices = Array.from({ length: 160 }, (_, index) => {
   ];
   const serviceTypeCodes: ServiceTypeCode[] = ["WEB", "API", "BATCH", "EXTERNAL"];
   const statusCodes: ServiceStatusCode[] = [
+    "NORMAL",
+    "NORMAL",
     "NORMAL",
     "NORMAL",
     "NORMAL",
@@ -369,7 +371,7 @@ const baseServiceRelations: ServiceRelationRecord[] = [
 ];
 
 const generatedServiceRelations = generatedServices
-  .slice(0, 90)
+  .slice(0, 42)
   .map((service, index) => {
     const target = generatedServices[(index + 7) % generatedServices.length];
     const relationTypeCodes: RelationTypeCode[] = ["REST", "MQ", "FILE", "SOAP"];
@@ -387,7 +389,7 @@ const generatedServiceRelations = generatedServices
     } satisfies ServiceRelationRecord;
   });
 
-const denseRelationHubs = [0, 5, 12, 25, 40, 63];
+const denseRelationHubs = [0, 5, 12, 24, 36];
 const denseServiceRelations = denseRelationHubs.flatMap((hubIndex, hubOrder) => {
   const hub = generatedServices[hubIndex];
   const relationTypeCodes: RelationTypeCode[] = ["REST", "MQ", "FILE", "SOAP"];
