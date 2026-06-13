@@ -114,10 +114,26 @@ function enforceVerticalGap(
   return result;
 }
 
-export function ServiceRelationFlow({ embedded = false }: { embedded?: boolean } = {}) {
+export function ServiceRelationFlow({
+  defaultRelationDepth = 1,
+  embedded = false,
+  hideDepthToggle = false,
+  hideTopControl = false,
+  initialServiceId,
+  onServiceSelect,
+  selectedServiceId,
+}: {
+  defaultRelationDepth?: number;
+  embedded?: boolean;
+  hideDepthToggle?: boolean;
+  hideTopControl?: boolean;
+  initialServiceId?: number;
+  onServiceSelect?: (serviceId: number) => void;
+  selectedServiceId?: number;
+} = {}) {
   const { services, relations, owners, servers, techStacks } = usePortalData();
   const [focusedServiceId, setFocusedServiceId] = useState<number>(
-    services[0]?.serviceId ?? 0
+    initialServiceId ?? selectedServiceId ?? services[0]?.serviceId ?? 0
   );
   const [query, setQuery] = useState("");
   const [detailOpen, setDetailOpen] = useState(false);
@@ -125,7 +141,7 @@ export function ServiceRelationFlow({ embedded = false }: { embedded?: boolean }
   const [detailServiceId, setDetailServiceId] = useState<number>(
     services[0]?.serviceId ?? 0
   );
-  const [relationDepth, setRelationDepth] = useState(1);
+  const [relationDepth, setRelationDepth] = useState(defaultRelationDepth);
   const [topControlMode, setTopControlMode] =
     useState<TopControlMode>("select");
   const [flowInstance, setFlowInstance] =
@@ -441,12 +457,14 @@ export function ServiceRelationFlow({ embedded = false }: { embedded?: boolean }
   const openServiceDetail = (serviceId: number) => {
     setDetailServiceId(serviceId);
     setDetailOpen(true);
+    onServiceSelect?.(serviceId);
   };
 
   const moveToFocusedService = (serviceId: number) => {
     setFocusedServiceId(serviceId);
     setDetailOpen(false);
     setQuery("");
+    onServiceSelect?.(serviceId);
   };
 
   const serviceNodes = useMemo<Node<ServiceNodeData>[]>(() => {
@@ -633,7 +651,7 @@ export function ServiceRelationFlow({ embedded = false }: { embedded?: boolean }
             <Controls />
           </ReactFlow>
 
-          {focusedService && (
+          {focusedService && !hideTopControl && (
             <RelationTopControl
               detailOpen={detailPanelWide}
               focusedService={focusedService}
@@ -647,7 +665,7 @@ export function ServiceRelationFlow({ embedded = false }: { embedded?: boolean }
             />
           )}
 
-          {detailService && (
+          {detailService && !embedded && (
             <RelationServiceDetailPanel
               open={detailOpen}
               incomingCount={directIncomingCount}
@@ -661,10 +679,12 @@ export function ServiceRelationFlow({ embedded = false }: { embedded?: boolean }
             />
           )}
 
-          <RelationDepthToggle
-            depth={relationDepth}
-            onDepthChange={setRelationDepth}
-          />
+          {!hideDepthToggle && (
+            <RelationDepthToggle
+              depth={relationDepth}
+              onDepthChange={setRelationDepth}
+            />
+          )}
         </div>
       </section>
 
@@ -1255,6 +1275,7 @@ function ServiceNode({ data }: { data: ServiceNodeData }) {
       } ${data.detailSelected ? "chainview-flow-node-detail-selected" : ""} ${
         data.connected ? "chainview-flow-node-connected" : ""
       }`}
+      onClick={() => data.onOpenDetail(data.serviceId)}
     >
       <Handle type="target" position={Position.Left} />
       <div className="flex items-start justify-between gap-3">
