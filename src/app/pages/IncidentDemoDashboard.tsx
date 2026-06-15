@@ -89,6 +89,9 @@ export function IncidentDemoDashboard() {
   const [normalPopupServiceId, setNormalPopupServiceId] = useState<
     number | null
   >(null);
+  const [incidentRegisterService, setIncidentRegisterService] =
+    useState<ServiceRecord | null>(null);
+  const [incidentSymptom, setIncidentSymptom] = useState("");
   const [demoIncidentIds, setDemoIncidentIds] = useState<Set<number>>(
     () => new Set()
   );
@@ -367,13 +370,14 @@ export function IncidentDemoDashboard() {
 
     return createNormalIncident(selectedService);
   };
-  const createNormalIncident = (service: ServiceRecord) => {
+  const createNormalIncident = (service: ServiceRecord, symptom?: string) => {
+    const description =
+      symptom?.trim() || "대시보드에서 운영자가 등록한 인시던트입니다.";
     const incident = createIncident({
       serviceId: service.serviceId,
       severityCode: "MAJOR",
       title: `${service.serviceName} 응답 지연 감지`,
-      description:
-        "대시보드에서 운영자가 등록한 인시던트입니다.",
+      description,
       manualRegisteredYn: "Y",
       registeredBy: "admin",
     });
@@ -534,7 +538,10 @@ export function IncidentDemoDashboard() {
                 relationCountByServiceId={relationCountByServiceId}
                 selectedServiceId={selectedService.serviceId}
                 services={normalListServices}
-                onCreateIncident={(service) => createNormalIncident(service)}
+                onCreateIncident={(service) => {
+                  setIncidentRegisterService(service);
+                  setIncidentSymptom("");
+                }}
                 onOpenDetail={(service) => setNormalPopupServiceId(service.serviceId)}
                 onSelectService={(serviceId) => {
                   setSelectedServiceId(serviceId);
@@ -577,7 +584,24 @@ export function IncidentDemoDashboard() {
             status={getDashboardStatus(normalPopupService)}
             onClose={() => setNormalPopupServiceId(null)}
             onCreateIncident={() => {
-              createNormalIncident(normalPopupService);
+              setIncidentRegisterService(normalPopupService);
+              setIncidentSymptom("");
+            }}
+          />
+        ) : null}
+        {incidentRegisterService ? (
+          <IncidentRegistrationModal
+            service={incidentRegisterService}
+            symptom={incidentSymptom}
+            onChangeSymptom={setIncidentSymptom}
+            onClose={() => {
+              setIncidentRegisterService(null);
+              setIncidentSymptom("");
+            }}
+            onConfirm={() => {
+              createNormalIncident(incidentRegisterService, incidentSymptom);
+              setIncidentRegisterService(null);
+              setIncidentSymptom("");
               setNormalPopupServiceId(null);
             }}
           />
@@ -799,26 +823,8 @@ export function IncidentDemoDashboard() {
               setActionNote("");
             }}
             onCreateIncident={() => {
-              const incident = createIncident({
-                serviceId: selectedService.serviceId,
-                severityCode: "MAJOR",
-                title: `${selectedService.serviceName} 응답 지연 감지`,
-                description:
-                  "대시보드에서 운영자가 등록한 인시던트입니다.",
-                manualRegisteredYn: "Y",
-                registeredBy: "admin",
-              });
-              setDemoIncidentIds((current) => {
-                const next = new Set(current);
-                next.add(incident.incidentId);
-                return next;
-              });
-              updateDashboardStatus(selectedService.serviceId, "INCIDENT");
-              setSelectedServiceId(selectedService.serviceId);
-              setImpactDetailTab("history");
-              setServiceDetailPanelOpen(true);
-              window.setTimeout(() => scrollToSection(relationSectionRef), 0);
-              return incident;
+              setIncidentRegisterService(selectedService);
+              setIncidentSymptom("");
             }}
             onClose={() => setServiceDetailPanelOpen(false)}
             onOpenServiceDetail={() => setNormalPopupServiceId(selectedService.serviceId)}
@@ -927,7 +933,24 @@ export function IncidentDemoDashboard() {
           status={getDashboardStatus(normalPopupService)}
           onClose={() => setNormalPopupServiceId(null)}
           onCreateIncident={() => {
-            createNormalIncident(normalPopupService);
+            setIncidentRegisterService(normalPopupService);
+            setIncidentSymptom("");
+          }}
+        />
+      ) : null}
+      {incidentRegisterService ? (
+        <IncidentRegistrationModal
+          service={incidentRegisterService}
+          symptom={incidentSymptom}
+          onChangeSymptom={setIncidentSymptom}
+          onClose={() => {
+            setIncidentRegisterService(null);
+            setIncidentSymptom("");
+          }}
+          onConfirm={() => {
+            createNormalIncident(incidentRegisterService, incidentSymptom);
+            setIncidentRegisterService(null);
+            setIncidentSymptom("");
             setNormalPopupServiceId(null);
           }}
         />
@@ -998,11 +1021,11 @@ function NormalServiceRankList({
         </colgroup>
         <thead>
           <tr className="border-b border-slate-100 bg-white text-left text-xs font-black text-slate-400">
-            <th className="px-5 py-4">순위</th>
-            <th className="px-5 py-4">서비스</th>
-            <th className="px-5 py-4 text-right">상태</th>
-            <th className="px-5 py-4 text-right">인스턴스</th>
-            <th className="px-5 py-4 text-right">연관 서비스</th>
+            <th className="px-5 py-4 text-center">순위</th>
+            <th className="px-5 py-4 text-center">서비스</th>
+            <th className="px-5 py-4 text-center">상태</th>
+            <th className="px-5 py-4 text-center">인스턴스</th>
+            <th className="px-5 py-4 text-center">연관 서비스</th>
             <th className="px-5 py-4 text-center">작업</th>
           </tr>
         </thead>
@@ -1023,8 +1046,8 @@ function NormalServiceRankList({
                   selected ? "bg-[#f2f7ff]" : "hover:bg-slate-50"
                 }`}
               >
-                <td className="whitespace-nowrap px-5 py-4">
-                  <div className="flex items-center gap-4">
+                <td className="whitespace-nowrap px-5 py-4 text-center">
+                  <div className="flex items-center justify-center gap-4">
                     <span className="text-slate-300">♥</span>
                     <span className="text-base font-black text-slate-700">
                       {index + 1}
@@ -1052,7 +1075,7 @@ function NormalServiceRankList({
                     </div>
                   </div>
                 </td>
-                <td className="whitespace-nowrap px-5 py-4 text-right">
+                <td className="whitespace-nowrap px-5 py-4 text-center">
                   <span
                     className={`text-sm font-black ${
                       displayStatus === "NORMAL"
@@ -1065,10 +1088,10 @@ function NormalServiceRankList({
                     {codeLabels.serviceStatus[displayStatus]}
                   </span>
                 </td>
-                <td className="whitespace-nowrap px-5 py-4 text-right text-sm font-black text-slate-700">
+                <td className="whitespace-nowrap px-5 py-4 text-center text-sm font-black text-slate-700">
                   {service.instanceCount}개
                 </td>
-                <td className="whitespace-nowrap px-5 py-4 text-right text-sm font-black text-slate-700">
+                <td className="whitespace-nowrap px-5 py-4 text-center text-sm font-black text-slate-700">
                   {totalRelations}개
                 </td>
                 <td className="whitespace-nowrap px-5 py-4">
@@ -1208,6 +1231,84 @@ function NormalServiceDetailModal({
             className="inline-flex h-11 items-center justify-center rounded-xl bg-[#3182f6] text-sm font-black text-white transition hover:bg-[#1b64da]"
           >
             인시던트 등록
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function IncidentRegistrationModal({
+  onChangeSymptom,
+  onClose,
+  onConfirm,
+  service,
+  symptom,
+}: {
+  onChangeSymptom: (value: string) => void;
+  onClose: () => void;
+  onConfirm: () => void;
+  service: ServiceRecord;
+  symptom: string;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 px-5 py-8"
+      onClick={onClose}
+    >
+      <section
+        className="w-full max-w-[520px] overflow-hidden rounded-2xl bg-white shadow-2xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
+          <div className="min-w-0">
+            <div className="text-xs font-black text-[#f04452]">인시던트 등록 확인</div>
+            <h2 className="mt-1 truncate text-xl font-black text-slate-950">
+              {service.serviceName}
+            </h2>
+            <p className="mt-1 truncate text-sm font-bold text-slate-500">
+              {service.serviceCode} · {getNormalServiceCategory(service)}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+            title="팝업 닫기"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="px-6 py-5">
+          <label className="block">
+            <span className="text-sm font-black text-slate-700">증상 입력</span>
+            <textarea
+              value={symptom}
+              onChange={(event) => onChangeSymptom(event.target.value)}
+              placeholder="예: 응답 시간이 증가하고 일부 요청에서 타임아웃이 발생합니다."
+              className="mt-2 min-h-[120px] w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold leading-6 text-slate-700 outline-none transition focus:border-[#86b7ff] focus:bg-white focus:ring-4 focus:ring-[#edf5ff]"
+            />
+          </label>
+          <div className="mt-3 rounded-xl border border-[#ffe5e8] bg-[#fff5f6] px-4 py-3 text-xs font-bold leading-5 text-[#b4232f]">
+            등록하면 대시보드 상단에 인시던트 알림이 표시되고, 영향도와 타임라인 기록이 생성됩니다.
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 border-t border-slate-100 px-6 py-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-sm font-black text-slate-600 transition hover:bg-slate-50"
+          >
+            취소
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="inline-flex h-11 items-center justify-center rounded-xl bg-[#3182f6] text-sm font-black text-white transition hover:bg-[#1b64da]"
+          >
+            등록
           </button>
         </div>
       </section>
@@ -1370,15 +1471,6 @@ function NormalSelectedServicePanel({
           </button>
         </div>
       </div>
-      <div className="shrink-0 border-t border-slate-100 p-3">
-        <button
-          type="button"
-          onClick={onClose}
-          className="inline-flex h-10 w-full items-center justify-center rounded-lg border border-slate-200 bg-white text-xs font-black text-slate-600 transition hover:bg-slate-50"
-        >
-          닫기
-        </button>
-      </div>
     </aside>
   );
 }
@@ -1539,7 +1631,7 @@ function ImpactDetailTabs({
 
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
         {activeTab === "service" ? (
-          <div>
+          <div className="flex min-h-[500px] flex-col">
             <div className="flex items-start gap-3 border-b border-slate-100 pb-4">
               <div
                 className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
@@ -1595,7 +1687,7 @@ function ImpactDetailTabs({
               />
             </div>
 
-            <div className="mt-8 grid gap-2 border-t border-slate-100 pt-4">
+            <div className="mt-auto grid gap-2 border-t border-slate-100 pt-4">
               <button
                 type="button"
                 onClick={onOpenServiceDetail}
@@ -1713,15 +1805,6 @@ function ImpactDetailTabs({
             )}
           </div>
         ) : null}
-      </div>
-      <div className="shrink-0 border-t border-slate-100 p-3">
-        <button
-          type="button"
-          onClick={onClose}
-          className="inline-flex h-10 w-full items-center justify-center rounded-lg border border-slate-200 bg-white text-xs font-black text-slate-600 transition hover:bg-slate-50"
-        >
-          닫기
-        </button>
       </div>
     </aside>
   );
