@@ -21,14 +21,14 @@ export const router = createBrowserRouter(
         { index: true, element: <Navigate to="/dashboard" replace /> },
         {
           path: "dashboard",
-          lazy: lazyPage(() => import("./pages/Dashboard"), "Dashboard"),
-        },
-        {
-          path: "incident-demo-dashboard",
           lazy: lazyPage(
             () => import("./pages/IncidentDemoDashboard"),
             "IncidentDemoDashboard"
           ),
+        },
+        {
+          path: "incident-demo-dashboard",
+          element: <Navigate to="/dashboard" replace />,
         },
         {
           path: "service-catalog/relations",

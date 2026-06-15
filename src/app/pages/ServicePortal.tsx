@@ -856,7 +856,13 @@ function ServiceDetail({
             <button
               onClick={() => {
                 const result = onHealthCheck(healthUrl);
-                setHealthMessage(`${result.statusCode} · ${result.statusText}`);
+                setHealthMessage(
+                  `${result.statusCode} · ${result.statusText}${
+                    result.incidentId
+                      ? ` · 인시던트 #${result.incidentId} 생성`
+                      : ""
+                  }`
+                );
               }}
               className="inline-flex items-center gap-2 rounded-lg bg-[#2563eb] px-3 py-2 text-white"
             >

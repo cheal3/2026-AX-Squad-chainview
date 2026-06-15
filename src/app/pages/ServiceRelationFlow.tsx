@@ -118,12 +118,24 @@ function enforceVerticalGap(
 
 export function ServiceRelationFlow({
   embedded = false,
+  embeddedHeightClassName,
+  frameless = false,
+  hideDepthToggle = false,
+  hideDetailPanel = false,
+  hideTopControl = false,
   incidentMode = false,
   initialServiceId,
+  onSelectService,
 }: {
   embedded?: boolean;
+  embeddedHeightClassName?: string;
+  frameless?: boolean;
+  hideDepthToggle?: boolean;
+  hideDetailPanel?: boolean;
+  hideTopControl?: boolean;
   incidentMode?: boolean;
   initialServiceId?: number;
+  onSelectService?: (serviceId: number) => void;
 } = {}) {
   const { services, relations, owners, servers, techStacks, incidents } =
     usePortalData();
@@ -478,12 +490,14 @@ export function ServiceRelationFlow({
   const openServiceDetail = (serviceId: number) => {
     setDetailServiceId(serviceId);
     setDetailOpen(true);
+    onSelectService?.(serviceId);
   };
 
   const moveToFocusedService = (serviceId: number) => {
     setFocusedServiceId(serviceId);
     setDetailOpen(false);
     setQuery("");
+    onSelectService?.(serviceId);
   };
 
   const serviceNodes = useMemo<Node<ServiceNodeData>[]>(() => {
@@ -532,6 +546,7 @@ export function ServiceRelationFlow({
     laneByServiceId,
     moveToFocusedService,
     openServiceDetail,
+    onSelectService,
     ownerByServiceId,
     relationCountByServiceId,
     services,
@@ -658,7 +673,7 @@ export function ServiceRelationFlow({
     ? "min-h-[680px]"
     : "mx-auto flex w-full max-w-[1600px] flex-col gap-5";
   const canvasClassName = embedded
-    ? "relative h-[680px] min-h-[620px]"
+    ? `relative ${embeddedHeightClassName ?? "h-[680px] min-h-[620px]"}`
     : "relative h-[calc(100vh-188px)] min-h-[620px]";
 
   return (
@@ -671,7 +686,13 @@ export function ServiceRelationFlow({
         />
       )}
 
-      <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <section
+        className={
+          frameless
+            ? "overflow-hidden bg-white"
+            : "overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
+        }
+      >
         <div className={canvasClassName}>
           <ReactFlow
             nodes={nodes}
@@ -686,7 +707,7 @@ export function ServiceRelationFlow({
             <Controls />
           </ReactFlow>
 
-          {focusedService && (
+          {focusedService && !hideTopControl && (
             <RelationTopControl
               detailOpen={detailPanelWide}
               focusedService={focusedService}
@@ -700,7 +721,7 @@ export function ServiceRelationFlow({
             />
           )}
 
-          {detailService && (
+          {detailService && !hideDetailPanel && (
             <RelationServiceDetailPanel
               open={detailOpen}
               incomingCount={directIncomingCount}
@@ -717,10 +738,12 @@ export function ServiceRelationFlow({
             />
           )}
 
-          <RelationDepthToggle
-            depth={relationDepth}
-            onDepthChange={setRelationDepth}
-          />
+          {!hideDepthToggle && (
+            <RelationDepthToggle
+              depth={relationDepth}
+              onDepthChange={setRelationDepth}
+            />
+          )}
         </div>
       </section>
 

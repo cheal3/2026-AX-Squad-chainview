@@ -15,6 +15,7 @@ export const codeLabels = {
   envType: {
     PROD: "운영",
     STAGE: "스테이징",
+    TEST: "시험",
     DEV: "개발",
   },
   osType: {

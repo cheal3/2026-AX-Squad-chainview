@@ -31,6 +31,16 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  server: {
+    proxy: {
+      '/chainview-api': {
+        target: 'http://chainview.kro.kr:8080',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (requestPath) => requestPath.replace(/^\/chainview-api/, ''),
+      },
+    },
+  },
 
   // File types to support raw imports. Never add .css, .tsx, or .ts files to this.
   assetsInclude: ['**/*.svg', '**/*.csv'],

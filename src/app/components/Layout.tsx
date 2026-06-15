@@ -44,14 +44,8 @@ export function Layout() {
       items: [
         {
           path: "/dashboard",
-          label: "실시간 대시보드",
+          label: "대시보드",
           icon: LayoutDashboard,
-          badge: incidentCount,
-        },
-        {
-          path: "/incident-demo-dashboard",
-          label: "장애 시연 대시보드",
-          icon: AlertTriangle,
           badge: incidentCount,
         },
         { path: "/incidents", label: "인시던트 관리", icon: AlertTriangle },

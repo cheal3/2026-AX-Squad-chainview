@@ -17,7 +17,6 @@ import { usePortalData } from "../PortalDataStore";
 import { PageHeader } from "../components/PageHeader";
 import {
   codeLabels,
-  incidentImpacts,
   type IncidentImpactRecord,
   type IncidentRecord,
   type IncidentStatusCode,
@@ -36,7 +35,13 @@ const incidentTabLabels: Record<IncidentDetailTab, string> = {
 };
 
 export function IncidentListPage() {
-  const { incidents, relations, services } = usePortalData();
+  const { createIncident, incidentImpacts, incidents, relations, services } =
+    usePortalData();
+  const [manualServiceId, setManualServiceId] = useState(
+    services[0]?.serviceId ?? 0
+  );
+  const [manualTitle, setManualTitle] = useState("");
+  const [manualDescription, setManualDescription] = useState("");
   const openIncidents = incidents.filter(
     (incident) => incident.incidentStatusCode === "OPEN"
   );
@@ -85,6 +90,69 @@ export function IncidentListPage() {
         />
       </section>
 
+      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-base font-black text-slate-950">
+              수동 인시던트 등록
+            </h2>
+            <p className="mt-1 text-xs font-bold text-slate-400">
+              등록 즉시 인시던트 기록, 영향도, 알림 전파 이력이 생성됩니다.
+            </p>
+          </div>
+        </div>
+        <div className="grid gap-3 lg:grid-cols-[220px_minmax(0,1fr)_minmax(0,1.4fr)_120px]">
+          <select
+            value={manualServiceId}
+            onChange={(event) => setManualServiceId(Number(event.target.value))}
+            className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 outline-none"
+          >
+            {services.slice(0, 24).map((service) => (
+              <option key={service.serviceId} value={service.serviceId}>
+                {service.serviceName}
+              </option>
+            ))}
+          </select>
+          <input
+            value={manualTitle}
+            onChange={(event) => setManualTitle(event.target.value)}
+            placeholder="인시던트 제목"
+            className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 outline-none"
+          />
+          <input
+            value={manualDescription}
+            onChange={(event) => setManualDescription(event.target.value)}
+            placeholder="감지 내용 또는 현상"
+            className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 outline-none"
+          />
+          <button
+            type="button"
+            onClick={() => {
+              const service = services.find(
+                (item) => item.serviceId === manualServiceId
+              );
+              createIncident({
+                serviceId: manualServiceId,
+                severityCode: "MAJOR",
+                title:
+                  manualTitle.trim() ||
+                  `${service?.serviceName ?? "서비스"} 수동 인시던트`,
+                description:
+                  manualDescription.trim() ||
+                  "운영자가 수동으로 등록한 인시던트입니다.",
+                manualRegisteredYn: "Y",
+                registeredBy: "admin",
+              });
+              setManualTitle("");
+              setManualDescription("");
+            }}
+            className="h-10 rounded-lg bg-[#3182f6] px-4 text-sm font-black text-white transition hover:bg-[#1b64da]"
+          >
+            등록
+          </button>
+        </div>
+      </section>
+
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
           <div>
@@ -101,16 +169,25 @@ export function IncidentListPage() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[980px]">
+          <table className="w-full min-w-[980px] table-fixed">
+            <colgroup>
+              <col className="w-[92px]" />
+              <col />
+              <col className="w-[220px]" />
+              <col className="w-[120px]" />
+              <col className="w-[120px]" />
+              <col className="w-[160px]" />
+              <col className="w-[150px]" />
+            </colgroup>
             <thead className="bg-slate-50 text-left text-xs font-black text-slate-400">
               <tr>
-                <th className="w-[92px] px-5 py-3">ID</th>
+                <th className="px-5 py-3">ID</th>
                 <th className="px-5 py-3">인시던트</th>
-                <th className="w-[220px] px-5 py-3">대상</th>
-                <th className="w-[120px] px-5 py-3 text-center">심각도</th>
-                <th className="w-[120px] px-5 py-3 text-center">상태</th>
-                <th className="w-[160px] px-5 py-3">발생 시각</th>
-                <th className="w-[150px] px-5 py-3 text-center">액션</th>
+                <th className="px-5 py-3">대상</th>
+                <th className="px-5 py-3 text-center">심각도</th>
+                <th className="px-5 py-3 text-center">상태</th>
+                <th className="px-5 py-3">발생 시각</th>
+                <th className="px-5 py-3 text-center">액션</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -148,8 +225,8 @@ export function IncidentListPage() {
                     </td>
                     <td className="px-5 py-4 text-center">
                       <Link
-                        to={`/incidents/${incident.incidentId}`}
-                        className="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-slate-200 bg-slate-100 px-2.5 text-xs font-black text-slate-700 transition hover:bg-slate-200"
+                        to={`/dashboard?incidentId=${incident.incidentId}`}
+                        className="inline-flex h-8 min-w-[72px] shrink-0 items-center justify-center gap-1 whitespace-nowrap break-keep rounded-md border border-slate-200 bg-slate-100 px-3 text-xs font-black leading-none text-slate-700 transition hover:bg-slate-200"
                       >
                         <Eye size={14} />
                         상세
@@ -168,8 +245,18 @@ export function IncidentListPage() {
 
 export function IncidentImpact() {
   const { incidentId } = useParams();
-  const { incidents, owners, relations, services } = usePortalData();
+  const {
+    addIncidentEvent,
+    incidentEvents,
+    incidentImpacts,
+    incidents,
+    owners,
+    relations,
+    services,
+    updateIncidentStatus,
+  } = usePortalData();
   const [activeTab, setActiveTab] = useState<IncidentDetailTab>("overview");
+  const [actionNote, setActionNote] = useState("");
   const incident =
     incidents.find((item) => item.incidentId === Number(incidentId)) ??
     incidents[0];
@@ -218,6 +305,7 @@ export function IncidentImpact() {
 
   const elapsed = getIncidentElapsedLabel(incident);
   const historyRows = getIncidentHistoryRows({
+    events: incidentEvents.filter((event) => event.incidentId === incident.incidentId),
     incident,
     ownerNames:
       targetService && ownerByServiceId.get(targetService.serviceId)
@@ -240,6 +328,36 @@ export function IncidentImpact() {
               <Clock size={16} />
               경과 {elapsed}
             </div>
+            {incident.incidentStatusCode !== "RESOLVED" ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() =>
+                    updateIncidentStatus(
+                      incident.incidentId,
+                      "MONITORING",
+                      "장애 조치 후 모니터링 상태로 전환했습니다."
+                    )
+                  }
+                  className="inline-flex h-10 items-center rounded-lg border border-[#d9e8ff] bg-[#f2f7ff] px-4 text-sm font-black text-[#1f6feb]"
+                >
+                  모니터링 전환
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    updateIncidentStatus(
+                      incident.incidentId,
+                      "RESOLVED",
+                      "복구 확인 후 인시던트를 완료 처리했습니다."
+                    )
+                  }
+                  className="inline-flex h-10 items-center rounded-lg bg-[#20c997] px-4 text-sm font-black text-white"
+                >
+                  완료 처리
+                </button>
+              </>
+            ) : null}
             <BackToIncidentList />
           </div>
         }
@@ -317,7 +435,15 @@ export function IncidentImpact() {
       )}
 
       {activeTab === "history" && (
-        <IncidentHistorySection rows={historyRows} />
+        <IncidentHistorySection
+          actionNote={actionNote}
+          onActionNoteChange={setActionNote}
+          onAddAction={() => {
+            addIncidentEvent(incident.incidentId, actionNote);
+            setActionNote("");
+          }}
+          rows={historyRows}
+        />
       )}
     </div>
   );
@@ -551,12 +677,37 @@ function OwnerInfoSection({
   );
 }
 
-function IncidentHistorySection({ rows }: { rows: IncidentHistoryRow[] }) {
+function IncidentHistorySection({
+  actionNote,
+  onActionNoteChange,
+  onAddAction,
+  rows,
+}: {
+  actionNote: string;
+  onActionNoteChange: (value: string) => void;
+  onAddAction: () => void;
+  rows: IncidentHistoryRow[];
+}) {
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="mb-4 flex items-center gap-2">
         <Bell size={18} className="text-[#f08c00]" />
         <h3 className="text-lg font-black text-slate-950">인시던트이력</h3>
+      </div>
+      <div className="mb-4 grid gap-2 lg:grid-cols-[minmax(0,1fr)_120px]">
+        <input
+          value={actionNote}
+          onChange={(event) => onActionNoteChange(event.target.value)}
+          placeholder="타임라인에 남길 진행 내역 또는 조치 내용을 입력"
+          className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 outline-none focus:border-[#86b7ff] focus:ring-4 focus:ring-[#edf5ff]"
+        />
+        <button
+          type="button"
+          onClick={onAddAction}
+          className="h-10 rounded-lg bg-[#3182f6] px-4 text-sm font-black text-white transition hover:bg-[#1b64da]"
+        >
+          기록 추가
+        </button>
       </div>
       <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
         {rows.map((row, index) => (
@@ -708,14 +859,44 @@ function TimelineRow({
 }
 
 function getIncidentHistoryRows({
+  events,
   incident,
   ownerNames,
   service,
 }: {
+  events: Array<{
+    actor: string;
+    createdAt: string;
+    eventType: string;
+    message: string;
+  }>;
   incident: IncidentRecord;
   ownerNames: string[];
   service?: ServiceRecord;
 }): IncidentHistoryRow[] {
+  if (events.length) {
+    return [...events]
+      .sort((first, second) => first.createdAt.localeCompare(second.createdAt))
+      .map((event) => ({
+        color:
+          event.eventType === "DETECTED"
+            ? "red"
+            : event.eventType === "NOTIFICATION_SENT"
+              ? "amber"
+              : event.eventType === "RESOLVED"
+                ? "emerald"
+                : event.eventType === "STATUS_CHANGED"
+                  ? "blue"
+                  : "slate",
+        time: event.createdAt.slice(11, 16),
+        label: (
+          <>
+            {event.message} · {event.actor}
+          </>
+        ),
+      }));
+  }
+
   const serviceName = service?.serviceName ?? incident.title;
   const ownerName = ownerNames[0] ?? "담당 그룹";
 
