@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, Outlet, useLocation } from "react-router";
 import {
   AlertTriangle,
@@ -32,11 +32,38 @@ function isActivePath(pathname: string, path: string) {
 export function Layout() {
   const location = useLocation();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const { services } = usePortalData();
+  const { incidents, services } = usePortalData();
   const incidentCount = services.filter(
     (service) =>
       service.statusCode === "INCIDENT" || service.statusCode === "INACTIVE"
   ).length;
+  const activeIncidentAlert = useMemo(() => {
+    const serviceById = new Map(
+      services.map((service) => [service.serviceId, service])
+    );
+
+    return incidents
+      .filter(
+        (incident) =>
+          incident.incidentStatusCode !== "RESOLVED" &&
+          (incident.manualRegisteredYn === "Y" || incident.registeredBy === "admin")
+      )
+      .map((incident) => ({
+        incident,
+        service: incident.serviceId
+          ? serviceById.get(incident.serviceId)
+          : undefined,
+      }))
+      .filter(
+        (item): item is {
+          incident: (typeof incidents)[number];
+          service: (typeof services)[number];
+        } => Boolean(item.service)
+      )
+      .sort((first, second) =>
+        second.incident.startedAt.localeCompare(first.incident.startedAt)
+      )[0];
+  }, [incidents, services]);
 
   const sections: { label: string; items: NavItem[] }[] = [
     {
@@ -204,6 +231,31 @@ export function Layout() {
 
       <div className="min-w-0 flex-1 overflow-hidden">
         <main className="h-full overflow-auto p-6">
+          {activeIncidentAlert ? (
+            <section className="mx-auto mb-4 flex w-full max-w-[1680px] items-center justify-between gap-4 rounded-xl border border-[#ffd1d6] bg-[#fff5f6] px-5 py-3 shadow-sm">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#ffe5e8] text-[#f04452]">
+                  <AlertTriangle size={19} />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-sm font-black text-[#f04452]">
+                    인시던트 알림
+                  </div>
+                  <div className="mt-0.5 truncate text-xs font-bold text-[#b4232f]">
+                    {activeIncidentAlert.service.serviceName} ·{" "}
+                    {activeIncidentAlert.incident.title} · 발생{" "}
+                    {activeIncidentAlert.incident.startedAt}
+                  </div>
+                </div>
+              </div>
+              <Link
+                to={`/dashboard?incidentId=${activeIncidentAlert.incident.incidentId}`}
+                className="inline-flex h-9 shrink-0 items-center justify-center rounded-lg bg-[#3182f6] px-4 text-xs font-black text-white transition hover:bg-[#1b64da]"
+              >
+                상세 보기
+              </Link>
+            </section>
+          ) : null}
           <Outlet />
         </main>
       </div>

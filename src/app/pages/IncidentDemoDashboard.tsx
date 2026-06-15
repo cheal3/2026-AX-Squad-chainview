@@ -202,7 +202,6 @@ export function IncidentDemoDashboard() {
 
     return activeIncidentCards;
   }, [demoIncidentIds, incidents, services]);
-  const normalAlertIncidentCard = openIncidentCards[0];
   const displayedIncidentCount = criticalServices.length;
   const requestedIncidentId = Number(searchParams.get("incidentId"));
   const requestedServiceId = Number(searchParams.get("serviceId"));
@@ -441,37 +440,6 @@ export function IncidentDemoDashboard() {
           </div>
         </section>
 
-        {normalAlertIncidentCard ? (
-          <section className="flex items-center justify-between gap-4 rounded-xl border border-[#ffd1d6] bg-[#fff5f6] px-5 py-3 shadow-sm">
-            <div className="flex min-w-0 items-center gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#ffe5e8] text-[#f04452]">
-                <AlertTriangle size={19} />
-              </div>
-              <div className="min-w-0">
-                <div className="text-sm font-black text-[#f04452]">
-                  인시던트 알림
-                </div>
-                <div className="mt-0.5 truncate text-xs font-bold text-[#b4232f]">
-                  {normalAlertIncidentCard.service.serviceName} ·{" "}
-                  {normalAlertIncidentCard.incident.title} · 발생{" "}
-                  {normalAlertIncidentCard.incident.startedAt}
-                </div>
-              </div>
-            </div>
-            <Link
-              to={`/dashboard?incidentId=${normalAlertIncidentCard.incident.incidentId}`}
-              onClick={() => {
-                setSelectedServiceId(normalAlertIncidentCard.service.serviceId);
-                setServiceDetailPanelOpen(true);
-                setImpactDetailTab("service");
-              }}
-              className="inline-flex h-9 shrink-0 items-center justify-center rounded-lg bg-[#3182f6] px-4 text-xs font-black text-white transition hover:bg-[#1b64da]"
-            >
-              상세 보기
-            </Link>
-          </section>
-        ) : null}
-
         <section className="grid min-w-0 gap-3">
           <div className="min-w-0 space-y-3">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
@@ -494,6 +462,12 @@ export function IncidentDemoDashboard() {
                     </p>
                   </div>
                   <div className="flex min-w-0 flex-wrap items-center justify-end gap-3">
+                    <div className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-black text-slate-500">
+                      기준 {new Date().toLocaleTimeString("ko-KR", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </div>
                     <label className="relative min-w-[220px] max-w-full flex-1 sm:flex-none">
                       <Search
                         size={15}
@@ -506,12 +480,6 @@ export function IncidentDemoDashboard() {
                         className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-3 text-xs font-semibold text-slate-700 outline-none transition focus:border-[#86b7ff] focus:bg-white focus:ring-4 focus:ring-[#edf5ff] sm:w-64"
                       />
                     </label>
-                    <div className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-black text-slate-500">
-                      기준 {new Date().toLocaleTimeString("ko-KR", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </div>
                   </div>
                 </div>
                 <div className="mt-5 overflow-x-auto">
