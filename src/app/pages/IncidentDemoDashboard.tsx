@@ -34,7 +34,6 @@ import {
   Smartphone,
   UserRound,
   Users,
-  X,
 } from "lucide-react";
 import { usePortalData } from "../PortalDataStore";
 import { PageHeader } from "../components/PageHeader";
@@ -1146,14 +1145,6 @@ function NormalServiceDetailModal({
               {service.serviceCode} · {getNormalServiceCategory(service)}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-            title="팝업 닫기"
-          >
-            <X size={18} />
-          </button>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
@@ -1193,7 +1184,7 @@ function NormalServiceDetailModal({
           </div>
         </div>
 
-        <div className="grid shrink-0 grid-cols-2 gap-2 border-t border-slate-100 px-6 py-4">
+        <div className="grid shrink-0 grid-cols-3 gap-2 border-t border-slate-100 px-6 py-4">
           <Link
             to={`/services/${service.serviceId}`}
             className="inline-flex h-11 items-center justify-center rounded-xl border border-[#3182f6] bg-white text-sm font-black text-[#1f6feb] transition hover:bg-[#f2f7ff]"
@@ -1206,6 +1197,13 @@ function NormalServiceDetailModal({
             className="inline-flex h-11 items-center justify-center rounded-xl bg-[#3182f6] text-sm font-black text-white transition hover:bg-[#1b64da]"
           >
             인시던트 등록
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-sm font-black text-slate-600 transition hover:bg-slate-50"
+          >
+            닫기
           </button>
         </div>
       </section>
@@ -1323,7 +1321,7 @@ function NormalSelectedServicePanel({
   service: ServiceRecord;
 }) {
   return (
-    <aside className="sticky top-4 flex max-h-[calc(100vh-112px)] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+    <aside className="flex max-h-[calc(100vh-112px)] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-4 py-3">
         <h2 className="text-sm font-black text-slate-950">선택 서비스 정보</h2>
         <div className="flex items-center gap-2">
@@ -1331,14 +1329,6 @@ function NormalSelectedServicePanel({
             <CheckCircle2 size={13} />
             정상
           </span>
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-            title="서비스 상세 닫기"
-          >
-            <X size={16} />
-          </button>
         </div>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
@@ -1375,6 +1365,15 @@ function NormalSelectedServicePanel({
             인시던트 생성
           </button>
         </div>
+      </div>
+      <div className="shrink-0 border-t border-slate-100 p-3">
+        <button
+          type="button"
+          onClick={onClose}
+          className="inline-flex h-10 w-full items-center justify-center rounded-lg border border-slate-200 bg-white text-xs font-black text-slate-600 transition hover:bg-slate-50"
+        >
+          닫기
+        </button>
       </div>
     </aside>
   );
@@ -1512,7 +1511,7 @@ function ImpactDetailTabs({
     incident?.serviceId === service.serviceId ? incident : undefined;
 
   return (
-    <aside className="sticky top-4 flex max-h-[calc(100vh-112px)] min-h-[560px] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+    <aside className="flex max-h-[calc(100vh-112px)] min-h-[560px] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       <div className="shrink-0 border-b border-slate-100 p-3">
         <div className="flex items-center gap-2">
           <div className="grid min-w-0 flex-1 grid-cols-4 rounded-lg border border-slate-200 bg-slate-50 p-1">
@@ -1531,14 +1530,6 @@ function ImpactDetailTabs({
               </button>
             ))}
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-            title="서비스 상세 닫기"
-          >
-            <X size={17} />
-          </button>
         </div>
       </div>
 
@@ -1600,7 +1591,7 @@ function ImpactDetailTabs({
               />
             </div>
 
-            <div className="grid gap-2">
+            <div className="mt-8 grid gap-2 border-t border-slate-100 pt-4">
               <button
                 type="button"
                 onClick={onOpenServiceDetail}
@@ -1718,6 +1709,15 @@ function ImpactDetailTabs({
             )}
           </div>
         ) : null}
+      </div>
+      <div className="shrink-0 border-t border-slate-100 p-3">
+        <button
+          type="button"
+          onClick={onClose}
+          className="inline-flex h-10 w-full items-center justify-center rounded-lg border border-slate-200 bg-white text-xs font-black text-slate-600 transition hover:bg-slate-50"
+        >
+          닫기
+        </button>
       </div>
     </aside>
   );
@@ -2051,13 +2051,6 @@ function SelectedServicePanel({
             </span>
           </div>
         </div>
-        <button
-          type="button"
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-50 hover:text-slate-700"
-          aria-label="패널 닫기"
-        >
-          <X size={17} />
-        </button>
       </div>
 
       <div className="space-y-3 py-4 text-sm">
@@ -2244,14 +2237,6 @@ function TimelineDetailModal({
               탐지부터 조치까지 시간순으로 추적합니다.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-            title="팝업 닫기"
-          >
-            <X size={18} />
-          </button>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
@@ -2273,6 +2258,15 @@ function TimelineDetailModal({
               </div>
             ))}
           </div>
+        </div>
+        <div className="shrink-0 border-t border-slate-100 px-6 py-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-11 w-full items-center justify-center rounded-xl border border-slate-200 bg-white text-sm font-black text-slate-600 transition hover:bg-slate-50"
+          >
+            닫기
+          </button>
         </div>
       </section>
     </div>
@@ -2417,12 +2411,50 @@ function ImpactMatrixPanel() {
 }
 
 function SupportInfoPanel() {
+  const [openDocument, setOpenDocument] = useState<string | null>(null);
+  const documents: Record<string, string[]> = {
+    "운영 가이드": [
+      "장애 감지 후 영향도 맵에서 직접/간접 영향 서비스를 확인합니다.",
+      "담당자 탭에서 온콜 그룹과 서비스 담당자를 확인하고 전파 상태를 기록합니다.",
+      "진행 기록에는 확인한 증상, 조치, 복구 판단 근거를 시간순으로 남깁니다.",
+    ],
+    "장애 대응 절차": [
+      "1차: 장애 중심 서비스 헬스체크와 최근 변경 사항을 확인합니다.",
+      "2차: 직접 영향 서비스 담당자에게 처리 지연 가능성을 알립니다.",
+      "복구 후 완료 처리하고 타임라인을 장애 지침서로 재사용합니다.",
+    ],
+  };
+
   return (
     <InfoPanel title="기타 정보">
       <div className="space-y-2">
-        <SupportLink label="운영 가이드" />
-        <SupportLink label="장애 대응 절차" />
+        {Object.keys(documents).map((label) => (
+          <SupportLink
+            key={label}
+            active={openDocument === label}
+            label={label}
+            onClick={() =>
+              setOpenDocument((current) => (current === label ? null : label))
+            }
+          />
+        ))}
       </div>
+      {openDocument ? (
+        <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+          <div className="text-xs font-black text-slate-700">{openDocument}</div>
+          <div className="mt-2 space-y-1.5">
+            {documents[openDocument].map((item) => (
+              <div
+                key={item}
+                className="flex items-start gap-2 text-xs font-bold leading-5 text-slate-600"
+              >
+                <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[#3182f6]" />
+                <span>{item}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
       <div className="mt-5 text-xs font-black text-slate-500">태그</div>
       <div className="mt-2 flex flex-wrap gap-2">
         {["결제", "기간계", "CRITICAL", "PROD"].map((tag) => (
@@ -2479,14 +2511,27 @@ function PanelButton({
   );
 }
 
-function SupportLink({ label }: { label: string }) {
+function SupportLink({
+  active,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  label: string;
+  onClick: () => void;
+}) {
   return (
     <button
       type="button"
-      className="flex h-10 w-full items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-black text-slate-700 transition hover:bg-slate-100"
+      onClick={onClick}
+      className={`flex h-10 w-full items-center justify-between rounded-lg border px-3 text-xs font-black transition ${
+        active
+          ? "border-[#c7dbff] bg-[#f2f7ff] text-[#1f6feb]"
+          : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
+      }`}
     >
       {label}
-      <ExternalLink size={13} className="text-slate-400" />
+      <ExternalLink size={13} className={active ? "text-[#1f6feb]" : "text-slate-400"} />
     </button>
   );
 }
@@ -2985,8 +3030,14 @@ function IncidentAnalysisReport({
   const impactTotal = Math.max(1, relationCount.incoming + relationCount.outgoing);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4">
-      <section className="max-h-[88vh] w-full max-w-3xl overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-2xl">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4"
+      onClick={onClose}
+    >
+      <section
+        className="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl"
+        onClick={(event) => event.stopPropagation()}
+      >
         <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
           <div>
             <div className="flex items-center gap-2 text-sm font-black text-slate-700">
@@ -3000,16 +3051,9 @@ function IncidentAnalysisReport({
               장애 영향도 확인과 전파 이력을 시연하기 위한 보고서 묵업입니다.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-black text-slate-600 transition hover:bg-slate-50"
-          >
-            닫기
-          </button>
         </div>
 
-        <div className="space-y-4 p-5">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
           <div className="grid gap-3 md:grid-cols-3">
             <ReportMetric label="장애 서비스" value={service.serviceName} />
             <ReportMetric label="영향 서비스" value={`${impactTotal}개`} />
@@ -3040,6 +3084,15 @@ function IncidentAnalysisReport({
               "Email 상세 분석 보고 발송 완료",
             ]}
           />
+        </div>
+        <div className="shrink-0 border-t border-slate-100 px-5 py-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-11 w-full rounded-xl border border-slate-200 bg-white text-sm font-black text-slate-600 transition hover:bg-slate-50"
+          >
+            닫기
+          </button>
         </div>
       </section>
     </div>
