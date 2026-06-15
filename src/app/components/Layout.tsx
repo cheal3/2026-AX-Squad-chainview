@@ -137,17 +137,17 @@ export function Layout() {
         </div>
 
         <nav
-          className={`min-h-0 flex-1 overflow-y-auto py-5 transition-all duration-300 ${
+          className={`min-h-0 flex-1 overflow-hidden py-3 transition-all duration-300 ${
             sidebarCollapsed ? "px-3" : "px-3"
           }`}
         >
           {sections.map((section) => (
-            <div key={section.label} className="mb-6 last:mb-0">
+            <div key={section.label} className="mb-3 last:mb-0">
               <div
-                className={`mb-2 overflow-hidden px-2 text-xs font-black text-slate-400 transition-all duration-300 ${
+                className={`mb-1 overflow-hidden px-2 text-[11px] font-black text-slate-400 transition-all duration-300 ${
                   sidebarCollapsed
                     ? "h-0 translate-y-[-4px] opacity-0"
-                    : "h-5 translate-y-0 opacity-100"
+                    : "h-4 translate-y-0 opacity-100"
                 }`}
               >
                 {section.label}
@@ -162,7 +162,7 @@ export function Layout() {
                       key={item.path}
                       to={item.path}
                       title={sidebarCollapsed ? item.label : undefined}
-                      className={`relative flex h-10 items-center rounded-lg text-sm font-bold transition ${
+                      className={`relative flex h-8 items-center rounded-lg text-[13px] font-bold transition ${
                         sidebarCollapsed
                           ? "justify-center px-0"
                           : "gap-2 px-3"
