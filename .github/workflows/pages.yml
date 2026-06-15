@@ -33,6 +33,8 @@ jobs:
         run: npm run build
         env:
           GITHUB_PAGES: "true"
+          VITE_CHAINVIEW_API_BASE_URL: ${{ vars.VITE_CHAINVIEW_API_BASE_URL }}
+          VITE_CHAINVIEW_EMPLOYEE_NO: ${{ vars.VITE_CHAINVIEW_EMPLOYEE_NO || '8913812' }}
 
       - name: Add SPA fallback
         run: |

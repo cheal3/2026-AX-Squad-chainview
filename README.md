@@ -25,3 +25,20 @@ npm run dev
 npm run dev
 npm run build
 ```
+
+## API deployment
+
+로컬 개발 서버는 Vite proxy로 `/chainview-api` 요청을
+`http://chainview.kro.kr:8080`에 전달합니다.
+
+GitHub Pages 같은 HTTPS 정적 배포에서는 브라우저가 HTTP API 직접 호출을
+차단합니다. Cloudflare Worker, Nginx, Vercel Function 같은 HTTPS 프록시를
+배포한 뒤 GitHub repository variables에 다음 값을 설정하세요.
+
+```bash
+VITE_CHAINVIEW_API_BASE_URL=https://chainview-api-proxy.<account>.workers.dev
+VITE_CHAINVIEW_EMPLOYEE_NO=8913812
+```
+
+Cloudflare Worker 예시는
+`deploy/cloudflare-worker/chainview-api-proxy.js`에 있습니다.

@@ -925,6 +925,7 @@ export function IncidentDemoDashboard() {
           }
           service={normalPopupService}
           status={getDashboardStatus(normalPopupService)}
+          showActions={false}
           onClose={() => setNormalPopupServiceId(null)}
           onCreateIncident={() => {
             setIncidentRegisterService(normalPopupService);
@@ -1212,6 +1213,7 @@ function NormalServiceDetailModal({
   ownerNames,
   relationCount,
   service,
+  showActions = true,
   status,
 }: {
   onClose: () => void;
@@ -1219,6 +1221,7 @@ function NormalServiceDetailModal({
   ownerNames: string[];
   relationCount: { incoming: number; outgoing: number };
   service: ServiceRecord;
+  showActions?: boolean;
   status: ServiceStatusCode;
 }) {
   return (
@@ -1287,21 +1290,23 @@ function NormalServiceDetailModal({
           </div>
         </div>
 
-        <div className="grid shrink-0 grid-cols-2 gap-2 border-t border-slate-100 px-6 py-4">
-          <Link
-            to={`/services/${service.serviceId}`}
-            className="inline-flex h-11 items-center justify-center rounded-xl border border-[#3182f6] bg-white text-sm font-black text-[#1f6feb] transition hover:bg-[#f2f7ff]"
-          >
-            서비스 관리로 이동
-          </Link>
-          <button
-            type="button"
-            onClick={onCreateIncident}
-            className="inline-flex h-11 items-center justify-center rounded-xl bg-[#3182f6] text-sm font-black text-white transition hover:bg-[#1b64da]"
-          >
-            인시던트 등록
-          </button>
-        </div>
+        {showActions ? (
+          <div className="grid shrink-0 grid-cols-2 gap-2 border-t border-slate-100 px-6 py-4">
+            <Link
+              to={`/services/${service.serviceId}`}
+              className="inline-flex h-11 items-center justify-center rounded-xl border border-[#3182f6] bg-white text-sm font-black text-[#1f6feb] transition hover:bg-[#f2f7ff]"
+            >
+              서비스 관리로 이동
+            </Link>
+            <button
+              type="button"
+              onClick={onCreateIncident}
+              className="inline-flex h-11 items-center justify-center rounded-xl bg-[#3182f6] text-sm font-black text-white transition hover:bg-[#1b64da]"
+            >
+              인시던트 등록
+            </button>
+          </div>
+        ) : null}
       </section>
     </div>
   );

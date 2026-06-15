@@ -121,29 +121,37 @@ export function Layout() {
             sidebarCollapsed ? "justify-center px-3" : "gap-3 px-5"
           }`}
         >
-          <div
-            className={`flex shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#3182f6] font-black text-white transition-all duration-300 ${
-              sidebarCollapsed
-                ? "h-0 w-0 scale-75 opacity-0"
-                : "h-10 w-10 scale-100 text-sm opacity-100"
+          <Link
+            to="/dashboard"
+            className={`flex min-w-0 items-center transition-all duration-300 ${
+              sidebarCollapsed ? "gap-0" : "gap-3"
             }`}
+            aria-label="대시보드로 이동"
           >
-            CV
-          </div>
-          <div
-            className={`min-w-0 overflow-hidden transition-all duration-300 ${
-              sidebarCollapsed
-                ? "max-w-0 translate-x-1 opacity-0"
-                : "max-w-[150px] translate-x-0 opacity-100"
-            }`}
-          >
-            <h1 className="truncate text-lg font-black leading-6 text-slate-900">
-              ChainView
-            </h1>
-            <p className="truncate text-sm font-semibold text-slate-500">
-              Service Monitor
-            </p>
-          </div>
+            <div
+              className={`flex shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#3182f6] font-black text-white transition-all duration-300 ${
+                sidebarCollapsed
+                  ? "h-0 w-0 scale-75 opacity-0"
+                  : "h-10 w-10 scale-100 text-sm opacity-100"
+              }`}
+            >
+              CV
+            </div>
+            <div
+              className={`min-w-0 overflow-hidden transition-all duration-300 ${
+                sidebarCollapsed
+                  ? "max-w-0 translate-x-1 opacity-0"
+                  : "max-w-[150px] translate-x-0 opacity-100"
+              }`}
+            >
+              <h1 className="truncate text-lg font-black leading-6 text-slate-900">
+                ChainView
+              </h1>
+              <p className="truncate text-sm font-semibold text-slate-500">
+                Service Monitor
+              </p>
+            </div>
+          </Link>
           <button
             type="button"
             aria-label={sidebarCollapsed ? "사이드바 펼치기" : "사이드바 접기"}
