@@ -33,6 +33,11 @@ export function Layout() {
   const location = useLocation();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const { incidents, services } = usePortalData();
+  const routeSearchParams = new URLSearchParams(location.search);
+  const hideIncidentAlert =
+    location.pathname === "/dashboard" &&
+    (routeSearchParams.get("mode") === "incident" ||
+      routeSearchParams.has("incidentId"));
   const incidentCount = services.filter(
     (service) =>
       service.statusCode === "INCIDENT" || service.statusCode === "INACTIVE"
@@ -239,7 +244,7 @@ export function Layout() {
 
       <div className="min-w-0 flex-1 overflow-hidden">
         <main className="h-full overflow-auto p-6">
-          {activeIncidentAlert ? (
+          {activeIncidentAlert && !hideIncidentAlert ? (
             <section className="mx-auto mb-4 flex w-full max-w-[1680px] items-center justify-between gap-4 rounded-xl border border-[#ffd1d6] bg-[#fff5f6] px-5 py-3 shadow-sm">
               <div className="flex min-w-0 items-center gap-3">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#ffe5e8] text-[#f04452]">

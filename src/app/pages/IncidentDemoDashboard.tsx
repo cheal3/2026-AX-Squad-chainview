@@ -9,9 +9,10 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import {
   AlertTriangle,
+  ArrowLeft,
   ArrowRight,
   BadgeInfo,
   BriefcaseBusiness,
@@ -62,7 +63,6 @@ const LazyServiceRelationFlow = lazy(() =>
 );
 
 export function IncidentDemoDashboard() {
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const {
     addIncidentEvent,
@@ -99,6 +99,7 @@ export function IncidentDemoDashboard() {
   );
   const [timelinePopupOpen, setTimelinePopupOpen] = useState(false);
   const [actionNote, setActionNote] = useState("");
+  const [currentTime, setCurrentTime] = useState(() => new Date());
   const [statusOverrides, setStatusOverrides] = useState<
     Record<number, ServiceStatusCode>
   >({});
@@ -255,6 +256,24 @@ export function IncidentDemoDashboard() {
     : "NORMAL";
   const hasActiveIncident =
     incidentDashboardRequested && Boolean(selectedService) && Boolean(activeIncident);
+  const activeIncidentStartedAt = activeIncident
+    ? parseDateTime(activeIncident.startedAt)
+    : null;
+  const incidentStartedTime = activeIncidentStartedAt
+    ? formatClockTime(activeIncidentStartedAt)
+    : "-";
+  const incidentElapsedTime = activeIncidentStartedAt
+    ? formatElapsedTime(activeIncidentStartedAt, currentTime)
+    : "-";
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, []);
+
   const impactSnapshot = useMemo(() => {
     if (!primaryIncidentService) {
       return {
@@ -609,6 +628,14 @@ export function IncidentDemoDashboard() {
       <section className="rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex min-w-0 flex-1 items-center gap-4">
+            <Link
+              to="/dashboard"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50"
+              aria-label="전체 상황판"
+              title="전체 상황판"
+            >
+              <ArrowLeft size={18} />
+            </Link>
             <div
               className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg ${
                 hasActiveIncident
@@ -642,44 +669,9 @@ export function IncidentDemoDashboard() {
             </div>
           </div>
           <div className="flex w-full flex-wrap items-center justify-end gap-3 md:w-auto">
-            <Link
-              to="/dashboard"
-              className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 transition hover:bg-slate-50"
-            >
-              전체 상황판
-            </Link>
-            {openIncidentCards.length > 1 ? (
-              <select
-                value={activeIncident?.incidentId ?? ""}
-                onChange={(event) => {
-                  const incidentId = event.target.value;
-                  const nextIncidentCard = openIncidentCards.find(
-                    ({ incident }) => String(incident.incidentId) === incidentId
-                  );
-                  if (nextIncidentCard) {
-                    setSelectedServiceId(nextIncidentCard.service.serviceId);
-                    setServiceDetailPanelOpen(true);
-                    setImpactDetailTab("service");
-                  }
-                  if (incidentId) {
-                    navigate(`/dashboard?incidentId=${incidentId}`);
-                  }
-                }}
-                className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-black text-slate-700 outline-none transition focus:border-[#86b7ff] focus:ring-4 focus:ring-[#edf5ff]"
-                title="다른 인시던트로 이동"
-              >
-                {openIncidentCards.map(({ incident, service }) => (
-                  <option key={incident.incidentId} value={incident.incidentId}>
-                    {service.serviceName} · {incident.incidentId}
-                  </option>
-                ))}
-              </select>
-            ) : null}
-            <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
-              <HeaderStat label="발생 시간" value="14:12:21" />
-              <HeaderStat label="경과 시간" value="23분" />
-              <HeaderStat label="최근 갱신" value="14:35:21" tone="green" />
-              <HeaderStat label="환경" value="PROD" />
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <HeaderStat label="발생 시간" value={incidentStartedTime} />
+              <HeaderStat label="경과 시간" value={incidentElapsedTime} />
             </div>
             {activeIncident &&
             activeIncident.incidentStatusCode !== "RESOLVED" ? (
@@ -1931,6 +1923,36 @@ function ImpactServiceGroup({
       </div>
     </div>
   );
+}
+
+function parseDateTime(value: string) {
+  const normalized = value.includes("T")
+    ? value
+    : value.replace(" ", "T");
+  const parsed = new Date(normalized);
+
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function formatClockTime(value: Date) {
+  return [value.getHours(), value.getMinutes(), value.getSeconds()]
+    .map((item) => String(item).padStart(2, "0"))
+    .join(":");
+}
+
+function formatElapsedTime(startedAt: Date, currentTime: Date) {
+  const elapsedSeconds = Math.max(
+    0,
+    Math.floor((currentTime.getTime() - startedAt.getTime()) / 1000)
+  );
+  const hours = Math.floor(elapsedSeconds / 3600);
+  const minutes = Math.floor((elapsedSeconds % 3600) / 60);
+  const seconds = elapsedSeconds % 60;
+
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  }
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
 function HeaderStat({
