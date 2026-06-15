@@ -1,5 +1,4 @@
 const REMOTE_ORIGIN = "http://chainview.kro.kr:8080";
-const DEFAULT_API_BASE_URL = "/chainview-api";
 const DEFAULT_EMPLOYEE_NO = "8913812";
 
 export const chainViewRemoteOrigin =
@@ -7,7 +6,7 @@ export const chainViewRemoteOrigin =
 
 export const chainViewApiBaseUrl =
   import.meta.env.VITE_CHAINVIEW_API_BASE_URL ||
-  DEFAULT_API_BASE_URL;
+  (import.meta.env.DEV ? "/chainview-api" : chainViewRemoteOrigin);
 
 const chainViewEmployeeNo =
   import.meta.env.VITE_CHAINVIEW_EMPLOYEE_NO ?? DEFAULT_EMPLOYEE_NO;
