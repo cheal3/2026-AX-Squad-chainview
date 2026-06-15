@@ -5,13 +5,18 @@ import {
   ArrowLeft,
   ArrowRight,
   Bell,
+  CheckCircle2,
   Clock,
   Eye,
   FileText,
+  Mail,
+  MessageSquare,
+  Phone,
   Route,
   ShieldAlert,
   TrendingUp,
   UserRound,
+  Wrench,
 } from "lucide-react";
 import { usePortalData } from "../PortalDataStore";
 import { PageHeader } from "../components/PageHeader";
@@ -225,7 +230,7 @@ export function IncidentListPage() {
                     </td>
                     <td className="px-5 py-4 text-center">
                       <Link
-                        to={`/dashboard?incidentId=${incident.incidentId}`}
+                        to={`/incidents/${incident.incidentId}`}
                         className="inline-flex h-8 min-w-[72px] shrink-0 items-center justify-center gap-1 whitespace-nowrap break-keep rounded-md border border-slate-200 bg-slate-100 px-3 text-xs font-black leading-none text-slate-700 transition hover:bg-slate-200"
                       >
                         <Eye size={14} />
@@ -315,6 +320,12 @@ export function IncidentImpact() {
         : [],
     service: targetService,
   });
+  const ownerNames =
+    targetService && ownerByServiceId.get(targetService.serviceId)
+      ? ownerByServiceId
+          .get(targetService.serviceId)!
+          .map((owner) => owner.ownerName)
+      : [];
 
   return (
     <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-5">
@@ -383,39 +394,50 @@ export function IncidentImpact() {
       </section>
 
       {activeTab === "overview" && (
-        <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.15fr_0.85fr]">
-          <ProgressIncidentCard
-            elapsed={elapsed}
-            incident={incident}
-            targetService={targetService}
-          />
-          <section className="grid grid-cols-2 gap-3">
-            <IncidentMetric
-              icon={<AlertCircle size={21} />}
-              label="상태"
-              tone="red"
-              value={codeLabels.incidentStatus[incident.incidentStatusCode]}
+        <div className="space-y-5">
+          <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.15fr_0.85fr]">
+            <ProgressIncidentCard
+              elapsed={elapsed}
+              incident={incident}
+              targetService={targetService}
             />
-            <IncidentMetric
-              icon={<TrendingUp size={21} />}
-              label="영향 서비스"
-              tone="amber"
-              value={impactServices.length}
+            <section className="grid grid-cols-2 gap-3">
+              <IncidentMetric
+                icon={<AlertCircle size={21} />}
+                label="상태"
+                tone="red"
+                value={codeLabels.incidentStatus[incident.incidentStatusCode]}
+              />
+              <IncidentMetric
+                icon={<TrendingUp size={21} />}
+                label="영향 서비스"
+                tone="amber"
+                value={impactServices.length}
+              />
+              <IncidentMetric
+                icon={<Route size={21} />}
+                label="필수 관계"
+                tone="slate"
+                value={mandatoryRelations.length}
+              />
+              <IncidentMetric
+                icon={<Clock size={21} />}
+                label="발생 시각"
+                tone="blue"
+                value={incident.startedAt}
+                compact
+              />
+            </section>
+          </div>
+          {incident.incidentStatusCode === "RESOLVED" ? (
+            <CompletedIncidentReport
+              historyRows={historyRows}
+              impactServices={impactServices}
+              incident={incident}
+              ownerNames={ownerNames}
+              targetService={targetService}
             />
-            <IncidentMetric
-              icon={<Route size={21} />}
-              label="필수 관계"
-              tone="slate"
-              value={mandatoryRelations.length}
-            />
-            <IncidentMetric
-              icon={<Clock size={21} />}
-              label="발생 시각"
-              tone="blue"
-              value={incident.startedAt}
-              compact
-            />
-          </section>
+          ) : null}
         </div>
       )}
 
@@ -719,6 +741,168 @@ function IncidentHistorySection({
             {row.label}
           </TimelineRow>
         ))}
+      </div>
+    </section>
+  );
+}
+
+function CompletedIncidentReport({
+  historyRows,
+  impactServices,
+  incident,
+  ownerNames,
+  targetService,
+}: {
+  historyRows: IncidentHistoryRow[];
+  impactServices: Array<{
+    impact: IncidentImpactRecord;
+    service: ServiceRecord;
+  }>;
+  incident: IncidentRecord;
+  ownerNames: string[];
+  targetService?: ServiceRecord;
+}) {
+  const resolvedRow =
+    historyRows.find((row) => row.color === "emerald") ??
+    historyRows[historyRows.length - 1];
+  const notificationTargets = ownerNames.length
+    ? ownerNames.slice(0, 4)
+    : ["결제 운영팀", "서비스 담당 그룹", "장애 대응 채널"];
+  const directImpactCount = impactServices.filter(
+    ({ impact }) => impact.directYn === "Y"
+  ).length;
+  const indirectImpactCount = Math.max(0, impactServices.length - directImpactCount);
+
+  return (
+    <section className="rounded-xl border border-[#a7efd8] bg-white p-5 shadow-sm ring-1 ring-[#ecfff8]">
+      <div className="flex flex-col gap-3 border-b border-slate-100 pb-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <div className="flex items-center gap-2 text-sm font-black text-[#00a77d]">
+            <CheckCircle2 size={18} />
+            완료 인시던트 기록
+          </div>
+          <h3 className="mt-2 text-xl font-black text-slate-950">
+            {targetService?.serviceName ?? "대상 서비스"} 조치 완료 리포트
+          </h3>
+          <p className="mt-1 text-sm font-semibold text-slate-500">
+            장애 발생부터 알림 전파, 영향도 확인, 조치 완료까지의 기록입니다.
+          </p>
+        </div>
+        <span className="inline-flex h-9 items-center rounded-lg bg-[#ecfff8] px-3 text-xs font-black text-[#00a77d]">
+          완료 처리 · {resolvedRow?.time ?? incident.startedAt.slice(11, 16)}
+        </span>
+      </div>
+
+      <div className="mt-5 grid gap-4 xl:grid-cols-[1fr_1fr]">
+        <article className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <div className="mb-3 flex items-center gap-2 text-sm font-black text-slate-800">
+            <Wrench size={17} className="text-[#3182f6]" />
+            조치 및 복구 내용
+          </div>
+          <div className="space-y-2 text-sm font-bold leading-6 text-slate-600">
+            <p>원인 서비스: {targetService?.serviceName ?? "-"}</p>
+            <p>
+              조치 결과:{" "}
+              {resolvedRow ? resolvedRow.label : "복구 확인 후 인시던트를 완료 처리했습니다."}
+            </p>
+            <p>
+              운영 지침: 동일 증상 발생 시 타임라인의 탐지, 영향도 산출, 담당자 알림,
+              복구 확인 순서로 재사용할 수 있습니다.
+            </p>
+          </div>
+        </article>
+
+        <article className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <div className="mb-3 flex items-center gap-2 text-sm font-black text-slate-800">
+            <Bell size={17} className="text-[#f08c00]" />
+            알림 발송 이력
+          </div>
+          <div className="grid gap-2 sm:grid-cols-3">
+            {[
+              ["Slack", MessageSquare, "장애 채널"],
+              ["SMS", Phone, "온콜 담당"],
+              ["Email", Mail, "운영 그룹"],
+            ].map(([channel, Icon, target]) => (
+              <div
+                key={channel as string}
+                className="rounded-lg border border-white bg-white px-3 py-2"
+              >
+                <div className="flex items-center gap-2 text-xs font-black text-slate-500">
+                  <Icon size={14} />
+                  {channel as string}
+                </div>
+                <div className="mt-1 text-sm font-black text-slate-900">
+                  발송 완료
+                </div>
+                <div className="mt-0.5 text-xs font-bold text-slate-400">
+                  {target as string}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {notificationTargets.map((target) => (
+              <span
+                key={target}
+                className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-black text-slate-600"
+              >
+                {target}
+              </span>
+            ))}
+          </div>
+        </article>
+      </div>
+
+      <div className="mt-4 grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+        <article className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <div className="mb-3 flex items-center gap-2 text-sm font-black text-slate-800">
+            <TrendingUp size={17} className="text-[#f08c00]" />
+            영향도 요약
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <InfoTile label="총 영향" value={`${impactServices.length}개`} />
+            <InfoTile label="직접 영향" value={`${directImpactCount}개`} />
+            <InfoTile label="간접 영향" value={`${indirectImpactCount}개`} />
+          </div>
+          <div className="mt-3 space-y-2">
+            {impactServices.slice(0, 4).map(({ impact, service }) => (
+              <div
+                key={impact.impactId}
+                className="flex items-center justify-between gap-3 rounded-lg border border-white bg-white px-3 py-2 text-xs"
+              >
+                <span className="min-w-0 truncate font-black text-slate-700">
+                  {service.serviceName}
+                </span>
+                <span className="shrink-0 font-bold text-slate-400">
+                  {impact.directYn === "Y" ? "직접" : "간접"} · {impact.impactLevel}차
+                </span>
+              </div>
+            ))}
+            {!impactServices.length ? (
+              <div className="rounded-lg border border-dashed border-slate-200 bg-white px-3 py-5 text-center text-xs font-bold text-slate-400">
+                기록된 영향 서비스가 없습니다.
+              </div>
+            ) : null}
+          </div>
+        </article>
+
+        <article className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <div className="mb-3 flex items-center gap-2 text-sm font-black text-slate-800">
+            <Clock size={17} className="text-[#3182f6]" />
+            타임라인
+          </div>
+          <div className="rounded-lg border border-white bg-white p-3">
+            {historyRows.map((row, index) => (
+              <TimelineRow
+                key={`${row.time}-completed-${index}`}
+                color={row.color}
+                time={row.time}
+              >
+                {row.label}
+              </TimelineRow>
+            ))}
+          </div>
+        </article>
       </div>
     </section>
   );
