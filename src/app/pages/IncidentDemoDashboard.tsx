@@ -34,6 +34,7 @@ import {
   Smartphone,
   UserRound,
   Users,
+  X,
 } from "lucide-react";
 import { usePortalData } from "../PortalDataStore";
 import { PageHeader } from "../components/PageHeader";
@@ -173,7 +174,8 @@ export function IncidentDemoDashboard() {
     const activeIncidentCards = incidents
       .filter(
         (incident) =>
-          demoIncidentIds.has(incident.incidentId) &&
+          (demoIncidentIds.has(incident.incidentId) ||
+            incident.registeredBy === "admin") &&
           incident.incidentStatusCode !== "RESOLVED"
       )
       .map((incident) => {
@@ -208,7 +210,8 @@ export function IncidentDemoDashboard() {
     (Number.isFinite(requestedIncidentId) && requestedIncidentId > 0
       ? incidents.find(
           (incident) =>
-            demoIncidentIds.has(incident.incidentId) &&
+            (demoIncidentIds.has(incident.incidentId) ||
+              incident.registeredBy === "admin") &&
             incident.incidentId === requestedIncidentId &&
             incident.incidentStatusCode !== "RESOLVED"
         )
@@ -435,16 +438,16 @@ export function IncidentDemoDashboard() {
         </section>
 
         {normalAlertIncidentCard ? (
-          <section className="flex items-center justify-between gap-4 rounded-xl border border-[#ffd978] bg-[#fff8df] px-5 py-3 shadow-sm">
+          <section className="flex items-center justify-between gap-4 rounded-xl border border-[#ffd1d6] bg-[#fff5f6] px-5 py-3 shadow-sm">
             <div className="flex min-w-0 items-center gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#fff1bd] text-[#f08c00]">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#ffe5e8] text-[#f04452]">
                 <AlertTriangle size={19} />
               </div>
               <div className="min-w-0">
-                <div className="text-sm font-black text-slate-950">
+                <div className="text-sm font-black text-[#f04452]">
                   인시던트 알림
                 </div>
-                <div className="mt-0.5 truncate text-xs font-bold text-slate-600">
+                <div className="mt-0.5 truncate text-xs font-bold text-[#b4232f]">
                   {normalAlertIncidentCard.service.serviceName} ·{" "}
                   {normalAlertIncidentCard.incident.title} · 발생{" "}
                   {normalAlertIncidentCard.incident.startedAt}
@@ -1000,7 +1003,7 @@ function NormalServiceRankList({
             <th className="px-5 py-4 text-right">상태</th>
             <th className="px-5 py-4 text-right">인스턴스</th>
             <th className="px-5 py-4 text-right">연관 서비스</th>
-            <th className="px-5 py-4 text-right">작업</th>
+            <th className="px-5 py-4 text-center">작업</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
@@ -1069,7 +1072,7 @@ function NormalServiceRankList({
                   {totalRelations}개
                 </td>
                 <td className="whitespace-nowrap px-5 py-4">
-                  <div className="flex justify-end gap-2">
+                  <div className="flex justify-center gap-2">
                     <button
                       type="button"
                       onClick={(event) => {
@@ -1145,6 +1148,14 @@ function NormalServiceDetailModal({
               {service.serviceCode} · {getNormalServiceCategory(service)}
             </p>
           </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+            title="팝업 닫기"
+          >
+            <X size={18} />
+          </button>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
@@ -1184,7 +1195,7 @@ function NormalServiceDetailModal({
           </div>
         </div>
 
-        <div className="grid shrink-0 grid-cols-3 gap-2 border-t border-slate-100 px-6 py-4">
+        <div className="grid shrink-0 grid-cols-2 gap-2 border-t border-slate-100 px-6 py-4">
           <Link
             to={`/services/${service.serviceId}`}
             className="inline-flex h-11 items-center justify-center rounded-xl border border-[#3182f6] bg-white text-sm font-black text-[#1f6feb] transition hover:bg-[#f2f7ff]"
@@ -1197,13 +1208,6 @@ function NormalServiceDetailModal({
             className="inline-flex h-11 items-center justify-center rounded-xl bg-[#3182f6] text-sm font-black text-white transition hover:bg-[#1b64da]"
           >
             인시던트 등록
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex h-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-sm font-black text-slate-600 transition hover:bg-slate-50"
-          >
-            닫기
           </button>
         </div>
       </section>
