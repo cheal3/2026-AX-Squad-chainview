@@ -47,6 +47,7 @@ export function IncidentListPage() {
   );
   const [manualTitle, setManualTitle] = useState("");
   const [manualDescription, setManualDescription] = useState("");
+  const [manualConfirmOpen, setManualConfirmOpen] = useState(false);
   const openIncidents = incidents.filter(
     (incident) => incident.incidentStatusCode === "OPEN"
   );
@@ -133,23 +134,7 @@ export function IncidentListPage() {
           <button
             type="button"
             onClick={() => {
-              const service = services.find(
-                (item) => item.serviceId === manualServiceId
-              );
-              createIncident({
-                serviceId: manualServiceId,
-                severityCode: "MAJOR",
-                title:
-                  manualTitle.trim() ||
-                  `${service?.serviceName ?? "서비스"} 수동 인시던트`,
-                description:
-                  manualDescription.trim() ||
-                  "운영자가 수동으로 등록한 인시던트입니다.",
-                manualRegisteredYn: "Y",
-                registeredBy: "admin",
-              });
-              setManualTitle("");
-              setManualDescription("");
+              setManualConfirmOpen(true);
             }}
             className="h-10 rounded-lg bg-[#3182f6] px-4 text-sm font-black text-white transition hover:bg-[#1b64da]"
           >
@@ -157,6 +142,36 @@ export function IncidentListPage() {
           </button>
         </div>
       </section>
+
+      {manualConfirmOpen ? (
+        <ManualIncidentConfirmModal
+          description={manualDescription}
+          service={services.find((item) => item.serviceId === manualServiceId)}
+          title={manualTitle}
+          onChangeDescription={setManualDescription}
+          onClose={() => setManualConfirmOpen(false)}
+          onConfirm={() => {
+            const service = services.find(
+              (item) => item.serviceId === manualServiceId
+            );
+            createIncident({
+              serviceId: manualServiceId,
+              severityCode: "MAJOR",
+              title:
+                manualTitle.trim() ||
+                `${service?.serviceName ?? "서비스"} 수동 인시던트`,
+              description:
+                manualDescription.trim() ||
+                "운영자가 수동으로 등록한 인시던트입니다.",
+              manualRegisteredYn: "Y",
+              registeredBy: "admin",
+            });
+            setManualTitle("");
+            setManualDescription("");
+            setManualConfirmOpen(false);
+          }}
+        />
+      ) : null}
 
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
@@ -230,7 +245,11 @@ export function IncidentListPage() {
                     </td>
                     <td className="px-5 py-4 text-center">
                       <Link
-                        to={`/incidents/${incident.incidentId}`}
+                        to={
+                          incident.incidentStatusCode === "RESOLVED"
+                            ? `/incidents/${incident.incidentId}`
+                            : `/dashboard?incidentId=${incident.incidentId}`
+                        }
                         className="inline-flex h-8 min-w-[72px] shrink-0 items-center justify-center gap-1 whitespace-nowrap break-keep rounded-md border border-slate-200 bg-slate-100 px-3 text-xs font-black leading-none text-slate-700 transition hover:bg-slate-200"
                       >
                         <Eye size={14} />
@@ -242,6 +261,78 @@ export function IncidentListPage() {
               })}
             </tbody>
           </table>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function ManualIncidentConfirmModal({
+  description,
+  onChangeDescription,
+  onClose,
+  onConfirm,
+  service,
+  title,
+}: {
+  description: string;
+  onChangeDescription: (value: string) => void;
+  onClose: () => void;
+  onConfirm: () => void;
+  service?: ServiceRecord;
+  title: string;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 px-5 py-8"
+      onClick={onClose}
+    >
+      <section
+        className="w-full max-w-[520px] overflow-hidden rounded-2xl bg-white shadow-2xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="border-b border-slate-100 px-6 py-5">
+          <div className="text-xs font-black text-[#f04452]">
+            인시던트 등록 확인
+          </div>
+          <h2 className="mt-1 truncate text-xl font-black text-slate-950">
+            {title.trim() || `${service?.serviceName ?? "서비스"} 수동 인시던트`}
+          </h2>
+          <p className="mt-1 truncate text-sm font-bold text-slate-500">
+            {service?.serviceCode ?? "-"} · {service?.serviceName ?? "대상 서비스"}
+          </p>
+        </div>
+
+        <div className="px-6 py-5">
+          <label className="block">
+            <span className="text-sm font-black text-slate-700">증상 입력</span>
+            <textarea
+              value={description}
+              onChange={(event) => onChangeDescription(event.target.value)}
+              placeholder="예: 응답 시간이 증가하고 일부 요청에서 타임아웃이 발생합니다."
+              className="mt-2 min-h-[120px] w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold leading-6 text-slate-700 outline-none transition focus:border-[#86b7ff] focus:bg-white focus:ring-4 focus:ring-[#edf5ff]"
+            />
+          </label>
+          <div className="mt-3 rounded-xl border border-[#ffe5e8] bg-[#fff5f6] px-4 py-3 text-xs font-bold leading-5 text-[#b4232f]">
+            등록하면 상단 인시던트 알림이 표시되고 장애 대시보드에서 영향도와 진행 이력을 확인할 수 있습니다.
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 border-t border-slate-100 px-6 py-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-sm font-black text-slate-600 transition hover:bg-slate-50"
+          >
+            취소
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="inline-flex h-11 items-center justify-center rounded-xl bg-[#3182f6] text-sm font-black text-white transition hover:bg-[#1b64da]"
+          >
+            등록
+          </button>
         </div>
       </section>
     </div>
@@ -341,6 +432,12 @@ export function IncidentImpact() {
             </div>
             {incident.incidentStatusCode !== "RESOLVED" ? (
               <>
+                <Link
+                  to={`/dashboard?incidentId=${incident.incidentId}`}
+                  className="inline-flex h-10 items-center rounded-lg bg-[#3182f6] px-4 text-sm font-black text-white shadow-sm transition hover:bg-[#1b64da]"
+                >
+                  장애 대시보드
+                </Link>
                 <button
                   type="button"
                   onClick={() =>

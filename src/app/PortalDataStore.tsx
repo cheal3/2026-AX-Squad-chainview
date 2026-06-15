@@ -243,7 +243,10 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           ? {
               ...service,
               statusCode:
-                input.severityCode === "CRITICAL" ? "INCIDENT" : "IMPACTED",
+                input.manualRegisteredYn === "Y" ||
+                input.severityCode === "CRITICAL"
+                  ? "INCIDENT"
+                  : "IMPACTED",
               updatedAt: now,
             }
           : service
@@ -876,7 +879,14 @@ function asRemoteNumber(value: unknown, fallback = 0) {
 }
 
 function timestamp() {
-  return new Date().toISOString().slice(0, 16).replace("T", " ");
+  const now = new Date();
+  const pad = (value: number) => String(value).padStart(2, "0");
+
+  return [
+    now.getFullYear(),
+    pad(now.getMonth() + 1),
+    pad(now.getDate()),
+  ].join("-") + ` ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
 }
 
 function nextId<T extends Record<K, number>, K extends keyof T>(

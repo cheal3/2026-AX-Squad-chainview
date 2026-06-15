@@ -1,6 +1,7 @@
 import {
   forwardRef,
   lazy,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -82,6 +83,7 @@ export function IncidentDemoDashboard() {
   const [impactDetailTab, setImpactDetailTab] =
     useState<ImpactDetailTab>("service");
   const [normalCategoryTab, setNormalCategoryTab] = useState("전체");
+  const [normalListPage, setNormalListPage] = useState(1);
   const [selectedServiceId, setSelectedServiceId] = useState<number | null>(
     null
   );
@@ -178,6 +180,7 @@ export function IncidentDemoDashboard() {
       .filter(
         (incident) =>
           (demoIncidentIds.has(incident.incidentId) ||
+            incident.manualRegisteredYn === "Y" ||
             incident.registeredBy === "admin") &&
           incident.incidentStatusCode !== "RESOLVED"
       )
@@ -213,6 +216,7 @@ export function IncidentDemoDashboard() {
       ? incidents.find(
           (incident) =>
             (demoIncidentIds.has(incident.incidentId) ||
+              incident.manualRegisteredYn === "Y" ||
               incident.registeredBy === "admin") &&
             incident.incidentId === requestedIncidentId &&
             incident.incidentStatusCode !== "RESOLVED"
@@ -416,6 +420,20 @@ export function IncidentDemoDashboard() {
         second.instanceCount - first.instanceCount ||
         first.serviceName.localeCompare(second.serviceName, "ko")
     );
+  const normalListPageSize = 10;
+  const normalListTotalPages = Math.max(
+    1,
+    Math.ceil(normalListServices.length / normalListPageSize)
+  );
+  const safeNormalListPage = Math.min(normalListPage, normalListTotalPages);
+  const pagedNormalListServices = normalListServices.slice(
+    (safeNormalListPage - 1) * normalListPageSize,
+    safeNormalListPage * normalListPageSize
+  );
+
+  useEffect(() => {
+    setNormalListPage(1);
+  }, [normalCategoryTab, normalizedQuery]);
 
   if (!hasActiveIncident && selectedService) {
     return (
@@ -482,7 +500,7 @@ export function IncidentDemoDashboard() {
                     </label>
                   </div>
                 </div>
-                <div className="mt-5 overflow-x-auto">
+                <div className="mt-5 overflow-x-auto border-b border-slate-200 bg-white">
                   <div className="grid min-w-[980px] grid-cols-5 gap-0">
                     {normalCategoryTabs.map((tab) => (
                       <button
@@ -505,7 +523,8 @@ export function IncidentDemoDashboard() {
                 getServiceStatus={getDashboardStatus}
                 relationCountByServiceId={relationCountByServiceId}
                 selectedServiceId={selectedService.serviceId}
-                services={normalListServices}
+                rankOffset={(safeNormalListPage - 1) * normalListPageSize}
+                services={pagedNormalListServices}
                 onCreateIncident={(service) => {
                   setIncidentRegisterService(service);
                   setIncidentSymptom("");
@@ -515,25 +534,32 @@ export function IncidentDemoDashboard() {
                   setSelectedServiceId(serviceId);
                 }}
               />
+              <NormalServicePagination
+                currentPage={safeNormalListPage}
+                pageSize={normalListPageSize}
+                totalItems={normalListServices.length}
+                totalPages={normalListTotalPages}
+                onPageChange={setNormalListPage}
+              />
             </section>
           </div>
         </section>
 
         <section className="grid gap-3 xl:grid-cols-[0.9fr_0.95fr_1.1fr_1.1fr]">
-          <NormalInfoPanel title="관리 필요 서비스">
+          <NormalInfoPanel title="관리 필요 서비스" to="/services">
             <StatusCountRow label="담당조직 미등록" value={ownerlessCount} />
             <StatusCountRow label="담당그룹 미등록" value={Math.max(2, Math.floor(ownerlessCount / 2))} />
             <StatusCountRow label="영향도 미연결" value={noRelationCount} />
             <StatusCountRow label="서비스 설명 미등록" value={undocumentedCount} />
             <StatusCountRow label="미완료 인시던트" value={openIncidentCards.length} danger />
           </NormalInfoPanel>
-          <NormalInfoPanel title="최근 서비스 현행화">
+          <NormalInfoPanel title="최근 서비스 현행화" to="/services">
             <NormalServiceList services={services.slice(0, 5)} />
           </NormalInfoPanel>
-          <NormalInfoPanel title="최근 서비스 변경">
+          <NormalInfoPanel title="최근 서비스 변경" to="/services">
             <NormalChangeList services={services.slice(0, 5)} />
           </NormalInfoPanel>
-          <NormalInfoPanel title="최근 인시던트">
+          <NormalInfoPanel title="최근 인시던트" to="/incidents">
             <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-7 text-center text-xs font-bold text-slate-400">
               진행 중인 인시던트가 없습니다.
             </div>
@@ -964,6 +990,7 @@ function NormalServiceRankList({
   onCreateIncident,
   onOpenDetail,
   onSelectService,
+  rankOffset,
   relationCountByServiceId,
   selectedServiceId,
   services,
@@ -972,6 +999,7 @@ function NormalServiceRankList({
   onCreateIncident: (service: ServiceRecord) => void;
   onOpenDetail: (service: ServiceRecord) => void;
   onSelectService: (serviceId: number) => void;
+  rankOffset: number;
   relationCountByServiceId: Map<number, { incoming: number; outgoing: number }>;
   selectedServiceId: number;
   services: ServiceRecord[];
@@ -988,7 +1016,7 @@ function NormalServiceRankList({
           <col className="w-[220px]" />
         </colgroup>
         <thead>
-          <tr className="border-b border-slate-100 bg-white text-left text-xs font-black text-slate-400">
+          <tr className="border-b border-slate-200 border-t border-t-slate-100 bg-slate-50 text-left text-xs font-black text-slate-400">
             <th className="px-5 py-4 text-center">순위</th>
             <th className="px-5 py-4 text-center">서비스</th>
             <th className="px-5 py-4 text-center">상태</th>
@@ -1018,7 +1046,7 @@ function NormalServiceRankList({
                   <div className="flex items-center justify-center gap-4">
                     <span className="text-slate-300">♥</span>
                     <span className="text-base font-black text-slate-700">
-                      {index + 1}
+                      {rankOffset + index + 1}
                     </span>
                   </div>
                 </td>
@@ -1101,6 +1129,79 @@ function NormalServiceRankList({
           ) : null}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function NormalServicePagination({
+  currentPage,
+  onPageChange,
+  pageSize,
+  totalItems,
+  totalPages,
+}: {
+  currentPage: number;
+  onPageChange: (page: number) => void;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+}) {
+  const start = totalItems === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const end = Math.min(currentPage * pageSize, totalItems);
+  const visiblePages = Array.from({ length: totalPages }, (_, index) => index + 1)
+    .filter(
+      (page) =>
+        page === 1 ||
+        page === totalPages ||
+        Math.abs(page - currentPage) <= 1
+    );
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-white px-5 py-4">
+      <div className="text-xs font-bold text-slate-400">
+        {start}-{end} / 총 {totalItems}개
+      </div>
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          disabled={currentPage <= 1}
+          onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+          className="inline-flex h-8 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-black text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          이전
+        </button>
+        {visiblePages.map((page, index) => {
+          const previousPage = visiblePages[index - 1];
+          const showGap = previousPage && page - previousPage > 1;
+
+          return (
+            <span key={page} className="inline-flex items-center gap-1">
+              {showGap ? (
+                <span className="px-1 text-xs font-black text-slate-300">...</span>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => onPageChange(page)}
+                className={`inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-xs font-black transition ${
+                  currentPage === page
+                    ? "bg-slate-950 text-white"
+                    : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                {page}
+              </button>
+            </span>
+          );
+        })}
+        <button
+          type="button"
+          disabled={currentPage >= totalPages}
+          onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
+          className="inline-flex h-8 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-black text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          다음
+        </button>
+      </div>
     </div>
   );
 }
@@ -1455,15 +1556,22 @@ function NormalDetailLine({ label, value }: { label: string; value: string }) {
 function NormalInfoPanel({
   children,
   title,
+  to,
 }: {
   children: ReactNode;
   title: string;
+  to: string;
 }) {
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-sm font-black text-slate-950">{title}</h2>
-        <span className="text-xs font-black text-slate-500">더보기 &gt;</span>
+        <Link
+          to={to}
+          className="text-xs font-black text-slate-500 transition hover:text-[#1f6feb]"
+        >
+          더보기 &gt;
+        </Link>
       </div>
       <div className="space-y-2">{children}</div>
     </section>
