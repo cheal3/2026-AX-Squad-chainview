@@ -466,9 +466,9 @@ export function IncidentDemoDashboard() {
           </section>
         ) : null}
 
-        <section className="grid min-w-[1180px] gap-3">
+        <section className="grid min-w-0 gap-3">
           <div className="min-w-0 space-y-3">
-            <div className="grid grid-cols-5 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
               <NormalMetricCard icon={<Server size={22} />} label="전체 서비스" value={services.length} />
               <NormalMetricCard icon={<BriefcaseBusiness size={22} />} label="공통 플랫폼" value={12} />
               <NormalMetricCard icon={<Monitor size={22} />} label="기간계/업무계" value={18} emphasis />
@@ -487,8 +487,8 @@ export function IncidentDemoDashboard() {
                       분류별 정상 운영 서비스를 목록으로 확인합니다.
                     </p>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <label className="relative">
+                  <div className="flex min-w-0 flex-wrap items-center justify-end gap-3">
+                    <label className="relative min-w-[220px] max-w-full flex-1 sm:flex-none">
                       <Search
                         size={15}
                         className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
@@ -497,7 +497,7 @@ export function IncidentDemoDashboard() {
                         value={query}
                         onChange={(event) => setQuery(event.target.value)}
                         placeholder="서비스 검색"
-                        className="h-9 w-64 rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-3 text-xs font-semibold text-slate-700 outline-none transition focus:border-[#86b7ff] focus:bg-white focus:ring-4 focus:ring-[#edf5ff]"
+                        className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-3 text-xs font-semibold text-slate-700 outline-none transition focus:border-[#86b7ff] focus:bg-white focus:ring-4 focus:ring-[#edf5ff] sm:w-64"
                       />
                     </label>
                     <div className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-black text-slate-500">
@@ -689,7 +689,7 @@ export function IncidentDemoDashboard() {
       </section>
 
       <section
-        className={`grid min-w-[1180px] gap-4 ${
+        className={`grid min-w-0 gap-4 ${
           serviceDetailPanelOpen
             ? "xl:grid-cols-[minmax(0,1fr)_360px]"
             : "xl:grid-cols-1"
