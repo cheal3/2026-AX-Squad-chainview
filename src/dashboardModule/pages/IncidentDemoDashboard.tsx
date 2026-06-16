@@ -68,6 +68,11 @@ const incidentRows = [
   ["Auth-Service", "INC-2026-0017", "완료", "2개", "5일 전", "green"],
 ];
 
+function isCoreService(service: ServiceRecord) {
+  const rootCategory = service.categoryPath[0] ?? "";
+  return rootCategory.includes("기간계");
+}
+
 export function IncidentDemoDashboard({
   activeIncidentId,
 }: {
@@ -97,13 +102,6 @@ function DashboardCase({
     (incident) => incident.incidentStatusCode !== "RESOLVED"
   );
   const { relations, services } = stableDataRef.current;
-  const [selectedServiceId, setSelectedServiceId] = useState<number | undefined>();
-  const handleSelectService = (serviceId: number) => {
-    setSelectedServiceId((current) => (current === serviceId ? undefined : serviceId));
-  };
-  const selectedService =
-    services.find((service) => service.serviceId === selectedServiceId) ??
-    services[0];
   const relationCountByServiceId = useMemo(() => {
     const counts = new Map<number, number>();
 
@@ -120,6 +118,47 @@ function DashboardCase({
 
     return counts;
   }, [relations]);
+  const coreServices = useMemo(() => {
+    const matched = services.filter(isCoreService);
+    return matched.length > 0 ? matched : services;
+  }, [services]);
+  const defaultSelectedServiceId = useMemo(
+    () =>
+      [...coreServices]
+        .sort((first, second) => {
+          const relationCountDiff =
+            (relationCountByServiceId.get(second.serviceId) ?? 0) -
+            (relationCountByServiceId.get(first.serviceId) ?? 0);
+
+          return (
+            relationCountDiff ||
+            first.serviceName.localeCompare(second.serviceName, "ko") ||
+            first.serviceId - second.serviceId
+          );
+        })[0]?.serviceId,
+    [coreServices, relationCountByServiceId]
+  );
+  const [selectedServiceId, setSelectedServiceId] = useState<number | undefined>(
+    defaultSelectedServiceId
+  );
+
+  useEffect(() => {
+    setSelectedServiceId((current) => {
+      if (current && coreServices.some((service) => service.serviceId === current)) {
+        return current;
+      }
+
+      return defaultSelectedServiceId;
+    });
+  }, [coreServices, defaultSelectedServiceId]);
+
+  const handleSelectService = (serviceId: number) => {
+    setSelectedServiceId(serviceId);
+  };
+  const selectedService =
+    services.find((service) => service.serviceId === selectedServiceId) ??
+    coreServices.find((service) => service.serviceId === defaultSelectedServiceId) ??
+    services[0];
 
   if (activeIncident) {
     return (
@@ -136,6 +175,7 @@ function DashboardCase({
       <MetricStrip />
       <div className="mt-3 grid min-h-0 min-w-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(300px,400px)] gap-3">
         <RelationMap
+          coreServiceIds={coreServices.map((service) => service.serviceId)}
           selectedServiceId={selectedServiceId}
           onSelectService={handleSelectService}
         />
@@ -235,13 +275,16 @@ function MetricStrip() {
 }
 
 function RelationMap({
+  coreServiceIds,
   onSelectService,
   selectedServiceId,
 }: {
+  coreServiceIds: number[];
   onSelectService: (serviceId: number) => void;
   selectedServiceId?: number;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const coreServiceIdSet = useMemo(() => new Set(coreServiceIds), [coreServiceIds]);
 
   return (
     <>
@@ -262,7 +305,7 @@ function RelationMap({
         </div>
         <div className="h-[calc(100%-44px)] min-h-[256px] min-w-0 overflow-hidden">
           <ServiceRelationFlow
-            autoCenter={false}
+            autoCenter
             embedded
             embeddedHeightClassName="h-full"
             frameless
@@ -271,8 +314,10 @@ function RelationMap({
             hideTopControl
             highlightServiceId={selectedServiceId}
             initialFitView
+            initialRelationDepth={2}
+            initialServiceId={selectedServiceId}
             onSelectService={onSelectService}
-            showAllServices
+            serviceFilter={(service) => coreServiceIdSet.has(service.serviceId)}
           />
         </div>
       </section>
@@ -280,7 +325,7 @@ function RelationMap({
       {isExpanded ? (
         <RelationFlowModal title="서비스 관계도" onClose={() => setIsExpanded(false)}>
           <ServiceRelationFlow
-            autoCenter={false}
+            autoCenter
             embedded
             embeddedHeightClassName="h-full"
             frameless
@@ -288,8 +333,10 @@ function RelationMap({
             hideTopControl
             highlightServiceId={selectedServiceId}
             initialFitView
+            initialRelationDepth={2}
+            initialServiceId={selectedServiceId}
             onSelectService={onSelectService}
-            showAllServices
+            serviceFilter={(service) => coreServiceIdSet.has(service.serviceId)}
           />
         </RelationFlowModal>
       ) : null}

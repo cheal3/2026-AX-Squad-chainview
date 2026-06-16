@@ -137,6 +137,7 @@ export function ServiceRelationFlow({
   incidentMode = false,
   initialServiceId,
   onSelectService,
+  serviceFilter,
   showAllServices = false,
 }: {
   autoCenter?: boolean;
@@ -154,6 +155,7 @@ export function ServiceRelationFlow({
   incidentMode?: boolean;
   initialServiceId?: number;
   onSelectService?: (serviceId: number) => void;
+  serviceFilter?: (service: ServiceRecord) => boolean;
   showAllServices?: boolean;
 } = {}) {
   const portalData = usePortalData();
@@ -163,6 +165,14 @@ export function ServiceRelationFlow({
     : portalData;
   const { services, relations, owners, servers, techStacks, incidents } =
     dataSource;
+  const filteredServices = useMemo(
+    () => (serviceFilter ? services.filter((service) => serviceFilter(service)) : services),
+    [serviceFilter, services]
+  );
+  const allowedServiceIds = useMemo(
+    () => new Set(filteredServices.map((service) => service.serviceId)),
+    [filteredServices]
+  );
   const activeIncident = useMemo<IncidentRecord | undefined>(() => {
     if (!incidentMode) {
       return undefined;
@@ -178,7 +188,7 @@ export function ServiceRelationFlow({
     );
   }, [incidentMode, incidents, initialServiceId]);
   const initialFocusedServiceId =
-    initialServiceId ?? activeIncident?.serviceId ?? services[0]?.serviceId ?? 0;
+    initialServiceId ?? activeIncident?.serviceId ?? filteredServices[0]?.serviceId ?? 0;
   const [focusedServiceId, setFocusedServiceId] = useState<number>(
     initialFocusedServiceId
   );
@@ -239,9 +249,11 @@ export function ServiceRelationFlow({
       relations.filter(
         (relation) =>
           relation.relationStatusCode === "ACTIVE" &&
-          relation.sourceServiceId !== relation.targetServiceId
+          relation.sourceServiceId !== relation.targetServiceId &&
+          allowedServiceIds.has(relation.sourceServiceId) &&
+          allowedServiceIds.has(relation.targetServiceId)
       ),
-    [relations]
+    [allowedServiceIds, relations]
   );
   const activeIncidentServiceId =
     activeIncident?.serviceId ?? initialFocusedServiceId;
@@ -292,7 +304,7 @@ export function ServiceRelationFlow({
       return [];
     }
 
-    return services
+    return filteredServices
       .filter((service) => {
         return [
           service.serviceName,
@@ -304,7 +316,7 @@ export function ServiceRelationFlow({
           .includes(normalized);
       })
       .slice(0, 12);
-  }, [query, services]);
+  }, [filteredServices, query]);
 
   const {
     visibleRelationIds,
@@ -352,7 +364,7 @@ export function ServiceRelationFlow({
         );
       };
 
-      services.forEach((service) => {
+      filteredServices.forEach((service) => {
         const lane = getAllServicesLane(service);
         const laneServiceIds = laneGroups.get(lane) ?? [];
 
@@ -508,7 +520,7 @@ export function ServiceRelationFlow({
       if (
         sourceLane !== undefined &&
         targetLane !== undefined &&
-        targetLane - sourceLane === 1
+        Math.abs(targetLane - sourceLane) === 1
       ) {
         relationIds.add(relation.relationId);
       }
@@ -590,10 +602,10 @@ export function ServiceRelationFlow({
     };
   }, [
     activeRelations,
+    filteredServices,
     focusedServiceId,
     relationDepth,
     serviceById,
-    services,
     showAllServices,
   ]);
 
@@ -645,7 +657,7 @@ export function ServiceRelationFlow({
   };
 
   const serviceNodes = useMemo<Node<ServiceNodeData>[]>(() => {
-    const visibleServices = services.filter((service) => {
+    const visibleServices = filteredServices.filter((service) => {
       return visibleServiceIds.has(service.serviceId);
     });
     const highlightedServiceId = showAllServices ? highlightServiceId : focusedServiceId;
@@ -721,7 +733,7 @@ export function ServiceRelationFlow({
     onSelectService,
     ownerByServiceId,
     relationCountByServiceId,
-    services,
+    filteredServices,
     showAllServices,
     visibleServiceIds,
     yByServiceId,
@@ -744,7 +756,7 @@ export function ServiceRelationFlow({
             return false;
           }
 
-          return showAllServices || targetLane - sourceLane === 1;
+          return showAllServices || Math.abs(targetLane - sourceLane) === 1;
         }
       )
       .map((relation) => {
@@ -772,18 +784,20 @@ export function ServiceRelationFlow({
           className: directlyConnected
             ? "chainview-flow-edge chainview-flow-edge-active"
             : hasHighlight
-              ? "chainview-flow-edge chainview-flow-edge-muted"
+              ? showAllServices
+                ? "chainview-flow-edge chainview-flow-edge-muted"
+                : "chainview-flow-edge chainview-flow-edge-normal-dashed"
               : showAllServices
                 ? "chainview-flow-edge chainview-flow-edge-default-dashed"
-                : "chainview-flow-edge",
+                : "chainview-flow-edge chainview-flow-edge-normal-dashed",
           markerEnd: {
             type: MarkerType.ArrowClosed,
             color: stroke,
           },
           style: {
             stroke,
-            strokeWidth: incidentMode ? 2.8 : directlyConnected ? 2.8 : 1.75,
-            opacity: incidentMode ? 0.95 : directlyConnected ? 0.98 : hasHighlight ? 0.36 : showAllServices ? 0.42 : 0.72,
+            strokeWidth: incidentMode ? 2.8 : showAllServices ? (directlyConnected ? 2.8 : 1.75) : 2.4,
+            opacity: incidentMode ? 0.95 : showAllServices ? (directlyConnected ? 0.98 : hasHighlight ? 0.36 : 0.42) : 0.92,
           },
         };
       });
@@ -850,15 +864,15 @@ export function ServiceRelationFlow({
     const frame = window.requestAnimationFrame(() => {
       flowInstance.fitView({
         duration: 0,
-        maxZoom: 0.18,
-        minZoom: 0.18,
-        padding: 0.18,
+        maxZoom: showAllServices ? 0.18 : 0.46,
+        minZoom: showAllServices ? 0.18 : 0.46,
+        padding: showAllServices ? 0.18 : 0.26,
       });
       initialFitViewDoneRef.current = true;
     });
 
     return () => window.cancelAnimationFrame(frame);
-  }, [flowInstance, initialFitView, nodes.length, edges.length]);
+  }, [edges.length, flowInstance, initialFitView, nodes.length, showAllServices]);
 
   useEffect(() => {
     if (!autoCenter) {
@@ -1085,6 +1099,11 @@ export function ServiceRelationFlow({
 
         .chainview-flow-edge-default-dashed path {
           stroke-dasharray: 5 8;
+        }
+
+        .chainview-flow-edge-normal-dashed path {
+          stroke-dasharray: 12 10;
+          animation: chainview-edge-flow 1.2s linear infinite;
         }
 
         .chainview-flow-dark .react-flow {

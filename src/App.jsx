@@ -106,6 +106,27 @@ const staticIncidentRows = [
   },
 ];
 
+const menuMetaByKey = {
+  dashboard: { section: "모니터링", label: "대시보드", icon: "📊" },
+  incidents: { section: "모니터링", label: "인시던트 현황", icon: "🚨" },
+  topology: { section: "모니터링", label: "서비스 관계도", icon: "🗺️" },
+  services: { section: "서비스", label: "서비스 조회", icon: "📦" },
+  relations: { section: "서비스", label: "서비스 관계조회", icon: "🔗" },
+  techstacks: { section: "서비스", label: "기술 스택", icon: "🧩" },
+  servers: { section: "인프라", label: "서버 조회", icon: "🖥️" },
+  deployments: { section: "인프라", label: "배포 현황", icon: "🚀" },
+  owners: { section: "담당자", label: "담당자 조회", icon: "👨‍💼" },
+  groups: { section: "담당자", label: "그룹 조회", icon: "📁" },
+  users: { section: "시스템 관리", label: "사용자 관리", icon: "👥" },
+  "owner-management": { section: "시스템 관리", label: "서비스 담당자 관리", icon: "👨‍💼" },
+  categories: { section: "시스템 관리", label: "서비스 분류 관리", icon: "🗂️" },
+  codes: { section: "시스템 관리", label: "공통코드 관리", icon: "⚙️" },
+};
+
+function getMenuMeta(menu) {
+  return menuMetaByKey[menu] || { section: "서비스", label: "화면", icon: "📄" };
+}
+
 function LegacyPage({ onIncidentOpen, page }) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -128,6 +149,27 @@ function LegacyPage({ onIncidentOpen, page }) {
       if (nextHref) {
         anchor.setAttribute("href", nextHref);
       }
+    });
+
+    const menuMeta = getMenuMeta(page.menu);
+    const crumb = root.querySelector(".crumb");
+    if (crumb) {
+      crumb.classList.add("crumb--standardized");
+      crumb.innerHTML = `<span>${menuMeta.section}</span><span class="sep">/</span><span>${menuMeta.label}</span>`;
+    }
+
+    const pageHead = root.querySelector(".page-head");
+    if (pageHead) {
+      pageHead.classList.add("page-head--standardized");
+    }
+
+    const pageHeadTitle = root.querySelector(".page-head__title");
+    if (pageHeadTitle) {
+      pageHeadTitle.innerHTML = `<span class="page-head__icon" aria-hidden="true">${menuMeta.icon}</span><span>${menuMeta.label}</span>`;
+    }
+
+    root.querySelectorAll(".page-head__title small, .page-head__desc").forEach((element) => {
+      element.remove();
     });
 
     const cleanups = [];
@@ -287,9 +329,8 @@ const sidebarSections = [
   {
     label: "모니터링",
     items: [
-      { key: "dashboard", icon: "📊", label: "대시보드", to: "/dashboard", badge: "2" },
+      { key: "dashboard", icon: "📊", label: "대시보드", to: "/dashboard" },
       { key: "incidents", icon: "🚨", label: "인시던트 현황", to: "/admin-incidents" },
-      { key: "topology", icon: "🗺️", label: "서비스 관계도", to: "/topology" },
     ],
   },
   {
@@ -315,12 +356,6 @@ const sidebarSections = [
     ],
   },
   {
-    label: "[관리자만 접근가능한 메뉴]",
-    items: [
-      { key: "permissions", icon: "🔐", label: "권한 관리", to: "/admin-permissions" },
-    ],
-  },
-  {
     label: "시스템 관리",
     items: [
       { key: "users", icon: "👥", label: "사용자 관리", to: "/admin-users" },
@@ -332,8 +367,33 @@ const sidebarSections = [
 ];
 
 function Sidebar({ activeMenu = "", isDark = false }) {
+  const { incidents } = usePortalData();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const itemClass = (key) => `lnb__item${activeMenu === key ? " is-active" : ""}`;
+  const openIncidentCount = incidents.filter(
+    (incident) => incident.incidentStatusCode !== "RESOLVED"
+  ).length;
+  const sectionItems = useMemo(
+    () =>
+      sidebarSections.map((section) => ({
+        ...section,
+        items: section.items.map((item) =>
+          item.key === "dashboard"
+            ? {
+                ...item,
+                badge: openIncidentCount > 0 ? String(openIncidentCount) : undefined,
+              }
+            : item
+        ),
+      })),
+    [openIncidentCount]
+  );
+  const handleAccountEdit = () => {
+    window.alert("계정정보 수정 기능은 다음 단계에서 연결 예정입니다.");
+  };
+  const handleLogout = () => {
+    window.alert("로그아웃 기능은 다음 단계에서 연결 예정입니다.");
+  };
 
   return (
     <aside className={`lnb${isCollapsed ? " is-collapsed" : ""}${isDark ? " is-dark" : ""}`}>
@@ -351,7 +411,19 @@ function Sidebar({ activeMenu = "", isDark = false }) {
           <Link to="/dashboard"><h2>ChainView</h2></Link>
         </div>
       </div>
-      {sidebarSections.map((section) => (
+      <div className="lnb__account">
+        <div className="lnb__account-avatar" aria-hidden="true">김</div>
+        <div className="lnb__account-body">
+          <strong>김OO</strong>
+          <span>모니터링팀 · ADMIN</span>
+          <small>kimoo@chainview.kr</small>
+        </div>
+        <div className="lnb__account-actions">
+          <button className="lnb__account-button" onClick={handleAccountEdit} type="button">정보 수정</button>
+          <button className="lnb__account-button is-logout" onClick={handleLogout} type="button">로그아웃</button>
+        </div>
+      </div>
+      {sectionItems.map((section) => (
         <div className="lnb__group" key={section.label}>
           <div className="lnb__title">{section.label}</div>
           {section.items.map((item) => (
@@ -402,10 +474,6 @@ function IncidentAdminPage() {
       .filter((row) => !dynamicCodes.has(row.code))
       .map((row) => ({ ...row, source: "static" })),
   ];
-  const openCount = rows.filter((row) => !row.endedAt && row.statusCode === "OPEN").length;
-  const progressCount = rows.filter((row) => !row.endedAt && row.statusCode === "IN_PROGRESS").length;
-  const newCount = portalData.incidents.length;
-
   const openIncident = (row) => {
     if (row.endedAt) {
       return;
@@ -438,21 +506,46 @@ function IncidentAdminPage() {
     navigate(`/dashboard?incidentId=${incident.incidentId}`);
   };
 
+  const handleCreateIncident = () => {
+    const service = portalData.services[0];
+    const nextSeq =
+      portalData.incidents.reduce((maxSeq, incident) => {
+        const [, seqText] =
+          incident.externalIncidentCode?.match(/^INC-\d{4}-(\d+)$/) ?? [];
+        const seq = Number(seqText);
+        return Number.isFinite(seq) ? Math.max(maxSeq, seq) : maxSeq;
+      }, 142) + 1;
+
+    const incident = portalData.createIncident({
+      serviceId: service?.serviceId ?? 1,
+      severityCode: "MAJOR",
+      externalIncidentCode: `INC-2026-${String(nextSeq).padStart(4, "0")}`,
+      targetCode: service?.serviceCode ?? "SVC-001",
+      targetLabel: `SERVICE · ${service?.serviceCode ?? "SVC-001"}`,
+      title: `${service?.serviceName ?? "대표 서비스"} 시연용 인시던트`,
+      description: "시연을 위한 수동 등록 인시던트입니다.",
+      manualRegisteredYn: "Y",
+      registeredBy: "admin",
+    });
+
+    navigate(`/dashboard?incidentId=${incident.incidentId}`);
+  };
+
   return (
     <>
-      <div className="crumb">
-        <a href="/dashboard">대시보드</a><span className="sep">/</span>
-        <span>모니터링</span><span className="sep">/</span><span>인시던트 관리</span>
-      </div>
-
-      <div className="page-head">
-        <div>
-          <h1 className="page-head__title">🚨 인시던트 관리 <small>INCIDENT</small></h1>
-          <p className="page-head__desc">발생한 인시던트를 조회·수정·종결합니다. (OPEN {openCount} · IN_PROGRESS {progressCount} · 생성 이력 {newCount})</p>
+      <div className="page-header-stack">
+        <div className="crumb crumb--standardized">
+          <span>모니터링</span><span className="sep">/</span><span>인시던트 현황</span>
         </div>
-        <div className="page-head__right">
-          <button className="btn">📥 CSV 내보내기</button>
-          <button className="btn btn--primary" type="button">＋ 인시던트 등록</button>
+
+        <div className="page-head page-head--standardized">
+          <div>
+            <h1 className="page-head__title"><span className="page-head__icon" aria-hidden="true">🚨</span><span>인시던트 현황</span></h1>
+          </div>
+          <div className="page-head__right">
+            <button className="btn">📥 CSV 내보내기</button>
+            <button className="btn btn--primary" onClick={handleCreateIncident} type="button">＋ 인시던트 등록</button>
+          </div>
         </div>
       </div>
 
@@ -696,12 +789,10 @@ function ServiceDetailPage({ service }) {
 
   return (
     <div className="service-detail-page">
-      <div className="service-detail__crumb">
-        <a href="/dashboard">실시간 대시보드</a>
-        <span>/</span>
-        <span>{service.categoryPath?.[0] ?? "대외계"}</span>
-        <span>/</span>
-        <span>{service.serviceName}</span>
+      <div className="service-detail__crumb crumb--standardized">
+        <Link to="/admin-services">서비스</Link>
+        <span className="sep">/</span>
+        <span>서비스 조회</span>
       </div>
 
       <section className="service-detail__hero">
@@ -1269,17 +1360,13 @@ function DashboardFrame() {
       <main className="main chain-dashboard-main">
         {!isIncidentMode ? (
           <>
-            <div className="crumb">
-              <span>대시보드</span><span className="sep">/</span>
-              <span>모니터링</span><span className="sep">/</span><span>실시간 대시보드</span>
+            <div className="crumb crumb--standardized">
+              <span>모니터링</span><span className="sep">/</span>
+              <span>대시보드</span>
             </div>
-            <div className="page-head">
+            <div className="page-head page-head--standardized">
               <div>
-                <h1 className="page-head__title">📊 실시간 대시보드 <small>DASHBOARD</small></h1>
-                <p className="page-head__desc">전체 서비스 운영 현황과 서비스 관계, 인시던트 영향을 확인합니다.</p>
-              </div>
-              <div className="page-head__right">
-                <button className="btn btn--primary">새로고침</button>
+                <h1 className="page-head__title"><span className="page-head__icon" aria-hidden="true">📊</span><span>대시보드</span></h1>
               </div>
             </div>
           </>

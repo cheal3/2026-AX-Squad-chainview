@@ -25,6 +25,14 @@ a:hover{text-decoration:underline}
 .lnb__logo{width:34px;height:34px;border-radius:8px;background:var(--brand);color:#fff;display:grid;place-items:center;font-weight:700}
 .lnb__brand h2{margin:0;font-size:15px}
 .lnb__brand p{margin:0;font-size:11px;color:var(--muted)}
+.lnb__account{display:grid;grid-template-columns:auto 1fr;gap:10px;padding:10px;border:1px solid var(--line);border-radius:10px;background:#f8fafc}
+.lnb__account-avatar{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:var(--brand);color:#fff;font-size:13px;font-weight:700}
+.lnb__account-body{min-width:0;display:grid;gap:2px}
+.lnb__account-body strong{font-size:13px;line-height:1.3}
+.lnb__account-body span,.lnb__account-body small{color:var(--muted);font-size:11px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lnb__account-actions{grid-column:1 / -1;display:flex;gap:6px}
+.lnb__account-button{flex:1;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--text);font-size:12px;font-weight:600;padding:7px 8px}
+.lnb__account-button.is-logout{color:#b91c1c}
 .lnb__group{display:flex;flex-direction:column;gap:2px}
 .lnb__title{font-size:11px;color:var(--muted-2);padding:4px 8px;letter-spacing:.04em;font-weight:600}
 .lnb__item{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:6px;color:var(--text);text-decoration:none;font-size:13px}
@@ -33,7 +41,7 @@ a:hover{text-decoration:underline}
 .lnb__item .badge{margin-left:auto;background:var(--crit);color:#fff;font-size:10px;padding:1px 6px;border-radius:10px;font-weight:700}
 
 /* Main */
-.main{padding:18px 22px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.main{padding:28px 34px 32px;display:flex;flex-direction:column;gap:14px;min-width:0}
 
 /* Page header */
 .page-head{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap}
@@ -41,6 +49,13 @@ a:hover{text-decoration:underline}
 .page-head__title small{font-size:12px;color:var(--muted);font-weight:500;margin-left:6px}
 .page-head__desc{color:var(--muted);font-size:12px;margin:4px 0 0}
 .page-head__right{margin-left:auto;display:flex;gap:8px}
+.page-head.page-head--standardized{align-items:flex-start;gap:16px;margin-bottom:0;padding-top:0}
+.page-head.page-head--standardized > :first-child{display:grid;gap:0}
+.page-head.page-head--standardized .page-head__title{font-size:28px;font-weight:800;line-height:1.2;gap:10px}
+.page-head.page-head--standardized .page-head__icon{display:inline-flex;align-items:center;justify-content:center;line-height:1}
+.page-head.page-head--standardized .page-head__title small,
+.page-head.page-head--standardized .page-head__desc{display:none}
+.page-header-stack{display:flex;flex-direction:column;gap:0}
 
 /* Buttons */
 .btn{border:1px solid var(--line);background:#fff;border-radius:6px;padding:7px 14px;font-size:13px;font-weight:600;color:var(--text);display:inline-flex;align-items:center;gap:6px}
@@ -139,6 +154,7 @@ table.tbl .col-actions{width:120px;text-align:right}
 .crumb{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-bottom:-4px}
 .crumb a{color:var(--muted)}
 .crumb .sep{color:#cbd5e1}
+.crumb.crumb--standardized{margin-bottom:20px}
 
 /* icon button (in table row) */
 .ibtn{width:28px;height:28px;border-radius:6px;border:1px solid var(--line);background:#fff;color:var(--muted);display:inline-grid;place-items:center;font-size:13px}

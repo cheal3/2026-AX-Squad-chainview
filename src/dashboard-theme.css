@@ -25,6 +25,16 @@
   min-width: 0;
 }
 
+.lnb__account-button:hover {
+  border-color: #cbd5e1;
+  background: #fff;
+}
+
+.lnb__account-button.is-logout:hover {
+  border-color: #fecaca;
+  background: #fff5f5;
+}
+
 .lnb__toggle {
   width: 34px;
   height: 34px;
@@ -70,6 +80,7 @@
 }
 
 .lnb.is-collapsed .lnb__brand-text,
+.lnb.is-collapsed .lnb__account,
 .lnb.is-collapsed .lnb__title,
 .lnb.is-collapsed .lnb__item-text {
   display: none;
@@ -143,6 +154,34 @@
 .lnb.is-dark .lnb__brand p,
 .lnb.is-dark .lnb__title {
   color: #8ba3bd;
+}
+
+.lnb.is-dark .lnb__account {
+  background: #081b2d;
+  border-color: #1f3549;
+}
+
+.lnb.is-dark .lnb__account-avatar {
+  background: #126cf0;
+}
+
+.lnb.is-dark .lnb__account-body span,
+.lnb.is-dark .lnb__account-body small {
+  color: #8ba3bd;
+}
+
+.lnb.is-dark .lnb__account-button {
+  background: #0b2135;
+  border-color: #1f3549;
+  color: #e5edf7;
+}
+
+.lnb.is-dark .lnb__account-button:hover {
+  border-color: #35506b;
+}
+
+.lnb.is-dark .lnb__account-button.is-logout {
+  color: #fca5a5;
 }
 
 .lnb.is-dark .lnb__item:hover {
