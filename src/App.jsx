@@ -4,6 +4,7 @@ import { initAdminInteractions } from "./adminInteractions.js";
 import { pages } from "./pagesData.js";
 import { PortalDataProvider, usePortalData } from "./dashboardModule/PortalDataStore";
 import { IncidentDemoDashboard } from "./dashboardModule/pages/IncidentDemoDashboard";
+import { codeLabels } from "./dashboardModule/mockData";
 
 const htmlPageToRoute = (href) => {
   if (!href || /^(https?:|mailto:|tel:|#)/i.test(href)) {
@@ -34,6 +35,74 @@ const severityByLabel = {
   낮음: "MINOR",
   정보: "MINOR",
 };
+
+const staticIncidentRows = [
+  {
+    code: "INC-2026-0142",
+    endedAt: "",
+    impactCount: 4,
+    incidentTypeLabel: "장애",
+    severityCode: "CRITICAL",
+    severityLabel: "치명",
+    startedAt: "2026-06-01 14:02",
+    statusCode: "OPEN",
+    targetCode: "EXT-001",
+    targetLabel: "SERVICE · EXT-001",
+    title: "카드승인연계 응답지연 (P99 > 3s)",
+  },
+  {
+    code: "INC-2026-0141",
+    endedAt: "",
+    impactCount: 3,
+    incidentTypeLabel: "성능저하",
+    severityCode: "MAJOR",
+    severityLabel: "높음",
+    startedAt: "2026-06-01 13:48",
+    statusCode: "IN_PROGRESS",
+    targetCode: "DEP-001",
+    targetLabel: "SERVICE · DEP-001",
+    title: "예금이체 TPS 30% 하락",
+  },
+  {
+    code: "INC-2026-0140",
+    endedAt: "",
+    impactCount: 2,
+    incidentTypeLabel: "성능저하",
+    severityCode: "MINOR",
+    severityLabel: "중간",
+    startedAt: "2026-06-01 13:25",
+    statusCode: "OPEN",
+    targetCode: "WAS-PRD-12",
+    targetLabel: "SERVER · WAS-PRD-12",
+    title: "WAS CPU 사용률 92% 지속",
+  },
+  {
+    code: "INC-2026-0139",
+    endedAt: "2026-06-01 03:10",
+    impactCount: 0,
+    incidentTypeLabel: "점검",
+    severityCode: "NOTICE",
+    severityLabel: "정보",
+    startedAt: "2026-06-01 02:00",
+    statusCode: "RESOLVED",
+    targetCode: "NOTI-001",
+    targetLabel: "SERVICE · NOTI-001",
+    title: "알림서비스 정기점검 완료",
+  },
+  {
+    code: "INC-2026-0138",
+    endedAt: "2026-05-31 23:40",
+    impactCount: 1,
+    incidentTypeLabel: "보안",
+    severityCode: "MAJOR",
+    severityLabel: "높음",
+    startedAt: "2026-05-31 22:14",
+    statusCode: "CLOSED",
+    targetCode: "AUTH-001",
+    targetLabel: "SERVICE · AUTH-001",
+    title: "비정상 로그인 시도 다발",
+  },
+];
 
 function LegacyPage({ onIncidentOpen, page }) {
   const location = useLocation();
@@ -164,6 +233,17 @@ function RoutePage({ slug }) {
     navigate(`/dashboard?incident=${encodeURIComponent(incident.code)}`);
   };
 
+  if (page.menu === "incidents") {
+    return (
+      <div className="app">
+        <Sidebar activeMenu={page.menu} />
+        <main className="main is-incident-list">
+          <IncidentAdminPage />
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="app">
       <Sidebar activeMenu={page.menu} />
@@ -247,6 +327,206 @@ function Sidebar({ activeMenu = "", isDark = false }) {
         </div>
       ))}
     </aside>
+  );
+}
+
+function IncidentAdminPage() {
+  const navigate = useNavigate();
+  const portalData = usePortalData();
+  const serviceById = useMemo(
+    () => new Map(portalData.services.map((service) => [service.serviceId, service])),
+    [portalData.services]
+  );
+  const dynamicRows = portalData.incidents.map((incident) => {
+    const service = incident.serviceId ? serviceById.get(incident.serviceId) : undefined;
+    const targetCode = incident.targetCode || service?.serviceCode || "-";
+    const targetLabel = incident.targetLabel || `${incident.incidentTypeCode} · ${targetCode}`;
+
+    return {
+      code: incident.externalIncidentCode || `INC-${String(incident.incidentId).padStart(4, "0")}`,
+      endedAt: incident.endedAt || "",
+      impactCount: portalData.incidentImpacts.filter((impact) => impact.incidentId === incident.incidentId).length,
+      incident,
+      incidentTypeLabel: incident.incidentTypeCode === "SERVER" ? "장애" : "장애",
+      severityCode: incident.severityCode,
+      severityLabel: severityLabelFor(incident.severityCode),
+      source: "dynamic",
+      startedAt: incident.startedAt,
+      statusCode: incident.incidentStatusCode,
+      targetCode,
+      targetLabel,
+      title: incident.title,
+    };
+  });
+  const dynamicCodes = new Set(dynamicRows.map((row) => row.code));
+  const rows = [
+    ...dynamicRows,
+    ...staticIncidentRows
+      .filter((row) => !dynamicCodes.has(row.code))
+      .map((row) => ({ ...row, source: "static" })),
+  ];
+  const openCount = rows.filter((row) => !row.endedAt && row.statusCode === "OPEN").length;
+  const progressCount = rows.filter((row) => !row.endedAt && row.statusCode === "IN_PROGRESS").length;
+  const newCount = portalData.incidents.length;
+
+  const openIncident = (row) => {
+    if (row.endedAt) {
+      return;
+    }
+
+    if (row.incident) {
+      navigate(`/dashboard?incidentId=${row.incident.incidentId}`);
+      return;
+    }
+
+    const service =
+      portalData.services.find((item) => item.serviceCode === row.targetCode) ??
+      portalData.services[0];
+    const existing = portalData.incidents.find((incident) => incident.externalIncidentCode === row.code);
+    const incident =
+      existing ??
+      portalData.createIncident({
+        serviceId: service?.serviceId ?? 1,
+        severityCode: row.severityCode,
+        externalIncidentCode: row.code,
+        targetCode: row.targetCode,
+        targetLabel: row.targetLabel,
+        title: row.title,
+        description: `${row.code} 관리 화면에서 선택한 인시던트입니다.`,
+        startedAt: row.startedAt,
+        manualRegisteredYn: "Y",
+        registeredBy: "admin",
+      });
+
+    navigate(`/dashboard?incidentId=${incident.incidentId}`);
+  };
+
+  return (
+    <>
+      <div className="crumb">
+        <a href="/dashboard">대시보드</a><span className="sep">/</span>
+        <span>모니터링</span><span className="sep">/</span><span>인시던트 관리</span>
+      </div>
+
+      <div className="page-head">
+        <div>
+          <h1 className="page-head__title">🚨 인시던트 관리 <small>INCIDENT</small></h1>
+          <p className="page-head__desc">발생한 인시던트를 조회·수정·종결합니다. (OPEN {openCount} · IN_PROGRESS {progressCount} · 생성 이력 {newCount})</p>
+        </div>
+        <div className="page-head__right">
+          <button className="btn">📥 CSV 내보내기</button>
+          <button className="btn btn--primary" type="button">＋ 인시던트 등록</button>
+        </div>
+      </div>
+
+      <div className="toolbar">
+        <select><option>상태 · 전체</option><option>OPEN</option><option>IN_PROGRESS</option><option>RESOLVED</option><option>CLOSED</option></select>
+        <select><option>심각도 · 전체</option><option>치명(CRITICAL)</option><option>높음(HIGH)</option><option>중간(MEDIUM)</option><option>낮음(LOW)</option><option>정보(INFO)</option></select>
+        <select><option>유형 · 전체</option><option>장애</option><option>성능저하</option><option>보안</option><option>장애예측</option><option>점검</option></select>
+        <select><option>대상유형 · 전체</option><option>SERVICE</option><option>SERVER</option><option>DEPLOYMENT</option></select>
+        <input type="date" />
+        <input type="date" />
+        <div className="search">🔍<input type="text" placeholder="ID, 제목, 대상 검색..." /></div>
+        <div className="right"><button className="btn btn--ghost btn--sm">초기화</button></div>
+      </div>
+
+      <div className="card">
+        <table className="tbl">
+          <thead>
+            <tr>
+              <th className="col-check"><input type="checkbox" className="chk" /></th>
+              <th>ID</th><th>유형</th><th>심각도</th><th>상태</th>
+              <th>대상</th><th>제목</th><th>영향 서비스</th>
+              <th>발생시각</th><th>종료시각</th>
+              <th className="col-actions">관리</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => {
+              const isOpen = !row.endedAt;
+              return (
+                <tr
+                  className={isOpen ? "is-clickable-incident" : undefined}
+                  key={`${row.source}-${row.code}-${row.startedAt}`}
+                  onClick={() => openIncident(row)}
+                >
+                  <td className="col-check"><input type="checkbox" className="chk" onClick={(event) => event.stopPropagation()} /></td>
+                  <td><code>{row.code}</code></td>
+                  <td><span className={`pill ${severityPillClass(row.severityCode)}`}>{row.incidentTypeLabel}</span></td>
+                  <td><span className={`pill ${severityPillClass(row.severityCode)}`}>{row.severityLabel}</span></td>
+                  <td><span className={`dot ${statusDotClass(row.statusCode, row.endedAt)}`}></span>{row.statusCode}</td>
+                  <td>{formatTargetLabel(row.targetLabel, row.targetCode)}</td>
+                  <td>{row.title}</td>
+                  <td>{row.impactCount}건</td>
+                  <td>{row.startedAt}</td>
+                  <td>{row.endedAt || "-"}</td>
+                  <td className="col-actions">
+                    <div className="row-actions">
+                      <button className="ibtn" onClick={(event) => event.stopPropagation()} type="button">✏️</button>
+                      <button className="ibtn ibtn--danger" onClick={(event) => event.stopPropagation()} type="button">🗑</button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        <div className="pager">
+          <div className="pager__info">전체 {rows.length}건 · 1-{rows.length} / 1 페이지</div>
+          <div className="pager__nav"><button disabled>‹</button><button className="is-on">1</button><button disabled>›</button></div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function severityLabelFor(severityCode) {
+  return {
+    CRITICAL: "치명",
+    MAJOR: "높음",
+    MINOR: "중간",
+    NOTICE: "정보",
+  }[severityCode] || codeLabels.severity[severityCode] || severityCode;
+}
+
+function severityPillClass(severityCode) {
+  if (severityCode === "CRITICAL" || severityCode === "MAJOR") {
+    return "pill--crit";
+  }
+
+  if (severityCode === "MINOR") {
+    return "pill--warn";
+  }
+
+  return "pill--gray";
+}
+
+function statusDotClass(statusCode, endedAt) {
+  if (endedAt || statusCode === "RESOLVED") {
+    return "";
+  }
+
+  if (statusCode === "CLOSED") {
+    return "dot--idle";
+  }
+
+  if (statusCode === "IN_PROGRESS" || statusCode === "MONITORING") {
+    return "dot--warn";
+  }
+
+  return "dot--crit";
+}
+
+function formatTargetLabel(targetLabel, targetCode) {
+  if (!targetLabel) {
+    return <code>{targetCode}</code>;
+  }
+
+  const [prefix] = targetLabel.split("·");
+  return (
+    <>
+      {prefix.trim()} · <code>{targetCode}</code>
+    </>
   );
 }
 
@@ -412,8 +692,10 @@ function TopologyInfo({ children, title }) {
 }
 
 function DashboardFrame() {
+  const location = useLocation();
   const { incidents } = usePortalData();
   const isIncidentMode = incidents.some((incident) => incident.incidentStatusCode !== "RESOLVED");
+  const activeIncidentId = Number(new URLSearchParams(location.search).get("incidentId")) || undefined;
 
   return (
     <div className={`app${isIncidentMode ? " is-dark" : ""}`}>
@@ -438,7 +720,7 @@ function DashboardFrame() {
           </>
         ) : null}
         <div className="chain-dashboard-scope">
-          <IncidentDemoDashboard />
+          <IncidentDemoDashboard activeIncidentId={activeIncidentId} />
         </div>
       </main>
     </div>

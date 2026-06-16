@@ -102,11 +102,11 @@
   place-items: center;
 }
 
-.main.is-incident-list #legacy-page-root table.tbl tbody tr.is-clickable-incident {
+.main.is-incident-list table.tbl tbody tr.is-clickable-incident {
   cursor: pointer;
 }
 
-.main.is-incident-list #legacy-page-root table.tbl tbody tr.is-clickable-incident:hover {
+.main.is-incident-list table.tbl tbody tr.is-clickable-incident:hover {
   background: #eef2ff;
 }
 

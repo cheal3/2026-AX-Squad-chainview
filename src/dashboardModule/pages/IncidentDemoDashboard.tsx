@@ -66,20 +66,32 @@ const incidentRows = [
   ["Auth-Service", "INC-2026-0017", "완료", "2개", "5일 전", "green"],
 ];
 
-export function IncidentDemoDashboard() {
+export function IncidentDemoDashboard({
+  activeIncidentId,
+}: {
+  activeIncidentId?: number;
+} = {}) {
   return (
     <div className="min-w-0 overflow-x-auto text-slate-950">
       <div className="flex min-h-[720px] w-full">
-        <DashboardCase />
+        <DashboardCase activeIncidentId={activeIncidentId} />
       </div>
     </div>
   );
 }
 
-function DashboardCase() {
+function DashboardCase({
+  activeIncidentId,
+}: {
+  activeIncidentId?: number;
+}) {
   const portalData = usePortalData();
   const stableDataRef = useRef(portalData);
   const activeIncident = portalData.incidents.find(
+    (incident) =>
+      incident.incidentId === activeIncidentId &&
+      incident.incidentStatusCode !== "RESOLVED"
+  ) ?? portalData.incidents.find(
     (incident) => incident.incidentStatusCode !== "RESOLVED"
   );
   const { relations, services } = stableDataRef.current;
@@ -127,9 +139,18 @@ function DashboardCase() {
               return;
             }
 
+            const maxIncidentSeq = portalData.incidents.reduce((maxSeq, incident) => {
+              const [, seqText] = incident.externalIncidentCode?.match(/^INC-\d{4}-(\d+)$/) ?? [];
+              const seq = Number(seqText);
+              return Number.isFinite(seq) ? Math.max(maxSeq, seq) : maxSeq;
+            }, 142);
+
             portalData.createIncident({
               serviceId: selectedService.serviceId,
               severityCode: "CRITICAL",
+              externalIncidentCode: `INC-2026-${String(maxIncidentSeq + 1).padStart(4, "0")}`,
+              targetCode: selectedService.serviceCode,
+              targetLabel: `SERVICE · ${selectedService.serviceCode}`,
               title: `${selectedService.serviceName} 장애 발생`,
               description: "대시보드에서 등록한 서비스 장애입니다.",
               manualRegisteredYn: "Y",
