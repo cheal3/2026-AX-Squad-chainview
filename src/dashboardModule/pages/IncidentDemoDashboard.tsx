@@ -26,6 +26,7 @@ import {
 import { ServiceRelationFlow } from "./ServiceRelationFlow";
 import { usePortalData } from "../PortalDataStore";
 import type { IncidentRecord, ServiceRecord, ServiceRelationRecord } from "../mockData";
+import { useNavigate } from "react-router-dom";
 
 const categories = [
   { label: "전체 서비스", value: 48, icon: <Server size={26} />, tone: "slate" },
@@ -96,9 +97,10 @@ function DashboardCase({
     (incident) => incident.incidentStatusCode !== "RESOLVED"
   );
   const { relations, services } = stableDataRef.current;
-  const [selectedServiceId, setSelectedServiceId] = useState(
-    services[0]?.serviceId ?? 0
-  );
+  const [selectedServiceId, setSelectedServiceId] = useState<number | undefined>();
+  const handleSelectService = (serviceId: number) => {
+    setSelectedServiceId((current) => (current === serviceId ? undefined : serviceId));
+  };
   const selectedService =
     services.find((service) => service.serviceId === selectedServiceId) ??
     services[0];
@@ -133,7 +135,10 @@ function DashboardCase({
     <section className="flex min-h-full min-w-0 flex-1 flex-col">
       <MetricStrip />
       <div className="mt-3 grid min-h-0 min-w-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(300px,400px)] gap-3">
-        <RelationMap onSelectService={setSelectedServiceId} />
+        <RelationMap
+          selectedServiceId={selectedServiceId}
+          onSelectService={handleSelectService}
+        />
         <ServiceInfoPanel
           onCreateIncident={() => {
             if (!selectedService) {
@@ -231,8 +236,10 @@ function MetricStrip() {
 
 function RelationMap({
   onSelectService,
+  selectedServiceId,
 }: {
   onSelectService: (serviceId: number) => void;
+  selectedServiceId?: number;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -262,6 +269,7 @@ function RelationMap({
             hideDepthToggle
             hideDetailPanel
             hideTopControl
+            highlightServiceId={selectedServiceId}
             initialFitView
             onSelectService={onSelectService}
             showAllServices
@@ -278,6 +286,7 @@ function RelationMap({
             frameless
             hideDepthToggle
             hideTopControl
+            highlightServiceId={selectedServiceId}
             initialFitView
             onSelectService={onSelectService}
             showAllServices
@@ -805,6 +814,7 @@ function IncidentSelectedPanel({
     rootService?.categoryPath.join(" > ") ||
     (incident.targetCode ? `관리 화면 대상 · ${incident.targetCode}` : "-");
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const navigate = useNavigate();
 
   return (
     <>
@@ -840,7 +850,13 @@ function IncidentSelectedPanel({
           >
             서비스 상세 <ExternalLink className="inline" size={12} />
           </button>
-          <button className="h-8 rounded border border-[#35506b] bg-[#0b2135] text-xs font-black text-slate-200" type="button">인시던트 상세 <ExternalLink className="inline" size={12} /></button>
+          <button
+            className="h-8 rounded border border-[#35506b] bg-[#0b2135] text-xs font-black text-slate-200"
+            type="button"
+            onClick={() => navigate(`/dashboard-proto-detail?incidentId=${incident.incidentId}`)}
+          >
+            인시던트 상세 <ExternalLink className="inline" size={12} />
+          </button>
         </div>
       </aside>
 

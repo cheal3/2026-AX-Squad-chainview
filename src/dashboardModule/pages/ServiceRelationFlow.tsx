@@ -46,6 +46,7 @@ type ServiceNodeData = {
   serverCount: number;
   focused: boolean;
   connected: boolean;
+  dimmed: boolean;
   detailSelected: boolean;
   relationCount: number;
   lane: number;
@@ -127,6 +128,7 @@ export function ServiceRelationFlow({
   hideDepthToggle = false,
   hideDetailPanel = false,
   hideTopControl = false,
+  highlightServiceId,
   initialFitView = false,
   initialRelationDepth,
   initialViewport,
@@ -142,6 +144,7 @@ export function ServiceRelationFlow({
   hideDepthToggle?: boolean;
   hideDetailPanel?: boolean;
   hideTopControl?: boolean;
+  highlightServiceId?: number;
   initialFitView?: boolean;
   initialRelationDepth?: number;
   initialViewport?: { x: number; y: number; zoom: number };
@@ -642,14 +645,32 @@ export function ServiceRelationFlow({
     const visibleServices = services.filter((service) => {
       return visibleServiceIds.has(service.serviceId);
     });
+    const highlightedServiceId = showAllServices ? highlightServiceId : focusedServiceId;
+    const highlightedConnectedServiceIds = new Set<number>();
+
+    activeRelations.forEach((relation) => {
+      if (!highlightedServiceId) {
+        return;
+      }
+
+      if (relation.sourceServiceId === highlightedServiceId) {
+        highlightedConnectedServiceIds.add(relation.targetServiceId);
+      }
+
+      if (relation.targetServiceId === highlightedServiceId) {
+        highlightedConnectedServiceIds.add(relation.sourceServiceId);
+      }
+    });
 
     return visibleServices.map((service) => {
       const lane = laneByServiceId.get(service.serviceId) ?? 0;
       const connected =
-        !showAllServices &&
-        (service.serviceId === focusedServiceId ||
-          connectedServiceIds.has(service.serviceId));
-      const focused = !showAllServices && service.serviceId === focusedServiceId;
+        Boolean(highlightedServiceId) &&
+        (service.serviceId === highlightedServiceId ||
+          highlightedConnectedServiceIds.has(service.serviceId) ||
+          (!showAllServices && connectedServiceIds.has(service.serviceId)));
+      const focused = Boolean(highlightedServiceId) && service.serviceId === highlightedServiceId;
+      const dimmed = showAllServices && Boolean(highlightedServiceId) && !connected;
 
       return {
         id: String(service.serviceId),
@@ -670,6 +691,7 @@ export function ServiceRelationFlow({
           serverCount: service.serverId ? 1 : 0,
           focused,
           connected,
+          dimmed,
           detailSelected:
             !showAllServices &&
             detailOpen &&
@@ -684,9 +706,11 @@ export function ServiceRelationFlow({
   }, [
     focusedServiceId,
     connectedServiceIds,
+    activeRelations,
     detailOpen,
     detailServiceId,
     laneByServiceId,
+    highlightServiceId,
     moveToFocusedService,
     openServiceDetail,
     onSelectService,
@@ -721,10 +745,14 @@ export function ServiceRelationFlow({
       .map((relation) => {
         const sourceLane = laneByServiceId.get(relation.sourceServiceId) ?? 0;
         const targetLane = laneByServiceId.get(relation.targetServiceId) ?? 0;
+        const highlightedServiceId = showAllServices
+          ? highlightServiceId
+          : highlightServiceId ?? focusedServiceId;
+        const hasHighlight = !incidentMode && Boolean(highlightedServiceId);
         const directlyConnected =
-          !showAllServices &&
-          (relation.sourceServiceId === focusedServiceId ||
-            relation.targetServiceId === focusedServiceId);
+          hasHighlight &&
+          (relation.sourceServiceId === highlightedServiceId ||
+            relation.targetServiceId === highlightedServiceId);
         const stroke = incidentMode
           ? "#ff3344"
           : sourceLane >= 0 && targetLane > sourceLane
@@ -738,21 +766,24 @@ export function ServiceRelationFlow({
           type: "default",
           className: directlyConnected
             ? "chainview-flow-edge chainview-flow-edge-active"
-            : "chainview-flow-edge chainview-flow-edge-muted",
+            : hasHighlight
+              ? "chainview-flow-edge chainview-flow-edge-muted"
+              : "chainview-flow-edge",
           markerEnd: {
             type: MarkerType.ArrowClosed,
             color: stroke,
           },
           style: {
             stroke,
-            strokeWidth: incidentMode ? 2.8 : directlyConnected ? 2.6 : 1.75,
-            opacity: incidentMode ? 0.95 : directlyConnected ? 0.9 : 0.62,
+            strokeWidth: incidentMode ? 2.8 : directlyConnected ? 2.8 : 1.75,
+            opacity: incidentMode ? 0.95 : directlyConnected ? 0.98 : hasHighlight ? 0.36 : 0.72,
           },
         };
       });
   }, [
     activeRelations,
     focusedServiceId,
+    highlightServiceId,
     incidentMode,
     laneByServiceId,
     showAllServices,
@@ -968,6 +999,10 @@ export function ServiceRelationFlow({
           border-color: rgba(37, 99, 235, 0.45);
         }
 
+        .chainview-flow-node-dimmed {
+          opacity: 0.5;
+        }
+
         .chainview-flow-node-detail-selected {
           border-color: #0ea5e9;
           box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.2),
@@ -979,6 +1014,17 @@ export function ServiceRelationFlow({
           border-radius: 8px;
           padding: 8px 10px;
           box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);
+        }
+
+        .chainview-flow-node-compact.chainview-flow-node-focused {
+          border-color: #2563eb;
+          box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2),
+            0 12px 26px rgba(37, 99, 235, 0.18);
+        }
+
+        .chainview-flow-node-compact.chainview-flow-node-connected {
+          border-color: rgba(37, 99, 235, 0.55);
+          box-shadow: 0 8px 20px rgba(37, 99, 235, 0.12);
         }
 
         .chainview-lane-node {
@@ -1674,7 +1720,11 @@ function ServiceNode({ data }: { data: ServiceNodeData }) {
     return (
       <button
         type="button"
-        className="chainview-flow-node chainview-flow-node-compact nodrag nopan text-left"
+        className={`chainview-flow-node chainview-flow-node-compact nodrag nopan text-left ${
+          data.focused ? "chainview-flow-node-focused" : ""
+        } ${data.connected ? "chainview-flow-node-connected" : ""} ${
+          data.dimmed ? "chainview-flow-node-dimmed" : ""
+        }`}
         onClick={(event) => {
           event.preventDefault();
           event.stopPropagation();

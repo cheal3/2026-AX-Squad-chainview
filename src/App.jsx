@@ -4,6 +4,7 @@ import { initAdminInteractions } from "./adminInteractions.js";
 import { pages } from "./pagesData.js";
 import { PortalDataProvider, usePortalData } from "./dashboardModule/PortalDataStore";
 import { IncidentDemoDashboard } from "./dashboardModule/pages/IncidentDemoDashboard";
+import { ServiceRelationFlow } from "./dashboardModule/pages/ServiceRelationFlow";
 import { codeLabels } from "./dashboardModule/mockData";
 
 const htmlPageToRoute = (href) => {
@@ -737,6 +738,199 @@ function DashboardFrame() {
   );
 }
 
+function IncidentDetailPage() {
+  const location = useLocation();
+  const { incidentEvents, incidentImpacts, incidents, relations, services } = usePortalData();
+  const [now, setNow] = useState(() => new Date());
+  const incidentId = Number(new URLSearchParams(location.search).get("incidentId")) || undefined;
+  const incident =
+    incidents.find((item) => item.incidentId === incidentId) ??
+    incidents.find((item) => item.incidentStatusCode !== "RESOLVED") ??
+    {
+      incidentId: 0,
+      incidentStatusCode: "OPEN",
+      severityCode: "CRITICAL",
+      externalIncidentCode: "INC-2026-0312",
+      targetCode: "EXT-001",
+      targetLabel: "SERVICE · EXT-001",
+      title: "외부 카드사 응답 timeout 다발",
+      startedAt: "2026-06-01 14:08",
+      description: "외부 카드사 승인 요청 지연으로 영향 서비스가 감지되었습니다.",
+      manualRegisteredYn: "Y",
+      registeredBy: "SYSTEM",
+    };
+  const service =
+    services.find((item) => item.serviceId === incident.serviceId) ??
+    services.find((item) => item.serviceCode === incident.targetCode) ??
+    services[0];
+  const impactedServices = incidentImpacts
+    .filter((impact) => impact.incidentId === incident.incidentId)
+    .map((impact) => services.find((item) => item.serviceId === impact.impactedServiceId))
+    .filter(Boolean);
+  const relatedRelations = relations
+    .filter(
+      (relation) =>
+        relation.sourceServiceId === service?.serviceId ||
+        relation.targetServiceId === service?.serviceId
+    )
+    .slice(0, 6);
+  const relationServiceName = (serviceId) =>
+    services.find((item) => item.serviceId === serviceId)?.serviceName ?? `SERVICE-${serviceId}`;
+  const elapsedLabel = incident.startedAt ? formatIncidentElapsed(incident.startedAt, now) : "00:00:00";
+  const eventRows = incidentEvents.filter((event) => event.incidentId === incident.incidentId);
+  const timelineRows = eventRows.length
+    ? eventRows.map((event) => [event.createdAt?.slice(11, 16) || "-", event.message, event.actor])
+    : [
+        ["14:08", "자동 감지: 에러율 임계치 초과 · 외부 통신 5xx", "System"],
+        ["14:08", "자동 감지: 인스턴스 1대 헬스체크 실패", "System"],
+        ["14:09", "담당 그룹 알림 발송 · Slack · SMS 3명", "System"],
+        ["14:11", "연쇄 영향 감지: 카드취소연계, 카드정산연계 상태 변화", "System"],
+        ["14:12", "담당자 ACK 수신", "System"],
+      ];
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  return (
+    <div className="app is-dark">
+      <Sidebar activeMenu="dashboard" isDark />
+      <main className="main chain-dashboard-main incident-detail-page">
+        <div className="incident-detail__crumb">
+          <Link to="/dashboard">📊 실시간 대시보드</Link>
+          <span>/</span>
+          <span>{service?.categoryPath?.[0] ?? "대외계"}</span>
+          <span>/</span>
+          <span>{service?.serviceName ?? incident.targetCode}</span>
+        </div>
+
+        <section className="incident-detail__hero">
+          <div className="incident-detail__alarm">🚨</div>
+          <div className="incident-detail__hero-main">
+            <div className="incident-detail__title-row">
+              <h1>{service?.serviceName ?? incident.title}</h1>
+              <span>{incident.severityCode} · 진행중</span>
+            </div>
+            <div className="incident-detail__meta">
+              <span>serviceCode <b>{service?.serviceCode ?? incident.targetCode}</b></span>
+              <span>분류 <b>{service?.categoryPath?.join(" > ") ?? "대외계 > 결제 > 승인"}</b></span>
+              <span>SERVICE_TYPE <b>{service?.serviceTypeCode ?? "API"}</b></span>
+              <span>IMPORTANCE <b>{service?.importanceCode ?? "높음"}</b></span>
+              <span>STATUS <b>{codeLabels.serviceStatus?.[service?.statusCode] ?? "운영중"}</b></span>
+            </div>
+          </div>
+          <div className="incident-detail__timer">
+            <span>경과시간</span>
+            <strong>{elapsedLabel}</strong>
+          </div>
+        </section>
+
+        <nav className="incident-detail__tabs">
+          {["개요", "인시던트 이력", "배포/서버", "서비스 관계", "기술스택", "변경 이력"].map((tab, index) => (
+            <span className={index === 0 ? "is-active" : ""} key={tab}>{tab}</span>
+          ))}
+        </nav>
+
+        <div className="incident-detail__layout">
+          <section className="incident-detail__left">
+            <article className="incident-detail__card incident-detail__card--danger">
+              <div className="incident-detail__card-head">
+                <h2>🚨 진행 중 인시던트</h2>
+                <span>id: {incident.externalIncidentCode ?? `#${incident.incidentId}`} · severity: {incident.severityCode} · occurredAt: {incident.startedAt}</span>
+              </div>
+              <div className="incident-detail__summary">
+                <b>title</b>
+                <p>{incident.title} · incidentType: 서비스 장애 · affectedServices: {Math.max(impactedServices.length, 2)}</p>
+              </div>
+              <h3>감지 및 알림 이력</h3>
+              <div className="incident-detail__timeline">
+                {timelineRows.map(([time, message, actor], index) => (
+                  <div className="incident-detail__timeline-row" key={`${time}-${message}`}>
+                    <span>{time}</span>
+                    <i className={index < 2 ? "is-danger" : index < 4 ? "is-warn" : ""} />
+                    <p>{message}</p>
+                    <em>{actor}</em>
+                  </div>
+                ))}
+              </div>
+            </article>
+
+            <article className="incident-detail__card">
+              <div className="incident-detail__card-head">
+                <h2>영향 범위 (BLAST RADIUS)</h2>
+                <Link to="/topology">전체 토폴로지 보기 →</Link>
+              </div>
+              <div className="incident-detail__blast">
+                <ServiceRelationFlow
+                  embedded
+                  embeddedHeightClassName="h-full"
+                  frameless
+                  hideDepthToggle
+                  hideDetailPanel
+                  hideTopControl
+                  incidentMode
+                  initialRelationDepth={2}
+                  initialServiceId={service?.serviceId}
+                />
+              </div>
+            </article>
+          </section>
+
+          <aside className="incident-detail__right">
+            <article className="incident-detail__card">
+              <h2>📦 기본 정보 (SERVICE)</h2>
+              <dl className="incident-detail__dl">
+                <dt>serviceCode</dt><dd><code>{service?.serviceCode ?? incident.targetCode}</code></dd>
+                <dt>serviceName</dt><dd>{service?.serviceName ?? incident.title}</dd>
+                <dt>categoryL1/L2/L3</dt><dd>{service?.categoryPath?.join(" > ") ?? "-"}</dd>
+                <dt>serviceType</dt><dd>{service?.serviceTypeCode ?? "API"}</dd>
+                <dt>importance</dt><dd>{service?.importanceCode ?? "높음"}</dd>
+                <dt>status</dt><dd>{service?.statusCode ?? "INCIDENT"}</dd>
+                <dt>endpointUrl</dt><dd>{service?.endpointUrl ?? "-"}</dd>
+                <dt>description</dt><dd>{service?.description ?? incident.description}</dd>
+              </dl>
+            </article>
+
+            <article className="incident-detail__card">
+              <h2>🔗 서비스 관계 (SERVICE_RELATION)</h2>
+              <div className="incident-detail__relation-list">
+                {relatedRelations.map((relation) => (
+                  <div className={relation.relationStatusCode === "ACTIVE" ? "" : "is-danger"} key={relation.relationId}>
+                    <span>{relationServiceName(relation.sourceServiceId)} → {relationServiceName(relation.targetServiceId)}</span>
+                    <code>{relation.relationTypeCode}</code>
+                  </div>
+                ))}
+              </div>
+            </article>
+
+            <article className="incident-detail__card">
+              <h2>👥 담당자 (SERVICE_OWNER)</h2>
+              {["김OO · 주담당자", "박OO · 부담당자", "이OO · 운영자"].map((owner) => (
+                <div className="incident-detail__owner" key={owner}>
+                  <b>{owner.slice(0, 1)}</b>
+                  <span>{owner}<small>대외계팀 · bank.com</small></span>
+                  <em>✉</em>
+                </div>
+              ))}
+            </article>
+          </aside>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+function formatIncidentElapsed(startedAt, now = new Date()) {
+  const date = new Date(startedAt.includes("T") ? startedAt : startedAt.replace(" ", "T"));
+  const elapsed = Number.isNaN(date.getTime()) ? 0 : Math.max(0, Math.floor((now.getTime() - date.getTime()) / 1000));
+  const hours = Math.floor(elapsed / 3600);
+  const minutes = Math.floor((elapsed % 3600) / 60);
+  const seconds = elapsed % 60;
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+}
+
 function AppRoutes() {
   const adminPages = Object.keys(pages).filter((slug) => pages[slug].isAdmin);
 
@@ -746,7 +940,7 @@ function AppRoutes() {
       <Route path="/dashboard" element={<DashboardPage />} />
       <Route path="/topology" element={<TopologyPage />} />
       <Route path="/dashboard-proto" element={<Navigate to="/dashboard" replace />} />
-      <Route path="/dashboard-proto-detail" element={<Navigate to="/dashboard" replace />} />
+      <Route path="/dashboard-proto-detail" element={<IncidentDetailPage />} />
       <Route path="/dashboard-proto-topology" element={<Navigate to="/topology" replace />} />
       <Route path="/admin-permissions" element={<RoutePage activeMenuOverride="permissions" slug="admin-users" />} />
       <Route path="/admin-owner-management" element={<RoutePage activeMenuOverride="owner-management" slug="admin-owners" />} />

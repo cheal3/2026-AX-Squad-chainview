@@ -364,6 +364,337 @@
   border-radius: 0 !important;
 }
 
+.incident-detail-page {
+  color: #dbe7f4;
+  overflow: auto;
+}
+
+.incident-detail__crumb {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #8fa5bb;
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 16px;
+}
+
+.incident-detail__crumb a {
+  color: #9ec5ff;
+  text-decoration: none;
+}
+
+.incident-detail__hero {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  border: 1px solid #663244;
+  border-radius: 10px;
+  background: radial-gradient(circle at 8% 12%, rgba(255, 69, 88, 0.18), transparent 28%), #081b2d;
+  padding: 18px;
+  box-shadow: inset 0 0 0 1px rgba(255, 77, 90, 0.08);
+}
+
+.incident-detail__alarm {
+  width: 68px;
+  height: 68px;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  background: #ff4d5a;
+  color: white;
+  font-size: 34px;
+  box-shadow: 0 0 0 8px rgba(255, 77, 90, 0.16);
+}
+
+.incident-detail__title-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.incident-detail__title-row h1 {
+  margin: 0;
+  color: #fff;
+  font-size: 24px;
+  line-height: 1.2;
+}
+
+.incident-detail__title-row span {
+  border-radius: 999px;
+  background: rgba(255, 77, 90, 0.18);
+  color: #ff8b96;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.incident-detail__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+  margin-top: 12px;
+  color: #9fb1c5;
+  font-size: 13px;
+}
+
+.incident-detail__meta b {
+  color: #e8f1fa;
+}
+
+.incident-detail__timer {
+  min-width: 150px;
+  text-align: right;
+}
+
+.incident-detail__timer span {
+  display: block;
+  color: #91a7bd;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.incident-detail__timer strong {
+  color: #ff4d5a;
+  font-size: 28px;
+  letter-spacing: 0;
+}
+
+.incident-detail__tabs {
+  display: flex;
+  gap: 24px;
+  border-bottom: 1px solid #1f3549;
+  margin: 18px 0;
+  color: #9fb1c5;
+  font-weight: 800;
+}
+
+.incident-detail__tabs span {
+  padding: 0 0 12px;
+}
+
+.incident-detail__tabs .is-active {
+  color: #fff;
+  border-bottom: 2px solid #fff;
+}
+
+.incident-detail__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.95fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.incident-detail__left,
+.incident-detail__right {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.incident-detail__card {
+  min-width: 0;
+  border: 1px solid #1f3549;
+  border-radius: 10px;
+  background: #081b2d;
+  padding: 18px;
+}
+
+.incident-detail__card--danger {
+  border-color: #663244;
+  background: radial-gradient(circle at 0 0, rgba(255, 77, 90, 0.13), transparent 34%), #081b2d;
+}
+
+.incident-detail__card h2,
+.incident-detail__card h3 {
+  margin: 0 0 14px;
+  color: #fff;
+  font-size: 16px;
+}
+
+.incident-detail__card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.incident-detail__card-head h2 {
+  margin: 0;
+}
+
+.incident-detail__card-head span,
+.incident-detail__card-head a {
+  color: #9fb1c5;
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.incident-detail__summary {
+  border: 1px dashed #663244;
+  border-radius: 8px;
+  padding: 14px;
+  margin-bottom: 18px;
+  color: #ffb5bc;
+}
+
+.incident-detail__summary p {
+  margin: 8px 0 0;
+}
+
+.incident-detail__timeline {
+  max-height: 230px;
+  overflow: auto;
+  padding-right: 6px;
+}
+
+.incident-detail__timeline-row {
+  display: grid;
+  grid-template-columns: 54px 16px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  color: #dbe7f4;
+  font-size: 14px;
+}
+
+.incident-detail__timeline-row i {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: #70859c;
+  box-shadow: 0 0 0 3px rgba(112, 133, 156, 0.15);
+}
+
+.incident-detail__timeline-row i.is-danger {
+  background: #ff4d5a;
+  box-shadow: 0 0 0 3px rgba(255, 77, 90, 0.16);
+}
+
+.incident-detail__timeline-row i.is-warn {
+  background: #f59e0b;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.16);
+}
+
+.incident-detail__timeline-row p {
+  min-width: 0;
+  margin: 0;
+}
+
+.incident-detail__timeline-row em {
+  border-radius: 999px;
+  background: #112b43;
+  color: #a9bed3;
+  padding: 2px 7px;
+  font-style: normal;
+  font-size: 11px;
+}
+
+.incident-detail__blast {
+  height: 360px;
+  min-height: 320px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #061625;
+  border: 1px solid #35506b;
+}
+
+.incident-detail__dl {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 11px 14px;
+  margin: 0;
+  color: #dbe7f4;
+  font-size: 14px;
+}
+
+.incident-detail__dl dt {
+  color: #91a7bd;
+  font-weight: 800;
+}
+
+.incident-detail__dl dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.incident-detail__dl code {
+  background: #112b43;
+  border-radius: 6px;
+  padding: 2px 6px;
+}
+
+.incident-detail__relation-list {
+  display: grid;
+  gap: 8px;
+}
+
+.incident-detail__relation-list div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid #1f3549;
+  border-radius: 8px;
+  background: #0b2135;
+  padding: 10px;
+}
+
+.incident-detail__relation-list div.is-danger {
+  border-color: #663244;
+  background: rgba(255, 77, 90, 0.08);
+}
+
+.incident-detail__relation-list code {
+  color: #9fb1c5;
+}
+
+.incident-detail__owner {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  border-radius: 8px;
+  background: #0b2135;
+  padding: 10px;
+  margin-top: 10px;
+}
+
+.incident-detail__owner b {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: #1f3549;
+}
+
+.incident-detail__owner span {
+  font-weight: 900;
+}
+
+.incident-detail__owner small {
+  display: block;
+  color: #91a7bd;
+  font-weight: 600;
+  margin-top: 3px;
+}
+
+@media (max-width: 1100px) {
+  .incident-detail__layout,
+  .incident-detail__hero {
+    grid-template-columns: 1fr;
+  }
+
+  .incident-detail__timer {
+    text-align: left;
+  }
+}
+
 .topology-proto {
   --topology-bg: #f5f6fa;
   --topology-panel: #fff;
