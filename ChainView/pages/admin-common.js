@@ -11,8 +11,8 @@
     </div>
     <div class="lnb__group">
       <div class="lnb__title">모니터링</div>
-      <a class="lnb__item" data-key="dashboard" href="dashboard-proto.html">📊 실시간 대시보드<span class="badge">2</span></a>
-      <a class="lnb__item" data-key="topology" href="dashboard-proto-topology.html">🗺️ 관계 그래프</a>
+      <a class="lnb__item" data-key="dashboard" href="/dashboard">📊 실시간 대시보드<span class="badge">2</span></a>
+      <a class="lnb__item" data-key="topology" href="/admin-relations">🗺️ 관계 그래프</a>
       <a class="lnb__item" data-key="incidents" href="admin-incidents.html">🚨 인시던트 관리</a>
     </div>
     <div class="lnb__group">

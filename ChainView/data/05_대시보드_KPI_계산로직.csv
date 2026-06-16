@@ -1,7 +1,7 @@
 KPI명,계산로직,데이터소스,링크
-전체 서비스,COUNT(*) FROM SERVICE WHERE isDeleted = false,SERVICE,services.html
-운영중 서비스,COUNT(*) FROM SERVICE WHERE status = '운영중',SERVICE,services.html?status=운영중
-등록 서버,COUNT(*) FROM SERVER WHERE isDeleted = false,SERVER,servers.html
-OPEN 인시던트,COUNT(*) FROM INCIDENT WHERE status = 'OPEN',INCIDENT,incidents.html?status=OPEN
-미지정 담당 서비스,서비스 중 SERVICE_OWNER에 매핑 없는 수,SERVICE LEFT JOIN SERVICE_OWNER,services.html?dataCompleteness=담당자미지정
-비활성 사용자,COUNT(*) FROM USER WHERE isActive = false,USER,users.html?isActive=false
+전체 서비스,COUNT(*) FROM SERVICE WHERE isDeleted = false,SERVICE,admin-services.html
+운영중 서비스,COUNT(*) FROM SERVICE WHERE status = '운영중',SERVICE,admin-services.html?status=운영중
+등록 서버,COUNT(*) FROM SERVER WHERE isDeleted = false,SERVER,admin-servers.html
+OPEN 인시던트,COUNT(*) FROM INCIDENT WHERE status = 'OPEN',INCIDENT,admin-incidents.html?status=OPEN
+미지정 담당 서비스,서비스 중 SERVICE_OWNER에 매핑 없는 수,SERVICE LEFT JOIN SERVICE_OWNER,admin-services.html?dataCompleteness=담당자미지정
+비활성 사용자,COUNT(*) FROM USER WHERE isActive = false,USER,admin-users.html?isActive=false

@@ -25,7 +25,7 @@
 
 ## 1. 서비스 관리
 
-> **관련 페이지:** services.html, service-detail.html  
+> **관련 페이지:** admin-services.html, dashboard-proto-detail.html  
 > **연관 서비스:** 대시보드(KPI), 서비스 분류, 서비스 관계, 서비스 담당자, 인시던트, 배포 정보
 
 ### 1.1 서비스 등록
@@ -194,7 +194,7 @@
 
 ## 4. 서버 관리
 
-> **관련 페이지:** servers.html  
+> **관련 페이지:** admin-servers.html  
 > **연관 서비스:** 배포 정보, 대시보드(KPI), 인시던트
 
 ### 4.1 서버 등록
@@ -367,7 +367,7 @@
 
 ## 7. 사용자 관리
 
-> **관련 페이지:** users.html  
+> **관련 페이지:** admin-users.html  
 > **연관 서비스:** 로그인, 서비스 담당자, 대시보드(KPI: 비활성 사용자)
 
 ### 7.1 사용자 등록
@@ -496,7 +496,7 @@
 
 ## 10. 인시던트 관리
 
-> **관련 페이지:** incidents.html  
+> **관련 페이지:** admin-incidents.html  
 > **연관 서비스:** 서비스 관리, 서버 관리, 대시보드(KPI: OPEN 인시던트)
 
 ### 10.1 인시던트 등록
@@ -620,19 +620,19 @@
 
 ## 12. 대시보드
 
-> **관련 페이지:** dashboard.html  
+> **관련 페이지:** dashboard-proto.html  
 > **연관 서비스:** 모든 서비스 (집계 데이터 표시)
 
 ### 12.1 KPI 카드
 
 | KPI | 계산 로직 | 데이터 소스 | 링크 |
 |-----|-----------|-------------|------|
-| 전체 서비스 | COUNT(*) FROM SERVICE WHERE isDeleted = false | SERVICE | services.html |
-| 운영중 서비스 | COUNT(*) FROM SERVICE WHERE status = '운영중' | SERVICE | services.html?status=운영중 |
-| 등록 서버 | COUNT(*) FROM SERVER WHERE isDeleted = false | SERVER | servers.html |
-| OPEN 인시던트 | COUNT(*) FROM INCIDENT WHERE status = 'OPEN' | INCIDENT | incidents.html?status=OPEN |
-| 미지정 담당 서비스 | 서비스 중 SERVICE_OWNER에 매핑 없는 수 | SERVICE LEFT JOIN SERVICE_OWNER | services.html?dataCompleteness=담당자미지정 |
-| 비활성 사용자 | COUNT(*) FROM USER WHERE isActive = false | USER | users.html?isActive=false |
+| 전체 서비스 | COUNT(*) FROM SERVICE WHERE isDeleted = false | SERVICE | admin-services.html |
+| 운영중 서비스 | COUNT(*) FROM SERVICE WHERE status = '운영중' | SERVICE | admin-services.html?status=운영중 |
+| 등록 서버 | COUNT(*) FROM SERVER WHERE isDeleted = false | SERVER | admin-servers.html |
+| OPEN 인시던트 | COUNT(*) FROM INCIDENT WHERE status = 'OPEN' | INCIDENT | admin-incidents.html?status=OPEN |
+| 미지정 담당 서비스 | 서비스 중 SERVICE_OWNER에 매핑 없는 수 | SERVICE LEFT JOIN SERVICE_OWNER | admin-services.html?dataCompleteness=담당자미지정 |
+| 비활성 사용자 | COUNT(*) FROM USER WHERE isActive = false | USER | admin-users.html?isActive=false |
 
 ### 12.2 최근 등록/수정 서비스
 
