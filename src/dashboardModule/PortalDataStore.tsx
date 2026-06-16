@@ -144,7 +144,14 @@ type PortalDataContextValue = {
 };
 
 const PortalDataContext = createContext<PortalDataContextValue | null>(null);
-const REMOTE_API_ENABLED = false;
+const remoteApiEnabledFlag = import.meta.env.VITE_CHAINVIEW_REMOTE_API_ENABLED;
+const remoteOrigin = import.meta.env.VITE_CHAINVIEW_REMOTE_ORIGIN ?? "https://chainview.kro.kr";
+const isMixedContentRuntime =
+  typeof window !== "undefined" &&
+  window.location.protocol === "https:" &&
+  remoteOrigin.startsWith("http://");
+const REMOTE_API_ENABLED =
+  remoteApiEnabledFlag === "true" || remoteApiEnabledFlag === "1";
 
 const normalizedInitialServices = initialServices.map((service) => ({
   ...service,
@@ -204,6 +211,14 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!REMOTE_API_ENABLED) {
+      return;
+    }
+
+    if (isMixedContentRuntime) {
+      console.warn(
+        "[ChainView API] remote mode disabled in browser because an HTTPS page cannot call an HTTP API origin.",
+        { remoteOrigin }
+      );
       return;
     }
 

@@ -1,4 +1,4 @@
-const REMOTE_ORIGIN = "http://chainview.kro.kr:8080";
+const REMOTE_ORIGIN = "https://chainview.kro.kr";
 const DEFAULT_EMPLOYEE_NO = "8913812";
 
 export const chainViewRemoteOrigin =
@@ -10,6 +10,8 @@ export const chainViewApiBaseUrl =
 
 const chainViewEmployeeNo =
   import.meta.env.VITE_CHAINVIEW_EMPLOYEE_NO ?? DEFAULT_EMPLOYEE_NO;
+const chainViewPassword =
+  import.meta.env.VITE_CHAINVIEW_PASSWORD ?? "";
 
 type QueryValue =
   | string
@@ -320,7 +322,7 @@ async function establishSession(employeeNo = chainViewEmployeeNo) {
     return;
   }
 
-  const token = await fetchCsrfTokenFrom("/session");
+  const token = await fetchCsrfTokenFrom("/login");
   if (!token) {
     throw new ChainViewApiError({
       authRequired: true,
@@ -329,15 +331,24 @@ async function establishSession(employeeNo = chainViewEmployeeNo) {
     });
   }
 
+  if (!chainViewPassword) {
+    throw new ChainViewApiError({
+      authRequired: true,
+      message:
+        "원격 ChainView 로그인 비밀번호가 없습니다. VITE_CHAINVIEW_PASSWORD 환경변수를 설정해 주세요.",
+      status: 0,
+    });
+  }
+
   csrfToken = token;
 
   const body = new URLSearchParams({
     employeeNo,
-    password: "",
+    password: chainViewPassword,
     _csrf: token,
   });
 
-  await fetch(buildUrl("/session"), {
+  const response = await fetch(buildUrl("/login"), {
     method: "POST",
     credentials: "include",
     redirect: "manual",
@@ -346,6 +357,18 @@ async function establishSession(employeeNo = chainViewEmployeeNo) {
     },
     body,
   });
+  const loginSucceeded =
+    response.type === "opaqueredirect" ||
+    response.status === 302 ||
+    response.status === 303 ||
+    response.status === 307;
+  if (!loginSucceeded) {
+    throw new ChainViewApiError({
+      authRequired: true,
+      message: "ChainView 로그인에 실패했습니다. 계정/비밀번호를 확인해 주세요.",
+      status: response.status,
+    });
+  }
   hasAuthenticatedSession = true;
 }
 

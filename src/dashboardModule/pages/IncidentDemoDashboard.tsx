@@ -928,6 +928,8 @@ function DarkPanel({ children, title }: { children: ReactNode; title: string }) 
 }
 
 function BottomPanels() {
+  const navigate = useNavigate();
+
   return (
     <div className="mt-3 grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)_minmax(0,1.25fr)_minmax(0,2.15fr)] gap-2">
       <Panel title="관리 필요 서비스">
@@ -941,7 +943,11 @@ function BottomPanels() {
           />
         ))}
       </Panel>
-      <Panel title="최근 배포">
+      <Panel
+        actionLabel="더보기 〉"
+        onAction={() => navigate("/admin-deployments")}
+        title="최근 배포"
+      >
         {deployRows.map(([service, time, status]) => (
           <TinyRow key={service} icon={status === "up" ? "↑" : "●"} label={service} value={time} tone={status === "up" ? "success" : "muted"} />
         ))}
@@ -955,7 +961,11 @@ function BottomPanels() {
           </div>
         ))}
       </Panel>
-      <Panel title="최근 인시던트">
+      <Panel
+        actionLabel="더보기 〉"
+        onAction={() => navigate("/admin-incidents")}
+        title="최근 인시던트"
+      >
         <div className="grid min-w-0 grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(58px,0.72fr)_minmax(50px,0.7fr)_minmax(42px,0.55fr)] gap-2 pb-1 text-[12px] font-black leading-5 text-slate-500">
           <span className="break-words">서비스</span>
           <span className="break-words">인시던트</span>
@@ -977,12 +987,30 @@ function BottomPanels() {
   );
 }
 
-function Panel({ children, title }: { children: ReactNode; title: string }) {
+function Panel({
+  actionLabel,
+  children,
+  onAction,
+  title,
+}: {
+  actionLabel?: string;
+  children: ReactNode;
+  onAction?: () => void;
+  title: string;
+}) {
   return (
     <section className="min-h-[164px] min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
       <div className="mb-2 flex min-w-0 items-center justify-between gap-3">
         <h3 className="truncate text-sm font-black leading-5 text-slate-950">{title}</h3>
-        <button className="shrink-0 whitespace-nowrap text-[11px] font-bold text-slate-500">더보기 〉</button>
+        {actionLabel && onAction ? (
+          <button
+            className="shrink-0 whitespace-nowrap text-[11px] font-bold text-slate-500"
+            onClick={onAction}
+            type="button"
+          >
+            {actionLabel}
+          </button>
+        ) : null}
       </div>
       <div className="min-w-0 overflow-hidden">{children}</div>
     </section>
