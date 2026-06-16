@@ -868,6 +868,7 @@ function IncidentDetailPage() {
                   frameless
                   hideDepthToggle
                   hideDetailPanel
+                  hideNodeActions
                   hideTopControl
                   incidentMode
                   initialRelationDepth={2}

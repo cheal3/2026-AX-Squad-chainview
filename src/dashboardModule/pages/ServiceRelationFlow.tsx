@@ -48,6 +48,7 @@ type ServiceNodeData = {
   connected: boolean;
   dimmed: boolean;
   detailSelected: boolean;
+  hideActions: boolean;
   relationCount: number;
   lane: number;
   onMoveToFocus: (serviceId: number) => void;
@@ -127,6 +128,7 @@ export function ServiceRelationFlow({
   frameless = false,
   hideDepthToggle = false,
   hideDetailPanel = false,
+  hideNodeActions = false,
   hideTopControl = false,
   highlightServiceId,
   initialFitView = false,
@@ -143,6 +145,7 @@ export function ServiceRelationFlow({
   frameless?: boolean;
   hideDepthToggle?: boolean;
   hideDetailPanel?: boolean;
+  hideNodeActions?: boolean;
   hideTopControl?: boolean;
   highlightServiceId?: number;
   initialFitView?: boolean;
@@ -698,6 +701,7 @@ export function ServiceRelationFlow({
             detailServiceId === service.serviceId,
           relationCount: relationCountByServiceId.get(service.serviceId) ?? 0,
           lane,
+          hideActions: hideNodeActions,
           onMoveToFocus: moveToFocusedService,
           onOpenDetail: openServiceDetail,
         },
@@ -711,6 +715,7 @@ export function ServiceRelationFlow({
     detailServiceId,
     laneByServiceId,
     highlightServiceId,
+    hideNodeActions,
     moveToFocusedService,
     openServiceDetail,
     onSelectService,
@@ -768,7 +773,9 @@ export function ServiceRelationFlow({
             ? "chainview-flow-edge chainview-flow-edge-active"
             : hasHighlight
               ? "chainview-flow-edge chainview-flow-edge-muted"
-              : "chainview-flow-edge",
+              : showAllServices
+                ? "chainview-flow-edge chainview-flow-edge-default-dashed"
+                : "chainview-flow-edge",
           markerEnd: {
             type: MarkerType.ArrowClosed,
             color: stroke,
@@ -776,7 +783,7 @@ export function ServiceRelationFlow({
           style: {
             stroke,
             strokeWidth: incidentMode ? 2.8 : directlyConnected ? 2.8 : 1.75,
-            opacity: incidentMode ? 0.95 : directlyConnected ? 0.98 : hasHighlight ? 0.36 : 0.72,
+            opacity: incidentMode ? 0.95 : directlyConnected ? 0.98 : hasHighlight ? 0.36 : showAllServices ? 0.42 : 0.72,
           },
         };
       });
@@ -1074,6 +1081,10 @@ export function ServiceRelationFlow({
 
         .chainview-flow-edge-muted path {
           stroke-dasharray: 2 8;
+        }
+
+        .chainview-flow-edge-default-dashed path {
+          stroke-dasharray: 5 8;
         }
 
         .chainview-flow-dark .react-flow {
@@ -1787,32 +1798,34 @@ function ServiceNode({ data }: { data: ServiceNodeData }) {
           {data.ownerGroup}
         </span>
       </div>
-      <div className="nodrag nopan mt-3 grid grid-cols-2 gap-2">
-        <button
-          type="button"
-          onClick={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            data.onOpenDetail(data.serviceId);
-          }}
-          className="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 text-[11px] font-black text-slate-700 transition hover:bg-slate-100"
-        >
-          <PanelRightOpen size={13} />
-          상세보기
-        </button>
-        <button
-          type="button"
-          onClick={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            data.onMoveToFocus(data.serviceId);
-          }}
-          className="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-black text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
-        >
-          <ChevronRight size={13} />
-          이동
-        </button>
-      </div>
+      {!data.hideActions ? (
+        <div className="nodrag nopan mt-3 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              data.onOpenDetail(data.serviceId);
+            }}
+            className="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 text-[11px] font-black text-slate-700 transition hover:bg-slate-100"
+          >
+            <PanelRightOpen size={13} />
+            상세보기
+          </button>
+          <button
+            type="button"
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              data.onMoveToFocus(data.serviceId);
+            }}
+            className="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-black text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
+          >
+            <ChevronRight size={13} />
+            이동
+          </button>
+        </div>
+      ) : null}
       <Handle type="source" position={Position.Right} />
     </div>
   );
