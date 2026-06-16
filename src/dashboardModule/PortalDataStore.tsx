@@ -103,6 +103,9 @@ export type IncidentEventRecord = {
 type NewIncidentInput = {
   serviceId: number;
   severityCode: SeverityCode;
+  externalIncidentCode?: string;
+  targetCode?: string;
+  targetLabel?: string;
   title: string;
   description: string;
   startedAt?: string;

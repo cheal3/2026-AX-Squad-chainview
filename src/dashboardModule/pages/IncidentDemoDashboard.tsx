@@ -390,6 +390,9 @@ function IncidentCommandDashboard({
     services[0];
   const impact = buildIncidentImpactColumns(rootService, services, relations);
   const impactedCount = impact.level1.length + impact.level2.length;
+  const incidentTitle = incident.title || `${rootService?.serviceName ?? "서비스"} 장애 발생`;
+  const incidentTargetName =
+    incident.targetLabel || rootService?.serviceName || incident.targetCode || "대상 미지정";
   const startedAt = useMemo(
     () => incident.startedAt || formatDateTime(new Date()),
     [incident.startedAt]
@@ -397,7 +400,7 @@ function IncidentCommandDashboard({
   const [now, setNow] = useState(() => new Date());
   const startedAtDate = useMemo(() => parseDashboardDate(startedAt), [startedAt]);
   const timelineEvents = [
-    [formatTimelineClock(startedAtDate), `${rootService?.serviceName ?? "서비스"} 오류 증가 감지`],
+    [formatTimelineClock(startedAtDate), `${incidentTargetName} 오류 증가 감지`],
     [formatTimelineClock(clampTimelineTime(addSeconds(startedAtDate, 14), now)), `${impact.level1[0]?.serviceName ?? "Order-Service"} 영향 감지`],
     [formatTimelineClock(clampTimelineTime(addSeconds(startedAtDate, 24), now)), `${impact.level2[0]?.serviceName ?? "Contract-Service"} 영향 감지`],
     [formatTimelineClock(now), "현재 모니터링 중"],
@@ -423,7 +426,7 @@ function IncidentCommandDashboard({
               <div className="text-xs font-black text-[#ff4d5a]">서비스 장애 발생</div>
               <div className="mt-1 flex min-w-0 items-center gap-2">
                 <h1 className="truncate text-xl font-black text-white">
-                  {rootService?.serviceName ?? "Payment-Service"} 장애 발생
+                  {incidentTitle}
                 </h1>
                 <span className="rounded bg-[#7f1d2d] px-3 py-1 text-xs font-black text-white">
                   {incident.severityCode}
@@ -557,22 +560,29 @@ function IncidentSelectedPanel({
   incident: IncidentRecord;
   rootService?: ServiceRecord;
 }) {
+  const targetLabel = incident.targetLabel || rootService?.serviceName || incident.targetCode || "-";
+  const categoryLabel =
+    rootService?.categoryPath.join(" > ") ||
+    (incident.targetCode ? `관리 화면 대상 · ${incident.targetCode}` : "-");
+
   return (
     <aside className="overflow-hidden rounded-lg border border-[#1f3549] bg-[#081b2d] p-3">
       <div className="flex items-center justify-between border-b border-[#1f3549] pb-2">
-        <h2 className="text-sm font-black text-white">선택된 서비스</h2>
+        <h2 className="text-sm font-black text-white">선택된 인시던트</h2>
         <X size={18} className="text-slate-400" />
       </div>
       <div className="mt-3 flex min-w-0 items-center gap-2">
         <AlertTriangle size={19} className="text-[#ff4d5a]" />
-        <span className="truncate text-base font-black text-white">{rootService?.serviceName ?? incident.title}</span>
+        <span className="truncate text-base font-black text-white">{incident.title}</span>
         <span className="rounded bg-[#7f1d2d] px-2 py-1 text-[11px] font-black text-white">{incident.severityCode}</span>
       </div>
       <dl className="mt-3 grid grid-cols-[82px_minmax(0,1fr)] gap-y-2 text-xs">
         <dt className="text-slate-400">상태</dt><dd className="font-black text-[#ff4d5a]">장애</dd>
         <dt className="text-slate-400">심각도</dt><dd className="font-black text-[#ff4d5a]">치명({incident.severityCode})</dd>
+        <dt className="text-slate-400">인시던트</dt><dd className="truncate text-slate-200">{incident.externalIncidentCode ?? `#${incident.incidentId}`}</dd>
+        <dt className="text-slate-400">대상</dt><dd className="truncate text-slate-200">{targetLabel}</dd>
         <dt className="text-slate-400">발생 시간</dt><dd className="truncate text-slate-200">{incident.startedAt}</dd>
-        <dt className="text-slate-400">서비스 분류</dt><dd className="truncate text-slate-200">{rootService?.categoryPath.join(" > ") ?? "-"}</dd>
+        <dt className="text-slate-400">서비스 분류</dt><dd className="truncate text-slate-200">{categoryLabel}</dd>
         <dt className="text-slate-400">영향받은 서비스</dt><dd className="font-black text-slate-100">{impactedCount}개</dd>
       </dl>
       <div className="mt-3 rounded border border-[#1f3549] bg-[#0b2135] p-2 text-xs text-slate-300">

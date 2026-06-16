@@ -163,6 +163,9 @@ export interface IncidentRecord {
   serverId?: number;
   incidentStatusCode: IncidentStatusCode;
   severityCode: SeverityCode;
+  externalIncidentCode?: string;
+  targetCode?: string;
+  targetLabel?: string;
   title: string;
   description: string;
   startedAt: string;

@@ -61,30 +61,43 @@ function LegacyPage({ onIncidentOpen, page }) {
 
     const cleanups = [];
 
+    if (page.menu === "incidents") {
+      root.querySelectorAll("table.tbl tbody tr").forEach((row) => {
+        const cells = Array.from(row.querySelectorAll("td"));
+        const endedAt = cells[9]?.textContent?.trim() || "";
+        const isOpenIncident = !endedAt || endedAt === "-";
+
+        row.classList.toggle("is-clickable-incident", isOpenIncident);
+        row.toggleAttribute("data-incident-openable", isOpenIncident);
+      });
+    }
+
     const handleIncidentRowClick = (event) => {
       if (page.menu !== "incidents") {
         return;
       }
 
-        const row = event.target.closest?.("tbody tr");
-        const ignoredControl = event.target.closest?.("button, a, input, select, textarea, label");
+      const row = event.target.closest?.("tbody tr");
+      const ignoredControl = event.target.closest?.("button, a, input, select, textarea, label");
 
-        if (row && root.contains(row) && !ignoredControl) {
-          const cells = Array.from(row.querySelectorAll("td"));
-          const incidentCode = cells[1]?.textContent?.trim() || "";
-          const severityLabel = cells[3]?.textContent?.trim() || "치명";
+      if (!row || !root.contains(row) || ignoredControl || !row.hasAttribute("data-incident-openable")) {
+        return;
+      }
 
-          event.preventDefault();
-          event.stopPropagation();
-          onIncidentOpen?.({
-            code: incidentCode,
-            severityCode: severityByLabel[severityLabel] || "MAJOR",
-            serviceCode: cells[5]?.querySelector("code")?.textContent?.trim() || "",
-            startedAt: cells[8]?.textContent?.trim() || "",
-            title: cells[6]?.textContent?.trim() || `${incidentCode} 인시던트`,
-          });
-          return;
-        }
+      const cells = Array.from(row.querySelectorAll("td"));
+      const incidentCode = cells[1]?.textContent?.trim() || "";
+      const severityLabel = cells[3]?.textContent?.trim() || "치명";
+
+      event.preventDefault();
+      event.stopPropagation();
+      onIncidentOpen?.({
+        code: incidentCode,
+        severityCode: severityByLabel[severityLabel] || "MAJOR",
+        serviceCode: cells[5]?.querySelector("code")?.textContent?.trim() || "",
+        targetLabel: cells[5]?.textContent?.replace(/\s+/g, " ").trim() || "",
+        startedAt: cells[8]?.textContent?.trim() || "",
+        title: cells[6]?.textContent?.trim() || `${incidentCode} 인시던트`,
+      });
     };
 
     if (page.menu === "incidents") {
@@ -138,6 +151,9 @@ function RoutePage({ slug }) {
     portalData.createIncident({
       serviceId: service?.serviceId ?? 1,
       severityCode: incident.severityCode,
+      externalIncidentCode: incident.code,
+      targetCode: incident.serviceCode,
+      targetLabel: incident.targetLabel,
       title: incident.title,
       description: `${incident.code} 관리 화면에서 선택한 인시던트입니다.`,
       startedAt: incident.startedAt,
