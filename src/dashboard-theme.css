@@ -4,8 +4,16 @@
 
 .lnb {
   width: 240px;
-  overflow: hidden;
+  max-height: 100vh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
   transition: width 0.18s ease, background-color 0.18s ease, border-color 0.18s ease;
+}
+
+.lnb::-webkit-scrollbar {
+  display: none;
 }
 
 .lnb__brand {

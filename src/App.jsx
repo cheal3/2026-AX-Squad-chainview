@@ -207,10 +207,11 @@ function LegacyPage({ onIncidentOpen, page }) {
   return <div id="legacy-page-root" dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
-function RoutePage({ slug }) {
+function RoutePage({ activeMenuOverride, slug }) {
   const page = pages[slug] || pages["admin-services"];
   const navigate = useNavigate();
   const portalData = usePortalData();
+  const activeMenu = activeMenuOverride || page.menu;
 
   const handleIncidentOpen = (incident) => {
     const service =
@@ -236,7 +237,7 @@ function RoutePage({ slug }) {
   if (page.menu === "incidents") {
     return (
       <div className="app">
-        <Sidebar activeMenu={page.menu} />
+        <Sidebar activeMenu={activeMenu} />
         <main className="main is-incident-list">
           <IncidentAdminPage />
         </main>
@@ -246,7 +247,7 @@ function RoutePage({ slug }) {
 
   return (
     <div className="app">
-      <Sidebar activeMenu={page.menu} />
+      <Sidebar activeMenu={activeMenu} />
       <main className={`main${page.menu === "incidents" ? " is-incident-list" : ""}`}>
         <LegacyPage onIncidentOpen={handleIncidentOpen} page={page} />
       </main>
@@ -258,38 +259,47 @@ const sidebarSections = [
   {
     label: "모니터링",
     items: [
-      { key: "dashboard", icon: "📊", label: "실시간 대시보드", to: "/dashboard", badge: "2" },
-      { key: "topology", icon: "🗺️", label: "관계 그래프", to: "/topology" },
-      { key: "incidents", icon: "🚨", label: "인시던트 관리", to: "/admin-incidents" },
+      { key: "dashboard", icon: "📊", label: "대시보드", to: "/dashboard", badge: "2" },
+      { key: "incidents", icon: "🚨", label: "인시던트 현황", to: "/admin-incidents" },
+      { key: "topology", icon: "🗺️", label: "서비스 관계도", to: "/topology" },
     ],
   },
   {
-    label: "서비스 카탈로그",
+    label: "서비스",
     items: [
-      { key: "services", icon: "📦", label: "서비스 관리", to: "/admin-services" },
-      { key: "categories", icon: "🗂️", label: "서비스 분류 관리", to: "/admin-categories" },
-      { key: "techstacks", icon: "🧩", label: "기술스택 마스터", to: "/admin-techstacks" },
-      { key: "relations", icon: "🔗", label: "서비스 관계 관리", to: "/admin-relations" },
+      { key: "services", icon: "📦", label: "서비스 조회", to: "/admin-services" },
+      { key: "relations", icon: "🔗", label: "서비스 관계조회", to: "/admin-relations" },
+      { key: "techstacks", icon: "🧩", label: "기술 스택", to: "/admin-techstacks" },
     ],
   },
   {
-    label: "배포 인프라",
+    label: "인프라",
     items: [
-      { key: "servers", icon: "🖥️", label: "서버 관리", to: "/admin-servers" },
-      { key: "deployments", icon: "🚀", label: "배포 정보", to: "/admin-deployments" },
+      { key: "servers", icon: "🖥️", label: "서버 조회", to: "/admin-servers" },
+      { key: "deployments", icon: "🚀", label: "배포 현황", to: "/admin-deployments" },
     ],
   },
   {
-    label: "소유권",
+    label: "담당자",
+    items: [
+      { key: "owners", icon: "👨‍💼", label: "담당자 조회", to: "/admin-owners" },
+      { key: "groups", icon: "📁", label: "그룹 조회", to: "/admin-groups" },
+    ],
+  },
+  {
+    label: "[관리자만 접근가능한 메뉴]",
+    items: [
+      { key: "permissions", icon: "🔐", label: "권한 관리", to: "/admin-permissions" },
+    ],
+  },
+  {
+    label: "시스템 관리",
     items: [
       { key: "users", icon: "👥", label: "사용자 관리", to: "/admin-users" },
-      { key: "groups", icon: "📁", label: "그룹 관리", to: "/admin-groups" },
-      { key: "owners", icon: "👨‍💼", label: "서비스 담당자", to: "/admin-owners" },
+      { key: "owner-management", icon: "👨‍💼", label: "서비스 담당자 관리", to: "/admin-owner-management" },
+      { key: "categories", icon: "🗂️", label: "서비스 분류 관리", to: "/admin-categories" },
+      { key: "codes", icon: "⚙️", label: "공통코드 관리", to: "/admin-codes" },
     ],
-  },
-  {
-    label: "시스템",
-    items: [{ key: "codes", icon: "⚙️", label: "공통코드 관리", to: "/admin-codes" }],
   },
 ];
 
@@ -738,6 +748,8 @@ function AppRoutes() {
       <Route path="/dashboard-proto" element={<Navigate to="/dashboard" replace />} />
       <Route path="/dashboard-proto-detail" element={<Navigate to="/dashboard" replace />} />
       <Route path="/dashboard-proto-topology" element={<Navigate to="/topology" replace />} />
+      <Route path="/admin-permissions" element={<RoutePage activeMenuOverride="permissions" slug="admin-users" />} />
+      <Route path="/admin-owner-management" element={<RoutePage activeMenuOverride="owner-management" slug="admin-owners" />} />
       {adminPages.map((slug) => (
         <Route key={slug} path={`/${slug}`} element={<RoutePage slug={slug} />} />
       ))}
