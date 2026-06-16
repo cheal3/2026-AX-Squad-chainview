@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Background,
   Controls,
@@ -165,6 +165,8 @@ export function ServiceRelationFlow({
     useState<TopControlMode>("select");
   const [flowInstance, setFlowInstance] =
     useState<ReactFlowInstance<GraphNodeData> | null>(null);
+  const userMovedViewportRef = useRef(false);
+  const autoCenteredKeyRef = useRef("");
 
   const serviceById = useMemo(
     () => new Map(services.map((service) => [service.serviceId, service])),
@@ -494,6 +496,7 @@ export function ServiceRelationFlow({
   };
 
   const moveToFocusedService = (serviceId: number) => {
+    userMovedViewportRef.current = false;
     setFocusedServiceId(serviceId);
     setDetailOpen(false);
     setQuery("");
@@ -650,6 +653,7 @@ export function ServiceRelationFlow({
     setDetailServiceId(initialFocusedServiceId);
     setDetailOpen(true);
     setRelationDepth(2);
+    userMovedViewportRef.current = false;
   }, [incidentMode, initialFocusedServiceId, initialServiceId]);
 
   useEffect(() => {
@@ -659,15 +663,24 @@ export function ServiceRelationFlow({
       }
 
       const expanded = relationDepth > 1;
+      const autoCenterKey = `${focusedServiceId}:${relationDepth}`;
+
+      if (
+        userMovedViewportRef.current &&
+        autoCenteredKeyRef.current === autoCenterKey
+      ) {
+        return;
+      }
 
       flowInstance.setCenter(NODE_WIDTH / 2, 0, {
         zoom: expanded ? 0.52 : 0.86,
         duration: 800,
       });
+      autoCenteredKeyRef.current = autoCenterKey;
     });
 
     return () => window.cancelAnimationFrame(frame);
-  }, [flowInstance, focusedServiceId, nodes, relationDepth]);
+  }, [flowInstance, focusedServiceId, relationDepth]);
 
   const shellClassName = embedded
     ? "min-h-[680px]"
@@ -699,6 +712,11 @@ export function ServiceRelationFlow({
             edges={edges}
             nodeTypes={nodeTypes}
             onInit={(instance) => setFlowInstance(instance)}
+            onMoveStart={(event) => {
+              if (event) {
+                userMovedViewportRef.current = true;
+              }
+            }}
             minZoom={0.18}
             maxZoom={1.4}
             className="relative z-[1]"

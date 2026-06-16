@@ -701,7 +701,7 @@ export function IncidentDemoDashboard() {
       </section>
 
       <section
-        className={`grid min-w-0 gap-4 ${
+        className={`grid min-w-0 items-stretch gap-4 ${
           serviceDetailPanelOpen
             ? "xl:grid-cols-[minmax(0,1fr)_360px]"
             : "xl:grid-cols-1"
@@ -745,7 +745,7 @@ export function IncidentDemoDashboard() {
 
           <section
             ref={relationSectionRef}
-            className="scroll-mt-6 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
+            className="h-full scroll-mt-6 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
           >
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-3">
               <div>
@@ -1680,7 +1680,7 @@ function ImpactDetailTabs({
     incident?.serviceId === service.serviceId ? incident : undefined;
 
   return (
-    <aside className="flex max-h-[calc(100vh-112px)] min-h-[560px] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+    <aside className="flex h-full max-h-[calc(100vh-112px)] min-h-[680px] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       <div className="shrink-0 border-b border-slate-100 p-3">
         <div className="flex items-center gap-2">
           <div className="grid min-w-0 flex-1 grid-cols-4 rounded-lg border border-slate-200 bg-slate-50 p-1">
