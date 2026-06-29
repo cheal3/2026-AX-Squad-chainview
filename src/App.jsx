@@ -764,91 +764,148 @@ function AdminRecordModal({ modal, onClose, portalData, serverById, serviceById 
 
 function ServiceAdminForm({ form, onChange, servers, isEdit }) {
   return (
-    <div className="form-grid">
-      <div className="form-row">
-        <label>serviceCode<span className="req">*</span></label>
-        <input type="text" value={form.serviceCode} onChange={(event) => onChange("serviceCode", event.target.value)} disabled={isEdit} placeholder="예: PAY-API-001" />
-        <span className="help">{isEdit ? "PK · 수정 불가" : "고유 식별자. 등록 후 수정 불가"}</span>
+    <>
+      <div className="form-section">
+        <h4 className="form-section__title">기본 정보</h4>
+        <div className="form-grid">
+          <div className="form-row">
+            <label>serviceCode<span className="req">*</span></label>
+            <input type="text" value={form.serviceCode} onChange={(event) => onChange("serviceCode", event.target.value)} disabled={isEdit} placeholder="예: PAY-API-001" />
+            <span className="help">{isEdit ? "PK · 수정 불가" : "고유 식별자. 등록 후 수정 불가"}</span>
+          </div>
+          <div className="form-row"><label>서비스명<span className="req">*</span></label><input type="text" value={form.serviceName} onChange={(event) => onChange("serviceName", event.target.value)} placeholder="예: 결제 API" /></div>
+          <div className="form-row full"><label>엔드포인트 URL</label><input type="text" value={form.endpointUrl} onChange={(event) => onChange("endpointUrl", event.target.value)} placeholder="https://..." /></div>
+        </div>
       </div>
-      <div className="form-row"><label>서비스명<span className="req">*</span></label><input type="text" value={form.serviceName} onChange={(event) => onChange("serviceName", event.target.value)} placeholder="예: 결제 API" /></div>
-      <div className="form-row"><label>대분류 (categoryL1)</label><input type="text" value={form.categoryL1} onChange={(event) => onChange("categoryL1", event.target.value)} placeholder="예: 대외계" /></div>
-      <div className="form-row"><label>중분류 (categoryL2)</label><input type="text" value={form.categoryL2} onChange={(event) => onChange("categoryL2", event.target.value)} placeholder="예: 결제" /></div>
-      <div className="form-row"><label>소분류 (categoryL3)</label><input type="text" value={form.categoryL3} onChange={(event) => onChange("categoryL3", event.target.value)} placeholder="예: 승인" /></div>
-      <div className="form-row"><label>서비스 유형 (SERVICE_TYPE)<span className="req">*</span></label><CodeSelect labels={codeLabels.serviceType} value={form.serviceTypeCode} onChange={(value) => onChange("serviceTypeCode", value)} /></div>
-      <div className="form-row"><label>중요도 (IMPORTANCE)<span className="req">*</span></label><CodeSelect labels={codeLabels.importance} value={form.importanceCode} onChange={(value) => onChange("importanceCode", value)} /></div>
-      <div className="form-row"><label>상태 (STATUS)<span className="req">*</span></label><CodeSelect labels={codeLabels.serviceStatus} value={form.statusCode} onChange={(value) => onChange("statusCode", value)} /></div>
-      <div className="form-row"><label>배포 서버</label><select value={form.serverId} onChange={(event) => onChange("serverId", event.target.value)}>{servers.map((server) => <option key={server.serverId} value={server.serverId}>{server.serverName}</option>)}</select></div>
-      <div className="form-row"><label>배포 상태</label><CodeSelect labels={codeLabels.deploymentStatus} value={form.deploymentStatusCode} onChange={(value) => onChange("deploymentStatusCode", value)} /></div>
-      <div className="form-row"><label>배포 경로</label><input type="text" value={form.deployPath} onChange={(event) => onChange("deployPath", event.target.value)} placeholder="/opt/app" /></div>
-      <div className="form-row"><label>포트</label><input type="text" value={form.portInfo} onChange={(event) => onChange("portInfo", event.target.value)} placeholder="8080,8443" /></div>
-      <div className="form-row"><label>인스턴스 수</label><input type="number" min="1" value={form.instanceCount} onChange={(event) => onChange("instanceCount", event.target.value)} /></div>
-      <div className="form-row full"><label>엔드포인트 URL</label><input type="text" value={form.endpointUrl} onChange={(event) => onChange("endpointUrl", event.target.value)} placeholder="https://..." /></div>
-      <div className="form-row full"><label>설명</label><textarea value={form.description} onChange={(event) => onChange("description", event.target.value)} placeholder="서비스 상세 설명" /></div>
-    </div>
+      <div className="form-section">
+        <h4 className="form-section__title">분류 및 상태</h4>
+        <div className="form-grid">
+          <div className="form-row"><label>대분류 (categoryL1)</label><input type="text" value={form.categoryL1} onChange={(event) => onChange("categoryL1", event.target.value)} placeholder="예: 대외계" /></div>
+          <div className="form-row"><label>중분류 (categoryL2)</label><input type="text" value={form.categoryL2} onChange={(event) => onChange("categoryL2", event.target.value)} placeholder="예: 결제" /></div>
+          <div className="form-row"><label>소분류 (categoryL3)</label><input type="text" value={form.categoryL3} onChange={(event) => onChange("categoryL3", event.target.value)} placeholder="예: 승인" /></div>
+          <div className="form-row"><label>서비스 유형 (SERVICE_TYPE)<span className="req">*</span></label><CodeSelect labels={codeLabels.serviceType} value={form.serviceTypeCode} onChange={(value) => onChange("serviceTypeCode", value)} /></div>
+          <div className="form-row"><label>중요도 (IMPORTANCE)<span className="req">*</span></label><CodeSelect labels={codeLabels.importance} value={form.importanceCode} onChange={(value) => onChange("importanceCode", value)} /></div>
+          <div className="form-row"><label>상태 (STATUS)<span className="req">*</span></label><CodeSelect labels={codeLabels.serviceStatus} value={form.statusCode} onChange={(value) => onChange("statusCode", value)} /></div>
+        </div>
+      </div>
+      <div className="form-section">
+        <h4 className="form-section__title">배포 정보</h4>
+        <div className="form-grid">
+          <div className="form-row"><label>배포 서버</label><select value={form.serverId} onChange={(event) => onChange("serverId", event.target.value)}>{servers.map((server) => <option key={server.serverId} value={server.serverId}>{server.serverName}</option>)}</select></div>
+          <div className="form-row"><label>배포 상태</label><CodeSelect labels={codeLabels.deploymentStatus} value={form.deploymentStatusCode} onChange={(value) => onChange("deploymentStatusCode", value)} /></div>
+          <div className="form-row"><label>배포 경로</label><input type="text" value={form.deployPath} onChange={(event) => onChange("deployPath", event.target.value)} placeholder="/opt/app" /></div>
+          <div className="form-row"><label>포트</label><input type="text" value={form.portInfo} onChange={(event) => onChange("portInfo", event.target.value)} placeholder="8080,8443" /></div>
+          <div className="form-row"><label>인스턴스 수</label><input type="number" min="1" value={form.instanceCount} onChange={(event) => onChange("instanceCount", event.target.value)} /></div>
+        </div>
+      </div>
+      <div className="form-section">
+        <h4 className="form-section__title">설명</h4>
+        <div className="form-row"><label>설명</label><textarea value={form.description} onChange={(event) => onChange("description", event.target.value)} placeholder="서비스 상세 설명" /></div>
+      </div>
+    </>
   );
 }
 
 function ServerAdminForm({ form, onChange, isEdit }) {
   return (
-    <div className="form-grid">
-      <div className="form-row">
-        <label>serverName<span className="req">*</span></label>
-        <input type="text" value={form.serverName} onChange={(event) => onChange("serverName", event.target.value)} disabled={isEdit} placeholder="예: WAS-PRD-14" />
-        {isEdit ? <span className="help">PK · 수정 불가</span> : <span className="help">고유 · 명명규칙 준수</span>}
+    <>
+      <div className="form-section">
+        <h4 className="form-section__title">기본 정보</h4>
+        <div className="form-grid">
+          <div className="form-row">
+            <label>serverName<span className="req">*</span></label>
+            <input type="text" value={form.serverName} onChange={(event) => onChange("serverName", event.target.value)} disabled={isEdit} placeholder="예: WAS-PRD-14" />
+            {isEdit ? <span className="help">PK · 수정 불가</span> : <span className="help">고유 · 명명규칙 준수</span>}
+          </div>
+          <div className="form-row"><label>hostname<span className="req">*</span></label><input type="text" value={form.hostName} onChange={(event) => onChange("hostName", event.target.value)} placeholder="예: was-prd-14.bank.local" /></div>
+          <div className="form-row"><label>IP 주소<span className="req">*</span></label><input type="text" value={form.ipAddress} onChange={(event) => onChange("ipAddress", event.target.value)} placeholder="예: 10.20.30.14" /></div>
+        </div>
       </div>
-      <div className="form-row"><label>hostname<span className="req">*</span></label><input type="text" value={form.hostName} onChange={(event) => onChange("hostName", event.target.value)} placeholder="예: was-prd-14.bank.local" /></div>
-      <div className="form-row"><label>IP 주소<span className="req">*</span></label><input type="text" value={form.ipAddress} onChange={(event) => onChange("ipAddress", event.target.value)} placeholder="예: 10.20.30.14" /></div>
-      <div className="form-row"><label>환경 (ENVIRONMENT)<span className="req">*</span></label><CodeSelect labels={codeLabels.envType} value={form.envCode} onChange={(value) => onChange("envCode", value)} /></div>
-      <div className="form-row"><label>OS 유형 (OS_TYPE)<span className="req">*</span></label><CodeSelect labels={codeLabels.osType} value={form.osTypeCode} onChange={(value) => onChange("osTypeCode", value)} /></div>
-      <div className="form-row"><label>OS 버전</label><input type="text" value={form.osVersion} onChange={(event) => onChange("osVersion", event.target.value)} placeholder="예: RHEL 8.9" /></div>
-      <div className="form-row"><label>상태</label><CodeSelect labels={codeLabels.serverStatus} value={form.statusCode} onChange={(value) => onChange("statusCode", value)} /></div>
-      <div className="form-row full"><label>설명</label><textarea value={form.description} onChange={(event) => onChange("description", event.target.value)} placeholder="서버 설명 또는 위치/IDC 정보" /></div>
-    </div>
+      <div className="form-section">
+        <h4 className="form-section__title">운영 환경</h4>
+        <div className="form-grid">
+          <div className="form-row"><label>환경 (ENVIRONMENT)<span className="req">*</span></label><CodeSelect labels={codeLabels.envType} value={form.envCode} onChange={(value) => onChange("envCode", value)} /></div>
+          <div className="form-row"><label>상태</label><CodeSelect labels={codeLabels.serverStatus} value={form.statusCode} onChange={(value) => onChange("statusCode", value)} /></div>
+        </div>
+      </div>
+      <div className="form-section">
+        <h4 className="form-section__title">OS 정보</h4>
+        <div className="form-grid">
+          <div className="form-row"><label>OS 유형 (OS_TYPE)<span className="req">*</span></label><CodeSelect labels={codeLabels.osType} value={form.osTypeCode} onChange={(value) => onChange("osTypeCode", value)} /></div>
+          <div className="form-row"><label>OS 버전</label><input type="text" value={form.osVersion} onChange={(event) => onChange("osVersion", event.target.value)} placeholder="예: RHEL 8.9" /></div>
+        </div>
+      </div>
+      <div className="form-section">
+        <h4 className="form-section__title">설명</h4>
+        <div className="form-row"><label>설명</label><textarea value={form.description} onChange={(event) => onChange("description", event.target.value)} placeholder="서버 설명 또는 위치/IDC 정보" /></div>
+      </div>
+    </>
   );
 }
 
 function RelationAdminForm({ form, onChange, services, serviceById, isEdit }) {
   return (
-    <div className="form-grid">
-      <div className="form-row">
-        <label>source 서비스<span className="req">*</span></label>
-        <select value={form.sourceServiceId} onChange={(event) => onChange("sourceServiceId", event.target.value)} disabled={isEdit}>
-          <option value="">선택</option>
-          {services.map((service) => <option key={service.serviceId} value={service.serviceId}>{service.serviceCode} {service.serviceName}</option>)}
-        </select>
-        <span className="help">호출하는 쪽</span>
+    <>
+      <div className="form-section">
+        <h4 className="form-section__title">연결 서비스</h4>
+        <div className="form-grid">
+          <div className="form-row">
+            <label>source 서비스<span className="req">*</span></label>
+            <select value={form.sourceServiceId} onChange={(event) => onChange("sourceServiceId", event.target.value)} disabled={isEdit}>
+              <option value="">선택</option>
+              {services.map((service) => <option key={service.serviceId} value={service.serviceId}>{service.serviceCode} {service.serviceName}</option>)}
+            </select>
+            <span className="help">호출하는 쪽</span>
+          </div>
+          <div className="form-row">
+            <label>target 서비스<span className="req">*</span></label>
+            <select value={form.targetServiceId} onChange={(event) => onChange("targetServiceId", event.target.value)} disabled={isEdit}>
+              <option value="">선택</option>
+              {services.map((service) => <option key={service.serviceId} value={service.serviceId}>{service.serviceCode} {service.serviceName}</option>)}
+            </select>
+            <span className="help">호출받는 쪽</span>
+          </div>
+          {isEdit ? <div className="form-row full"><label>연결</label><input type="text" value={`${serviceLabel(serviceById.get(Number(form.sourceServiceId)))} → ${serviceLabel(serviceById.get(Number(form.targetServiceId)))}`} disabled /></div> : null}
+        </div>
       </div>
-      <div className="form-row">
-        <label>target 서비스<span className="req">*</span></label>
-        <select value={form.targetServiceId} onChange={(event) => onChange("targetServiceId", event.target.value)} disabled={isEdit}>
-          <option value="">선택</option>
-          {services.map((service) => <option key={service.serviceId} value={service.serviceId}>{service.serviceCode} {service.serviceName}</option>)}
-        </select>
-        <span className="help">호출받는 쪽</span>
+      <div className="form-section">
+        <h4 className="form-section__title">관계 속성</h4>
+        <div className="form-grid">
+          <div className="form-row"><label>관계 유형 (RELATION_TYPE)<span className="req">*</span></label><CodeSelect labels={codeLabels.relationType} value={form.relationTypeCode} onChange={(value) => onChange("relationTypeCode", value)} /></div>
+          <div className="form-row"><label>연결 상태</label><CodeSelect labels={codeLabels.relationStatus} value={form.relationStatusCode} onChange={(value) => onChange("relationStatusCode", value)} /></div>
+          <div className="form-row"><label>필수 여부 (isRequired)</label><select value={form.mandatoryYn} onChange={(event) => onChange("mandatoryYn", event.target.value)}><option value="Y">Y (필수)</option><option value="N">N (선택)</option></select></div>
+        </div>
       </div>
-      {isEdit ? <div className="form-row full"><label>연결</label><input type="text" value={`${serviceLabel(serviceById.get(Number(form.sourceServiceId)))} → ${serviceLabel(serviceById.get(Number(form.targetServiceId)))}`} disabled /></div> : null}
-      <div className="form-row"><label>관계 유형 (RELATION_TYPE)<span className="req">*</span></label><CodeSelect labels={codeLabels.relationType} value={form.relationTypeCode} onChange={(value) => onChange("relationTypeCode", value)} /></div>
-      <div className="form-row"><label>연결 상태</label><CodeSelect labels={codeLabels.relationStatus} value={form.relationStatusCode} onChange={(value) => onChange("relationStatusCode", value)} /></div>
-      <div className="form-row"><label>필수 여부 (isRequired)</label><select value={form.mandatoryYn} onChange={(event) => onChange("mandatoryYn", event.target.value)}><option value="Y">Y (필수)</option><option value="N">N (선택)</option></select></div>
-      <div className="form-row full"><label>설명</label><textarea value={form.description} onChange={(event) => onChange("description", event.target.value)} placeholder="이 관계가 어떤 비즈니스 흐름인지" /></div>
-    </div>
+      <div className="form-section">
+        <h4 className="form-section__title">설명</h4>
+        <div className="form-row"><label>설명</label><textarea value={form.description} onChange={(event) => onChange("description", event.target.value)} placeholder="이 관계가 어떤 비즈니스 흐름인지" /></div>
+      </div>
+    </>
   );
 }
 
 function TechStackAdminForm({ form, onChange, services, isEdit }) {
   return (
-    <div className="form-grid">
-      <div className="form-row full">
-        <label>서비스<span className="req">*</span></label>
-        <select value={form.serviceId} onChange={(event) => onChange("serviceId", event.target.value)} disabled={isEdit}>
-          {services.map((service) => <option key={service.serviceId} value={service.serviceId}>{service.serviceCode} {service.serviceName}</option>)}
-        </select>
+    <>
+      <div className="form-section">
+        <h4 className="form-section__title">연결 서비스</h4>
+        <div className="form-row">
+          <label>서비스<span className="req">*</span></label>
+          <select value={form.serviceId} onChange={(event) => onChange("serviceId", event.target.value)} disabled={isEdit}>
+            {services.map((service) => <option key={service.serviceId} value={service.serviceId}>{service.serviceCode} {service.serviceName}</option>)}
+          </select>
+        </div>
       </div>
-      <div className="form-row"><label>유형 (TECH_TYPE)<span className="req">*</span></label><input type="text" value={form.techTypeName} onChange={(event) => onChange("techTypeName", event.target.value)} placeholder="예: FRAMEWORK" /></div>
-      <div className="form-row"><label>기술명<span className="req">*</span></label><input type="text" value={form.techName} onChange={(event) => onChange("techName", event.target.value)} placeholder="예: Spring Boot" /></div>
-      <div className="form-row"><label>기본버전</label><input type="text" value={form.versionText} onChange={(event) => onChange("versionText", event.target.value)} placeholder="예: 3.2.5" /></div>
-      <div className="form-row"><label>벤더</label><input type="text" value={form.vendorName} onChange={(event) => onChange("vendorName", event.target.value)} placeholder="예: VMware" /></div>
-    </div>
+      <div className="form-section">
+        <h4 className="form-section__title">기술 정보</h4>
+        <div className="form-grid">
+          <div className="form-row"><label>유형 (TECH_TYPE)<span className="req">*</span></label><input type="text" value={form.techTypeName} onChange={(event) => onChange("techTypeName", event.target.value)} placeholder="예: FRAMEWORK" /></div>
+          <div className="form-row"><label>기술명<span className="req">*</span></label><input type="text" value={form.techName} onChange={(event) => onChange("techName", event.target.value)} placeholder="예: Spring Boot" /></div>
+          <div className="form-row"><label>기본버전</label><input type="text" value={form.versionText} onChange={(event) => onChange("versionText", event.target.value)} placeholder="예: 3.2.5" /></div>
+          <div className="form-row"><label>벤더</label><input type="text" value={form.vendorName} onChange={(event) => onChange("vendorName", event.target.value)} placeholder="예: VMware" /></div>
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -989,40 +1046,53 @@ function OwnerManagementModals({ modal, onClose, owner, services }) {
           <button className="close" onClick={onClose} type="button">×</button>
         </div>
         <div className="modal__body">
-          <div className="form-row">
-            <label>서비스 (serviceCode)<span className="req">*</span></label>
-            {isEdit ? (
-              <input type="text" value={serviceLabel} disabled />
-            ) : (
-              <select defaultValue="">
-                <option value="">선택</option>
-                {services.slice(0, 12).map((item) => (
-                  <option key={item.serviceId}>{item.serviceCode} {item.serviceName}</option>
-                ))}
-              </select>
-            )}
+          <div className="form-section">
+            <h4 className="form-section__title">연결 서비스</h4>
+            <div className="form-row">
+              <label>서비스 (serviceCode)<span className="req">*</span></label>
+              {isEdit ? (
+                <input type="text" value={serviceLabel} disabled />
+              ) : (
+                <select defaultValue="">
+                  <option value="">선택</option>
+                  {services.slice(0, 12).map((item) => (
+                    <option key={item.serviceId}>{item.serviceCode} {item.serviceName}</option>
+                  ))}
+                </select>
+              )}
+            </div>
           </div>
-          <div className="form-row">
-            <label>담당자/그룹<span className="req">*</span></label>
-            <input type="text" defaultValue={owner?.ownerName ?? ""} placeholder="예: 대외계 담당그룹" disabled={isEdit} />
+          <div className="form-section">
+            <h4 className="form-section__title">담당자 정보</h4>
+            <div className="form-grid">
+              <div className="form-row">
+                <label>담당자/그룹<span className="req">*</span></label>
+                <input type="text" defaultValue={owner?.ownerName ?? ""} placeholder="예: 대외계 담당그룹" disabled={isEdit} />
+              </div>
+              <div className="form-row">
+                <label>담당 유형</label>
+                <select defaultValue={owner?.ownerTypeCode ?? "GROUP"}>
+                  <option value="GROUP">그룹</option>
+                  <option value="USER">사용자</option>
+                </select>
+              </div>
+              <div className="form-row">
+                <label>책임</label>
+                <select defaultValue={owner?.responsibilityCode ?? "MAIN"}>
+                  <option value="MAIN">주담당</option>
+                  <option value="SUB">부담당</option>
+                  <option value="ALERT">알림수신</option>
+                </select>
+              </div>
+            </div>
           </div>
-          <div className="form-row">
-            <label>담당 유형</label>
-            <select defaultValue={owner?.ownerTypeCode ?? "GROUP"}>
-              <option value="GROUP">그룹</option>
-              <option value="USER">사용자</option>
-            </select>
+          <div className="form-section">
+            <h4 className="form-section__title">적용 기간</h4>
+            <div className="form-grid">
+              <div className="form-row"><label>시작일</label><input type="date" defaultValue="2024-01-02" /></div>
+              <div className="form-row"><label>종료일</label><input type="date" /></div>
+            </div>
           </div>
-          <div className="form-row">
-            <label>책임</label>
-            <select defaultValue={owner?.responsibilityCode ?? "MAIN"}>
-              <option value="MAIN">주담당</option>
-              <option value="SUB">부담당</option>
-              <option value="ALERT">알림수신</option>
-            </select>
-          </div>
-          <div className="form-row"><label>시작일</label><input type="date" defaultValue="2024-01-02" /></div>
-          <div className="form-row"><label>종료일</label><input type="date" /></div>
         </div>
         <div className="modal__foot"><button className="btn" onClick={onClose} type="button">취소</button><button className="btn btn--primary" onClick={onClose} type="button">{isEdit ? "저장" : "등록"}</button></div>
       </div>
