@@ -367,6 +367,7 @@ function DynamicAdminListPage({ activeMenu, menu }) {
       columns: ["serviceId", "서비스", "분류", "유형", "중요도", "상태", "엔드포인트", "서버"],
       rows: portalData.services.map((service) => ({
         key: service.serviceId,
+        record: service,
         onClick: () => navigate(`/admin-services/${service.serviceCode}`),
         cells: [
           <code>{service.serviceId}</code>,
@@ -385,6 +386,7 @@ function DynamicAdminListPage({ activeMenu, menu }) {
       columns: ["serverId", "서버명", "호스트", "IP", "환경", "OS", "상태", "설명"],
       rows: portalData.servers.map((server) => ({
         key: server.serverId,
+        record: server,
         cells: [
           <code>{server.serverId}</code>,
           <b>{server.serverName}</b>,
@@ -402,6 +404,7 @@ function DynamicAdminListPage({ activeMenu, menu }) {
       columns: ["relationId", "송신 서비스", "수신 서비스", "유형", "필수", "상태", "설명"],
       rows: portalData.relations.map((relation) => ({
         key: relation.relationId,
+        record: relation,
         cells: [
           <code>{relation.relationId}</code>,
           formatServiceCell(serviceById.get(relation.sourceServiceId)),
@@ -418,6 +421,7 @@ function DynamicAdminListPage({ activeMenu, menu }) {
       columns: ["techStackId", "서비스", "유형", "기술명", "버전", "벤더"],
       rows: portalData.techStacks.map((stack) => ({
         key: stack.techStackId,
+        record: stack,
         cells: [
           <code>{stack.techStackId}</code>,
           formatServiceCell(serviceById.get(stack.serviceId)),
@@ -452,6 +456,83 @@ function DynamicAdminListPage({ activeMenu, menu }) {
   const openOwnerModal = (modal, owner) => {
     setSelectedOwner(owner);
     setOwnerModal(modal);
+  };
+  const handleEditRow = (row) => {
+    if (menu === "owners") {
+      openOwnerModal("edit", row.owner);
+      return;
+    }
+
+    if (menu === "services") {
+      const service = row.record;
+      const serviceName = window.prompt("서비스명을 수정하세요.", service.serviceName);
+      if (serviceName === null) return;
+      const cleaned = serviceName.trim();
+      if (!cleaned) return;
+      portalData.updateService(service.serviceId, { serviceName: cleaned });
+      return;
+    }
+
+    if (menu === "servers") {
+      const server = row.record;
+      const serverName = window.prompt("서버명을 수정하세요.", server.serverName);
+      if (serverName === null) return;
+      const cleaned = serverName.trim();
+      if (!cleaned) return;
+      portalData.updateServer(server.serverId, { serverName: cleaned });
+      return;
+    }
+
+    if (menu === "relations") {
+      const relation = row.record;
+      const description = window.prompt("관계 설명을 수정하세요.", relation.description);
+      if (description === null) return;
+      portalData.updateRelation(relation.relationId, { description: description.trim() });
+      return;
+    }
+
+    if (menu === "techstacks") {
+      const techStack = row.record;
+      const techName = window.prompt("기술명을 수정하세요.", techStack.techName);
+      if (techName === null) return;
+      const cleaned = techName.trim();
+      if (!cleaned) return;
+      portalData.updateTechStack(techStack.techStackId, { techName: cleaned });
+    }
+  };
+  const handleDeleteRow = (row) => {
+    if (menu === "owners") {
+      openOwnerModal("delete", row.owner);
+      return;
+    }
+
+    if (menu === "services") {
+      const service = row.record;
+      if (!window.confirm(`${service.serviceName} 서비스를 삭제할까요? 연결된 관계/담당자/기술스택도 함께 제거됩니다.`)) return;
+      portalData.deleteService(service.serviceId);
+      return;
+    }
+
+    if (menu === "servers") {
+      const server = row.record;
+      if (!window.confirm(`${server.serverName} 서버를 삭제할까요?`)) return;
+      const result = portalData.deleteServer(server.serverId);
+      window.alert(result.message);
+      return;
+    }
+
+    if (menu === "relations") {
+      const relation = row.record;
+      if (!window.confirm(`REL-${String(relation.relationId).padStart(4, "0")} 관계를 삭제할까요?`)) return;
+      portalData.removeRelation(relation.relationId);
+      return;
+    }
+
+    if (menu === "techstacks") {
+      const techStack = row.record;
+      if (!window.confirm(`${techStack.techName} 기술스택을 삭제할까요?`)) return;
+      portalData.deleteTechStack(techStack.techStackId);
+    }
   };
 
   return (
@@ -502,11 +583,10 @@ function DynamicAdminListPage({ activeMenu, menu }) {
                       className="ibtn"
                       onClick={(event) => {
                         event.stopPropagation();
-                        if (menu === "owners") {
-                          openOwnerModal("edit", row.owner);
-                        }
+                        handleEditRow(row);
                       }}
                       type="button"
+                      title="수정"
                     >
                       ✏️
                     </button>
@@ -514,11 +594,10 @@ function DynamicAdminListPage({ activeMenu, menu }) {
                       className="ibtn ibtn--danger"
                       onClick={(event) => {
                         event.stopPropagation();
-                        if (menu === "owners") {
-                          openOwnerModal("delete", row.owner);
-                        }
+                        handleDeleteRow(row);
                       }}
                       type="button"
+                      title="삭제"
                     >
                       🗑
                     </button>

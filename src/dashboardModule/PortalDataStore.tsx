@@ -133,9 +133,18 @@ type PortalDataContextValue = {
   updateService: (serviceId: number, input: Partial<ServiceRecord>) => void;
   deleteService: (serviceId: number) => void;
   addRelation: (input: NewRelationInput) => { ok: boolean; message: string };
+  updateRelation: (
+    relationId: number,
+    input: Partial<ServiceRelationRecord>
+  ) => void;
   removeRelation: (relationId: number) => void;
   addOwnerGroup: (serviceId: number, groupName: string) => void;
   addTechStack: (serviceId: number, techName: string) => void;
+  updateTechStack: (
+    techStackId: number,
+    input: Partial<TechStackRecord>
+  ) => void;
+  deleteTechStack: (techStackId: number) => void;
   runHealthCheck: (serviceId: number, url: string) => HealthCheckResult;
 };
 
@@ -558,6 +567,27 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         }
         return { ok: true, message: "서비스 종속 관계가 추가되었습니다." };
       },
+      updateRelation: (relationId, input) => {
+        setRelations((current) =>
+          current.map((relation) =>
+            relation.relationId === relationId
+              ? { ...relation, ...input, updatedAt: timestamp() }
+              : relation
+          )
+        );
+        const currentRelation = relations.find(
+          (relation) => relation.relationId === relationId
+        );
+        if (REMOTE_API_ENABLED && currentRelation) {
+          const nextRelation = { ...currentRelation, ...input };
+          void chainViewApi.serviceRelations
+            .update(relationId, toRelationPayload(nextRelation))
+            .then(() => refreshRemoteData(300))
+            .catch((error) => {
+              console.warn("[ChainView API] relation update failed", error);
+            });
+        }
+      },
       removeRelation: (relationId) => {
         setRelations((current) =>
           current.filter((relation) => relation.relationId !== relationId)
@@ -617,6 +647,39 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             .then(() => refreshRemoteData(400))
             .catch((error) => {
               console.warn("[ChainView API] tech stack create failed", error);
+            });
+        }
+      },
+      updateTechStack: (techStackId, input) => {
+        setTechStacks((current) =>
+          current.map((techStack) =>
+            techStack.techStackId === techStackId
+              ? { ...techStack, ...input }
+              : techStack
+          )
+        );
+        const currentTechStack = techStacks.find(
+          (techStack) => techStack.techStackId === techStackId
+        );
+        if (REMOTE_API_ENABLED && currentTechStack) {
+          void chainViewApi.techStacks
+            .update(techStackId, { ...currentTechStack, ...input })
+            .then(() => refreshRemoteData(400))
+            .catch((error) => {
+              console.warn("[ChainView API] tech stack update failed", error);
+            });
+        }
+      },
+      deleteTechStack: (techStackId) => {
+        setTechStacks((current) =>
+          current.filter((techStack) => techStack.techStackId !== techStackId)
+        );
+        if (REMOTE_API_ENABLED) {
+          void chainViewApi.techStacks
+            .delete(techStackId)
+            .then(() => refreshRemoteData(400))
+            .catch((error) => {
+              console.warn("[ChainView API] tech stack delete failed", error);
             });
         }
       },
