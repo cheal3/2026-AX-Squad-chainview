@@ -166,6 +166,13 @@
         <select><option>정상</option><option>지연</option><option>장애</option><option>미사용</option></select></div>
       <div class="form-row"><label>필수 여부 (isRequired)</label>
         <select><option>Y (필수)</option><option>N (선택)</option></select></div>
+      <div class="form-row"><label>영향도 레벨</label>
+        <select><option>직접 영향</option><option>1-hop 영향</option><option>2-hop 영향</option><option>참고 관계</option></select>
+        <span class="help">서비스 영향도 맵과 인시던트 상세 화면에 노출할 영향 범위</span></div>
+      <div class="form-row"><label>영향 조건</label>
+        <input type="text" placeholder="예: API Gateway 인증 실패 시 EAM/SSO 연계 서비스 영향" /></div>
+      <div class="form-row"><label>장애 시 노출 문구</label>
+        <textarea placeholder="예: 공통 API Gateway 인증 장애로 로그인 및 권한 검증 서비스 영향 가능"></textarea></div>
       <div class="form-row"><label>설명</label><textarea placeholder="이 관계가 어떤 비즈니스 흐름인지"></textarea></div>
     </div>
     <div class="modal__foot"><button class="btn" data-modal-close>취소</button><button class="btn btn--primary">등록</button></div>
@@ -181,6 +188,9 @@
       <div class="form-row"><label>관계 유형</label><select><option>SYNC_CALL</option><option>ASYNC_CALL</option></select></div>
       <div class="form-row"><label>연결 상태</label><select><option>장애</option><option>정상</option></select></div>
       <div class="form-row"><label>필수 여부</label><select><option>Y (필수)</option><option>N (선택)</option></select></div>
+      <div class="form-row"><label>영향도 레벨</label><select><option>직접 영향</option><option>1-hop 영향</option><option>2-hop 영향</option><option>참고 관계</option></select></div>
+      <div class="form-row"><label>영향 조건</label><input type="text" value="API Gateway 인증 실패 시 EAM/SSO 통합 인증 영향" /></div>
+      <div class="form-row"><label>장애 시 노출 문구</label><textarea>공통 API Gateway 장애로 인증 연계 서비스와 직접 영향 관계가 발생합니다.</textarea></div>
       <div class="form-row"><label>설명</label><textarea>승인 결과 → 잔액 차감 호출</textarea></div>
     </div>
     <div class="modal__foot"><button class="btn" data-modal-close>취소</button><button class="btn btn--primary">저장</button></div>

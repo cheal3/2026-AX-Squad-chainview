@@ -29,11 +29,11 @@ import type { IncidentRecord, ServiceRecord, ServiceRelationRecord } from "../mo
 import { useNavigate } from "react-router-dom";
 
 const categories = [
-  { label: "전체 서비스", value: 48, icon: <Server size={26} />, tone: "slate" },
-  { label: "공통 플랫폼", value: 12, icon: <Network size={28} />, tone: "blue" },
-  { label: "기간계/업무계", value: 18, icon: <Building2 size={28} />, tone: "teal" },
-  { label: "채널계", value: 10, icon: <Monitor size={27} />, tone: "green" },
-  { label: "대외채널", value: 8, icon: <Globe2 size={27} />, tone: "blue" },
+  { key: "all", label: "전체 서비스", value: 48, icon: <Server size={26} />, tone: "slate" },
+  { key: "platform", label: "공통 플랫폼", value: 12, icon: <Network size={28} />, tone: "blue" },
+  { key: "core", label: "기간계/업무계", value: 18, icon: <Building2 size={28} />, tone: "teal" },
+  { key: "channel", label: "채널계", value: 10, icon: <Monitor size={27} />, tone: "green" },
+  { key: "external", label: "대외채널", value: 8, icon: <Globe2 size={27} />, tone: "blue" },
 ];
 
 const managementRows = [
@@ -73,6 +73,33 @@ function isCoreService(service: ServiceRecord) {
   return rootCategory.includes("기간계");
 }
 
+function matchesDashboardCategory(service: ServiceRecord, categoryKey: string) {
+  const rootCategory = service.categoryPath[0] ?? "";
+  const categoryLabel = service.categoryPath.join(" ");
+
+  if (categoryKey === "all") {
+    return true;
+  }
+
+  if (categoryKey === "platform") {
+    return /공통|플랫폼|인프라/.test(categoryLabel);
+  }
+
+  if (categoryKey === "core") {
+    return /기간계|업무계/.test(categoryLabel);
+  }
+
+  if (categoryKey === "channel") {
+    return /채널/.test(categoryLabel);
+  }
+
+  if (categoryKey === "external") {
+    return /대외|외부/.test(rootCategory) || /대외|외부/.test(categoryLabel);
+  }
+
+  return true;
+}
+
 export function IncidentDemoDashboard({
   activeIncidentId,
 }: {
@@ -80,7 +107,7 @@ export function IncidentDemoDashboard({
 } = {}) {
   return (
     <div className="min-w-0 overflow-x-hidden text-slate-950">
-      <div className="flex min-h-[720px] w-full">
+      <div className="flex min-h-[820px] w-full">
         <DashboardCase activeIncidentId={activeIncidentId} />
       </div>
     </div>
@@ -118,10 +145,19 @@ function DashboardCase({
 
     return counts;
   }, [relations]);
-  const coreServices = useMemo(() => {
-    const matched = services.filter(isCoreService);
+  const [selectedCategoryKey, setSelectedCategoryKey] = useState("core");
+  const categoryServices = useMemo(() => {
+    const matched = services.filter((service) =>
+      matchesDashboardCategory(service, selectedCategoryKey)
+    );
     return matched.length > 0 ? matched : services;
-  }, [services]);
+  }, [selectedCategoryKey, services]);
+  const coreServices = useMemo(() => {
+    const matched = categoryServices.filter(isCoreService);
+    return selectedCategoryKey === "core" && matched.length > 0
+      ? matched
+      : categoryServices;
+  }, [categoryServices, selectedCategoryKey]);
   const defaultSelectedServiceId = useMemo(
     () =>
       [...coreServices]
@@ -171,9 +207,12 @@ function DashboardCase({
   }
 
   return (
-    <section className="flex min-h-full min-w-0 flex-1 flex-col">
-      <MetricStrip />
-      <div className="mt-3 grid min-h-0 min-w-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(300px,400px)] gap-3">
+    <section className="flex min-h-[calc(100vh-116px)] min-w-0 flex-1 flex-col">
+      <MetricStrip
+        selectedCategoryKey={selectedCategoryKey}
+        onSelectCategory={setSelectedCategoryKey}
+      />
+      <div className="mt-3 grid min-h-[460px] min-w-0 flex-[1.55] grid-cols-[minmax(0,1fr)_minmax(300px,400px)] gap-3">
         <RelationMap
           coreServiceIds={coreServices.map((service) => service.serviceId)}
           selectedServiceId={selectedServiceId}
@@ -252,11 +291,26 @@ function DashboardHeader() {
   );
 }
 
-function MetricStrip() {
+function MetricStrip({
+  onSelectCategory,
+  selectedCategoryKey,
+}: {
+  onSelectCategory: (categoryKey: string) => void;
+  selectedCategoryKey: string;
+}) {
   return (
     <div className="mt-1 grid min-w-0 grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-3">
       {categories.map((item) => (
-        <div key={item.label} className="h-[74px] min-w-0 rounded-lg border border-slate-200 bg-white px-5 py-3 shadow-[0_1px_3px_rgba(15,23,42,0.08)]">
+        <button
+          key={item.label}
+          className={`h-[74px] min-w-0 rounded-lg border bg-white px-5 py-3 text-left shadow-[0_1px_3px_rgba(15,23,42,0.08)] ${
+            selectedCategoryKey === item.key
+              ? "border-[#126cf0] ring-2 ring-[#126cf0]/15"
+              : "border-slate-200"
+          }`}
+          type="button"
+          onClick={() => onSelectCategory(item.key)}
+        >
           <div className="flex min-w-0 items-center justify-between gap-3">
             <div className="min-w-0">
               <div className="truncate text-xs font-black text-slate-500">{item.label}</div>
@@ -268,7 +322,7 @@ function MetricStrip() {
               {item.icon}
             </div>
           </div>
-        </div>
+        </button>
       ))}
     </div>
   );
@@ -303,7 +357,7 @@ function RelationMap({
             <Maximize2 size={15} />
           </button>
         </div>
-        <div className="h-[calc(100%-44px)] min-h-[256px] min-w-0 overflow-hidden">
+        <div className="h-[calc(100%-44px)] min-h-[386px] min-w-0 overflow-hidden">
           <ServiceRelationFlow
             autoCenter
             embedded
@@ -424,7 +478,7 @@ function ServiceInfoPanel({
 
   return (
     <>
-      <aside className="h-full min-h-[300px] min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white p-4">
+      <aside className="h-full min-h-[430px] min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white p-4">
         <div className="mb-3 flex min-w-0 items-center justify-between gap-3">
           <h2 className="truncate text-sm font-black">선택 서비스 정보</h2>
           <StatusBadge />
@@ -522,23 +576,45 @@ function ServiceDetailModal({
   relationCount: number;
   service?: ServiceRecord;
 }) {
-  const rows = [
-    ["서비스 코드", service?.serviceCode ?? "-"],
-    ["서비스명", service?.serviceName ?? "-"],
-    ["서비스 분류", service?.categoryPath.join(" > ") ?? "-"],
-    ["서비스 유형", service?.serviceTypeCode ?? "-"],
-    ["중요도", service?.importanceCode ?? "-"],
-    ["상태", service?.statusCode ?? "-"],
-    ["배포 상태", service?.deploymentStatusCode ?? "-"],
-    ["연관 서비스 수", `${relationCount}개`],
-    ["엔드포인트 URL", service?.endpointUrl ?? "-"],
-    ["배포 경로", service?.deployPath ?? "-"],
-    ["포트", service?.portInfo ?? "-"],
-    ["인스턴스 수", service?.instanceCount ? `${service.instanceCount}개` : "-"],
-    ["등록자", service?.createdBy ?? "-"],
-    ["수정자", service?.updatedBy ?? "-"],
-    ["등록일", service?.createdAt ?? "-"],
-    ["수정일", service?.updatedAt ?? "-"],
+  const sections = [
+    {
+      title: "서비스 정보",
+      rows: [
+        ["서비스 코드", service?.serviceCode ?? "-"],
+        ["서비스명", service?.serviceName ?? "-"],
+        ["서비스 분류", service?.categoryPath.join(" > ") ?? "-"],
+        ["서비스 유형", service?.serviceTypeCode ?? "-"],
+        ["중요도", service?.importanceCode ?? "-"],
+        ["상태", service?.statusCode ?? "-"],
+      ],
+    },
+    {
+      title: "배포 정보",
+      rows: [
+        ["배포 상태", service?.deploymentStatusCode ?? "-"],
+        ["엔드포인트 URL", service?.endpointUrl ?? "-"],
+        ["배포 경로", service?.deployPath ?? "-"],
+        ["포트", service?.portInfo ?? "-"],
+        ["인스턴스 수", service?.instanceCount ? `${service.instanceCount}개` : "-"],
+      ],
+    },
+    {
+      title: "영향도 정보",
+      rows: [
+        ["연관 서비스 수", `${relationCount}개`],
+        ["직접 영향", "EAM 통합 인증, SSO 통합 인증"],
+        ["간접 영향", "결제/주문/알림 연계 서비스"],
+      ],
+    },
+    {
+      title: "담당자 정보",
+      rows: [
+        ["등록자", service?.createdBy ?? "-"],
+        ["수정자", service?.updatedBy ?? "-"],
+        ["등록일", service?.createdAt ?? "-"],
+        ["수정일", service?.updatedAt ?? "-"],
+      ],
+    },
   ];
 
   return (
@@ -550,7 +626,7 @@ function ServiceDetailModal({
       onMouseDown={onClose}
     >
       <div
-        className={`flex max-h-[86vh] w-full max-w-[840px] flex-col overflow-hidden rounded-lg border shadow-2xl ${
+        className={`flex max-h-[86vh] w-full max-w-[1040px] flex-col overflow-hidden rounded-lg border shadow-2xl ${
           dark ? "border-[#1f3549] bg-[#081b2d] text-slate-100" : "border-slate-200 bg-white text-slate-950"
         }`}
         onMouseDown={(event) => event.stopPropagation()}
@@ -579,12 +655,19 @@ function ServiceDetailModal({
               {service?.statusCode ?? "UNKNOWN"}
             </span>
           </div>
-          <div className="mt-5 grid gap-3 md:grid-cols-2">
-            {rows.map(([label, value]) => (
-              <div className={`rounded-lg border p-3 ${dark ? "border-[#1f3549] bg-[#0b2135]" : "border-slate-200 bg-slate-50"}`} key={label}>
-                <div className={`text-xs font-black ${dark ? "text-slate-400" : "text-slate-500"}`}>{label}</div>
-                <div className="mt-1 break-words text-sm">{value}</div>
-              </div>
+          <div className="mt-5 grid gap-4 lg:grid-cols-2">
+            {sections.map((section) => (
+              <section className={`rounded-lg border p-4 ${dark ? "border-[#1f3549] bg-[#0b2135]" : "border-slate-200 bg-slate-50"}`} key={section.title}>
+                <h4 className="mb-3 text-sm font-black">{section.title}</h4>
+                <div className="grid gap-3">
+                  {section.rows.map(([label, value]) => (
+                    <div className="grid grid-cols-[112px_minmax(0,1fr)] gap-3 text-sm" key={label}>
+                      <div className={`font-black ${dark ? "text-slate-400" : "text-slate-500"}`}>{label}</div>
+                      <div className="min-w-0 break-words">{value}</div>
+                    </div>
+                  ))}
+                </div>
+              </section>
             ))}
           </div>
         </div>
@@ -720,7 +803,7 @@ function IncidentCommandDashboard({
         <DarkMetric icon={<Globe2 size={23} />} label="영향 채널" value="3" delta="1" tone="purple" />
       </div>
 
-      <div className="mt-3 grid min-h-0 min-w-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(280px,320px)] gap-3">
+      <div className="mt-3 grid min-h-[500px] min-w-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(280px,320px)] gap-3">
         <section className="min-h-0 overflow-hidden rounded-lg border border-[#1f3549] bg-[#081b2d]">
           <div className="flex h-10 items-center justify-between border-b border-[#1f3549] px-4">
             <div className="text-base font-black text-white">서비스 영향도 맵</div>
@@ -737,7 +820,7 @@ function IncidentCommandDashboard({
               </button>
             </div>
           </div>
-          <div className="h-[calc(100%-40px)] min-h-[250px] overflow-hidden">
+          <div className="h-[calc(100%-40px)] min-h-[420px] overflow-hidden">
             <ServiceRelationFlow
               embedded
               embeddedHeightClassName="h-full"
@@ -768,7 +851,7 @@ function IncidentCommandDashboard({
         <IncidentSelectedPanel incident={incident} rootService={rootService} impactedCount={impactedCount} />
       </div>
 
-      <div className="mt-3 grid min-h-[190px] min-w-0 grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-3">
+      <div className="mt-3 grid min-h-[240px] min-w-0 grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-3">
         <DarkPanel title="장애 타임라인">
           {timelineEvents.map(([time, text], index) => (
             <div key={`${time}-${text}`} className="flex gap-3 py-2 text-sm leading-5">
@@ -967,7 +1050,7 @@ function DarkMetric({
 
 function DarkPanel({ children, title }: { children: ReactNode; title: string }) {
   return (
-    <section className="min-h-[190px] overflow-hidden rounded-lg border border-[#1f3549] bg-[#081b2d] p-4">
+    <section className="min-h-[240px] overflow-hidden rounded-lg border border-[#1f3549] bg-[#081b2d] p-4">
       <h3 className="mb-3 text-base font-black text-white">{title}</h3>
       {children}
     </section>
@@ -978,7 +1061,7 @@ function BottomPanels() {
   const navigate = useNavigate();
 
   return (
-    <div className="mt-3 grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)_minmax(0,1.25fr)_minmax(0,2.15fr)] gap-2">
+    <div className="mt-3 grid min-h-[220px] min-w-0 flex-[0.7] grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)_minmax(0,1.25fr)_minmax(0,2.15fr)] items-stretch gap-2">
       <Panel title="관리 필요 서비스">
         {managementRows.map(([label, value, type]) => (
           <TinyRow
@@ -1046,7 +1129,7 @@ function Panel({
   title: string;
 }) {
   return (
-    <section className="min-h-[164px] min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+    <section className="h-full min-h-[220px] min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
       <div className="mb-2 flex min-w-0 items-center justify-between gap-3">
         <h3 className="truncate text-sm font-black leading-5 text-slate-950">{title}</h3>
         {actionLabel && onAction ? (

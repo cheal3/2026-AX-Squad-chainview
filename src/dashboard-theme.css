@@ -2,6 +2,174 @@
   grid-template-columns: auto minmax(0, 1fr);
 }
 
+.app__content {
+  min-width: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app__content > .main {
+  flex: 1;
+}
+
+.app-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 80;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.96);
+  padding: 0 28px;
+  backdrop-filter: blur(12px);
+}
+
+.app-topbar__spacer {
+  flex: 1;
+}
+
+.app-topbar__actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.app-topbar__icon-button {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+}
+
+.app-topbar__icon-button:hover {
+  border-color: var(--line);
+  background: #f8fafc;
+}
+
+.app-topbar__notification {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  min-width: 16px;
+  height: 16px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--crit);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.app-topbar__account {
+  position: relative;
+}
+
+.app-topbar__account-button {
+  min-width: 168px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  padding: 4px 8px;
+}
+
+.app-topbar__account-button:hover {
+  border-color: var(--line);
+  background: #f8fafc;
+}
+
+.app-topbar__avatar {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--brand);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.app-topbar__account-text {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+  text-align: left;
+}
+
+.app-topbar__account-text strong {
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.app-topbar__account-text small {
+  max-width: 104px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-topbar__menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 190px;
+  display: grid;
+  gap: 2px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 8px;
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.14);
+}
+
+.app-topbar__menu strong {
+  padding: 7px 8px 9px;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.app-topbar__menu button {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  padding: 0 8px;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.app-topbar__menu button:hover {
+  background: #f8fafc;
+}
+
+.app-topbar__menu button.is-logout {
+  color: #dc2626;
+}
+
 .lnb {
   width: 240px;
   max-height: 100vh;
@@ -80,7 +248,6 @@
 }
 
 .lnb.is-collapsed .lnb__brand-text,
-.lnb.is-collapsed .lnb__account,
 .lnb.is-collapsed .lnb__title,
 .lnb.is-collapsed .lnb__item-text {
   display: none;
@@ -134,6 +301,49 @@
 .app.is-dark .chain-dashboard-main {
   background: #061625;
   color: #e5edf7;
+}
+
+.app.is-dark .app-topbar {
+  border-color: #1f3549;
+  background: rgba(6, 22, 37, 0.96);
+}
+
+.app.is-dark .app-topbar__icon-button,
+.app.is-dark .app-topbar__account-button {
+  color: #e5edf7;
+}
+
+.app.is-dark .app-topbar__icon-button:hover,
+.app.is-dark .app-topbar__account-button:hover {
+  border-color: #1f3549;
+  background: #081b2d;
+}
+
+.app.is-dark .app-topbar__avatar {
+  background: #126cf0;
+}
+
+.app.is-dark .app-topbar__account-text small {
+  color: #8ba3bd;
+}
+
+.app.is-dark .app-topbar__menu {
+  border-color: #1f3549;
+  background: #081b2d;
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.36);
+}
+
+.app.is-dark .app-topbar__menu strong,
+.app.is-dark .app-topbar__menu button {
+  color: #e5edf7;
+}
+
+.app.is-dark .app-topbar__menu button:hover {
+  background: #0b2135;
+}
+
+.app.is-dark .app-topbar__menu button.is-logout {
+  color: #fca5a5;
 }
 
 .lnb.is-dark {
@@ -240,8 +450,16 @@
   display: block;
   min-width: 0;
   overflow: auto;
-  padding: 28px 34px 32px;
+  padding: 18px 34px 32px;
   background: var(--bg);
+}
+
+.chain-dashboard-main > .crumb + .page-head {
+  margin-top: 10px;
+}
+
+.chain-dashboard-main .page-head + .chain-dashboard-scope {
+  margin-top: 10px;
 }
 
 .chain-dashboard-scope {
@@ -255,9 +473,28 @@
 }
 
 .chain-dashboard-scope > div {
-  min-height: calc(100vh - 36px);
+  min-height: calc(100vh - 116px);
   background: var(--bg) !important;
   color: var(--text) !important;
+}
+
+.topology-page-main {
+  gap: 18px;
+}
+
+.topology-page-panel {
+  min-height: 680px;
+  height: calc(100vh - 190px);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+
+.app.is-dark .topology-page-panel {
+  border-color: #1f3549;
+  background: #081b2d;
 }
 
 .app.is-dark .chain-dashboard-scope {
@@ -503,7 +740,7 @@
 
 .incident-detail__tabs {
   display: flex;
-  gap: 24px;
+  gap: 18px;
   border-bottom: 1px solid #1f3549;
   margin: 18px 0;
   color: #9fb1c5;
@@ -692,6 +929,51 @@
   color: #9fb1c5;
 }
 
+.incident-detail__deploy-list {
+  display: grid;
+  gap: 8px;
+}
+
+.incident-detail__deploy-row {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) 64px 78px;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #1f3549;
+  border-radius: 8px;
+  background: #0b2135;
+  padding: 10px;
+  color: #dbe7f4;
+  font-size: 13px;
+}
+
+.incident-detail__deploy-row time {
+  color: #91a7bd;
+  font-weight: 800;
+}
+
+.incident-detail__deploy-row strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.incident-detail__deploy-row span {
+  color: #9fb1c5;
+}
+
+.incident-detail__deploy-row em {
+  border-radius: 999px;
+  background: #112b43;
+  color: #e8f1fa;
+  padding: 3px 7px;
+  text-align: center;
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 900;
+}
+
 .incident-detail__owner {
   display: grid;
   grid-template-columns: 40px minmax(0, 1fr) auto;
@@ -870,6 +1152,58 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 16px;
+}
+
+.service-detail__impact-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+.service-detail__impact-card {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #f8fafc;
+  padding: 16px;
+}
+
+.service-detail__impact-card h3 {
+  margin: 10px 0 12px;
+  color: var(--text);
+  font-size: 16px;
+}
+
+.service-detail__impact-card dl {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 8px 12px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.service-detail__impact-card dt {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.service-detail__impact-card dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.service-detail__impact-level {
+  display: inline-flex;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #3730a3;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.service-detail__impact-level.is-direct {
+  background: #fef2f2;
+  color: #991b1b;
 }
 
 .service-detail__panel {
@@ -1647,4 +1981,136 @@
   text-align: center;
   font-size: 12px;
   font-weight: 800;
+}
+
+.topology-proto--embedded {
+  height: calc(100vh - 190px);
+  min-height: 680px;
+  grid-template-columns: minmax(0, 1fr) 330px;
+  border: 1px solid #1f3549;
+  border-radius: 8px;
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.22);
+}
+
+.topology-proto--dark {
+  --topology-bg: #061625;
+  --topology-panel: #081b2d;
+  --topology-line: #1f3549;
+  --topology-muted: #8ba3bd;
+  --topology-text: #e5edf7;
+  --topology-brand: #126cf0;
+  background: #061625;
+  color: #e5edf7;
+}
+
+.topology-proto--dark .topology-proto__canvas-wrap {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(30, 64, 105, 0.34) 0%, rgba(6, 22, 37, 0) 55%),
+    #061625;
+}
+
+.topology-proto--dark .topology-proto__canvas-top h1,
+.topology-proto--dark .topology-proto__canvas-bottom,
+.topology-proto--dark .topology-proto__hint {
+  border-color: #1f3549;
+  background: rgba(8, 27, 45, 0.94);
+  color: #e5edf7;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.26);
+}
+
+.topology-proto--dark .topology-proto__canvas-top h1 span,
+.topology-proto--dark .topology-proto__canvas-bottom button,
+.topology-proto--dark .topology-proto__canvas-bottom span,
+.topology-proto--dark .topology-proto__hint {
+  color: #8ba3bd;
+}
+
+.topology-proto--dark .topology-proto__hint kbd {
+  border-color: #35506b;
+  background: #0b2135;
+  color: #e5edf7;
+}
+
+.topology-proto--dark .topology-proto__svg-muted {
+  fill: #8ba3bd;
+}
+
+.topology-proto--dark .topology-proto__svg-title {
+  fill: #f8fafc;
+}
+
+.topology-proto--dark .topology-proto__edge {
+  stroke: #64748b;
+}
+
+.topology-proto--dark .topology-proto__edge.is-strong {
+  stroke: #94a3b8;
+}
+
+.topology-proto--dark .topology-proto__edge.is-crit {
+  stroke: #ff6673;
+}
+
+.topology-proto--dark .topology-proto__edge.is-warn {
+  stroke: #fbbf24;
+}
+
+.topology-proto--dark .topology-proto__node rect {
+  fill: #0b2135;
+  stroke: #34d399;
+}
+
+.topology-proto--dark .topology-proto__node circle {
+  fill: #34d399;
+}
+
+.topology-proto--dark .topology-proto__node.is-crit rect {
+  fill: #2a1420;
+  stroke: #ff6673;
+}
+
+.topology-proto--dark .topology-proto__node.is-crit circle {
+  fill: #ff6673;
+}
+
+.topology-proto--dark .topology-proto__node.is-warn rect {
+  fill: #2b2414;
+  stroke: #fbbf24;
+}
+
+.topology-proto--dark .topology-proto__node.is-warn circle {
+  fill: #fbbf24;
+}
+
+.topology-proto--dark .topology-proto__node-label {
+  fill: #f8fafc;
+}
+
+.topology-proto--dark .topology-proto__node-code {
+  fill: #9fb1c6;
+}
+
+.topology-proto--dark .topology-proto__node.is-crit .topology-proto__node-label,
+.topology-proto--dark .topology-proto__node.is-crit .topology-proto__node-code,
+.topology-proto--dark .topology-proto__elapsed {
+  fill: #fecdd3;
+}
+
+.topology-proto--dark .topology-proto__info {
+  border-color: #1f3549;
+  background: #081b2d;
+}
+
+.topology-proto--dark .topology-proto__info-head h3 {
+  color: #f8fafc;
+}
+
+.topology-proto--dark .topology-proto__info-head p {
+  color: #8ba3bd;
+}
+
+.topology-proto--dark .topology-proto__info-section p {
+  border-color: #1f3549;
+  background: #0b2135;
+  color: #dbe7f4;
 }

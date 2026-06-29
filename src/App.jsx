@@ -1,6 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
-import { Eye, Mail, MessageCircle, Pencil, Phone, Plus, Trash2 } from "lucide-react";
+import {
+  Bell,
+  ChevronDown,
+  Eye,
+  LogOut,
+  Mail,
+  MessageCircle,
+  Pencil,
+  Phone,
+  Plus,
+  Settings,
+  Trash2,
+  UserRound,
+} from "lucide-react";
 import { initAdminInteractions } from "./adminInteractions.js";
 import { pages } from "./pagesData.js";
 import { PortalDataProvider, usePortalData } from "./dashboardModule/PortalDataStore";
@@ -306,23 +319,313 @@ function RoutePage({ activeMenuOverride, slug }) {
 
   if (page.menu === "incidents") {
     return (
-      <div className="app">
-        <Sidebar activeMenu={activeMenu} />
+      <AppShell activeMenu={activeMenu}>
         <main className="main is-incident-list">
           <IncidentAdminPage />
         </main>
-      </div>
+      </AppShell>
+    );
+  }
+
+  if (["services", "servers", "relations", "techstacks", "owners"].includes(page.menu)) {
+    return (
+      <AppShell activeMenu={activeMenu}>
+        <main className="main">
+          <DynamicAdminListPage activeMenu={activeMenu} menu={page.menu} />
+        </main>
+      </AppShell>
     );
   }
 
   return (
-    <div className="app">
-      <Sidebar activeMenu={activeMenu} />
+    <AppShell activeMenu={activeMenu}>
       <main className={`main${page.menu === "incidents" ? " is-incident-list" : ""}`}>
         <LegacyPage onIncidentOpen={handleIncidentOpen} page={page} />
       </main>
+    </AppShell>
+  );
+}
+
+function DynamicAdminListPage({ activeMenu, menu }) {
+  const navigate = useNavigate();
+  const portalData = usePortalData();
+  const [ownerModal, setOwnerModal] = useState(null);
+  const [selectedOwner, setSelectedOwner] = useState(null);
+  const serviceById = useMemo(
+    () => new Map(portalData.services.map((service) => [service.serviceId, service])),
+    [portalData.services]
+  );
+  const serverById = useMemo(
+    () => new Map(portalData.servers.map((server) => [server.serverId, server])),
+    [portalData.servers]
+  );
+  const meta = getMenuMeta(activeMenu || menu);
+
+  const configs = {
+    services: {
+      actionLabel: "＋ 서비스 등록",
+      columns: ["serviceId", "서비스", "분류", "유형", "중요도", "상태", "엔드포인트", "서버"],
+      rows: portalData.services.map((service) => ({
+        key: service.serviceId,
+        onClick: () => navigate(`/admin-services/${service.serviceCode}`),
+        cells: [
+          <code>{service.serviceId}</code>,
+          <><code>{service.serviceCode}</code> {service.serviceName}</>,
+          service.categoryPath?.join(" > ") || "미분류",
+          codeLabels.serviceType[service.serviceTypeCode] || service.serviceTypeCode,
+          codeLabels.importance[service.importanceCode] || service.importanceCode || "-",
+          codeLabels.serviceStatus[service.statusCode] || service.statusCode,
+          service.endpointUrl || "-",
+          serverById.get(service.serverId)?.serverName || "-",
+        ],
+      })),
+    },
+    servers: {
+      actionLabel: "＋ 서버 등록",
+      columns: ["serverId", "서버명", "호스트", "IP", "환경", "OS", "상태", "설명"],
+      rows: portalData.servers.map((server) => ({
+        key: server.serverId,
+        cells: [
+          <code>{server.serverId}</code>,
+          <b>{server.serverName}</b>,
+          server.hostName,
+          server.ipAddress,
+          codeLabels.envType[server.envCode] || server.envCode,
+          `${codeLabels.osType[server.osTypeCode] || server.osTypeCode} ${server.osVersion}`,
+          codeLabels.serverStatus[server.statusCode] || server.statusCode,
+          server.description || "-",
+        ],
+      })),
+    },
+    relations: {
+      actionLabel: "＋ 관계 등록",
+      columns: ["relationId", "송신 서비스", "수신 서비스", "유형", "필수", "상태", "설명"],
+      rows: portalData.relations.map((relation) => ({
+        key: relation.relationId,
+        cells: [
+          <code>{relation.relationId}</code>,
+          formatServiceCell(serviceById.get(relation.sourceServiceId)),
+          formatServiceCell(serviceById.get(relation.targetServiceId)),
+          codeLabels.relationType[relation.relationTypeCode] || relation.relationTypeCode,
+          relation.mandatoryYn,
+          codeLabels.relationStatus[relation.relationStatusCode] || relation.relationStatusCode,
+          relation.description || "-",
+        ],
+      })),
+    },
+    techstacks: {
+      actionLabel: "＋ 기술스택 등록",
+      columns: ["techStackId", "서비스", "유형", "기술명", "버전", "벤더"],
+      rows: portalData.techStacks.map((stack) => ({
+        key: stack.techStackId,
+        cells: [
+          <code>{stack.techStackId}</code>,
+          formatServiceCell(serviceById.get(stack.serviceId)),
+          stack.techTypeName,
+          <b>{stack.techName}</b>,
+          stack.versionText,
+          stack.vendorName,
+        ],
+      })),
+    },
+    owners: {
+      actionLabel: "＋ 담당자 지정",
+      columns: ["serviceOwnerId", "서비스", "담당 유형", "담당자/그룹", "책임"],
+      rows: portalData.owners.map((owner) => ({
+        key: owner.serviceOwnerId,
+        owner,
+        cells: [
+          <code>{owner.serviceOwnerId}</code>,
+          formatServiceCell(serviceById.get(owner.serviceId)),
+          codeLabels.ownerType[owner.ownerTypeCode] || owner.ownerTypeCode,
+          <b>{owner.ownerName}</b>,
+          codeLabels.responsibilityType[owner.responsibilityCode] || owner.responsibilityCode,
+        ],
+      })),
+    },
+  };
+  const config = configs[menu];
+  const closeOwnerModal = () => {
+    setOwnerModal(null);
+    setSelectedOwner(null);
+  };
+  const openOwnerModal = (modal, owner) => {
+    setSelectedOwner(owner);
+    setOwnerModal(modal);
+  };
+
+  return (
+    <>
+      <div className="page-header-stack">
+        <div className="crumb crumb--standardized">
+          <span>{meta.section}</span><span className="sep">/</span><span>{meta.label}</span>
+        </div>
+        <div className="page-head page-head--standardized">
+          <div>
+            <h1 className="page-head__title"><span className="page-head__icon" aria-hidden="true">{meta.icon}</span><span>{meta.label}</span></h1>
+          </div>
+          <div className="page-head__right">
+            <button className="btn">📥 CSV 내보내기</button>
+            <button
+              className="btn btn--primary"
+              onClick={menu === "owners" ? () => setOwnerModal("create") : undefined}
+              type="button"
+            >
+              {config.actionLabel}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="toolbar">
+        <div className="search">🔍<input type="text" placeholder={`${meta.label} 검색...`} /></div>
+        <div className="right"><button className="btn btn--ghost btn--sm">초기화</button></div>
+      </div>
+
+      <div className="card">
+        <table className="tbl">
+          <thead>
+            <tr>
+              <th className="col-check"><input type="checkbox" className="chk" /></th>
+              {config.columns.map((column) => <th key={column}>{column}</th>)}
+              <th className="col-actions">관리</th>
+            </tr>
+          </thead>
+          <tbody>
+            {config.rows.map((row) => (
+              <tr className={row.onClick ? "is-clickable-incident" : undefined} key={row.key} onClick={row.onClick}>
+                <td className="col-check"><input className="chk" onClick={(event) => event.stopPropagation()} type="checkbox" /></td>
+                {row.cells.map((cell, index) => <td key={index}>{cell}</td>)}
+                <td className="col-actions">
+                  <div className="row-actions">
+                    <button
+                      className="ibtn"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        if (menu === "owners") {
+                          openOwnerModal("edit", row.owner);
+                        }
+                      }}
+                      type="button"
+                    >
+                      ✏️
+                    </button>
+                    <button
+                      className="ibtn ibtn--danger"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        if (menu === "owners") {
+                          openOwnerModal("delete", row.owner);
+                        }
+                      }}
+                      type="button"
+                    >
+                      🗑
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <div className="pager">
+          <div className="pager__info">전체 {config.rows.length}건 · 1-{config.rows.length} / 1 페이지</div>
+          <div className="pager__nav"><button disabled>‹</button><button className="is-on">1</button><button disabled>›</button></div>
+        </div>
+      </div>
+      {menu === "owners" ? (
+        <OwnerManagementModals
+          modal={ownerModal}
+          onClose={closeOwnerModal}
+          owner={selectedOwner}
+          services={portalData.services}
+        />
+      ) : null}
+    </>
+  );
+}
+
+function OwnerManagementModals({ modal, onClose, owner, services }) {
+  if (!modal) {
+    return null;
+  }
+
+  const service = owner ? services.find((item) => item.serviceId === owner.serviceId) : services[0];
+  const serviceLabel = service ? `${service.serviceCode} ${service.serviceName}` : "서비스 선택";
+  const ownerId = owner?.serviceOwnerId ? `OWN-${String(owner.serviceOwnerId).padStart(4, "0")}` : "신규";
+
+  if (modal === "delete") {
+    return (
+      <div className="modal-backdrop is-open" onClick={onClose}>
+        <div className="modal confirm" onClick={(event) => event.stopPropagation()}>
+          <div className="modal__head"><h3>🗑 담당자 해제</h3><button className="close" onClick={onClose} type="button">×</button></div>
+          <div className="modal__body">
+            <div className="confirm__icon">⚠</div>
+            <div className="confirm__msg"><b>{ownerId} ({serviceLabel} / {owner?.ownerName ?? "담당자"})</b>을 해제하시겠습니까?</div>
+            <div className="confirm__note">해제 즉시 알림 수신 대상에서 제외됩니다.<br />일반적으로 종료일을 지정하여 이력 보존을 권장합니다.</div>
+          </div>
+          <div className="modal__foot"><button className="btn" onClick={onClose} type="button">취소</button><button className="btn btn--danger" onClick={onClose} type="button">해제</button></div>
+        </div>
+      </div>
+    );
+  }
+
+  const isEdit = modal === "edit";
+
+  return (
+    <div className="modal-backdrop is-open" onClick={onClose}>
+      <div className="modal" onClick={(event) => event.stopPropagation()}>
+        <div className="modal__head">
+          <h3>{isEdit ? `✏️ 담당자 수정 — ${ownerId}` : "＋ 담당자 지정"}</h3>
+          <button className="close" onClick={onClose} type="button">×</button>
+        </div>
+        <div className="modal__body">
+          <div className="form-row">
+            <label>서비스 (serviceCode)<span className="req">*</span></label>
+            {isEdit ? (
+              <input type="text" value={serviceLabel} disabled />
+            ) : (
+              <select defaultValue="">
+                <option value="">선택</option>
+                {services.slice(0, 12).map((item) => (
+                  <option key={item.serviceId}>{item.serviceCode} {item.serviceName}</option>
+                ))}
+              </select>
+            )}
+          </div>
+          <div className="form-row">
+            <label>담당자/그룹<span className="req">*</span></label>
+            <input type="text" defaultValue={owner?.ownerName ?? ""} placeholder="예: 대외계 담당그룹" disabled={isEdit} />
+          </div>
+          <div className="form-row">
+            <label>담당 유형</label>
+            <select defaultValue={owner?.ownerTypeCode ?? "GROUP"}>
+              <option value="GROUP">그룹</option>
+              <option value="USER">사용자</option>
+            </select>
+          </div>
+          <div className="form-row">
+            <label>책임</label>
+            <select defaultValue={owner?.responsibilityCode ?? "MAIN"}>
+              <option value="MAIN">주담당</option>
+              <option value="SUB">부담당</option>
+              <option value="ALERT">알림수신</option>
+            </select>
+          </div>
+          <div className="form-row"><label>시작일</label><input type="date" defaultValue="2024-01-02" /></div>
+          <div className="form-row"><label>종료일</label><input type="date" /></div>
+        </div>
+        <div className="modal__foot"><button className="btn" onClick={onClose} type="button">취소</button><button className="btn btn--primary" onClick={onClose} type="button">{isEdit ? "저장" : "등록"}</button></div>
+      </div>
     </div>
   );
+}
+
+function formatServiceCell(service) {
+  if (!service) {
+    return "-";
+  }
+  return <><code>{service.serviceCode}</code> {service.serviceName}</>;
 }
 
 const sidebarSections = [
@@ -366,6 +669,71 @@ const sidebarSections = [
   },
 ];
 
+function AppShell({ activeMenu = "", children, isDark = false }) {
+  return (
+    <div className={`app${isDark ? " is-dark" : ""}`}>
+      <Sidebar activeMenu={activeMenu} isDark={isDark} />
+      <div className="app__content">
+        <TopBar isDark={isDark} />
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function TopBar({ isDark = false }) {
+  const { incidents } = usePortalData();
+  const [isAccountOpen, setIsAccountOpen] = useState(false);
+  const openIncidentCount = incidents.filter(
+    (incident) => incident.incidentStatusCode !== "RESOLVED"
+  ).length;
+  const handleAccountEdit = () => {
+    window.alert("계정정보 수정 기능은 다음 단계에서 연결 예정입니다.");
+    setIsAccountOpen(false);
+  };
+  const handleLogout = () => {
+    window.alert("로그아웃 기능은 다음 단계에서 연결 예정입니다.");
+    setIsAccountOpen(false);
+  };
+
+  return (
+    <header className={`app-topbar${isDark ? " is-dark" : ""}`}>
+      <div className="app-topbar__spacer" />
+      <div className="app-topbar__actions">
+        <button className="app-topbar__icon-button" aria-label="알림" type="button">
+          <Bell size={18} />
+          {openIncidentCount > 0 ? (
+            <span className="app-topbar__notification">{openIncidentCount}</span>
+          ) : null}
+        </button>
+        <div className="app-topbar__account">
+          <button
+            aria-expanded={isAccountOpen}
+            className="app-topbar__account-button"
+            onClick={() => setIsAccountOpen((current) => !current)}
+            type="button"
+          >
+            <span className="app-topbar__avatar" aria-hidden="true">김</span>
+            <span className="app-topbar__account-text">
+              <strong>김OO</strong>
+              <small>모니터링팀 · ADMIN</small>
+            </span>
+            <ChevronDown size={16} />
+          </button>
+          {isAccountOpen ? (
+            <div className="app-topbar__menu">
+              <strong>내 계정</strong>
+              <button onClick={handleAccountEdit} type="button"><Settings size={15} />프로필 설정</button>
+              <button onClick={handleAccountEdit} type="button"><UserRound size={15} />환경 설정</button>
+              <button className="is-logout" onClick={handleLogout} type="button"><LogOut size={15} />로그아웃</button>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </header>
+  );
+}
+
 function Sidebar({ activeMenu = "", isDark = false }) {
   const { incidents } = usePortalData();
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -388,13 +756,6 @@ function Sidebar({ activeMenu = "", isDark = false }) {
       })),
     [openIncidentCount]
   );
-  const handleAccountEdit = () => {
-    window.alert("계정정보 수정 기능은 다음 단계에서 연결 예정입니다.");
-  };
-  const handleLogout = () => {
-    window.alert("로그아웃 기능은 다음 단계에서 연결 예정입니다.");
-  };
-
   return (
     <aside className={`lnb${isCollapsed ? " is-collapsed" : ""}${isDark ? " is-dark" : ""}`}>
       <div className="lnb__brand">
@@ -409,18 +770,6 @@ function Sidebar({ activeMenu = "", isDark = false }) {
         </button>
         <div className="lnb__brand-text">
           <Link to="/dashboard"><h2>ChainView</h2></Link>
-        </div>
-      </div>
-      <div className="lnb__account">
-        <div className="lnb__account-avatar" aria-hidden="true">김</div>
-        <div className="lnb__account-body">
-          <strong>김OO</strong>
-          <span>모니터링팀 · ADMIN</span>
-          <small>kimoo@chainview.kr</small>
-        </div>
-        <div className="lnb__account-actions">
-          <button className="lnb__account-button" onClick={handleAccountEdit} type="button">정보 수정</button>
-          <button className="lnb__account-button is-logout" onClick={handleLogout} type="button">로그아웃</button>
         </div>
       </div>
       {sectionItems.map((section) => (
@@ -614,10 +963,11 @@ const serviceDetailTabs = [
   { key: "overview", label: "개요" },
   { key: "incidents", label: "인시던트 이력" },
   { key: "deployments", label: "배포/서버" },
+  { key: "impact", label: "영향도" },
+  { key: "owners", label: "담당자" },
   { key: "relations", label: "서비스 관계" },
   { key: "techstack", label: "기술스택" },
   { key: "changes", label: "변경 이력" },
-  { key: "more", label: "+" },
 ];
 
 const serviceDetailSamples = {
@@ -657,9 +1007,15 @@ const serviceDetailSamples = {
       { type: "등록", actor: "이영희", at: "2026-01-15 10:00", field: "서비스", before: "-", after: "신규 등록" },
     ],
     relationRows: [
-      { direction: "송신", service: "사용자 인증 서비스", type: "API 호출", status: "정상", required: "Y", description: "사용자 토큰 검증" },
-      { direction: "송신", service: "PG 게이트웨이", type: "API 호출", status: "활성", required: "Y", description: "결제 승인 요청" },
-      { direction: "수신", service: "주문 관리 서비스", type: "API 호출", status: "정상", required: "Y", description: "결제 정보 조회" },
+      { direction: "송신", service: "EAM 통합 인증", type: "AUTH_CALL", status: "주의", required: "Y", impact: "직접", description: "공통 API Gateway 인증 실패 시 로그인/권한 검증 영향" },
+      { direction: "송신", service: "SSO 통합 인증", type: "AUTH_CALL", status: "주의", required: "Y", impact: "직접", description: "SSO 토큰 검증 장애 시 대외 API 전체 인증 영향" },
+      { direction: "송신", service: "PG 게이트웨이", type: "API 호출", status: "활성", required: "Y", impact: "직접", description: "결제 승인 요청" },
+      { direction: "수신", service: "주문 관리 서비스", type: "API 호출", status: "정상", required: "Y", impact: "간접", description: "결제 정보 조회" },
+    ],
+    impactRows: [
+      { level: "직접", service: "EAM 통합 인증", scenario: "API Gateway 인증 실패", radius: "공통 인증 경로", action: "인증 우회/캐시 토큰 정책 확인" },
+      { level: "직접", service: "SSO 통합 인증", scenario: "토큰 검증 지연", radius: "로그인 연계 서비스", action: "SSO 헬스체크 및 세션 재시도 확인" },
+      { level: "1-hop", service: "PG 게이트웨이", scenario: "승인 요청 timeout", radius: "결제 승인", action: "PG failover 및 큐 적체 확인" },
     ],
     incidentRows: [
       { title: "결제 서버 응답 지연", severity: "HIGH", status: "RESOLVED", direct: "직접", startedAt: "2026-05-10 14:30", endedAt: "2026-05-10 15:45" },
@@ -828,10 +1184,11 @@ function ServiceDetailPage({ service }) {
       {activeTab === "overview" ? <ServiceOverviewTab detail={detail} onOpenDeployments={() => setTab("deployments")} service={service} /> : null}
       {activeTab === "techstack" ? <ServiceTechStackTab detail={detail} onDelete={handleTechDelete} onEdit={handleTechEdit} /> : null}
       {activeTab === "deployments" ? <ServiceDeploymentTab detail={detail} onOpenDetail={handleServerDetail} /> : null}
+      {activeTab === "impact" ? <ServiceImpactTab detail={detail} /> : null}
+      {activeTab === "owners" ? <ServiceOwnersTab detail={detail} /> : null}
       {activeTab === "relations" ? <ServiceRelationTab detail={detail} /> : null}
       {activeTab === "changes" ? <ServiceChangeTab detail={detail} /> : null}
       {activeTab === "incidents" ? <ServiceIncidentTab detail={detail} onOpenDetail={handleIncidentDetail} /> : null}
-      {activeTab === "more" ? <ServiceOverviewTab detail={detail} onOpenDeployments={() => setTab("deployments")} service={service} /> : null}
     </div>
   );
 }
@@ -918,6 +1275,62 @@ function ServiceOverviewTab({ detail, onOpenDeployments, service }) {
         </div>
       </article>
     </div>
+  );
+}
+
+function ServiceImpactTab({ detail }) {
+  return (
+    <section className="service-detail__panel">
+      <div className="service-detail__section-head">
+        <div>
+          <h2>영향도</h2>
+          <p>관계 등록 시 함께 관리할 직접/간접 영향 정보</p>
+        </div>
+      </div>
+      <div className="service-detail__impact-grid">
+        {detail.impactRows.map((row) => (
+          <article className="service-detail__impact-card" key={row.service + row.scenario}>
+            <span className={`service-detail__impact-level ${row.level === "직접" ? "is-direct" : ""}`}>{row.level}</span>
+            <h3>{row.service}</h3>
+            <dl>
+              <dt>영향 조건</dt><dd>{row.scenario}</dd>
+              <dt>영향 범위</dt><dd>{row.radius}</dd>
+              <dt>확인 조치</dt><dd>{row.action}</dd>
+            </dl>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ServiceOwnersTab({ detail }) {
+  return (
+    <section className="service-detail__panel">
+      <div className="service-detail__section-head">
+        <div>
+          <h2>담당자 정보</h2>
+          <p>주담당/부담당/운영 담당을 분리해 확인</p>
+        </div>
+      </div>
+      <div className="service-detail__owner-list">
+        {detail.owners.map((owner) => (
+          <div className="service-detail__owner-row" key={owner.name + owner.role}>
+            <div className="service-detail__owner-avatar">{owner.name.slice(0, 1)}</div>
+            <div className="service-detail__owner-meta">
+              <strong>{owner.name}</strong>
+              <span>{owner.role}</span>
+              <small>{owner.meta}</small>
+            </div>
+            <div className="service-detail__owner-actions">
+              <button type="button"><MessageCircle size={14} /></button>
+              <button type="button"><Phone size={14} /></button>
+              <button type="button"><Mail size={14} /></button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -1033,6 +1446,7 @@ function ServiceRelationTab({ detail }) {
             <th>관계 유형</th>
             <th>관계 상태</th>
             <th>필수 여부</th>
+            <th>영향도</th>
             <th>설명</th>
             <th className="col-actions">액션</th>
           </tr>
@@ -1045,6 +1459,7 @@ function ServiceRelationTab({ detail }) {
               <td><span className="tag">{row.type}</span></td>
               <td><span className="pill pill--ok">{row.status}</span></td>
               <td>{row.required}</td>
+              <td><span className={row.impact === "직접" ? "pill pill--crit" : "tag"}>{row.impact}</span></td>
               <td>{row.description}</td>
               <td className="col-actions"><div className="row-actions"><button className="ibtn" type="button">✏️</button><button className="ibtn ibtn--danger" type="button">🗑</button></div></td>
             </tr>
@@ -1192,56 +1607,76 @@ function DashboardPage() {
 }
 
 function TopologyPage() {
+  const location = useLocation();
+  const { incidents, services } = usePortalData();
+  const searchParams = new URLSearchParams(location.search);
+  const incidentId = Number(searchParams.get("incidentId")) || undefined;
+  const incident =
+    incidents.find((item) => item.incidentId === incidentId) ??
+    incidents.find((item) => item.incidentStatusCode !== "RESOLVED");
+  const initialServiceId =
+    Number(searchParams.get("serviceId")) ||
+    incident?.serviceId ||
+    services[0]?.serviceId;
+
   return (
-    <div className="topology-proto">
-      <aside className="topology-proto__side">
-        <h2>🗺 관계 그래프 <Link to="/dashboard">← 대시보드</Link></h2>
-        <div className="topology-proto__search">🔍 <input placeholder="서비스 검색..." type="text" /></div>
-
-        <TopologyFilter title="보기 모드" rows={["🎯 집중 모드 (선택 ± 2hop)", "🌐 전체 그래프", "🚨 장애 영향만 보기"]} />
-        <TopologyFilter title="인시던트 상태 (SEVERITY)" rows={["🔴 CRITICAL 2", "🟠 HIGH 3", "🟡 MEDIUM 2", "🟢 LOW 8", "⚪ NOTICE 12"]} />
-        <TopologyFilter title="서비스 상태 (STATUS)" rows={["운영중 40", "테스트 2", "개발 1", "중지 3"]} />
-        <TopologyFilter title="관계 유형 (RELATION_TYPE)" rows={["API 호출", "DB 접근", "메시지 구독", "파일 참조", "isRequired=true 만"]} />
-        <TopologyFilter title="대분류 (categoryL1)" rows={["핵심 서비스 28", "부가 서비스 14", "인프라 서비스 8"]} />
-
-        <div className="topology-proto__group">
-          <div className="topology-proto__group-title">진행중 장애로 점프</div>
-          {["카드승인연계 EXT-001", "카드취소연계 EXT-004"].map((item, index) => (
-            <button className={`topology-proto__focus${index === 0 ? " is-on" : ""}`} key={item} type="button">
-              <span />{item}
-            </button>
-          ))}
+    <AppShell activeMenu="relations" isDark={Boolean(incident)}>
+      <main className="main chain-dashboard-main topology-page-main">
+        <div className="page-header-stack">
+          <div className="crumb crumb--standardized">
+            <Link to="/dashboard">모니터링</Link><span className="sep">/</span><span>서비스 관계도</span>
+          </div>
+          <div className="page-head page-head--standardized">
+            <div>
+              <h1 className="page-head__title"><span className="page-head__icon" aria-hidden="true">🗺️</span><span>{incident ? "장애 영향도 그래프" : "서비스 관계도"}</span></h1>
+            </div>
+          </div>
         </div>
+        {incident ? (
+          <IncidentTopologyPrototype incident={incident} service={services.find((item) => item.serviceId === initialServiceId) ?? services[0]} />
+        ) : (
+          <div className="topology-page-panel">
+            <ServiceRelationFlow
+              autoCenter
+              embedded
+              embeddedHeightClassName="h-full"
+              frameless
+              initialFitView
+              initialRelationDepth={1}
+              initialServiceId={initialServiceId}
+              showAllServices
+            />
+          </div>
+        )}
+      </main>
+    </AppShell>
+  );
+}
 
-        <div className="topology-proto__legend">
-          <b>범례</b>
-          <span><i className="is-crit" />장애</span>
-          <span><i className="is-warn" />지연</span>
-          <span><i className="is-ok" />정상</span>
-          <span><i className="is-idle" />중지/테스트</span>
-        </div>
-      </aside>
+function IncidentTopologyPrototype({ incident, service }) {
+  const serviceName = service?.serviceName ?? "카드승인연계";
+  const serviceCode = service?.serviceCode ?? incident.targetCode ?? "EXT-001";
+  const category = service?.categoryPath?.join(" / ") ?? "대외계 / 결제 / 승인";
+  const elapsedLabel = incident.startedAt ? formatIncidentElapsed(incident.startedAt) : "14:32 경과";
 
+  return (
+    <div className="topology-proto topology-proto--embedded topology-proto--dark">
       <main className="topology-proto__canvas-wrap">
         <div className="topology-proto__canvas-top">
-          <h1>🎯 카드승인연계 <span>· EXT-001 · 대외계</span></h1>
-          <div className="topology-proto__toggle">
-            <Link to="/dashboard">▦ 카드</Link>
-            <button className="is-on" type="button">🗺 토폴로지</button>
-          </div>
+          <h1>🎯 {serviceName} <span>· {serviceCode} · {category}</span></h1>
         </div>
 
         <div className="topology-proto__canvas">
           <svg viewBox="0 0 1200 720" preserveAspectRatio="xMidYMid meet">
             <defs>
-              <marker id="topology-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                <path d="M0 0 L10 5 L0 10 z" fill="#cbd5e1" />
+              <marker id="topology-arr-dark" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M0 0 L10 5 L0 10 z" fill="#64748b" />
               </marker>
-              <marker id="topology-arr-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                <path d="M0 0 L10 5 L0 10 z" fill="#ef4444" />
+              <marker id="topology-arr-red-dark" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M0 0 L10 5 L0 10 z" fill="#ff6673" />
               </marker>
-              <marker id="topology-arr-warn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                <path d="M0 0 L10 5 L0 10 z" fill="#f59e0b" />
+              <marker id="topology-arr-warn-dark" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M0 0 L10 5 L0 10 z" fill="#fbbf24" />
               </marker>
             </defs>
 
@@ -1251,18 +1686,18 @@ function TopologyPage() {
             <text x="830" y="42" className="topology-proto__svg-muted">↗ 직접 발신</text>
             <text x="1060" y="42" className="topology-proto__svg-muted">↗ 2-hop 하위</text>
 
-            <path className="topology-proto__edge" d="M180 200 L320 270 M180 370 L320 270 M180 370 L320 430 M180 540 L320 430" markerEnd="url(#topology-arr)" />
-            <path className="topology-proto__edge is-strong" d="M430 285 L560 355 M430 445 L560 385" markerEnd="url(#topology-arr)" />
-            <path className="topology-proto__edge is-crit" d="M690 355 L820 200 M690 370 L820 330 M930 200 L1060 160 M930 200 L1060 240" markerEnd="url(#topology-arr-red)" />
-            <path className="topology-proto__edge is-warn" d="M930 330 L1060 330" markerEnd="url(#topology-arr-warn)" />
-            <path className="topology-proto__edge is-strong" d="M690 385 L820 460 M690 400 L820 590 M930 460 L1060 460 M930 590 L1060 590" markerEnd="url(#topology-arr)" />
+            <path className="topology-proto__edge" d="M180 200 L320 270 M180 370 L320 270 M180 370 L320 430 M180 540 L320 430" markerEnd="url(#topology-arr-dark)" />
+            <path className="topology-proto__edge is-strong" d="M430 285 L560 355 M430 445 L560 385" markerEnd="url(#topology-arr-dark)" />
+            <path className="topology-proto__edge is-crit" d="M690 355 L820 200 M690 370 L820 330 M930 200 L1060 160 M930 200 L1060 240" markerEnd="url(#topology-arr-red-dark)" />
+            <path className="topology-proto__edge is-warn" d="M930 330 L1060 330" markerEnd="url(#topology-arr-warn-dark)" />
+            <path className="topology-proto__edge is-strong" d="M690 385 L820 460 M690 400 L820 590 M930 460 L1060 460 M930 590 L1060 590" markerEnd="url(#topology-arr-dark)" />
 
             <TopologyNode x={80} y={180} label="고객앱" tone="ok" small />
             <TopologyNode x={80} y={350} label="PC 브라우저" tone="ok" small />
             <TopologyNode x={80} y={520} label="제휴몰" tone="ok" small />
             <TopologyNode x={320} y={252} code="PORTAL-M01" label="모바일포탈" tone="ok" />
             <TopologyNode x={320} y={412} code="PORTAL-W01" label="웹포탈" tone="ok" />
-            <TopologyNode x={560} y={335} code="EXT-001 · 대외계" label="카드승인연계" tone="crit" focus />
+            <TopologyNode x={560} y={335} code={`${serviceCode} · ${category.split(" / ")[0] ?? "대외계"}`} label={serviceName} tone="crit" focus elapsed={elapsedLabel} />
             <TopologyNode x={820} y={180} code="EXT-004" label="카드취소연계" tone="crit" />
             <TopologyNode x={820} y={310} code="EXT-007" label="카드정산연계" tone="crit" />
             <TopologyNode x={820} y={440} code="PAY-HIST" label="결제이력 (DB)" tone="ok" />
@@ -1277,14 +1712,13 @@ function TopologyPage() {
 
         <div className="topology-proto__canvas-bottom">
           <button type="button">＋</button><span>100%</span><button type="button">－</button>
-          <button type="button">⤢</button><button type="button">↻</button><button type="button">📸</button>
+          <button type="button">⤢</button><button type="button">↻</button><button type="button">▦</button>
         </div>
 
         <div className="topology-proto__hint">
           <span><kbd>드래그</kbd> 화면 이동</span>
           <span><kbd>휠</kbd> 줌</span>
           <span><kbd>클릭</kbd> 노드 포커스</span>
-          <span><kbd>더블클릭</kbd> 상세 페이지</span>
         </div>
       </main>
 
@@ -1292,17 +1726,16 @@ function TopologyPage() {
         <div className="topology-proto__info-head">
           <span />
           <div>
-            <h3>카드승인연계</h3>
-            <p>EXT-001 · 대외계 / 결제 / 승인 · SERVICE_TYPE: API</p>
-            <b>INC-2026-0312 · CRITICAL · 14:32 경과</b>
+            <h3>{serviceName}</h3>
+            <p>{serviceCode} · {category} · SERVICE_TYPE: {service?.serviceTypeCode ?? "API"}</p>
+            <b>{incident.externalIncidentCode ?? `INC-${incident.incidentId}`} · {incident.severityCode} · {elapsedLabel}</b>
           </div>
         </div>
-        <TopologyInfo title="인시던트 title">외부 카드사 응답 timeout 다발. 인스턴스 1/3 down · affectedServices: 2</TopologyInfo>
+        <TopologyInfo title="인시던트 title">{incident.title || "외부 카드사 응답 timeout 다발"} · affectedServices: 2</TopologyInfo>
         <TopologyInfo title="영향 분석">1-hop 영향 2개, 2-hop 전파 3개, 최종 영향 사용자: 카드 결제 시도 고객 전체</TopologyInfo>
-        <TopologyInfo title="SERVICE 명세">importance 높음 · status 운영중 · 담당 그룹 대외계팀 · 인스턴스 3대</TopologyInfo>
+        <TopologyInfo title="SERVICE 명세">importance {service?.importanceCode ?? "높음"} · status {service?.statusCode ?? "운영중"} · 인스턴스 {service?.instanceCount ?? 3}대</TopologyInfo>
         <TopologyInfo title="↘ 수신">모바일포탈 (API 호출), 웹포탈 (API 호출)</TopologyInfo>
         <TopologyInfo title="↗ 발신">카드취소연계, 카드정산연계, 결제이력, 알림서비스</TopologyInfo>
-        <Link className="topology-proto__primary" to="/dashboard-proto-detail">서비스 상세 →</Link>
       </aside>
     </div>
   );
@@ -1319,7 +1752,7 @@ function TopologyFilter({ rows, title }) {
   );
 }
 
-function TopologyNode({ code = "", focus = false, label, small = false, tone, x, y }) {
+function TopologyNode({ code = "", elapsed = "14:32 경과", focus = false, label, small = false, tone, x, y }) {
   const width = focus ? 130 : small ? 100 : 110;
   const height = focus ? 70 : small ? 36 : 42;
   return (
@@ -1332,7 +1765,7 @@ function TopologyNode({ code = "", focus = false, label, small = false, tone, x,
         <>
           <rect className="topology-proto__node-badge" x={x + 12} y={y + 51} width="58" height="14" rx="7" />
           <text x={x + 41} y={y + 61} className="topology-proto__badge-label" textAnchor="middle">CRITICAL</text>
-          <text x={x + 75} y={y + 61} className="topology-proto__elapsed">14:32 경과</text>
+          <text x={x + 75} y={y + 61} className="topology-proto__elapsed">{elapsed}</text>
         </>
       ) : null}
     </g>
@@ -1355,8 +1788,7 @@ function DashboardFrame() {
   const activeIncidentId = Number(new URLSearchParams(location.search).get("incidentId")) || undefined;
 
   return (
-    <div className={`app${isIncidentMode ? " is-dark" : ""}`}>
-      <Sidebar activeMenu="dashboard" isDark={isIncidentMode} />
+    <AppShell activeMenu="dashboard" isDark={isIncidentMode}>
       <main className="main chain-dashboard-main">
         {!isIncidentMode ? (
           <>
@@ -1375,7 +1807,7 @@ function DashboardFrame() {
           <IncidentDemoDashboard activeIncidentId={activeIncidentId} />
         </div>
       </main>
-    </div>
+    </AppShell>
   );
 }
 
@@ -1428,6 +1860,11 @@ function IncidentDetailPage() {
         ["14:11", "연쇄 영향 감지: 카드취소연계, 카드정산연계 상태 변화", "System"],
         ["14:12", "담당자 ACK 수신", "System"],
       ];
+  const recentDeploymentRows = [
+    { date: "2026-06-23", title: "결제 API 지연 반영", owner: "김OO", status: "운영 반영" },
+    { date: "2026-06-22", title: "장애 대비 캐시 정책 긴급 반영", owner: "박OO", status: "운영 반영" },
+    { date: "2026-06-20", title: "Gateway timeout 설정 변경", owner: "이OO", status: "검토 필요" },
+  ];
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 1000);
@@ -1435,8 +1872,7 @@ function IncidentDetailPage() {
   }, []);
 
   return (
-    <div className="app is-dark">
-      <Sidebar activeMenu="dashboard" isDark />
+    <AppShell activeMenu="dashboard" isDark>
       <main className="main chain-dashboard-main incident-detail-page">
         <div className="incident-detail__crumb">
           <Link to="/dashboard">📊 실시간 대시보드</Link>
@@ -1468,7 +1904,7 @@ function IncidentDetailPage() {
         </section>
 
         <nav className="incident-detail__tabs">
-          {["개요", "인시던트 이력", "배포/서버", "서비스 관계", "기술스택", "변경 이력"].map((tab, index) => (
+          {["개요", "감지/알림 이력", "영향도", "최근 배포", "담당자"].map((tab, index) => (
             <span className={index === 0 ? "is-active" : ""} key={tab}>{tab}</span>
           ))}
         </nav>
@@ -1500,7 +1936,7 @@ function IncidentDetailPage() {
             <article className="incident-detail__card">
               <div className="incident-detail__card-head">
                 <h2>영향 범위 (BLAST RADIUS)</h2>
-                <Link to="/topology">전체 토폴로지 보기 →</Link>
+                <Link to={`/topology?incidentId=${incident.incidentId}&serviceId=${service?.serviceId ?? ""}`}>전체 토폴로지 보기 →</Link>
               </div>
               <div className="incident-detail__blast">
                 <ServiceRelationFlow
@@ -1515,6 +1951,23 @@ function IncidentDetailPage() {
                   initialRelationDepth={2}
                   initialServiceId={service?.serviceId}
                 />
+              </div>
+            </article>
+
+            <article className="incident-detail__card">
+              <div className="incident-detail__card-head">
+                <h2>최근 배포 이력</h2>
+                <span>장애 발생 전후 변경사항</span>
+              </div>
+              <div className="incident-detail__deploy-list">
+                {recentDeploymentRows.map((row) => (
+                  <div className="incident-detail__deploy-row" key={row.date + row.title}>
+                    <time>{row.date}</time>
+                    <strong>{row.title}</strong>
+                    <span>{row.owner}</span>
+                    <em>{row.status}</em>
+                  </div>
+                ))}
               </div>
             </article>
           </section>
@@ -1559,7 +2012,7 @@ function IncidentDetailPage() {
           </aside>
         </div>
       </main>
-    </div>
+    </AppShell>
   );
 }
 
@@ -1584,7 +2037,7 @@ function AppRoutes() {
       <Route path="/dashboard-proto" element={<Navigate to="/dashboard" replace />} />
       <Route path="/dashboard-proto-detail" element={<IncidentDetailPage />} />
       <Route path="/dashboard-proto-topology" element={<Navigate to="/topology" replace />} />
-      <Route path="/admin-services/:serviceCode" element={<div className="app"><Sidebar activeMenu="services" /><main className="main"><ServiceAdminPage /></main></div>} />
+      <Route path="/admin-services/:serviceCode" element={<AppShell activeMenu="services"><main className="main"><ServiceAdminPage /></main></AppShell>} />
       <Route path="/admin-permissions" element={<RoutePage activeMenuOverride="permissions" slug="admin-users" />} />
       <Route path="/admin-owner-management" element={<RoutePage activeMenuOverride="owner-management" slug="admin-owners" />} />
       {adminPages.map((slug) => (

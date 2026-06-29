@@ -972,6 +972,7 @@ button {
   display: none;
   align-items: center;
   justify-content: center;
+  padding: 36px clamp(32px, 4vw, 72px);
 }
 
 .modal.is-open {
@@ -987,9 +988,9 @@ button {
 
 .modal__container {
   position: relative;
-  width: 100%;
-  max-width: 700px;
-  max-height: 90vh;
+  width: clamp(760px, 58vw, 1040px);
+  max-width: calc(100vw - 96px);
+  max-height: min(86vh, 900px);
   background: var(--color-white);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-xl);
@@ -1002,6 +1003,7 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-shrink: 0;
   padding: var(--spacing-5) var(--spacing-6);
   border-bottom: 1px solid var(--color-gray-200);
 }
@@ -1024,6 +1026,7 @@ button {
 }
 
 .modal__body {
+  min-height: 0;
   flex: 1;
   overflow-y: auto;
   padding: var(--spacing-6);
@@ -1032,6 +1035,7 @@ button {
 .modal__footer {
   display: flex;
   justify-content: flex-end;
+  flex-shrink: 0;
   gap: var(--spacing-3);
   padding: var(--spacing-4) var(--spacing-6);
   border-top: 1px solid var(--color-gray-200);
@@ -1370,8 +1374,9 @@ button {
   }
 
   .modal__container {
-    max-width: 95%;
-    max-height: 95vh;
+    width: 100%;
+    max-width: 100%;
+    max-height: calc(100vh - 40px);
   }
 }
 

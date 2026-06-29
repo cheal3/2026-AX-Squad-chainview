@@ -7,13 +7,9 @@ import {
   type ReactNode,
 } from "react";
 import { chainViewApi } from "./chainViewApi";
+import * as generatedMockData from "./mockData.generated";
 import {
   codeLabels,
-  serviceOwners as initialServiceOwners,
-  serviceRelations as initialServiceRelations,
-  services as initialServices,
-  servers as initialServers,
-  techStacks as initialTechStacks,
   type DeploymentStatusCode,
   type EnvCode,
   type IncidentImpactRecord,
@@ -145,7 +141,7 @@ type PortalDataContextValue = {
 
 const PortalDataContext = createContext<PortalDataContextValue | null>(null);
 const remoteApiEnabledFlag = import.meta.env.VITE_CHAINVIEW_REMOTE_API_ENABLED;
-const remoteOrigin = import.meta.env.VITE_CHAINVIEW_REMOTE_ORIGIN ?? "https://chainview.kro.kr";
+const remoteOrigin = import.meta.env.VITE_CHAINVIEW_REMOTE_ORIGIN ?? "http://chainview.kro.kr:8080";
 const isMixedContentRuntime =
   typeof window !== "undefined" &&
   window.location.protocol === "https:" &&
@@ -153,7 +149,7 @@ const isMixedContentRuntime =
 const REMOTE_API_ENABLED =
   remoteApiEnabledFlag === "true" || remoteApiEnabledFlag === "1";
 
-const normalizedInitialServices = initialServices.map((service) => ({
+const normalizedInitialServices = generatedMockData.services.map((service) => ({
   ...service,
   statusCode: "NORMAL" as ServiceStatusCode,
   deploymentStatusCode:
@@ -163,15 +159,13 @@ const normalizedInitialServices = initialServices.map((service) => ({
 }));
 
 export function PortalDataProvider({ children }: { children: ReactNode }) {
-  const [servers, setServers] = useState(initialServers);
+  const [servers, setServers] = useState(generatedMockData.servers);
   const [services, setServices] = useState(normalizedInitialServices);
-  const [relations, setRelations] = useState(initialServiceRelations);
-  const [techStacks, setTechStacks] = useState(initialTechStacks);
-  const [owners, setOwners] = useState(initialServiceOwners);
+  const [relations, setRelations] = useState(generatedMockData.serviceRelations);
+  const [techStacks, setTechStacks] = useState(generatedMockData.techStacks);
+  const [owners, setOwners] = useState(generatedMockData.serviceOwners);
   const [incidents, setIncidents] = useState<IncidentRecord[]>([]);
-  const [incidentImpacts, setIncidentImpacts] = useState<IncidentImpactRecord[]>(
-    []
-  );
+  const [incidentImpacts, setIncidentImpacts] = useState<IncidentImpactRecord[]>([]);
   const [incidentEvents, setIncidentEvents] = useState<IncidentEventRecord[]>(
     []
   );
