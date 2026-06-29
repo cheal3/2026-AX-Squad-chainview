@@ -943,11 +943,12 @@ function IncidentSelectedPanel({
   const categoryLabel =
     rootService?.categoryPath.join(" > ") ||
     (incident.targetCode ? `관리 화면 대상 · ${incident.targetCode}` : "-");
-  const [isDetailOpen, setIsDetailOpen] = useState(false);
   const navigate = useNavigate();
+  const serviceDetailPath = rootService?.serviceCode
+    ? `/admin-services/${rootService.serviceCode}?tab=overview`
+    : "/admin-services";
 
   return (
-    <>
       <aside className="overflow-hidden rounded-lg border border-[#1f3549] bg-[#081b2d] p-3">
         <div className="flex items-center justify-between border-b border-[#1f3549] pb-2">
           <h2 className="text-sm font-black text-white">선택된 인시던트</h2>
@@ -976,7 +977,7 @@ function IncidentSelectedPanel({
           <button
             className="h-8 rounded bg-[#126cf0] text-xs font-black text-white"
             type="button"
-            onClick={() => setIsDetailOpen(true)}
+            onClick={() => navigate(serviceDetailPath)}
           >
             서비스 상세 <ExternalLink className="inline" size={12} />
           </button>
@@ -989,16 +990,6 @@ function IncidentSelectedPanel({
           </button>
         </div>
       </aside>
-
-      {isDetailOpen ? (
-        <ServiceDetailModal
-          dark
-          relationCount={impactedCount}
-          service={rootService}
-          onClose={() => setIsDetailOpen(false)}
-        />
-      ) : null}
-    </>
   );
 }
 

@@ -1911,7 +1911,7 @@ function IncidentDetailPage() {
 
         <div className="incident-detail__layout">
           <section className="incident-detail__left">
-            <article className="incident-detail__card incident-detail__card--danger">
+            <article className="incident-detail__card incident-detail__card--danger incident-detail__card--summary">
               <div className="incident-detail__card-head">
                 <h2>🚨 진행 중 인시던트</h2>
                 <span>id: {incident.externalIncidentCode ?? `#${incident.incidentId}`} · severity: {incident.severityCode} · occurredAt: {incident.startedAt}</span>
@@ -1921,7 +1921,7 @@ function IncidentDetailPage() {
                 <p>{incident.title} · incidentType: 서비스 장애 · affectedServices: {Math.max(impactedServices.length, 2)}</p>
               </div>
               <h3>감지 및 알림 이력</h3>
-              <div className="incident-detail__timeline">
+              <div className="incident-detail__timeline incident-detail__scroll-area">
                 {timelineRows.map(([time, message, actor], index) => (
                   <div className="incident-detail__timeline-row" key={`${time}-${message}`}>
                     <span>{time}</span>
@@ -1933,7 +1933,7 @@ function IncidentDetailPage() {
               </div>
             </article>
 
-            <article className="incident-detail__card">
+            <article className="incident-detail__card incident-detail__card--graph">
               <div className="incident-detail__card-head">
                 <h2>영향 범위 (BLAST RADIUS)</h2>
                 <Link to={`/topology?incidentId=${incident.incidentId}&serviceId=${service?.serviceId ?? ""}`}>전체 토폴로지 보기 →</Link>
@@ -1954,12 +1954,12 @@ function IncidentDetailPage() {
               </div>
             </article>
 
-            <article className="incident-detail__card">
+            <article className="incident-detail__card incident-detail__card--compact">
               <div className="incident-detail__card-head">
                 <h2>최근 배포 이력</h2>
                 <span>장애 발생 전후 변경사항</span>
               </div>
-              <div className="incident-detail__deploy-list">
+              <div className="incident-detail__deploy-list incident-detail__scroll-area">
                 {recentDeploymentRows.map((row) => (
                   <div className="incident-detail__deploy-row" key={row.date + row.title}>
                     <time>{row.date}</time>
@@ -1973,7 +1973,7 @@ function IncidentDetailPage() {
           </section>
 
           <aside className="incident-detail__right">
-            <article className="incident-detail__card">
+            <article className="incident-detail__card incident-detail__card--summary">
               <h2>📦 기본 정보 (SERVICE)</h2>
               <dl className="incident-detail__dl">
                 <dt>serviceCode</dt><dd><code>{service?.serviceCode ?? incident.targetCode}</code></dd>
@@ -1987,9 +1987,9 @@ function IncidentDetailPage() {
               </dl>
             </article>
 
-            <article className="incident-detail__card">
+            <article className="incident-detail__card incident-detail__card--graph">
               <h2>🔗 서비스 관계 (SERVICE_RELATION)</h2>
-              <div className="incident-detail__relation-list">
+              <div className="incident-detail__relation-list incident-detail__scroll-area">
                 {relatedRelations.map((relation) => (
                   <div className={relation.relationStatusCode === "ACTIVE" ? "" : "is-danger"} key={relation.relationId}>
                     <span>{relationServiceName(relation.sourceServiceId)} → {relationServiceName(relation.targetServiceId)}</span>
@@ -1999,7 +1999,7 @@ function IncidentDetailPage() {
               </div>
             </article>
 
-            <article className="incident-detail__card">
+            <article className="incident-detail__card incident-detail__card--compact">
               <h2>👥 담당자 (SERVICE_OWNER)</h2>
               {["김OO · 주담당자", "박OO · 부담당자", "이OO · 운영자"].map((owner) => (
                 <div className="incident-detail__owner" key={owner}>

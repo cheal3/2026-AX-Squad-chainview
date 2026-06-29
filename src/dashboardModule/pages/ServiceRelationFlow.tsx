@@ -645,7 +645,6 @@ export function ServiceRelationFlow({
   const openServiceDetail = (serviceId: number) => {
     setDetailServiceId(serviceId);
     setDetailOpen(true);
-    onSelectService?.(serviceId);
   };
 
   const moveToFocusedService = (serviceId: number) => {
