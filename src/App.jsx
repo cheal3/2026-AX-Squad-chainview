@@ -351,6 +351,7 @@ function DynamicAdminListPage({ activeMenu, menu }) {
   const portalData = usePortalData();
   const [ownerModal, setOwnerModal] = useState(null);
   const [selectedOwner, setSelectedOwner] = useState(null);
+  const [adminModal, setAdminModal] = useState(null);
   const serviceById = useMemo(
     () => new Map(portalData.services.map((service) => [service.serviceId, service])),
     [portalData.services]
@@ -453,9 +454,15 @@ function DynamicAdminListPage({ activeMenu, menu }) {
     setOwnerModal(null);
     setSelectedOwner(null);
   };
+  const closeAdminModal = () => {
+    setAdminModal(null);
+  };
   const openOwnerModal = (modal, owner) => {
     setSelectedOwner(owner);
     setOwnerModal(modal);
+  };
+  const openAdminModal = (mode, row) => {
+    setAdminModal({ mode, menu, record: row?.record ?? null });
   };
   const handleEditRow = (row) => {
     if (menu === "owners") {
@@ -463,42 +470,7 @@ function DynamicAdminListPage({ activeMenu, menu }) {
       return;
     }
 
-    if (menu === "services") {
-      const service = row.record;
-      const serviceName = window.prompt("서비스명을 수정하세요.", service.serviceName);
-      if (serviceName === null) return;
-      const cleaned = serviceName.trim();
-      if (!cleaned) return;
-      portalData.updateService(service.serviceId, { serviceName: cleaned });
-      return;
-    }
-
-    if (menu === "servers") {
-      const server = row.record;
-      const serverName = window.prompt("서버명을 수정하세요.", server.serverName);
-      if (serverName === null) return;
-      const cleaned = serverName.trim();
-      if (!cleaned) return;
-      portalData.updateServer(server.serverId, { serverName: cleaned });
-      return;
-    }
-
-    if (menu === "relations") {
-      const relation = row.record;
-      const description = window.prompt("관계 설명을 수정하세요.", relation.description);
-      if (description === null) return;
-      portalData.updateRelation(relation.relationId, { description: description.trim() });
-      return;
-    }
-
-    if (menu === "techstacks") {
-      const techStack = row.record;
-      const techName = window.prompt("기술명을 수정하세요.", techStack.techName);
-      if (techName === null) return;
-      const cleaned = techName.trim();
-      if (!cleaned) return;
-      portalData.updateTechStack(techStack.techStackId, { techName: cleaned });
-    }
+    openAdminModal("edit", row);
   };
   const handleDeleteRow = (row) => {
     if (menu === "owners") {
@@ -506,33 +478,7 @@ function DynamicAdminListPage({ activeMenu, menu }) {
       return;
     }
 
-    if (menu === "services") {
-      const service = row.record;
-      if (!window.confirm(`${service.serviceName} 서비스를 삭제할까요? 연결된 관계/담당자/기술스택도 함께 제거됩니다.`)) return;
-      portalData.deleteService(service.serviceId);
-      return;
-    }
-
-    if (menu === "servers") {
-      const server = row.record;
-      if (!window.confirm(`${server.serverName} 서버를 삭제할까요?`)) return;
-      const result = portalData.deleteServer(server.serverId);
-      window.alert(result.message);
-      return;
-    }
-
-    if (menu === "relations") {
-      const relation = row.record;
-      if (!window.confirm(`REL-${String(relation.relationId).padStart(4, "0")} 관계를 삭제할까요?`)) return;
-      portalData.removeRelation(relation.relationId);
-      return;
-    }
-
-    if (menu === "techstacks") {
-      const techStack = row.record;
-      if (!window.confirm(`${techStack.techName} 기술스택을 삭제할까요?`)) return;
-      portalData.deleteTechStack(techStack.techStackId);
-    }
+    openAdminModal("delete", row);
   };
 
   return (
@@ -549,7 +495,7 @@ function DynamicAdminListPage({ activeMenu, menu }) {
             <button className="btn">📥 CSV 내보내기</button>
             <button
               className="btn btn--primary"
-              onClick={menu === "owners" ? () => setOwnerModal("create") : undefined}
+              onClick={menu === "owners" ? () => setOwnerModal("create") : () => openAdminModal("create")}
               type="button"
             >
               {config.actionLabel}
@@ -620,8 +566,392 @@ function DynamicAdminListPage({ activeMenu, menu }) {
           services={portalData.services}
         />
       ) : null}
+      {adminModal ? (
+        <AdminRecordModal
+          modal={adminModal}
+          onClose={closeAdminModal}
+          portalData={portalData}
+          serverById={serverById}
+          serviceById={serviceById}
+        />
+      ) : null}
     </>
   );
+}
+
+function AdminRecordModal({ modal, onClose, portalData, serverById, serviceById }) {
+  const { mode, menu, record } = modal;
+  const isEdit = mode === "edit";
+  const isCreate = mode === "create";
+  const isDelete = mode === "delete";
+  const [form, setForm] = useState(() => buildAdminFormState(menu, record, portalData));
+  const title = getAdminModalTitle(menu, mode, record);
+
+  useEffect(() => {
+    setForm(buildAdminFormState(menu, record, portalData));
+  }, [menu, mode, record, portalData]);
+
+  const updateField = (field, value) => {
+    setForm((current) => ({ ...current, [field]: value }));
+  };
+  const requireValue = (value, label) => {
+    const cleaned = String(value ?? "").trim();
+    if (!cleaned) {
+      window.alert(`${label} 값을 입력해주세요.`);
+      return null;
+    }
+    return cleaned;
+  };
+  const handleSubmit = () => {
+    if (isDelete) {
+      if (menu === "services") {
+        portalData.deleteService(record.serviceId);
+      } else if (menu === "servers") {
+        const result = portalData.deleteServer(record.serverId);
+        window.alert(result.message);
+        if (!result.ok) return;
+      } else if (menu === "relations") {
+        portalData.removeRelation(record.relationId);
+      } else if (menu === "techstacks") {
+        portalData.deleteTechStack(record.techStackId);
+      }
+      onClose();
+      return;
+    }
+
+    if (menu === "services") {
+      const serviceCode = requireValue(form.serviceCode, "serviceCode");
+      const serviceName = requireValue(form.serviceName, "서비스명");
+      if (!serviceCode || !serviceName) return;
+      const payload = {
+        serviceCode,
+        serviceName,
+        categoryPath: [form.categoryL1, form.categoryL2, form.categoryL3].map((item) => item.trim()).filter(Boolean),
+        serviceTypeCode: form.serviceTypeCode,
+        importanceCode: form.importanceCode,
+        statusCode: form.statusCode,
+        endpointUrl: form.endpointUrl.trim(),
+        serverId: Number(form.serverId) || portalData.servers[0]?.serverId || 1,
+        deployPath: form.deployPath.trim(),
+        portInfo: form.portInfo.trim(),
+        deploymentStatusCode: form.deploymentStatusCode,
+        instanceCount: Number(form.instanceCount) || 1,
+        description: form.description.trim(),
+      };
+      if (isCreate) {
+        portalData.addService(payload);
+      } else {
+        portalData.updateService(record.serviceId, payload);
+      }
+    } else if (menu === "servers") {
+      const serverName = requireValue(form.serverName, "serverName");
+      const hostName = requireValue(form.hostName, "hostname");
+      const ipAddress = requireValue(form.ipAddress, "IP 주소");
+      if (!serverName || !hostName || !ipAddress) return;
+      const payload = {
+        serverName,
+        hostName,
+        ipAddress,
+        envCode: form.envCode,
+        osTypeCode: form.osTypeCode,
+        osVersion: form.osVersion.trim(),
+        statusCode: form.statusCode,
+        description: form.description.trim(),
+      };
+      if (isCreate) {
+        portalData.addServer(payload);
+      } else {
+        portalData.updateServer(record.serverId, payload);
+      }
+    } else if (menu === "relations") {
+      const sourceServiceId = Number(form.sourceServiceId);
+      const targetServiceId = Number(form.targetServiceId);
+      if (!sourceServiceId || !targetServiceId) {
+        window.alert("source/target 서비스를 선택해주세요.");
+        return;
+      }
+      if (sourceServiceId === targetServiceId) {
+        window.alert("source와 target 서비스는 서로 달라야 합니다.");
+        return;
+      }
+      const payload = {
+        sourceServiceId,
+        targetServiceId,
+        relationTypeCode: form.relationTypeCode,
+        mandatoryYn: form.mandatoryYn,
+        relationStatusCode: form.relationStatusCode,
+        description: form.description.trim(),
+      };
+      if (isCreate) {
+        const result = portalData.addRelation(payload);
+        if (!result.ok) {
+          window.alert(result.message);
+          return;
+        }
+      } else {
+        portalData.updateRelation(record.relationId, payload);
+      }
+    } else if (menu === "techstacks") {
+      const techName = requireValue(form.techName, "기술명");
+      if (!techName) return;
+      const serviceId = Number(form.serviceId) || portalData.services[0]?.serviceId;
+      if (!serviceId) {
+        window.alert("서비스를 선택해주세요.");
+        return;
+      }
+      const payload = {
+        serviceId,
+        techTypeName: form.techTypeName.trim() || "서비스 기술",
+        techName,
+        versionText: form.versionText.trim() || "-",
+        vendorName: form.vendorName.trim() || "-",
+      };
+      if (isCreate) {
+        portalData.addTechStack(payload);
+      } else {
+        portalData.updateTechStack(record.techStackId, payload);
+      }
+    }
+
+    onClose();
+  };
+
+  if (isDelete) {
+    return (
+      <div className="modal-backdrop is-open" onClick={onClose}>
+        <div className="modal confirm" onClick={(event) => event.stopPropagation()}>
+          <div className="modal__head"><h3>{title}</h3><button className="close" onClick={onClose} type="button">×</button></div>
+          <div className="modal__body">
+            <div className="confirm__icon">⚠</div>
+            <div className="confirm__msg"><b>{getAdminRecordLabel(menu, record, serviceById, serverById)}</b> 항목을 삭제하시겠습니까?</div>
+            <div className="confirm__note">삭제 후 목록과 연결 데이터에 즉시 반영됩니다.</div>
+          </div>
+          <div className="modal__foot"><button className="btn" onClick={onClose} type="button">취소</button><button className="btn btn--danger" onClick={handleSubmit} type="button">삭제</button></div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="modal-backdrop is-open" onClick={onClose}>
+      <div className={menu === "techstacks" ? "modal" : "modal modal--lg"} onClick={(event) => event.stopPropagation()}>
+        <div className="modal__head">
+          <h3>{title}</h3>
+          <button className="close" onClick={onClose} type="button">×</button>
+        </div>
+        <div className="modal__body">
+          {menu === "services" ? (
+            <ServiceAdminForm form={form} onChange={updateField} servers={portalData.servers} isEdit={isEdit} />
+          ) : null}
+          {menu === "servers" ? (
+            <ServerAdminForm form={form} onChange={updateField} isEdit={isEdit} />
+          ) : null}
+          {menu === "relations" ? (
+            <RelationAdminForm form={form} onChange={updateField} services={portalData.services} serviceById={serviceById} isEdit={isEdit} />
+          ) : null}
+          {menu === "techstacks" ? (
+            <TechStackAdminForm form={form} onChange={updateField} services={portalData.services} isEdit={isEdit} />
+          ) : null}
+        </div>
+        <div className="modal__foot">
+          <button className="btn" onClick={onClose} type="button">취소</button>
+          <button className="btn btn--primary" onClick={handleSubmit} type="button">{isCreate ? "등록" : "저장"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ServiceAdminForm({ form, onChange, servers, isEdit }) {
+  return (
+    <div className="form-grid">
+      <div className="form-row">
+        <label>serviceCode<span className="req">*</span></label>
+        <input type="text" value={form.serviceCode} onChange={(event) => onChange("serviceCode", event.target.value)} disabled={isEdit} placeholder="예: PAY-API-001" />
+        <span className="help">{isEdit ? "PK · 수정 불가" : "고유 식별자. 등록 후 수정 불가"}</span>
+      </div>
+      <div className="form-row"><label>서비스명<span className="req">*</span></label><input type="text" value={form.serviceName} onChange={(event) => onChange("serviceName", event.target.value)} placeholder="예: 결제 API" /></div>
+      <div className="form-row"><label>대분류 (categoryL1)</label><input type="text" value={form.categoryL1} onChange={(event) => onChange("categoryL1", event.target.value)} placeholder="예: 대외계" /></div>
+      <div className="form-row"><label>중분류 (categoryL2)</label><input type="text" value={form.categoryL2} onChange={(event) => onChange("categoryL2", event.target.value)} placeholder="예: 결제" /></div>
+      <div className="form-row"><label>소분류 (categoryL3)</label><input type="text" value={form.categoryL3} onChange={(event) => onChange("categoryL3", event.target.value)} placeholder="예: 승인" /></div>
+      <div className="form-row"><label>서비스 유형 (SERVICE_TYPE)<span className="req">*</span></label><CodeSelect labels={codeLabels.serviceType} value={form.serviceTypeCode} onChange={(value) => onChange("serviceTypeCode", value)} /></div>
+      <div className="form-row"><label>중요도 (IMPORTANCE)<span className="req">*</span></label><CodeSelect labels={codeLabels.importance} value={form.importanceCode} onChange={(value) => onChange("importanceCode", value)} /></div>
+      <div className="form-row"><label>상태 (STATUS)<span className="req">*</span></label><CodeSelect labels={codeLabels.serviceStatus} value={form.statusCode} onChange={(value) => onChange("statusCode", value)} /></div>
+      <div className="form-row"><label>배포 서버</label><select value={form.serverId} onChange={(event) => onChange("serverId", event.target.value)}>{servers.map((server) => <option key={server.serverId} value={server.serverId}>{server.serverName}</option>)}</select></div>
+      <div className="form-row"><label>배포 상태</label><CodeSelect labels={codeLabels.deploymentStatus} value={form.deploymentStatusCode} onChange={(value) => onChange("deploymentStatusCode", value)} /></div>
+      <div className="form-row"><label>배포 경로</label><input type="text" value={form.deployPath} onChange={(event) => onChange("deployPath", event.target.value)} placeholder="/opt/app" /></div>
+      <div className="form-row"><label>포트</label><input type="text" value={form.portInfo} onChange={(event) => onChange("portInfo", event.target.value)} placeholder="8080,8443" /></div>
+      <div className="form-row"><label>인스턴스 수</label><input type="number" min="1" value={form.instanceCount} onChange={(event) => onChange("instanceCount", event.target.value)} /></div>
+      <div className="form-row full"><label>엔드포인트 URL</label><input type="text" value={form.endpointUrl} onChange={(event) => onChange("endpointUrl", event.target.value)} placeholder="https://..." /></div>
+      <div className="form-row full"><label>설명</label><textarea value={form.description} onChange={(event) => onChange("description", event.target.value)} placeholder="서비스 상세 설명" /></div>
+    </div>
+  );
+}
+
+function ServerAdminForm({ form, onChange, isEdit }) {
+  return (
+    <div className="form-grid">
+      <div className="form-row">
+        <label>serverName<span className="req">*</span></label>
+        <input type="text" value={form.serverName} onChange={(event) => onChange("serverName", event.target.value)} disabled={isEdit} placeholder="예: WAS-PRD-14" />
+        {isEdit ? <span className="help">PK · 수정 불가</span> : <span className="help">고유 · 명명규칙 준수</span>}
+      </div>
+      <div className="form-row"><label>hostname<span className="req">*</span></label><input type="text" value={form.hostName} onChange={(event) => onChange("hostName", event.target.value)} placeholder="예: was-prd-14.bank.local" /></div>
+      <div className="form-row"><label>IP 주소<span className="req">*</span></label><input type="text" value={form.ipAddress} onChange={(event) => onChange("ipAddress", event.target.value)} placeholder="예: 10.20.30.14" /></div>
+      <div className="form-row"><label>환경 (ENVIRONMENT)<span className="req">*</span></label><CodeSelect labels={codeLabels.envType} value={form.envCode} onChange={(value) => onChange("envCode", value)} /></div>
+      <div className="form-row"><label>OS 유형 (OS_TYPE)<span className="req">*</span></label><CodeSelect labels={codeLabels.osType} value={form.osTypeCode} onChange={(value) => onChange("osTypeCode", value)} /></div>
+      <div className="form-row"><label>OS 버전</label><input type="text" value={form.osVersion} onChange={(event) => onChange("osVersion", event.target.value)} placeholder="예: RHEL 8.9" /></div>
+      <div className="form-row"><label>상태</label><CodeSelect labels={codeLabels.serverStatus} value={form.statusCode} onChange={(value) => onChange("statusCode", value)} /></div>
+      <div className="form-row full"><label>설명</label><textarea value={form.description} onChange={(event) => onChange("description", event.target.value)} placeholder="서버 설명 또는 위치/IDC 정보" /></div>
+    </div>
+  );
+}
+
+function RelationAdminForm({ form, onChange, services, serviceById, isEdit }) {
+  return (
+    <div className="form-grid">
+      <div className="form-row">
+        <label>source 서비스<span className="req">*</span></label>
+        <select value={form.sourceServiceId} onChange={(event) => onChange("sourceServiceId", event.target.value)} disabled={isEdit}>
+          <option value="">선택</option>
+          {services.map((service) => <option key={service.serviceId} value={service.serviceId}>{service.serviceCode} {service.serviceName}</option>)}
+        </select>
+        <span className="help">호출하는 쪽</span>
+      </div>
+      <div className="form-row">
+        <label>target 서비스<span className="req">*</span></label>
+        <select value={form.targetServiceId} onChange={(event) => onChange("targetServiceId", event.target.value)} disabled={isEdit}>
+          <option value="">선택</option>
+          {services.map((service) => <option key={service.serviceId} value={service.serviceId}>{service.serviceCode} {service.serviceName}</option>)}
+        </select>
+        <span className="help">호출받는 쪽</span>
+      </div>
+      {isEdit ? <div className="form-row full"><label>연결</label><input type="text" value={`${serviceLabel(serviceById.get(Number(form.sourceServiceId)))} → ${serviceLabel(serviceById.get(Number(form.targetServiceId)))}`} disabled /></div> : null}
+      <div className="form-row"><label>관계 유형 (RELATION_TYPE)<span className="req">*</span></label><CodeSelect labels={codeLabels.relationType} value={form.relationTypeCode} onChange={(value) => onChange("relationTypeCode", value)} /></div>
+      <div className="form-row"><label>연결 상태</label><CodeSelect labels={codeLabels.relationStatus} value={form.relationStatusCode} onChange={(value) => onChange("relationStatusCode", value)} /></div>
+      <div className="form-row"><label>필수 여부 (isRequired)</label><select value={form.mandatoryYn} onChange={(event) => onChange("mandatoryYn", event.target.value)}><option value="Y">Y (필수)</option><option value="N">N (선택)</option></select></div>
+      <div className="form-row full"><label>설명</label><textarea value={form.description} onChange={(event) => onChange("description", event.target.value)} placeholder="이 관계가 어떤 비즈니스 흐름인지" /></div>
+    </div>
+  );
+}
+
+function TechStackAdminForm({ form, onChange, services, isEdit }) {
+  return (
+    <div className="form-grid">
+      <div className="form-row full">
+        <label>서비스<span className="req">*</span></label>
+        <select value={form.serviceId} onChange={(event) => onChange("serviceId", event.target.value)} disabled={isEdit}>
+          {services.map((service) => <option key={service.serviceId} value={service.serviceId}>{service.serviceCode} {service.serviceName}</option>)}
+        </select>
+      </div>
+      <div className="form-row"><label>유형 (TECH_TYPE)<span className="req">*</span></label><input type="text" value={form.techTypeName} onChange={(event) => onChange("techTypeName", event.target.value)} placeholder="예: FRAMEWORK" /></div>
+      <div className="form-row"><label>기술명<span className="req">*</span></label><input type="text" value={form.techName} onChange={(event) => onChange("techName", event.target.value)} placeholder="예: Spring Boot" /></div>
+      <div className="form-row"><label>기본버전</label><input type="text" value={form.versionText} onChange={(event) => onChange("versionText", event.target.value)} placeholder="예: 3.2.5" /></div>
+      <div className="form-row"><label>벤더</label><input type="text" value={form.vendorName} onChange={(event) => onChange("vendorName", event.target.value)} placeholder="예: VMware" /></div>
+    </div>
+  );
+}
+
+function CodeSelect({ labels, value, onChange }) {
+  return (
+    <select value={value} onChange={(event) => onChange(event.target.value)}>
+      {Object.entries(labels).map(([code, label]) => (
+        <option key={code} value={code}>{label} ({code})</option>
+      ))}
+    </select>
+  );
+}
+
+function buildAdminFormState(menu, record, portalData) {
+  if (menu === "services") {
+    const categoryPath = record?.categoryPath ?? [];
+    return {
+      serviceCode: record?.serviceCode ?? "",
+      serviceName: record?.serviceName ?? "",
+      categoryL1: categoryPath[0] ?? "",
+      categoryL2: categoryPath[1] ?? "",
+      categoryL3: categoryPath[2] ?? "",
+      serviceTypeCode: record?.serviceTypeCode ?? "API",
+      importanceCode: record?.importanceCode ?? "NORMAL",
+      statusCode: record?.statusCode ?? "NORMAL",
+      endpointUrl: record?.endpointUrl ?? "",
+      serverId: String(record?.serverId ?? portalData.servers[0]?.serverId ?? ""),
+      deployPath: record?.deployPath ?? "/opt/app",
+      portInfo: record?.portInfo ?? "8080",
+      deploymentStatusCode: record?.deploymentStatusCode ?? "RUNNING",
+      instanceCount: String(record?.instanceCount ?? 1),
+      description: record?.description ?? "",
+    };
+  }
+
+  if (menu === "servers") {
+    return {
+      serverName: record?.serverName ?? "",
+      hostName: record?.hostName ?? "",
+      ipAddress: record?.ipAddress ?? "",
+      envCode: record?.envCode ?? "PROD",
+      osTypeCode: record?.osTypeCode ?? "LINUX",
+      osVersion: record?.osVersion ?? "",
+      statusCode: record?.statusCode ?? "NORMAL",
+      description: record?.description ?? "",
+    };
+  }
+
+  if (menu === "relations") {
+    return {
+      sourceServiceId: String(record?.sourceServiceId ?? ""),
+      targetServiceId: String(record?.targetServiceId ?? ""),
+      relationTypeCode: record?.relationTypeCode ?? "REST",
+      mandatoryYn: record?.mandatoryYn ?? "Y",
+      relationStatusCode: record?.relationStatusCode ?? "ACTIVE",
+      description: record?.description ?? "",
+    };
+  }
+
+  if (menu === "techstacks") {
+    return {
+      serviceId: String(record?.serviceId ?? portalData.services[0]?.serviceId ?? ""),
+      techTypeName: record?.techTypeName ?? "FRAMEWORK",
+      techName: record?.techName ?? "",
+      versionText: record?.versionText ?? "",
+      vendorName: record?.vendorName ?? "",
+    };
+  }
+
+  return {};
+}
+
+function getAdminModalTitle(menu, mode, record) {
+  const action = mode === "create" ? "＋" : mode === "delete" ? "🗑" : "✏️";
+  const verb = mode === "create" ? "등록" : mode === "delete" ? "삭제" : "수정";
+  const labels = {
+    services: "서비스",
+    servers: "서버",
+    relations: "서비스 관계",
+    techstacks: "기술스택",
+  };
+  const id = record ? getAdminRecordId(menu, record) : "";
+  return `${action} ${labels[menu]} ${verb}${id && mode !== "create" ? ` — ${id}` : ""}`;
+}
+
+function getAdminRecordId(menu, record) {
+  if (menu === "services") return record.serviceCode;
+  if (menu === "servers") return record.serverName;
+  if (menu === "relations") return `REL-${String(record.relationId).padStart(4, "0")}`;
+  if (menu === "techstacks") return `TECH-${String(record.techStackId).padStart(3, "0")}`;
+  return "";
+}
+
+function getAdminRecordLabel(menu, record, serviceById, serverById) {
+  if (menu === "services") return `${record.serviceCode} ${record.serviceName}`;
+  if (menu === "servers") return `${record.serverName} (${record.ipAddress})`;
+  if (menu === "relations") return `${serviceLabel(serviceById.get(record.sourceServiceId))} → ${serviceLabel(serviceById.get(record.targetServiceId))}`;
+  if (menu === "techstacks") return `${serviceLabel(serviceById.get(record.serviceId))} / ${record.techName}`;
+  return getAdminRecordId(menu, record);
+}
+
+function serviceLabel(service) {
+  return service ? `${service.serviceCode} ${service.serviceName}` : "서비스 미지정";
 }
 
 function OwnerManagementModals({ modal, onClose, owner, services }) {

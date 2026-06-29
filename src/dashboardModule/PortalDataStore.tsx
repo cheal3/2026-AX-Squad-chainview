@@ -71,6 +71,11 @@ type NewRelationInput = {
   description: string;
 };
 
+type NewTechStackInput = Pick<
+  TechStackRecord,
+  "serviceId" | "techTypeName" | "techName" | "versionText" | "vendorName"
+>;
+
 type HealthCheckResult = {
   serviceId: number;
   url: string;
@@ -139,7 +144,10 @@ type PortalDataContextValue = {
   ) => void;
   removeRelation: (relationId: number) => void;
   addOwnerGroup: (serviceId: number, groupName: string) => void;
-  addTechStack: (serviceId: number, techName: string) => void;
+  addTechStack: (
+    inputOrServiceId: NewTechStackInput | number,
+    techName?: string
+  ) => void;
   updateTechStack: (
     techStackId: number,
     input: Partial<TechStackRecord>
@@ -625,8 +633,18 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             });
         }
       },
-      addTechStack: (serviceId, techName) => {
-        const cleaned = techName.trim();
+      addTechStack: (inputOrServiceId, techName) => {
+        const input =
+          typeof inputOrServiceId === "number"
+            ? {
+                serviceId: inputOrServiceId,
+                techTypeName: "서비스 기술",
+                techName: techName ?? "",
+                versionText: "-",
+                vendorName: "-",
+              }
+            : inputOrServiceId;
+        const cleaned = input.techName.trim();
         if (!cleaned) {
           return;
         }
@@ -634,16 +652,16 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         setTechStacks((current) => [
           {
             techStackId: nextId(current, "techStackId"),
-            serviceId,
-            techTypeName: "서비스 기술",
+            serviceId: input.serviceId,
+            techTypeName: input.techTypeName || "서비스 기술",
             techName: cleaned,
-            versionText: "-",
-            vendorName: "-",
+            versionText: input.versionText || "-",
+            vendorName: input.vendorName || "-",
           },
           ...current,
         ]);
         if (REMOTE_API_ENABLED) {
-          void addRemoteTechStack(serviceId, cleaned)
+          void addRemoteTechStack(input.serviceId, cleaned)
             .then(() => refreshRemoteData(400))
             .catch((error) => {
               console.warn("[ChainView API] tech stack create failed", error);
