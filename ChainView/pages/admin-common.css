@@ -112,7 +112,7 @@ table.tbl .col-actions{width:82px;text-align:right}
 .pager__nav button:disabled{color:var(--muted-2);cursor:not-allowed}
 
 /* Modal */
-.modal-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.4);display:none;align-items:center;justify-content:center;z-index:50;padding:clamp(28px,4vh,48px) clamp(48px,5vw,96px);overflow:hidden}
+.modal-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.4);display:none;align-items:center;justify-content:center;z-index:2000;padding:clamp(28px,4vh,48px) clamp(48px,5vw,96px);overflow:hidden}
 .modal-backdrop.is-open{display:flex}
 .modal{background:#fff;border-radius:12px;width:clamp(720px,52vw,940px);max-width:calc(100vw - 128px);max-height:calc(100vh - clamp(56px,8vh,96px));box-shadow:0 20px 60px rgba(15,23,42,.2);animation:modalIn .18s ease-out;display:flex;flex-direction:column;overflow:hidden}
 .modal--lg{width:clamp(920px,62vw,1180px)}
