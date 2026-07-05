@@ -1,5 +1,6 @@
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -101,6 +102,21 @@ export type IncidentEventRecord = {
   createdAt: string;
 };
 
+type RemoteQueryKey =
+  | "services"
+  | "servers"
+  | "relations"
+  | "techstacks"
+  | "owners"
+  | "incidents";
+
+type RemoteApiStatus = {
+  state: "idle" | "loading" | "success" | "error" | "blocked";
+  message: string;
+  lastLoadedAt?: string;
+  source?: RemoteQueryKey | "snapshot";
+};
+
 type NewIncidentInput = {
   serviceId: number;
   severityCode: SeverityCode;
@@ -154,6 +170,13 @@ type PortalDataContextValue = {
   ) => void;
   deleteTechStack: (techStackId: number) => void;
   runHealthCheck: (serviceId: number, url: string) => HealthCheckResult;
+  remoteApi: {
+    enabled: boolean;
+    origin: string;
+    status: RemoteApiStatus;
+    refresh: () => Promise<RemoteApiStatus>;
+    testQuery: (queryKey: RemoteQueryKey) => Promise<RemoteApiStatus>;
+  };
 };
 
 const PortalDataContext = createContext<PortalDataContextValue | null>(null);
@@ -164,7 +187,36 @@ const isMixedContentRuntime =
   window.location.protocol === "https:" &&
   remoteOrigin.startsWith("http://");
 const REMOTE_API_ENABLED =
-  remoteApiEnabledFlag === "true" || remoteApiEnabledFlag === "1";
+  remoteApiEnabledFlag === undefined
+    ? import.meta.env.DEV
+    : remoteApiEnabledFlag === "true" || remoteApiEnabledFlag === "1";
+
+const remoteQueryLoaders: Record<RemoteQueryKey, () => Promise<unknown>> = {
+  services: () => chainViewApi.services.list(),
+  servers: () => chainViewApi.servers.list(),
+  relations: () => chainViewApi.serviceRelations.list(),
+  techstacks: () => chainViewApi.serviceTechStacks.list(),
+  owners: () => chainViewApi.ownership.serviceOwners.list(),
+  incidents: () => chainViewApi.incidents.list(),
+};
+
+const remoteQueryLabels: Record<RemoteQueryKey | "snapshot", string> = {
+  services: "서비스 조회",
+  servers: "서버 조회",
+  relations: "서비스 관계 조회",
+  techstacks: "기술스택 조회",
+  owners: "담당자 조회",
+  incidents: "인시던트 조회",
+  snapshot: "초기 데이터 조회",
+};
+
+function nowLabel() {
+  return new Date().toLocaleTimeString("ko-KR", { hour12: false });
+}
+
+function countRows(value: unknown) {
+  return Array.isArray(value) ? value.length : 1;
+}
 
 const normalizedInitialServices = generatedMockData.services.map((service) => ({
   ...service,
@@ -187,6 +239,12 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
     []
   );
   const [healthChecks, setHealthChecks] = useState<HealthCheckResult[]>([]);
+  const [remoteApiStatus, setRemoteApiStatus] = useState<RemoteApiStatus>({
+    state: "idle",
+    message: REMOTE_API_ENABLED
+      ? "원격 조회 대기"
+      : "원격 조회 비활성",
+  });
 
   const applyRemoteSnapshot = (snapshot: RemotePortalSnapshot) => {
     setServers(snapshot.servers);
@@ -199,56 +257,133 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
     setIncidentEvents(snapshot.incidentEvents);
   };
 
-  const refreshRemoteData = (delayMs = 0) => {
+  const loadRemoteSnapshot = useCallback(async (): Promise<RemoteApiStatus> => {
     if (!REMOTE_API_ENABLED) {
-      return;
+      const status = {
+        state: "blocked" as const,
+        message: "원격 조회가 비활성화되어 있습니다.",
+        source: "snapshot" as const,
+      };
+      setRemoteApiStatus(status);
+      return status;
     }
 
-    const load = () => {
-      void loadRemotePortalSnapshot()
-        .then(applyRemoteSnapshot)
-        .catch((error) => {
-          console.warn("[ChainView API] remote refresh failed", error);
-        });
-    };
+    if (isMixedContentRuntime) {
+      const status = {
+        state: "blocked" as const,
+        message: "HTTPS 화면에서는 HTTP API를 브라우저가 차단합니다.",
+        source: "snapshot" as const,
+      };
+      setRemoteApiStatus(status);
+      return status;
+    }
 
+    setRemoteApiStatus({
+      state: "loading",
+      message: "원격 기본 조회 API 호출 중",
+      source: "snapshot",
+    });
+
+    try {
+      const snapshot = await loadRemotePortalSnapshot();
+      applyRemoteSnapshot(snapshot);
+      const status = {
+        state: "success" as const,
+        message: `조회 성공: 서비스 ${snapshot.services.length}건, 서버 ${snapshot.servers.length}건`,
+        lastLoadedAt: nowLabel(),
+        source: "snapshot" as const,
+      };
+      setRemoteApiStatus(status);
+      return status;
+    } catch (error) {
+      console.warn("[ChainView API] remote snapshot load failed", error);
+      const status = {
+        state: "error" as const,
+        message:
+          error instanceof Error
+            ? error.message
+            : "원격 기본 조회 API 호출에 실패했습니다.",
+        source: "snapshot" as const,
+      };
+      setRemoteApiStatus(status);
+      return status;
+    }
+  }, []);
+
+  const refreshRemoteData = (delayMs = 0) => {
     if (delayMs > 0) {
-      window.setTimeout(load, delayMs);
+      window.setTimeout(() => {
+        void loadRemoteSnapshot();
+      }, delayMs);
       return;
     }
 
-    load();
+    void loadRemoteSnapshot();
   };
+
+  const testRemoteQuery = useCallback(
+    async (queryKey: RemoteQueryKey): Promise<RemoteApiStatus> => {
+      if (!REMOTE_API_ENABLED) {
+        const status = {
+          state: "blocked" as const,
+          message: "원격 조회가 비활성화되어 있습니다.",
+          source: queryKey,
+        };
+        setRemoteApiStatus(status);
+        return status;
+      }
+
+      if (isMixedContentRuntime) {
+        const status = {
+          state: "blocked" as const,
+          message: "HTTPS 화면에서는 HTTP API를 브라우저가 차단합니다.",
+          source: queryKey,
+        };
+        setRemoteApiStatus(status);
+        return status;
+      }
+
+      setRemoteApiStatus({
+        state: "loading",
+        message: `${remoteQueryLabels[queryKey]} API 호출 중`,
+        source: queryKey,
+      });
+
+      try {
+        const result = await remoteQueryLoaders[queryKey]();
+        const status = {
+          state: "success" as const,
+          message: `${remoteQueryLabels[queryKey]} 성공: ${countRows(result)}건`,
+          lastLoadedAt: nowLabel(),
+          source: queryKey,
+        };
+        setRemoteApiStatus(status);
+        await loadRemoteSnapshot();
+        setRemoteApiStatus(status);
+        return status;
+      } catch (error) {
+        console.warn("[ChainView API] remote query test failed", error);
+        const status = {
+          state: "error" as const,
+          message:
+            error instanceof Error
+              ? error.message
+              : `${remoteQueryLabels[queryKey]} API 호출에 실패했습니다.`,
+          source: queryKey,
+        };
+        setRemoteApiStatus(status);
+        return status;
+      }
+    },
+    [loadRemoteSnapshot]
+  );
 
   useEffect(() => {
     if (!REMOTE_API_ENABLED) {
       return;
     }
-
-    if (isMixedContentRuntime) {
-      console.warn(
-        "[ChainView API] remote mode disabled in browser because an HTTPS page cannot call an HTTP API origin.",
-        { remoteOrigin }
-      );
-      return;
-    }
-
-    let cancelled = false;
-
-    loadRemotePortalSnapshot()
-      .then((snapshot) => {
-        if (!cancelled) {
-          applyRemoteSnapshot(snapshot);
-        }
-      })
-      .catch((error) => {
-        console.warn("[ChainView API] initial remote load failed", error);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    void loadRemoteSnapshot();
+  }, [loadRemoteSnapshot]);
 
   const createIncidentRecord = (input: NewIncidentInput) => {
     const now = timestamp();
@@ -328,6 +463,13 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       incidentImpacts,
       incidentEvents,
       healthChecks,
+      remoteApi: {
+        enabled: REMOTE_API_ENABLED,
+        origin: remoteOrigin,
+        status: remoteApiStatus,
+        refresh: loadRemoteSnapshot,
+        testQuery: testRemoteQuery,
+      },
       createIncident: createIncidentRecord,
       updateIncidentStatus: (incidentId, statusCode, message) => {
         const now = timestamp();
@@ -750,8 +892,11 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       incidents,
       owners,
       relations,
+      remoteApiStatus,
       services,
       servers,
+      testRemoteQuery,
+      loadRemoteSnapshot,
       techStacks,
     ]
   );

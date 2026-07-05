@@ -10,6 +10,7 @@ import {
   Pencil,
   Phone,
   Plus,
+  RefreshCw,
   Settings,
   Trash2,
   UserRound,
@@ -361,6 +362,18 @@ function DynamicAdminListPage({ activeMenu, menu }) {
     [portalData.servers]
   );
   const meta = getMenuMeta(activeMenu || menu);
+  const remoteQueryKey = getRemoteQueryKey(menu);
+  const remoteStatus = portalData.remoteApi.status;
+  const isRemoteLoading =
+    remoteStatus.state === "loading" && remoteStatus.source === remoteQueryKey;
+  const showRemoteStatus =
+    remoteStatus.source === remoteQueryKey || remoteStatus.source === "snapshot";
+  const handleRemoteApiTest = () => {
+    if (!remoteQueryKey) {
+      return;
+    }
+    void portalData.remoteApi.testQuery(remoteQueryKey);
+  };
 
   const configs = {
     services: {
@@ -492,6 +505,28 @@ function DynamicAdminListPage({ activeMenu, menu }) {
             <h1 className="page-head__title"><span className="page-head__icon" aria-hidden="true">{meta.icon}</span><span>{meta.label}</span></h1>
           </div>
           <div className="page-head__right">
+            {remoteQueryKey ? (
+              <>
+                <button
+                  className="btn btn--ghost btn--sm"
+                  disabled={isRemoteLoading}
+                  onClick={handleRemoteApiTest}
+                  title={`${meta.label} 조회 API 테스트`}
+                  type="button"
+                >
+                  <RefreshCw size={14} />
+                  {isRemoteLoading ? "조회 중" : "조회 API 테스트"}
+                </button>
+                {showRemoteStatus ? (
+                  <span
+                    className={`pill ${remoteStatus.state === "success" ? "pill--ok" : remoteStatus.state === "error" || remoteStatus.state === "blocked" ? "pill--warn" : "pill--gray"}`}
+                    title={`${portalData.remoteApi.origin}${remoteStatus.lastLoadedAt ? ` · ${remoteStatus.lastLoadedAt}` : ""}`}
+                  >
+                    {remoteStatus.message}
+                  </span>
+                ) : null}
+              </>
+            ) : null}
             <button className="btn">📥 CSV 내보내기</button>
             <button
               className="btn btn--primary"
@@ -1105,6 +1140,17 @@ function formatServiceCell(service) {
     return "-";
   }
   return <><code>{service.serviceCode}</code> {service.serviceName}</>;
+}
+
+function getRemoteQueryKey(menu) {
+  return {
+    services: "services",
+    servers: "servers",
+    relations: "relations",
+    techstacks: "techstacks",
+    owners: "owners",
+    incidents: "incidents",
+  }[menu];
 }
 
 const sidebarSections = [
