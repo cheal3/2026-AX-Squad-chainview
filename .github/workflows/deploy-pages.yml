@@ -34,8 +34,8 @@ jobs:
         env:
           BASE_PATH: /${{ github.event.repository.name }}/
           VITE_CHAINVIEW_REMOTE_API_ENABLED: "true"
-          VITE_CHAINVIEW_REMOTE_ORIGIN: http://chainview.kro.kr:8080
-          VITE_CHAINVIEW_API_BASE_URL: http://chainview.kro.kr:8080
+          VITE_CHAINVIEW_REMOTE_ORIGIN: https://chainview.kro.kr
+          VITE_CHAINVIEW_API_BASE_URL: https://chainview.kro.kr
           VITE_CHAINVIEW_EMPLOYEE_NO: ${{ secrets.CHAINVIEW_EMPLOYEE_NO }}
         run: npm run build
 

@@ -8,7 +8,7 @@ export default defineConfig({
   server: {
     proxy: {
       "/chainview-api": {
-        target: "http://chainview.kro.kr:8080",
+        target: "https://chainview.kro.kr",
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/chainview-api/, ""),
       },

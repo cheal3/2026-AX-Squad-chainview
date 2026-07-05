@@ -181,7 +181,7 @@ type PortalDataContextValue = {
 
 const PortalDataContext = createContext<PortalDataContextValue | null>(null);
 const remoteApiEnabledFlag = import.meta.env.VITE_CHAINVIEW_REMOTE_API_ENABLED;
-const remoteOrigin = import.meta.env.VITE_CHAINVIEW_REMOTE_ORIGIN ?? "http://chainview.kro.kr:8080";
+const remoteOrigin = import.meta.env.VITE_CHAINVIEW_REMOTE_ORIGIN ?? "https://chainview.kro.kr";
 const isMixedContentRuntime =
   typeof window !== "undefined" &&
   window.location.protocol === "https:" &&
