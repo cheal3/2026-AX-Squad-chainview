@@ -30,9 +30,23 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Refresh API snapshot
+        env:
+          CHAINVIEW_API_BASE_URL: http://chainview.kro.kr:8080
+          CHAINVIEW_EMPLOYEE_NO: ${{ secrets.CHAINVIEW_EMPLOYEE_NO }}
+          CHAINVIEW_PASSWORD: ${{ secrets.CHAINVIEW_PASSWORD }}
+        run: |
+          if [ -z "$CHAINVIEW_PASSWORD" ]; then
+            echo "CHAINVIEW_PASSWORD secret is not set. Building with the checked-in API snapshot."
+            exit 0
+          fi
+
+          npm run generate:mock-data
+
       - name: Build
         env:
           BASE_PATH: /${{ github.event.repository.name }}/
+          VITE_CHAINVIEW_REMOTE_API_ENABLED: "false"
         run: npm run build
 
       - name: Add SPA fallback

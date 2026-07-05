@@ -492,7 +492,7 @@ function parseCategoryPath(value) {
 function formatDateTime(value) {
   const text = asString(value);
   if (!text) {
-    return new Date().toISOString().slice(0, 16).replace("T", " ");
+    return "";
   }
   return text.replace("T", " ").slice(0, 16);
 }
