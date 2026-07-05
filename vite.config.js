@@ -6,9 +6,10 @@ export default defineConfig({
   base: process.env.BASE_PATH || "/2026-AX-Squad-chainview/",
   plugins: [react(), tailwindcss()],
   server: {
+    host: "0.0.0.0",
     proxy: {
       "/chainview-api": {
-        target: "https://chainview.kro.kr",
+        target: "http://chainview.kro.kr:8080",
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/chainview-api/, ""),
       },

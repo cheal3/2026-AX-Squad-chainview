@@ -8,7 +8,6 @@ import {
   type ReactNode,
 } from "react";
 import { chainViewApi } from "./chainViewApi";
-import * as generatedMockData from "./mockData.generated";
 import {
   codeLabels,
   type DeploymentStatusCode,
@@ -108,13 +107,37 @@ type RemoteQueryKey =
   | "relations"
   | "techstacks"
   | "owners"
-  | "incidents";
+  | "incidents"
+  | "users"
+  | "groups"
+  | "categories"
+  | "codes"
+  | "deployments";
+
+type RemoteListRecord = Record<string, unknown>;
 
 type RemoteApiStatus = {
   state: "idle" | "loading" | "success" | "error" | "blocked";
   message: string;
   lastLoadedAt?: string;
   source?: RemoteQueryKey | "snapshot";
+  detail?: RemoteApiCallDetail;
+};
+
+type RemoteApiCallDetail = {
+  durationMs?: number;
+  errorMessage?: string;
+  finishedAt?: string;
+  label: string;
+  method: "GET";
+  origin: string;
+  path: string;
+  queryKey: RemoteQueryKey;
+  responsePreview?: unknown;
+  rowCount?: number;
+  startedAt: string;
+  state: "loading" | "success" | "error" | "blocked";
+  url: string;
 };
 
 type NewIncidentInput = {
@@ -137,6 +160,11 @@ type PortalDataContextValue = {
   techStacks: TechStackRecord[];
   owners: ServiceOwnerRecord[];
   incidents: IncidentRecord[];
+  users: RemoteListRecord[];
+  groups: RemoteListRecord[];
+  categories: RemoteListRecord[];
+  codes: RemoteListRecord[];
+  deployments: RemoteListRecord[];
   incidentImpacts: IncidentImpactRecord[];
   incidentEvents: IncidentEventRecord[];
   healthChecks: HealthCheckResult[];
@@ -174,22 +202,27 @@ type PortalDataContextValue = {
     enabled: boolean;
     origin: string;
     status: RemoteApiStatus;
+    debugEnabled: boolean;
     refresh: () => Promise<RemoteApiStatus>;
     testQuery: (queryKey: RemoteQueryKey) => Promise<RemoteApiStatus>;
   };
 };
 
 const PortalDataContext = createContext<PortalDataContextValue | null>(null);
+const API_ONLY_DATA_MODE = import.meta.env.VITE_CHAINVIEW_DATA_SOURCE === "api";
+const API_DEBUG_ENABLED = import.meta.env.DEV && import.meta.env.MODE !== "production";
+const MANUAL_API_LOAD_MODE = import.meta.env.MODE === "test";
 const remoteApiEnabledFlag = import.meta.env.VITE_CHAINVIEW_REMOTE_API_ENABLED;
-const remoteOrigin = import.meta.env.VITE_CHAINVIEW_REMOTE_ORIGIN ?? "https://chainview.kro.kr";
+const remoteOrigin = import.meta.env.VITE_CHAINVIEW_REMOTE_ORIGIN ?? "http://chainview.kro.kr:8080";
 const isMixedContentRuntime =
   typeof window !== "undefined" &&
   window.location.protocol === "https:" &&
   remoteOrigin.startsWith("http://");
 const REMOTE_API_ENABLED =
-  remoteApiEnabledFlag === undefined
+  API_ONLY_DATA_MODE ||
+  (remoteApiEnabledFlag === undefined
     ? import.meta.env.DEV
-    : remoteApiEnabledFlag === "true" || remoteApiEnabledFlag === "1";
+    : remoteApiEnabledFlag === "true" || remoteApiEnabledFlag === "1");
 
 const remoteQueryLoaders: Record<RemoteQueryKey, () => Promise<unknown>> = {
   services: () => chainViewApi.services.list(),
@@ -198,6 +231,25 @@ const remoteQueryLoaders: Record<RemoteQueryKey, () => Promise<unknown>> = {
   techstacks: () => chainViewApi.serviceTechStacks.list(),
   owners: () => chainViewApi.ownership.serviceOwners.list(),
   incidents: () => chainViewApi.incidents.list(),
+  users: () => chainViewApi.ownership.users.list(),
+  groups: () => chainViewApi.ownership.groups.list(),
+  categories: () => chainViewApi.serviceCategories.list(),
+  codes: () => chainViewApi.commonCodes.list(),
+  deployments: loadServiceDeployments,
+};
+
+const remoteQueryPaths: Record<RemoteQueryKey, string> = {
+  services: "/api/services",
+  servers: "/api/servers",
+  relations: "/api/service-relations",
+  techstacks: "/api/service-tech-stacks",
+  owners: "/api/ownership/service-owners",
+  incidents: "/api/incidents",
+  users: "/api/ownership/users",
+  groups: "/api/ownership/groups",
+  categories: "/api/service-categories",
+  codes: "/api/common-codes",
+  deployments: "/api/services + /api/services/{serviceId}",
 };
 
 const remoteQueryLabels: Record<RemoteQueryKey | "snapshot", string> = {
@@ -207,8 +259,38 @@ const remoteQueryLabels: Record<RemoteQueryKey | "snapshot", string> = {
   techstacks: "기술스택 조회",
   owners: "담당자 조회",
   incidents: "인시던트 조회",
+  users: "사용자 관리",
+  groups: "그룹 조회",
+  categories: "서비스 분류 관리",
+  codes: "공통코드 관리",
+  deployments: "배포 현황",
   snapshot: "초기 데이터 조회",
 };
+
+async function loadServiceDeployments() {
+  const serviceRows = asRemoteRecordArray(await chainViewApi.services.list());
+  const settled = await Promise.allSettled(
+    serviceRows.map((service) => {
+      const serviceId = asRemoteNumber(service.serviceId);
+      return serviceId ? chainViewApi.services.detail(serviceId) : null;
+    })
+  );
+
+  return settled.flatMap((result, index) => {
+    if (result.status !== "fulfilled") {
+      return [];
+    }
+    const detail = isRemoteRecord(result.value) ? result.value : {};
+    const service = serviceRows[index];
+    return asRemoteRecordArray(detail.deployments).map((deployment, deploymentIndex) => ({
+      ...deployment,
+      deploymentKey: `${asRemoteNumber(service.serviceId)}-${asRemoteNumber(deployment.deploymentId, deploymentIndex + 1)}`,
+      serviceCode: asRemoteString(detail.serviceCode ?? service.serviceCode),
+      serviceId: asRemoteNumber(detail.serviceId ?? service.serviceId),
+      serviceName: asRemoteString(detail.serviceName ?? service.serviceName),
+    }));
+  });
+}
 
 function nowLabel() {
   return new Date().toLocaleTimeString("ko-KR", { hour12: false });
@@ -218,22 +300,59 @@ function countRows(value: unknown) {
   return Array.isArray(value) ? value.length : 1;
 }
 
-const normalizedInitialServices = generatedMockData.services.map((service) => ({
-  ...service,
-  statusCode: "NORMAL" as ServiceStatusCode,
-  deploymentStatusCode:
-    service.deploymentStatusCode === "STOPPED"
-      ? service.deploymentStatusCode
-      : ("RUNNING" as DeploymentStatusCode),
-}));
+function buildRemoteApiDetail(
+  queryKey: RemoteQueryKey,
+  state: RemoteApiCallDetail["state"],
+  overrides: Partial<RemoteApiCallDetail> = {}
+): RemoteApiCallDetail {
+  const path = remoteQueryPaths[queryKey];
+  const origin = remoteOrigin.replace(/\/$/, "");
+  return {
+    label: remoteQueryLabels[queryKey],
+    method: "GET",
+    origin,
+    path,
+    queryKey,
+    startedAt: new Date().toISOString(),
+    state,
+    url: `${origin}${path}`,
+    ...overrides,
+  };
+}
+
+function previewResponse(value: unknown) {
+  if (Array.isArray(value)) {
+    return value.slice(0, 3);
+  }
+  if (value && typeof value === "object") {
+    return value;
+  }
+  return value ?? null;
+}
+
+function normalizeInitialServices(services: ServiceRecord[]) {
+  return services.map((service) => ({
+    ...service,
+    statusCode: "NORMAL" as ServiceStatusCode,
+    deploymentStatusCode:
+      service.deploymentStatusCode === "STOPPED"
+        ? service.deploymentStatusCode
+        : ("RUNNING" as DeploymentStatusCode),
+  }));
+}
 
 export function PortalDataProvider({ children }: { children: ReactNode }) {
-  const [servers, setServers] = useState(generatedMockData.servers);
-  const [services, setServices] = useState(normalizedInitialServices);
-  const [relations, setRelations] = useState(generatedMockData.serviceRelations);
-  const [techStacks, setTechStacks] = useState(generatedMockData.techStacks);
-  const [owners, setOwners] = useState(generatedMockData.serviceOwners);
+  const [servers, setServers] = useState<ServerRecord[]>([]);
+  const [services, setServices] = useState<ServiceRecord[]>([]);
+  const [relations, setRelations] = useState<ServiceRelationRecord[]>([]);
+  const [techStacks, setTechStacks] = useState<TechStackRecord[]>([]);
+  const [owners, setOwners] = useState<ServiceOwnerRecord[]>([]);
   const [incidents, setIncidents] = useState<IncidentRecord[]>([]);
+  const [users, setUsers] = useState<RemoteListRecord[]>([]);
+  const [groups, setGroups] = useState<RemoteListRecord[]>([]);
+  const [categories, setCategories] = useState<RemoteListRecord[]>([]);
+  const [codes, setCodes] = useState<RemoteListRecord[]>([]);
+  const [deployments, setDeployments] = useState<RemoteListRecord[]>([]);
   const [incidentImpacts, setIncidentImpacts] = useState<IncidentImpactRecord[]>([]);
   const [incidentEvents, setIncidentEvents] = useState<IncidentEventRecord[]>(
     []
@@ -241,7 +360,11 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
   const [healthChecks, setHealthChecks] = useState<HealthCheckResult[]>([]);
   const [remoteApiStatus, setRemoteApiStatus] = useState<RemoteApiStatus>({
     state: "idle",
-    message: REMOTE_API_ENABLED
+    message: MANUAL_API_LOAD_MODE
+      ? "API 실행 전"
+      : API_ONLY_DATA_MODE
+      ? "API 전용 모드: 원격 조회 대기"
+      : REMOTE_API_ENABLED
       ? "원격 조회 대기"
       : "원격 조회 비활성",
   });
@@ -256,6 +379,28 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
     setIncidentImpacts(snapshot.incidentImpacts);
     setIncidentEvents(snapshot.incidentEvents);
   };
+
+  useEffect(() => {
+    if (API_ONLY_DATA_MODE) {
+      return;
+    }
+
+    let cancelled = false;
+    void import("./mockData.generated").then((mockData) => {
+      if (cancelled) {
+        return;
+      }
+      setServers(mockData.servers);
+      setServices(normalizeInitialServices(mockData.services));
+      setRelations(mockData.serviceRelations);
+      setTechStacks(mockData.techStacks);
+      setOwners(mockData.serviceOwners);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const loadRemoteSnapshot = useCallback(async (): Promise<RemoteApiStatus> => {
     if (!REMOTE_API_ENABLED) {
@@ -321,55 +466,103 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
     void loadRemoteSnapshot();
   };
 
+  const applyRemoteQueryResult = (queryKey: RemoteQueryKey, result: unknown) => {
+    const rows = asRemoteRecordArray(result);
+    if (queryKey === "users") {
+      setUsers(rows);
+    } else if (queryKey === "groups") {
+      setGroups(rows);
+    } else if (queryKey === "categories") {
+      setCategories(rows);
+    } else if (queryKey === "codes") {
+      setCodes(rows);
+    } else if (queryKey === "deployments") {
+      setDeployments(rows);
+    }
+  };
+
   const testRemoteQuery = useCallback(
     async (queryKey: RemoteQueryKey): Promise<RemoteApiStatus> => {
       if (!REMOTE_API_ENABLED) {
+        const detail = buildRemoteApiDetail(queryKey, "blocked", {
+          errorMessage: "원격 조회가 비활성화되어 있습니다.",
+          finishedAt: new Date().toISOString(),
+        });
         const status = {
           state: "blocked" as const,
           message: "원격 조회가 비활성화되어 있습니다.",
           source: queryKey,
+          detail,
         };
         setRemoteApiStatus(status);
         return status;
       }
 
       if (isMixedContentRuntime) {
+        const detail = buildRemoteApiDetail(queryKey, "blocked", {
+          errorMessage: "HTTPS 화면에서는 HTTP API를 브라우저가 차단합니다.",
+          finishedAt: new Date().toISOString(),
+        });
         const status = {
           state: "blocked" as const,
           message: "HTTPS 화면에서는 HTTP API를 브라우저가 차단합니다.",
           source: queryKey,
+          detail,
         };
         setRemoteApiStatus(status);
         return status;
       }
 
+      const startedAtMs = performance.now();
+      const loadingDetail = buildRemoteApiDetail(queryKey, "loading");
       setRemoteApiStatus({
         state: "loading",
         message: `${remoteQueryLabels[queryKey]} API 호출 중`,
         source: queryKey,
+        detail: loadingDetail,
       });
 
       try {
         const result = await remoteQueryLoaders[queryKey]();
+        const finishedAt = new Date().toISOString();
+        const detail = {
+          ...loadingDetail,
+          durationMs: Math.round(performance.now() - startedAtMs),
+          finishedAt,
+          responsePreview: previewResponse(result),
+          rowCount: countRows(result),
+          state: "success" as const,
+        };
         const status = {
           state: "success" as const,
           message: `${remoteQueryLabels[queryKey]} 성공: ${countRows(result)}건`,
           lastLoadedAt: nowLabel(),
           source: queryKey,
+          detail,
         };
+        applyRemoteQueryResult(queryKey, result);
         setRemoteApiStatus(status);
         await loadRemoteSnapshot();
         setRemoteApiStatus(status);
         return status;
       } catch (error) {
         console.warn("[ChainView API] remote query test failed", error);
+        const message =
+          error instanceof Error
+            ? error.message
+            : `${remoteQueryLabels[queryKey]} API 호출에 실패했습니다.`;
+        const detail = {
+          ...loadingDetail,
+          durationMs: Math.round(performance.now() - startedAtMs),
+          errorMessage: message,
+          finishedAt: new Date().toISOString(),
+          state: "error" as const,
+        };
         const status = {
           state: "error" as const,
-          message:
-            error instanceof Error
-              ? error.message
-              : `${remoteQueryLabels[queryKey]} API 호출에 실패했습니다.`,
+          message,
           source: queryKey,
+          detail,
         };
         setRemoteApiStatus(status);
         return status;
@@ -379,7 +572,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
   );
 
   useEffect(() => {
-    if (!REMOTE_API_ENABLED) {
+    if (!REMOTE_API_ENABLED || MANUAL_API_LOAD_MODE) {
       return;
     }
     void loadRemoteSnapshot();
@@ -460,6 +653,11 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       techStacks,
       owners,
       incidents,
+      users,
+      groups,
+      categories,
+      codes,
+      deployments,
       incidentImpacts,
       incidentEvents,
       healthChecks,
@@ -467,6 +665,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         enabled: REMOTE_API_ENABLED,
         origin: remoteOrigin,
         status: remoteApiStatus,
+        debugEnabled: API_DEBUG_ENABLED,
         refresh: loadRemoteSnapshot,
         testQuery: testRemoteQuery,
       },
@@ -890,6 +1089,11 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       incidentEvents,
       incidentImpacts,
       incidents,
+      users,
+      groups,
+      categories,
+      codes,
+      deployments,
       owners,
       relations,
       remoteApiStatus,

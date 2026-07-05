@@ -328,7 +328,18 @@ function RoutePage({ activeMenuOverride, slug }) {
     );
   }
 
-  if (["services", "servers", "relations", "techstacks", "owners"].includes(page.menu)) {
+  if ([
+    "services",
+    "servers",
+    "relations",
+    "techstacks",
+    "owners",
+    "users",
+    "groups",
+    "categories",
+    "codes",
+    "deployments",
+  ].includes(page.menu)) {
     return (
       <AppShell activeMenu={activeMenu}>
         <main className="main">
@@ -353,6 +364,7 @@ function DynamicAdminListPage({ activeMenu, menu }) {
   const [ownerModal, setOwnerModal] = useState(null);
   const [selectedOwner, setSelectedOwner] = useState(null);
   const [adminModal, setAdminModal] = useState(null);
+  const [apiDetailModal, setApiDetailModal] = useState(null);
   const serviceById = useMemo(
     () => new Map(portalData.services.map((service) => [service.serviceId, service])),
     [portalData.services]
@@ -368,11 +380,14 @@ function DynamicAdminListPage({ activeMenu, menu }) {
     remoteStatus.state === "loading" && remoteStatus.source === remoteQueryKey;
   const showRemoteStatus =
     remoteStatus.source === remoteQueryKey || remoteStatus.source === "snapshot";
-  const handleRemoteApiTest = () => {
+  const handleRemoteApiTest = async () => {
     if (!remoteQueryKey) {
       return;
     }
-    void portalData.remoteApi.testQuery(remoteQueryKey);
+    const status = await portalData.remoteApi.testQuery(remoteQueryKey);
+    if (status.detail) {
+      setApiDetailModal(status.detail);
+    }
   };
 
   const configs = {
@@ -461,6 +476,88 @@ function DynamicAdminListPage({ activeMenu, menu }) {
         ],
       })),
     },
+    users: {
+      readOnly: true,
+      columns: ["userId", "사번", "이름", "조직", "부서", "역할", "연락처", "이메일", "활성"],
+      rows: portalData.users.map((user) => ({
+        key: recordKey(user, "userId", "employeeNo"),
+        record: user,
+        cells: [
+          <code>{field(user, "userId")}</code>,
+          <code>{field(user, "employeeNo")}</code>,
+          <b>{field(user, "userName")}</b>,
+          field(user, "orgName"),
+          field(user, "departmentName"),
+          field(user, "roleName"),
+          field(user, "phoneNumber"),
+          field(user, "email"),
+          yesNoPill(field(user, "activeYn")),
+        ],
+      })),
+    },
+    groups: {
+      readOnly: true,
+      columns: ["groupId", "groupCode", "그룹명", "설명"],
+      rows: portalData.groups.map((group) => ({
+        key: recordKey(group, "groupId", "groupCode"),
+        record: group,
+        cells: [
+          <code>{field(group, "groupId")}</code>,
+          <code>{field(group, "groupCode")}</code>,
+          <b>{field(group, "groupName")}</b>,
+          field(group, "description"),
+        ],
+      })),
+    },
+    categories: {
+      readOnly: true,
+      columns: ["categoryId", "분류코드", "분류명", "레벨", "상위 ID", "정렬", "수정일"],
+      rows: portalData.categories.map((category) => ({
+        key: recordKey(category, "categoryId", "categoryCode"),
+        record: category,
+        cells: [
+          <code>{field(category, "categoryId")}</code>,
+          <code>{field(category, "categoryCode")}</code>,
+          <b>{field(category, "categoryName")}</b>,
+          field(category, "categoryLevel"),
+          field(category, "parentCategoryId"),
+          field(category, "sortOrder"),
+          formatDateCell(field(category, "updatedAt") || field(category, "createdAt")),
+        ],
+      })),
+    },
+    codes: {
+      readOnly: true,
+      columns: ["코드그룹", "코드", "코드명", "정렬", "사용", "비고"],
+      rows: portalData.codes.map((code) => ({
+        key: `${field(code, "codeGroup")}-${field(code, "code")}`,
+        record: code,
+        cells: [
+          <code>{field(code, "codeGroup")}</code>,
+          <code>{field(code, "code")}</code>,
+          <b>{field(code, "codeName")}</b>,
+          field(code, "sortOrder"),
+          yesNoPill(field(code, "useYn")),
+          field(code, "remarks"),
+        ],
+      })),
+    },
+    deployments: {
+      readOnly: true,
+      columns: ["서비스", "서버", "배포 경로", "포트", "상태", "인스턴스"],
+      rows: portalData.deployments.map((deployment) => ({
+        key: field(deployment, "deploymentKey") || recordKey(deployment, "deploymentId", "serverId"),
+        record: deployment,
+        cells: [
+          <><code>{field(deployment, "serviceCode")}</code> {field(deployment, "serviceName")}</>,
+          field(deployment, "serverName") || field(deployment, "hostName") || field(deployment, "serverId"),
+          <code>{field(deployment, "deployPath")}</code>,
+          field(deployment, "portInfo") || field(deployment, "port"),
+          field(deployment, "deploymentStatusName") || field(deployment, "deploymentStatusCode"),
+          field(deployment, "instanceCount"),
+        ],
+      })),
+    },
   };
   const config = configs[menu];
   const closeOwnerModal = () => {
@@ -505,17 +602,17 @@ function DynamicAdminListPage({ activeMenu, menu }) {
             <h1 className="page-head__title"><span className="page-head__icon" aria-hidden="true">{meta.icon}</span><span>{meta.label}</span></h1>
           </div>
           <div className="page-head__right">
-            {remoteQueryKey ? (
+            {remoteQueryKey && portalData.remoteApi.debugEnabled ? (
               <>
                 <button
                   className="btn btn--ghost btn--sm"
                   disabled={isRemoteLoading}
                   onClick={handleRemoteApiTest}
-                  title={`${meta.label} 조회 API 테스트`}
+                  title={`${meta.label} API 실행`}
                   type="button"
                 >
                   <RefreshCw size={14} />
-                  {isRemoteLoading ? "조회 중" : "조회 API 테스트"}
+                  {isRemoteLoading ? "실행 중" : "API 실행"}
                 </button>
                 {showRemoteStatus ? (
                   <span
@@ -528,13 +625,15 @@ function DynamicAdminListPage({ activeMenu, menu }) {
               </>
             ) : null}
             <button className="btn">📥 CSV 내보내기</button>
-            <button
-              className="btn btn--primary"
-              onClick={menu === "owners" ? () => setOwnerModal("create") : () => openAdminModal("create")}
-              type="button"
-            >
-              {config.actionLabel}
-            </button>
+            {config.actionLabel ? (
+              <button
+                className="btn btn--primary"
+                onClick={menu === "owners" ? () => setOwnerModal("create") : () => openAdminModal("create")}
+                type="button"
+              >
+                {config.actionLabel}
+              </button>
+            ) : null}
           </div>
         </div>
       </div>
@@ -559,30 +658,34 @@ function DynamicAdminListPage({ activeMenu, menu }) {
                 <td className="col-check"><input className="chk" onClick={(event) => event.stopPropagation()} type="checkbox" /></td>
                 {row.cells.map((cell, index) => <td key={index}>{cell}</td>)}
                 <td className="col-actions">
-                  <div className="row-actions">
-                    <button
-                      className="ibtn"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        handleEditRow(row);
-                      }}
-                      type="button"
-                      title="수정"
-                    >
-                      ✏️
-                    </button>
-                    <button
-                      className="ibtn ibtn--danger"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        handleDeleteRow(row);
-                      }}
-                      type="button"
-                      title="삭제"
-                    >
-                      🗑
-                    </button>
-                  </div>
+                  {config.readOnly ? (
+                    <span className="pill pill--gray">조회</span>
+                  ) : (
+                    <div className="row-actions">
+                      <button
+                        className="ibtn"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleEditRow(row);
+                        }}
+                        type="button"
+                        title="수정"
+                      >
+                        ✏️
+                      </button>
+                      <button
+                        className="ibtn ibtn--danger"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleDeleteRow(row);
+                        }}
+                        type="button"
+                        title="삭제"
+                      >
+                        🗑
+                      </button>
+                    </div>
+                  )}
                 </td>
               </tr>
             ))}
@@ -610,8 +713,76 @@ function DynamicAdminListPage({ activeMenu, menu }) {
           serviceById={serviceById}
         />
       ) : null}
+      {apiDetailModal ? (
+        <ApiQueryDetailModal
+          detail={apiDetailModal}
+          onClose={() => setApiDetailModal(null)}
+        />
+      ) : null}
     </>
   );
+}
+
+function ApiQueryDetailModal({ detail, onClose }) {
+  const isSuccess = detail.state === "success";
+  const stateLabel = {
+    blocked: "차단",
+    error: "실패",
+    loading: "진행 중",
+    success: "성공",
+  }[detail.state] || detail.state;
+  const previewText = JSON.stringify(detail.responsePreview ?? null, null, 2);
+
+  return (
+    <div className="modal-backdrop is-open" onClick={onClose}>
+      <div className="modal modal--lg api-detail-modal" onClick={(event) => event.stopPropagation()}>
+        <div className="modal__head">
+          <h3>API 조회 상세</h3>
+          <button className="close" onClick={onClose} type="button">×</button>
+        </div>
+        <div className="modal__body">
+          <div className="api-detail-summary">
+            <span className={`pill ${isSuccess ? "pill--ok" : "pill--warn"}`}>{stateLabel}</span>
+            <b>{detail.label}</b>
+            <span>{detail.durationMs ?? 0}ms</span>
+          </div>
+          <div className="api-detail-grid">
+            <div><span>Method</span><b>{detail.method}</b></div>
+            <div><span>Path</span><code>{detail.path}</code></div>
+            <div><span>Origin</span><code>{detail.origin}</code></div>
+            <div><span>URL</span><code>{detail.url}</code></div>
+            <div><span>시작</span><b>{formatApiDate(detail.startedAt)}</b></div>
+            <div><span>완료</span><b>{formatApiDate(detail.finishedAt)}</b></div>
+            <div><span>결과 건수</span><b>{detail.rowCount ?? "-"}</b></div>
+            <div><span>실행 가능 모드</span><b>development / test</b></div>
+          </div>
+          {detail.errorMessage ? (
+            <div className="api-detail-error">
+              <b>오류</b>
+              <p>{detail.errorMessage}</p>
+            </div>
+          ) : null}
+          <div className="api-detail-response">
+            <div className="api-detail-response__head">
+              <b>응답 미리보기</b>
+              <span>배열 응답은 앞 3건만 표시</span>
+            </div>
+            <pre>{previewText}</pre>
+          </div>
+        </div>
+        <div className="modal__foot">
+          <button className="btn btn--primary" onClick={onClose} type="button">확인</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function formatApiDate(value) {
+  if (!value) {
+    return "-";
+  }
+  return value.replace("T", " ").slice(0, 19);
 }
 
 function AdminRecordModal({ modal, onClose, portalData, serverById, serviceById }) {
@@ -1142,6 +1313,31 @@ function formatServiceCell(service) {
   return <><code>{service.serviceCode}</code> {service.serviceName}</>;
 }
 
+function field(record, key, fallback = "-") {
+  const value = record?.[key];
+  if (value === undefined || value === null || value === "") {
+    return fallback;
+  }
+  return String(value);
+}
+
+function recordKey(record, idKey, fallbackKey) {
+  return field(record, idKey, field(record, fallbackKey, Math.random().toString(36)));
+}
+
+function formatDateCell(value) {
+  if (!value || value === "-") {
+    return "-";
+  }
+  return String(value).replace("T", " ").slice(0, 16);
+}
+
+function yesNoPill(value) {
+  const normalized = String(value ?? "").toUpperCase();
+  const enabled = normalized === "Y" || normalized === "TRUE" || normalized === "ACTIVE";
+  return <span className={`pill ${enabled ? "pill--ok" : "pill--idle"}`}>{enabled ? "활성" : "비활성"}</span>;
+}
+
 function getRemoteQueryKey(menu) {
   return {
     services: "services",
@@ -1150,6 +1346,11 @@ function getRemoteQueryKey(menu) {
     techstacks: "techstacks",
     owners: "owners",
     incidents: "incidents",
+    users: "users",
+    groups: "groups",
+    categories: "categories",
+    codes: "codes",
+    deployments: "deployments",
   }[menu];
 }
 

@@ -1,4 +1,4 @@
-const REMOTE_ORIGIN = "https://chainview.kro.kr";
+const REMOTE_ORIGIN = "http://chainview.kro.kr:8080";
 const DEFAULT_EMPLOYEE_NO = "8913812";
 
 export const chainViewRemoteOrigin =
@@ -315,9 +315,8 @@ async function ensureSession() {
 }
 
 async function establishSession(employeeNo = chainViewEmployeeNo) {
-  const existingToken = await fetchCsrfTokenFrom("/admin/services");
-  if (existingToken) {
-    csrfToken = existingToken;
+  if (await hasActiveApiSession()) {
+    csrfToken = csrfToken ?? (await fetchCsrfTokenFrom("/login"));
     hasAuthenticatedSession = true;
     return;
   }
@@ -327,15 +326,6 @@ async function establishSession(employeeNo = chainViewEmployeeNo) {
     throw new ChainViewApiError({
       authRequired: true,
       message: "ChainView 세션 CSRF 토큰을 찾지 못했습니다.",
-      status: 0,
-    });
-  }
-
-  if (!chainViewPassword) {
-    throw new ChainViewApiError({
-      authRequired: true,
-      message:
-        "원격 ChainView 로그인 비밀번호가 없습니다. VITE_CHAINVIEW_PASSWORD 환경변수를 설정해 주세요.",
       status: 0,
     });
   }
@@ -389,6 +379,26 @@ async function fetchCsrfTokenFrom(path: string) {
 
   const html = await response.text();
   return extractCsrfToken(html);
+}
+
+async function hasActiveApiSession() {
+  const response = await fetch(buildUrl("/api/dashboard/overview"), {
+    credentials: "include",
+    redirect: "manual",
+    headers: { Accept: "application/json" },
+  });
+
+  const contentType = response.headers.get("content-type") ?? "";
+  if (
+    response.type === "opaqueredirect" ||
+    response.status === 0 ||
+    (response.status >= 300 && response.status < 400) ||
+    contentType.includes("text/html")
+  ) {
+    return false;
+  }
+
+  return response.ok;
 }
 
 function buildUrl(path: string, query?: QueryParams) {

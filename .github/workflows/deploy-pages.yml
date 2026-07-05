@@ -33,6 +33,7 @@ jobs:
       - name: Build
         env:
           BASE_PATH: /${{ github.event.repository.name }}/
+          VITE_CHAINVIEW_DATA_SOURCE: api
           VITE_CHAINVIEW_REMOTE_API_ENABLED: "true"
           VITE_CHAINVIEW_REMOTE_ORIGIN: https://chainview.kro.kr
           VITE_CHAINVIEW_API_BASE_URL: https://chainview.kro.kr

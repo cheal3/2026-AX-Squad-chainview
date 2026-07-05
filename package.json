@@ -4,9 +4,12 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --host 0.0.0.0",
+    "dev": "node scripts/start-vite-whale.mjs development",
+    "test": "node scripts/start-vite-whale.mjs test",
+    "prod": "node scripts/start-vite-whale.mjs production",
     "build": "vite build",
     "generate:mock-data": "node scripts/generate-mock-data.mjs",
+    "test:api": "node scripts/test-api-data.mjs",
     "preview": "vite preview --host 0.0.0.0"
   },
   "dependencies": {
