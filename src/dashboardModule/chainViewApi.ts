@@ -319,15 +319,21 @@ async function ensureSession() {
 
 async function establishSession(employeeNo = chainViewEmployeeNo) {
   if (await hasActiveApiSession()) {
-    csrfToken = csrfToken ?? (await fetchCsrfTokenFrom("/login"));
     hasAuthenticatedSession = true;
     return;
   }
 
   if (await establishDevLoginSession(employeeNo)) {
-    csrfToken = csrfToken ?? (await fetchCsrfTokenFrom("/login"));
     hasAuthenticatedSession = true;
     return;
+  }
+
+  if (!chainViewPassword) {
+    throw new ChainViewApiError({
+      authRequired: true,
+      message: "ChainView devLogin 세션 생성에 실패했습니다. API 세션 쿠키를 확인해 주세요.",
+      status: 0,
+    });
   }
 
   await establishPasswordSession(employeeNo);
