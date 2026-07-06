@@ -41,6 +41,7 @@ jobs:
           VITE_CHAINVIEW_API_BASE_URL: https://chainview.kro.kr
           VITE_CHAINVIEW_EMPLOYEE_NO: ${{ secrets.CHAINVIEW_EMPLOYEE_NO }}
           VITE_CHAINVIEW_DEV_LOGIN_PATH: /admin/dashboard
+          VITE_CHAINVIEW_MANUAL_API_LOAD: "true"
         run: npm run build
 
       - name: Add SPA fallback

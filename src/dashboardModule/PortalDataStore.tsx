@@ -211,7 +211,9 @@ type PortalDataContextValue = {
 const PortalDataContext = createContext<PortalDataContextValue | null>(null);
 const API_ONLY_DATA_MODE = import.meta.env.VITE_CHAINVIEW_DATA_SOURCE === "api";
 const API_DEBUG_ENABLED = import.meta.env.DEV && import.meta.env.MODE !== "production";
-const MANUAL_API_LOAD_MODE = import.meta.env.MODE === "test";
+const MANUAL_API_LOAD_MODE =
+  import.meta.env.MODE === "test" ||
+  import.meta.env.VITE_CHAINVIEW_MANUAL_API_LOAD === "true";
 const remoteApiEnabledFlag = import.meta.env.VITE_CHAINVIEW_REMOTE_API_ENABLED;
 const remoteOrigin = import.meta.env.VITE_CHAINVIEW_REMOTE_ORIGIN ?? "http://chainview.kro.kr:8080";
 const isMixedContentRuntime =

@@ -331,7 +331,8 @@ async function establishSession(employeeNo = chainViewEmployeeNo) {
   if (!chainViewPassword) {
     throw new ChainViewApiError({
       authRequired: true,
-      message: "ChainView devLogin 세션 생성에 실패했습니다. API 세션 쿠키를 확인해 주세요.",
+      message:
+        "ChainView devLogin 세션 생성에 실패했습니다. JSESSIONID 쿠키가 cross-site API 호출에 전송되도록 SameSite=None; Secure 설정을 확인해 주세요.",
       status: 0,
     });
   }
