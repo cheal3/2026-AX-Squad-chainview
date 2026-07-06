@@ -380,6 +380,8 @@ function DynamicAdminListPage({ activeMenu, menu }) {
     remoteStatus.state === "loading" && remoteStatus.source === remoteQueryKey;
   const showRemoteStatus =
     remoteStatus.source === remoteQueryKey || remoteStatus.source === "snapshot";
+  const showRemoteApiButton =
+    remoteQueryKey && (portalData.remoteApi.debugEnabled || menu === "services");
   const handleRemoteApiTest = async () => {
     if (!remoteQueryKey) {
       return;
@@ -602,7 +604,7 @@ function DynamicAdminListPage({ activeMenu, menu }) {
             <h1 className="page-head__title"><span className="page-head__icon" aria-hidden="true">{meta.icon}</span><span>{meta.label}</span></h1>
           </div>
           <div className="page-head__right">
-            {remoteQueryKey && portalData.remoteApi.debugEnabled ? (
+            {showRemoteApiButton ? (
               <>
                 <button
                   className="btn btn--ghost btn--sm"
@@ -754,7 +756,7 @@ function ApiQueryDetailModal({ detail, onClose }) {
             <div><span>시작</span><b>{formatApiDate(detail.startedAt)}</b></div>
             <div><span>완료</span><b>{formatApiDate(detail.finishedAt)}</b></div>
             <div><span>결과 건수</span><b>{detail.rowCount ?? "-"}</b></div>
-            <div><span>실행 가능 모드</span><b>development / test</b></div>
+            <div><span>실행 가능 모드</span><b>development / test / production 서비스 조회</b></div>
           </div>
           {detail.errorMessage ? (
             <div className="api-detail-error">
