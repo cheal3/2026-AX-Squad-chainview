@@ -1,5 +1,6 @@
 const REMOTE_ORIGIN = "http://chainview.kro.kr:8080";
 const DEFAULT_EMPLOYEE_NO = "8913812";
+const DEFAULT_DEV_LOGIN_PATH = "/admin/dashboard";
 
 export const chainViewRemoteOrigin =
   import.meta.env.VITE_CHAINVIEW_REMOTE_ORIGIN ?? REMOTE_ORIGIN;
@@ -12,6 +13,8 @@ const chainViewEmployeeNo =
   import.meta.env.VITE_CHAINVIEW_EMPLOYEE_NO ?? DEFAULT_EMPLOYEE_NO;
 const chainViewPassword =
   import.meta.env.VITE_CHAINVIEW_PASSWORD ?? "";
+const chainViewDevLoginPath =
+  import.meta.env.VITE_CHAINVIEW_DEV_LOGIN_PATH ?? DEFAULT_DEV_LOGIN_PATH;
 
 type QueryValue =
   | string
@@ -321,11 +324,34 @@ async function establishSession(employeeNo = chainViewEmployeeNo) {
     return;
   }
 
+  if (await establishDevLoginSession(employeeNo)) {
+    csrfToken = csrfToken ?? (await fetchCsrfTokenFrom("/login"));
+    hasAuthenticatedSession = true;
+    return;
+  }
+
+  await establishPasswordSession(employeeNo);
+}
+
+async function establishDevLoginSession(employeeNo: string) {
+  try {
+    await fetch(buildDevLoginUrl(employeeNo), {
+      credentials: "include",
+      mode: "no-cors",
+    });
+  } catch {
+    return false;
+  }
+
+  return hasActiveApiSession();
+}
+
+async function establishPasswordSession(employeeNo: string) {
   const token = await fetchCsrfTokenFrom("/login");
   if (!token) {
     throw new ChainViewApiError({
       authRequired: true,
-      message: "ChainView 세션 CSRF 토큰을 찾지 못했습니다.",
+      message: "ChainView devLogin 세션 생성에 실패했고, 로그인 CSRF 토큰도 찾지 못했습니다.",
       status: 0,
     });
   }
@@ -360,6 +386,10 @@ async function establishSession(employeeNo = chainViewEmployeeNo) {
     });
   }
   hasAuthenticatedSession = true;
+}
+
+function buildDevLoginUrl(employeeNo: string) {
+  return buildUrl(chainViewDevLoginPath, { devLogin: employeeNo });
 }
 
 async function fetchCsrfTokenFrom(path: string) {
