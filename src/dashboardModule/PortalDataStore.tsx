@@ -188,6 +188,9 @@ type PortalDataContextValue = {
   ) => void;
   removeRelation: (relationId: number) => void;
   addOwnerGroup: (serviceId: number, groupName: string) => void;
+  createOwner: (input: RemoteListRecord) => void;
+  updateOwner: (serviceOwnerId: number, input: RemoteListRecord) => void;
+  deleteOwner: (serviceOwnerId: number) => void;
   addTechStack: (
     inputOrServiceId: NewTechStackInput | number,
     techName?: string
@@ -991,6 +994,65 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             });
         }
       },
+      createOwner: (input) => {
+        const serviceId = asRemoteNumber(input.serviceId);
+        const ownerTypeCode = asRemoteString(input.ownerTypeCode) || "GROUP";
+        const ownerName =
+          ownerTypeCode === "USER"
+            ? asRemoteString(input.userName)
+            : asRemoteString(input.groupName);
+        setOwners((current) => [
+          {
+            serviceOwnerId: nextRemoteId(current as unknown as RemoteListRecord[], "serviceOwnerId"),
+            serviceId,
+            ownerTypeCode,
+            ownerName,
+            responsibilityCode: asRemoteString(input.responsibilityCode) || "MAIN",
+          },
+          ...current,
+        ]);
+        if (REMOTE_API_ENABLED) {
+          void chainViewApi.ownership.serviceOwners
+            .add(toServiceOwnerCreatePayload(input))
+            .then(() => testRemoteQuery("owners"))
+            .catch((error) => {
+              console.warn("[ChainView API] service owner create failed", error);
+            });
+        }
+      },
+      updateOwner: (serviceOwnerId, input) => {
+        setOwners((current) =>
+          current.map((owner) =>
+            owner.serviceOwnerId === serviceOwnerId
+              ? {
+                  ...owner,
+                  responsibilityCode: asRemoteString(input.responsibilityCode) || owner.responsibilityCode,
+                }
+              : owner
+          )
+        );
+        if (REMOTE_API_ENABLED) {
+          void chainViewApi.ownership.serviceOwners
+            .update(serviceOwnerId, toServiceOwnerUpdatePayload(input))
+            .then(() => testRemoteQuery("owners"))
+            .catch((error) => {
+              console.warn("[ChainView API] service owner update failed", error);
+            });
+        }
+      },
+      deleteOwner: (serviceOwnerId) => {
+        setOwners((current) =>
+          current.filter((owner) => owner.serviceOwnerId !== serviceOwnerId)
+        );
+        if (REMOTE_API_ENABLED) {
+          void chainViewApi.ownership.serviceOwners
+            .delete(serviceOwnerId)
+            .then(() => testRemoteQuery("owners"))
+            .catch((error) => {
+              console.warn("[ChainView API] service owner delete failed", error);
+            });
+        }
+      },
       addTechStack: (inputOrServiceId, techName) => {
         const input =
           typeof inputOrServiceId === "number"
@@ -1484,6 +1546,23 @@ function toGroupUpdatePayload(input: RemoteListRecord) {
   return {
     groupName: asRemoteString(input.groupName),
     description: asRemoteString(input.description),
+  };
+}
+
+function toServiceOwnerCreatePayload(input: RemoteListRecord) {
+  const ownerTypeCode = asRemoteString(input.ownerTypeCode) || "GROUP";
+  return {
+    serviceId: asRemoteNumber(input.serviceId),
+    ownerTypeCode,
+    groupId: ownerTypeCode === "GROUP" ? asRemoteNumber(input.groupId) : null,
+    userId: ownerTypeCode === "USER" ? asRemoteNumber(input.userId) : null,
+    responsibilityCode: asRemoteString(input.responsibilityCode) || "MAIN",
+  };
+}
+
+function toServiceOwnerUpdatePayload(input: RemoteListRecord) {
+  return {
+    responsibilityCode: asRemoteString(input.responsibilityCode) || "MAIN",
   };
 }
 

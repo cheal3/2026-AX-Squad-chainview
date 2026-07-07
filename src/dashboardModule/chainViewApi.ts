@@ -207,6 +207,8 @@ export const chainViewApi = {
       requestJson<unknown[]>(`/api/incidents/${incidentId}/notifications/targets`, "GET"),
     sendAlimtalk: (incidentId: number, body: unknown) =>
       requestJson<unknown>(`/api/incidents/${incidentId}/notifications/alimtalk`, "POST", { body }),
+    sendNotifications: (incidentId: number, body: unknown) =>
+      requestJson<unknown>(`/api/incidents/${incidentId}/notifications/send`, "POST", { body }),
   },
   notificationHistories: {
     list: (request?: QueryParams) =>
@@ -229,13 +231,108 @@ export const chainViewApi = {
       requestJson<unknown[]>("/api/assistant/services", "GET", { query: { keyword } }),
     searchServices: (keyword: string) =>
       requestJson<unknown[]>("/api/assistant/services/search", "GET", { query: { keyword } }),
+    incidentReports: {
+      list: (query?: QueryParams) =>
+        requestJson<unknown[]>("/api/assistant/incident-reports", "GET", { query }),
+      detail: (reportId: string) =>
+        requestJson<unknown>(`/api/assistant/incident-reports/${reportId}`, "GET"),
+      download: (reportId: string) =>
+        requestBlob(`/api/assistant/incident-reports/${reportId}/download`),
+      ingest: (file: File, useLlm = true) => {
+        const body = new FormData();
+        body.append("file", file);
+        return requestJson<unknown>("/api/assistant/incident-reports/ingest", "POST", {
+          body,
+          query: { useLlm },
+        });
+      },
+    },
+    routingRules: {
+      list: (query?: QueryParams) =>
+        requestJson<unknown[]>("/api/assistant/routing-rules", "GET", { query }),
+      create: (body: unknown) =>
+        requestJson<unknown>("/api/assistant/routing-rules", "POST", { body }),
+      detail: (ruleId: number) =>
+        requestJson<unknown>(`/api/assistant/routing-rules/${ruleId}`, "GET"),
+      update: (ruleId: number, body: unknown) =>
+        requestJson<unknown>(`/api/assistant/routing-rules/${ruleId}`, "PUT", { body }),
+      delete: (ruleId: number) =>
+        requestJson<void>(`/api/assistant/routing-rules/${ruleId}`, "DELETE"),
+      groups: () => requestJson<unknown[]>("/api/assistant/routing-rules/groups", "GET"),
+      meta: () => requestJson<unknown>("/api/assistant/routing-rules/meta", "GET"),
+      preview: (body: unknown) =>
+        requestJson<unknown>("/api/assistant/routing-rules/preview", "POST", { body }),
+      reload: () => requestJson<unknown>("/api/assistant/routing-rules/reload", "POST"),
+    },
+    runbooks: {
+      get: (path: string) =>
+        requestJson<unknown>("/api/assistant/runbooks", "GET", { query: { path } }),
+      list: () => requestJson<unknown[]>("/api/assistant/runbooks/list", "GET"),
+      upsert: (body: unknown) =>
+        requestJson<unknown>("/api/assistant/runbooks", "POST", { body }),
+      delete: (path: string) =>
+        requestJson<void>("/api/assistant/runbooks", "DELETE", { query: { path } }),
+    },
   },
   impact: {
+    preview: (query: QueryParams) =>
+      requestJson<unknown>("/api/impact/preview", "GET", { query }),
     service: (serviceId: number, depth?: number) =>
       requestJson<unknown>(`/api/impact/services/${serviceId}`, "GET", { query: { depth } }),
   },
   dashboard: {
     overview: () => requestJson<unknown>("/api/dashboard/overview", "GET"),
+  },
+  healthCheckJobs: {
+    list: (query?: QueryParams) => requestJson<unknown[]>("/api/health-check-jobs", "GET", { query }),
+    create: (body: unknown) => requestJson<unknown>("/api/health-check-jobs", "POST", { body }),
+    detail: (jobId: number) => requestJson<unknown>(`/api/health-check-jobs/${jobId}`, "GET"),
+    update: (jobId: number, body: unknown) =>
+      requestJson<unknown>(`/api/health-check-jobs/${jobId}`, "PUT", { body }),
+    delete: (jobId: number) => requestJson<void>(`/api/health-check-jobs/${jobId}`, "DELETE"),
+    results: (jobId: number) => requestJson<unknown[]>(`/api/health-check-jobs/${jobId}/results`, "GET"),
+    start: (jobId: number) => requestJson<unknown>(`/api/health-check-jobs/${jobId}/start`, "POST"),
+    stop: (jobId: number) => requestJson<unknown>(`/api/health-check-jobs/${jobId}/stop`, "POST"),
+  },
+  healthCheckResults: {
+    detail: (resultId: number) => requestJson<unknown>(`/api/health-check-results/${resultId}`, "GET"),
+    notificationTargets: (resultId: number) =>
+      requestJson<unknown[]>(`/api/health-check-results/${resultId}/notification-targets`, "GET"),
+    notify: (resultId: number, body: unknown) =>
+      requestJson<unknown>(`/api/health-check-results/${resultId}/notify`, "POST", { body }),
+  },
+  infraNodes: {
+    list: (query?: QueryParams) => requestJson<unknown[]>("/api/infra-nodes", "GET", { query }),
+    create: (body: unknown) => requestJson<unknown>("/api/infra-nodes", "POST", { body }),
+    detail: (infraNodeId: number) => requestJson<unknown>(`/api/infra-nodes/${infraNodeId}`, "GET"),
+    update: (infraNodeId: number, body: unknown) =>
+      requestJson<unknown>(`/api/infra-nodes/${infraNodeId}`, "PUT", { body }),
+    delete: (infraNodeId: number) => requestJson<void>(`/api/infra-nodes/${infraNodeId}`, "DELETE"),
+    edges: (infraNodeId: number) => requestJson<unknown[]>(`/api/infra-nodes/${infraNodeId}/edges`, "GET"),
+    createEdge: (body: unknown) => requestJson<unknown>("/api/infra-nodes/edges", "POST", { body }),
+    deleteEdge: (infraEdgeId: number) =>
+      requestJson<void>(`/api/infra-nodes/edges/${infraEdgeId}`, "DELETE"),
+  },
+  internalMonitoring: {
+    jobs: () => requestJson<unknown[]>("/api/internal/monitoring/jobs", "GET"),
+    job: (jobCode: string) => requestJson<unknown>(`/api/internal/monitoring/jobs/${jobCode}`, "GET"),
+    recordResult: (body: unknown) =>
+      requestJson<unknown>("/api/internal/monitoring/results", "POST", { body }),
+    notifyResult: (resultId: number) =>
+      requestJson<unknown>(`/api/internal/monitoring/results/${resultId}/notify`, "POST"),
+  },
+  statistics: {
+    asset: (query?: QueryParams) => requestJson<unknown>("/api/statistics/asset", "GET", { query }),
+    assetExcel: (query?: QueryParams) => requestBlob("/api/statistics/asset/excel", { query }),
+    dependency: (query?: QueryParams) => requestJson<unknown>("/api/statistics/dependency", "GET", { query }),
+    dependencyExcel: (query?: QueryParams) => requestBlob("/api/statistics/dependency/excel", { query }),
+    operations: (query?: QueryParams) => requestJson<unknown>("/api/statistics/operations", "GET", { query }),
+    operationsExcel: (query?: QueryParams) => requestBlob("/api/statistics/operations/excel", { query }),
+    techstack: (query?: QueryParams) => requestJson<unknown>("/api/statistics/techstack", "GET", { query }),
+    techstackExcel: (query?: QueryParams) => requestBlob("/api/statistics/techstack/excel", { query }),
+  },
+  topology: {
+    graph: (query?: QueryParams) => requestJson<unknown>("/api/topology/graph", "GET", { query }),
   },
 };
 
@@ -305,6 +402,40 @@ async function requestJson<T>(
   }
 
   return text as T;
+}
+
+async function requestBlob(
+  path: string,
+  options: Pick<RequestOptions, "query"> = {}
+) {
+  if (!hasAuthenticatedSession) {
+    await ensureSession();
+  }
+
+  const response = await fetch(buildUrl(path, options.query), {
+    credentials: "include",
+    redirect: "manual",
+    headers: { Accept: "*/*" },
+  });
+
+  const contentType = response.headers.get("content-type") ?? "";
+  if (isSessionChallengeResponse(response, contentType, "")) {
+    hasAuthenticatedSession = false;
+    csrfToken = null;
+    await ensureSession();
+    return requestBlob(path, options);
+  }
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new ChainViewApiError({
+      body: text,
+      message: extractErrorMessage(text) ?? `ChainView 파일 다운로드 실패 (${response.status})`,
+      status: response.status,
+    });
+  }
+
+  return response.blob();
 }
 
 async function ensureSession() {

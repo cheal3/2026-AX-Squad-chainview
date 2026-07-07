@@ -698,11 +698,12 @@ function DynamicAdminListPage({ activeMenu, menu }) {
           <div className="pager__nav"><button disabled>‹</button><button className="is-on">1</button><button disabled>›</button></div>
         </div>
       </div>
-      {menu === "owners" ? (
+      {menu === "owners" && ownerModal ? (
         <OwnerManagementModals
           modal={ownerModal}
           onClose={closeOwnerModal}
           owner={selectedOwner}
+          portalData={portalData}
           services={portalData.services}
         />
       ) : null}
@@ -1483,7 +1484,7 @@ function serviceLabel(service) {
   return service ? `${service.serviceCode} ${service.serviceName}` : "서비스 미지정";
 }
 
-function OwnerManagementModals({ modal, onClose, owner, services }) {
+function OwnerManagementModals({ modal, onClose, owner, portalData, services }) {
   if (!modal) {
     return null;
   }
@@ -1491,6 +1492,55 @@ function OwnerManagementModals({ modal, onClose, owner, services }) {
   const service = owner ? services.find((item) => item.serviceId === owner.serviceId) : services[0];
   const serviceLabel = service ? `${service.serviceCode} ${service.serviceName}` : "서비스 선택";
   const ownerId = owner?.serviceOwnerId ? `OWN-${String(owner.serviceOwnerId).padStart(4, "0")}` : "신규";
+  const [form, setForm] = useState(() => ({
+    serviceId: String(owner?.serviceId ?? services[0]?.serviceId ?? ""),
+    ownerTypeCode: owner?.ownerTypeCode ?? "GROUP",
+    groupId: String(owner?.groupId ?? portalData.groups[0]?.groupId ?? ""),
+    userId: String(owner?.userId ?? portalData.users[0]?.userId ?? ""),
+    responsibilityCode: owner?.responsibilityCode ?? "MAIN",
+  }));
+  const updateField = (field, value) => setForm((current) => ({ ...current, [field]: value }));
+  const handleClose = () => onClose();
+  const handleSubmit = () => {
+    if (modal === "delete") {
+      portalData.deleteOwner(owner.serviceOwnerId);
+      onClose();
+      return;
+    }
+
+    const ownerTypeCode = form.ownerTypeCode;
+    const group = portalData.groups.find((item) => String(item.groupId) === String(form.groupId));
+    const user = portalData.users.find((item) => String(item.userId) === String(form.userId));
+    const payload = {
+      serviceId: Number(form.serviceId),
+      ownerTypeCode,
+      groupId: Number(form.groupId) || null,
+      groupName: group?.groupName,
+      userId: Number(form.userId) || null,
+      userName: user?.userName,
+      responsibilityCode: form.responsibilityCode,
+    };
+
+    if (!payload.serviceId) {
+      window.alert("서비스를 선택해주세요.");
+      return;
+    }
+    if (ownerTypeCode === "GROUP" && !payload.groupId) {
+      window.alert("그룹을 선택해주세요.");
+      return;
+    }
+    if (ownerTypeCode === "USER" && !payload.userId) {
+      window.alert("사용자를 선택해주세요.");
+      return;
+    }
+
+    if (modal === "edit") {
+      portalData.updateOwner(owner.serviceOwnerId, payload);
+    } else {
+      portalData.createOwner(payload);
+    }
+    onClose();
+  };
 
   if (modal === "delete") {
     return (
@@ -1502,7 +1552,7 @@ function OwnerManagementModals({ modal, onClose, owner, services }) {
             <div className="confirm__msg"><b>{ownerId} ({serviceLabel} / {owner?.ownerName ?? "담당자"})</b>을 해제하시겠습니까?</div>
             <div className="confirm__note">해제 즉시 알림 수신 대상에서 제외됩니다.<br />일반적으로 종료일을 지정하여 이력 보존을 권장합니다.</div>
           </div>
-          <div className="modal__foot"><button className="btn" onClick={onClose} type="button">취소</button><button className="btn btn--danger" onClick={onClose} type="button">해제</button></div>
+          <div className="modal__foot"><button className="btn" onClick={handleClose} type="button">취소</button><button className="btn btn--danger" onClick={handleSubmit} type="button">해제</button></div>
         </div>
       </div>
     );
@@ -1515,7 +1565,7 @@ function OwnerManagementModals({ modal, onClose, owner, services }) {
       <div className="modal" onClick={(event) => event.stopPropagation()}>
         <div className="modal__head">
           <h3>{isEdit ? `✏️ 담당자 수정 — ${ownerId}` : "＋ 담당자 지정"}</h3>
-          <button className="close" onClick={onClose} type="button">×</button>
+          <button className="close" onClick={handleClose} type="button">×</button>
         </div>
         <div className="modal__body">
           <div className="form-section">
@@ -1525,10 +1575,10 @@ function OwnerManagementModals({ modal, onClose, owner, services }) {
               {isEdit ? (
                 <input type="text" value={serviceLabel} disabled />
               ) : (
-                <select defaultValue="">
+                <select value={form.serviceId} onChange={(event) => updateField("serviceId", event.target.value)}>
                   <option value="">선택</option>
-                  {services.slice(0, 12).map((item) => (
-                    <option key={item.serviceId}>{item.serviceCode} {item.serviceName}</option>
+                  {services.map((item) => (
+                    <option key={item.serviceId} value={item.serviceId}>{item.serviceCode} {item.serviceName}</option>
                   ))}
                 </select>
               )}
@@ -1539,18 +1589,30 @@ function OwnerManagementModals({ modal, onClose, owner, services }) {
             <div className="form-grid">
               <div className="form-row">
                 <label>담당자/그룹<span className="req">*</span></label>
-                <input type="text" defaultValue={owner?.ownerName ?? ""} placeholder="예: 대외계 담당그룹" disabled={isEdit} />
+                {isEdit ? (
+                  <input type="text" value={owner?.assigneeDisplay ?? owner?.ownerName ?? ""} disabled />
+                ) : form.ownerTypeCode === "GROUP" ? (
+                  <select value={form.groupId} onChange={(event) => updateField("groupId", event.target.value)}>
+                    <option value="">그룹 선택</option>
+                    {portalData.groups.map((group) => <option key={group.groupId} value={group.groupId}>{group.groupCode} {group.groupName}</option>)}
+                  </select>
+                ) : (
+                  <select value={form.userId} onChange={(event) => updateField("userId", event.target.value)}>
+                    <option value="">사용자 선택</option>
+                    {portalData.users.map((user) => <option key={user.userId} value={user.userId}>{user.employeeNo} {user.userName}</option>)}
+                  </select>
+                )}
               </div>
               <div className="form-row">
                 <label>담당 유형</label>
-                <select defaultValue={owner?.ownerTypeCode ?? "GROUP"}>
+                <select value={form.ownerTypeCode} onChange={(event) => updateField("ownerTypeCode", event.target.value)} disabled={isEdit}>
                   <option value="GROUP">그룹</option>
                   <option value="USER">사용자</option>
                 </select>
               </div>
               <div className="form-row">
                 <label>책임</label>
-                <select defaultValue={owner?.responsibilityCode ?? "MAIN"}>
+                <select value={form.responsibilityCode} onChange={(event) => updateField("responsibilityCode", event.target.value)}>
                   <option value="MAIN">주담당</option>
                   <option value="SUB">부담당</option>
                   <option value="ALERT">알림수신</option>
@@ -1566,7 +1628,7 @@ function OwnerManagementModals({ modal, onClose, owner, services }) {
             </div>
           </div>
         </div>
-        <div className="modal__foot"><button className="btn" onClick={onClose} type="button">취소</button><button className="btn btn--primary" onClick={onClose} type="button">{isEdit ? "저장" : "등록"}</button></div>
+        <div className="modal__foot"><button className="btn" onClick={handleClose} type="button">취소</button><button className="btn btn--primary" onClick={handleSubmit} type="button">{isEdit ? "저장" : "등록"}</button></div>
       </div>
     </div>
   );
