@@ -853,6 +853,14 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             .then(() => refreshRemoteData(400))
             .catch((error) => {
               console.warn("[ChainView API] service create failed", error);
+              setServices((current) =>
+                current.filter((service) => service.serviceId !== nextService.serviceId)
+              );
+              window.alert(
+                error instanceof Error
+                  ? error.message
+                  : "서비스 등록 API 호출에 실패했습니다."
+              );
             });
         }
         return nextService;
@@ -1690,14 +1698,23 @@ function toIncidentUpdatePayload(
 }
 
 async function findCategoryId(categoryPath: string[]) {
-  const categoryName = categoryPath[categoryPath.length - 1] ?? categoryPath[0];
+  const cleanedPath = categoryPath.map((item) => item.trim()).filter(Boolean);
+  const categoryName = cleanedPath[cleanedPath.length - 1] ?? "";
   const categories = asRemoteRecordArray(
     await chainViewApi.serviceCategories.list()
   );
+  const leafCategories = categories.filter(
+    (category) => asRemoteNumber(category.categoryLevel) === 3
+  );
   const match =
+    leafCategories.find(
+      (category) => asRemoteString(category.categoryName) === categoryName
+    ) ??
     categories.find(
       (category) => asRemoteString(category.categoryName) === categoryName
-    ) ?? categories[0];
+    ) ??
+    leafCategories[0] ??
+    categories[0];
 
   return asRemoteNumber(match?.categoryId, 1);
 }

@@ -839,7 +839,7 @@ function AdminRecordModal({ modal, onClose, portalData, serverById, serviceById 
     }
 
     if (menu === "services") {
-      const serviceCode = requireValue(form.serviceCode, "serviceCode");
+      const serviceCode = requireValue(form.serviceCode, "serviceCode")?.toUpperCase();
       const serviceName = requireValue(form.serviceName, "서비스명");
       if (!serviceCode || !serviceName) return;
       const payload = {
