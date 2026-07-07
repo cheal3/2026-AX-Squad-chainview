@@ -197,6 +197,21 @@ type PortalDataContextValue = {
     input: Partial<TechStackRecord>
   ) => void;
   deleteTechStack: (techStackId: number) => void;
+  createUser: (input: RemoteListRecord) => void;
+  updateUser: (userId: number, input: RemoteListRecord) => void;
+  deleteUser: (userId: number) => void;
+  createGroup: (input: RemoteListRecord) => void;
+  updateGroup: (groupId: number, input: RemoteListRecord) => void;
+  deleteGroup: (groupId: number) => void;
+  createCategory: (input: RemoteListRecord) => void;
+  updateCategory: (categoryId: number, input: RemoteListRecord) => void;
+  deleteCategory: (categoryId: number) => void;
+  createCode: (input: RemoteListRecord) => void;
+  updateCode: (codeGroup: string, code: string, input: RemoteListRecord) => void;
+  deleteCode: (codeGroup: string, code: string) => void;
+  createDeployment: (input: RemoteListRecord) => void;
+  updateDeployment: (input: RemoteListRecord) => void;
+  deleteDeployment: (input: RemoteListRecord) => void;
   runHealthCheck: (serviceId: number, url: string) => HealthCheckResult;
   remoteApi: {
     enabled: boolean;
@@ -1044,6 +1059,231 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             });
         }
       },
+      createUser: (input) => {
+        const nextUser = {
+          userId: nextRemoteId(users, "userId"),
+          ...input,
+          activeYn: asRemoteBoolean(input.active) ? "Y" : "N",
+        };
+        setUsers((current) => [nextUser, ...current]);
+        if (REMOTE_API_ENABLED) {
+          void chainViewApi.ownership.users
+            .create(toUserCreatePayload(input))
+            .then(() => testRemoteQuery("users"))
+            .catch((error) => {
+              console.warn("[ChainView API] user create failed", error);
+            });
+        }
+      },
+      updateUser: (userId, input) => {
+        setUsers((current) =>
+          current.map((user) =>
+            asRemoteNumber(user.userId) === userId
+              ? { ...user, ...input, activeYn: asRemoteBoolean(input.active) ? "Y" : "N" }
+              : user
+          )
+        );
+        if (REMOTE_API_ENABLED) {
+          void chainViewApi.ownership.users
+            .update(userId, toUserUpdatePayload(input))
+            .then(() => testRemoteQuery("users"))
+            .catch((error) => {
+              console.warn("[ChainView API] user update failed", error);
+            });
+        }
+      },
+      deleteUser: (userId) => {
+        setUsers((current) =>
+          current.filter((user) => asRemoteNumber(user.userId) !== userId)
+        );
+        if (REMOTE_API_ENABLED) {
+          void chainViewApi.ownership.users
+            .delete(userId)
+            .then(() => testRemoteQuery("users"))
+            .catch((error) => {
+              console.warn("[ChainView API] user delete failed", error);
+            });
+        }
+      },
+      createGroup: (input) => {
+        setGroups((current) => [
+          { groupId: nextRemoteId(current, "groupId"), ...input },
+          ...current,
+        ]);
+        if (REMOTE_API_ENABLED) {
+          void chainViewApi.ownership.groups
+            .create(toGroupCreatePayload(input))
+            .then(() => testRemoteQuery("groups"))
+            .catch((error) => {
+              console.warn("[ChainView API] group create failed", error);
+            });
+        }
+      },
+      updateGroup: (groupId, input) => {
+        setGroups((current) =>
+          current.map((group) =>
+            asRemoteNumber(group.groupId) === groupId ? { ...group, ...input } : group
+          )
+        );
+        if (REMOTE_API_ENABLED) {
+          void chainViewApi.ownership.groups
+            .update(groupId, toGroupUpdatePayload(input))
+            .then(() => testRemoteQuery("groups"))
+            .catch((error) => {
+              console.warn("[ChainView API] group update failed", error);
+            });
+        }
+      },
+      deleteGroup: (groupId) => {
+        setGroups((current) =>
+          current.filter((group) => asRemoteNumber(group.groupId) !== groupId)
+        );
+        if (REMOTE_API_ENABLED) {
+          void chainViewApi.ownership.groups
+            .delete(groupId)
+            .then(() => testRemoteQuery("groups"))
+            .catch((error) => {
+              console.warn("[ChainView API] group delete failed", error);
+            });
+        }
+      },
+      createCategory: (input) => {
+        setCategories((current) => [
+          { categoryId: nextRemoteId(current, "categoryId"), ...input },
+          ...current,
+        ]);
+        if (REMOTE_API_ENABLED) {
+          void chainViewApi.serviceCategories
+            .create(toCategoryCreatePayload(input))
+            .then(() => testRemoteQuery("categories"))
+            .catch((error) => {
+              console.warn("[ChainView API] category create failed", error);
+            });
+        }
+      },
+      updateCategory: (categoryId, input) => {
+        setCategories((current) =>
+          current.map((category) =>
+            asRemoteNumber(category.categoryId) === categoryId ? { ...category, ...input } : category
+          )
+        );
+        if (REMOTE_API_ENABLED) {
+          void chainViewApi.serviceCategories
+            .update(categoryId, toCategoryUpdatePayload(input))
+            .then(() => testRemoteQuery("categories"))
+            .catch((error) => {
+              console.warn("[ChainView API] category update failed", error);
+            });
+        }
+      },
+      deleteCategory: (categoryId) => {
+        setCategories((current) =>
+          current.filter((category) => asRemoteNumber(category.categoryId) !== categoryId)
+        );
+        if (REMOTE_API_ENABLED) {
+          void chainViewApi.serviceCategories
+            .delete(categoryId)
+            .then(() => testRemoteQuery("categories"))
+            .catch((error) => {
+              console.warn("[ChainView API] category delete failed", error);
+            });
+        }
+      },
+      createCode: (input) => {
+        setCodes((current) => [{ useYn: "Y", ...input }, ...current]);
+        if (REMOTE_API_ENABLED) {
+          void chainViewApi.commonCodes
+            .create(toCommonCodeCreatePayload(input))
+            .then(() => testRemoteQuery("codes"))
+            .catch((error) => {
+              console.warn("[ChainView API] common code create failed", error);
+            });
+        }
+      },
+      updateCode: (codeGroup, code, input) => {
+        setCodes((current) =>
+          current.map((item) =>
+            asRemoteString(item.codeGroup) === codeGroup && asRemoteString(item.code) === code
+              ? { ...item, ...input }
+              : item
+          )
+        );
+        if (REMOTE_API_ENABLED) {
+          void chainViewApi.commonCodes
+            .update(codeGroup, code, toCommonCodeUpdatePayload(input))
+            .then(() => testRemoteQuery("codes"))
+            .catch((error) => {
+              console.warn("[ChainView API] common code update failed", error);
+            });
+        }
+      },
+      deleteCode: (codeGroup, code) => {
+        setCodes((current) =>
+          current.filter(
+            (item) => !(asRemoteString(item.codeGroup) === codeGroup && asRemoteString(item.code) === code)
+          )
+        );
+        if (REMOTE_API_ENABLED) {
+          void chainViewApi.commonCodes
+            .delete(codeGroup, code)
+            .then(() => testRemoteQuery("codes"))
+            .catch((error) => {
+              console.warn("[ChainView API] common code delete failed", error);
+            });
+        }
+      },
+      createDeployment: (input) => {
+        const serviceId = asRemoteNumber(input.serviceId);
+        const serverId = asRemoteNumber(input.serverId);
+        const service = services.find((item) => item.serviceId === serviceId);
+        const server = servers.find((item) => item.serverId === serverId);
+        const nextDeployment = {
+          deploymentKey: `${serviceId}-new-${Date.now()}`,
+          ...input,
+          serviceCode: service?.serviceCode,
+          serviceName: service?.serviceName,
+          serverName: server?.serverName,
+          hostName: server?.hostName,
+        };
+        setDeployments((current) => [nextDeployment, ...current]);
+        if (REMOTE_API_ENABLED && serviceId) {
+          void appendRemoteDeployment(serviceId, input)
+            .then(() => testRemoteQuery("deployments"))
+            .catch((error) => {
+              console.warn("[ChainView API] deployment create failed", error);
+            });
+        }
+      },
+      updateDeployment: (input) => {
+        const serviceId = asRemoteNumber(input.serviceId);
+        const key = deploymentKey(input);
+        setDeployments((current) =>
+          current.map((deployment) =>
+            deploymentKey(deployment) === key ? { ...deployment, ...input } : deployment
+          )
+        );
+        if (REMOTE_API_ENABLED && serviceId) {
+          void replaceRemoteDeployment(serviceId, input)
+            .then(() => testRemoteQuery("deployments"))
+            .catch((error) => {
+              console.warn("[ChainView API] deployment update failed", error);
+            });
+        }
+      },
+      deleteDeployment: (input) => {
+        const serviceId = asRemoteNumber(input.serviceId);
+        const key = deploymentKey(input);
+        setDeployments((current) =>
+          current.filter((deployment) => deploymentKey(deployment) !== key)
+        );
+        if (REMOTE_API_ENABLED && serviceId) {
+          void removeRemoteDeployment(serviceId, input)
+            .then(() => testRemoteQuery("deployments"))
+            .catch((error) => {
+              console.warn("[ChainView API] deployment delete failed", error);
+            });
+        }
+      },
       runHealthCheck: (serviceId, url) => {
         const normalizedUrl = url.trim();
         const ok =
@@ -1207,6 +1447,137 @@ function toRelationPayload(input: NewRelationInput) {
   };
 }
 
+function toUserCreatePayload(input: RemoteListRecord) {
+  return {
+    employeeNo: asRemoteString(input.employeeNo),
+    userName: asRemoteString(input.userName),
+    orgName: asRemoteString(input.orgName),
+    departmentName: asRemoteString(input.departmentName),
+    roleName: asRemoteString(input.roleName),
+    phoneNumber: asRemoteString(input.phoneNumber),
+    email: asRemoteString(input.email),
+    active: asRemoteBoolean(input.active ?? input.activeYn, true),
+  };
+}
+
+function toUserUpdatePayload(input: RemoteListRecord) {
+  return {
+    userName: asRemoteString(input.userName),
+    orgName: asRemoteString(input.orgName),
+    departmentName: asRemoteString(input.departmentName),
+    roleName: asRemoteString(input.roleName),
+    phoneNumber: asRemoteString(input.phoneNumber),
+    email: asRemoteString(input.email),
+    active: asRemoteBoolean(input.active ?? input.activeYn, true),
+  };
+}
+
+function toGroupCreatePayload(input: RemoteListRecord) {
+  return {
+    groupCode: asRemoteString(input.groupCode),
+    groupName: asRemoteString(input.groupName),
+    description: asRemoteString(input.description),
+  };
+}
+
+function toGroupUpdatePayload(input: RemoteListRecord) {
+  return {
+    groupName: asRemoteString(input.groupName),
+    description: asRemoteString(input.description),
+  };
+}
+
+function toCategoryCreatePayload(input: RemoteListRecord) {
+  const parentCategoryId = asRemoteNumber(input.parentCategoryId);
+  return {
+    parentCategoryId: parentCategoryId || null,
+    categoryLevel: asRemoteNumber(input.categoryLevel, 1),
+    categoryCode: asRemoteString(input.categoryCode),
+    categoryName: asRemoteString(input.categoryName),
+    sortOrder: asRemoteNumber(input.sortOrder),
+  };
+}
+
+function toCategoryUpdatePayload(input: RemoteListRecord) {
+  return {
+    categoryName: asRemoteString(input.categoryName),
+    sortOrder: asRemoteNumber(input.sortOrder),
+  };
+}
+
+function toCommonCodeCreatePayload(input: RemoteListRecord) {
+  return {
+    codeGroup: asRemoteString(input.codeGroup),
+    code: asRemoteString(input.code),
+    codeName: asRemoteString(input.codeName),
+    sortOrder: asRemoteNumber(input.sortOrder),
+    remarks: asRemoteString(input.remarks),
+  };
+}
+
+function toCommonCodeUpdatePayload(input: RemoteListRecord) {
+  return {
+    codeName: asRemoteString(input.codeName),
+    sortOrder: asRemoteNumber(input.sortOrder),
+    useYn: asRemoteString(input.useYn) || "Y",
+    remarks: asRemoteString(input.remarks),
+  };
+}
+
+async function appendRemoteDeployment(serviceId: number, input: RemoteListRecord) {
+  const detail = await chainViewApi.services.detail(serviceId);
+  const deployments = asRemoteRecordArray((detail as Record<string, unknown>)?.deployments);
+  await saveRemoteServiceDeployments(serviceId, detail, [...deployments, input]);
+}
+
+async function replaceRemoteDeployment(serviceId: number, input: RemoteListRecord) {
+  const detail = await chainViewApi.services.detail(serviceId);
+  const key = deploymentKey(input);
+  const deployments = asRemoteRecordArray((detail as Record<string, unknown>)?.deployments).map(
+    (deployment) => deploymentKey({ ...deployment, serviceId }) === key ? input : deployment
+  );
+  await saveRemoteServiceDeployments(serviceId, detail, deployments);
+}
+
+async function removeRemoteDeployment(serviceId: number, input: RemoteListRecord) {
+  const detail = await chainViewApi.services.detail(serviceId);
+  const key = deploymentKey(input);
+  const deployments = asRemoteRecordArray((detail as Record<string, unknown>)?.deployments).filter(
+    (deployment) => deploymentKey({ ...deployment, serviceId }) !== key
+  );
+  await saveRemoteServiceDeployments(serviceId, detail, deployments);
+}
+
+async function saveRemoteServiceDeployments(
+  serviceId: number,
+  detail: unknown,
+  deployments: RemoteListRecord[]
+) {
+  const record = isRemoteRecord(detail) ? detail : {};
+  const payload = {
+    categoryId: asRemoteNumber(record.categoryId, 1),
+    serviceCode: asRemoteString(record.serviceCode),
+    serviceName: asRemoteString(record.serviceName),
+    serviceTypeCode: asRemoteString(record.serviceTypeCode) || "API",
+    importanceCode: asRemoteString(record.importanceCode) || "NORMAL",
+    statusCode: asRemoteString(record.statusCode) || "NORMAL",
+    description: asRemoteString(record.description),
+    endpointUrl: asRemoteString(record.endpointUrl),
+    deployments: deployments.map(toRemoteDeploymentPayload),
+  };
+  await chainViewApi.services.update(serviceId, payload);
+}
+
+function deploymentKey(input: RemoteListRecord) {
+  return [
+    asRemoteNumber(input.serviceId),
+    asRemoteNumber(input.serviceServerId) ||
+      asRemoteNumber(input.deploymentId) ||
+      asRemoteString(input.deploymentKey) ||
+      `${asRemoteNumber(input.serverId)}:${asRemoteString(input.deployPath)}:${asRemoteString(input.portInfo)}`,
+  ].join(":");
+}
+
 function toIncidentCreatePayload(input: NewIncidentInput, startedAt: string) {
   return {
     incidentTypeCode: "SERVICE",
@@ -1350,6 +1721,20 @@ function asRemoteNumber(value: unknown, fallback = 0) {
   return Number.isFinite(numberValue) ? numberValue : fallback;
 }
 
+function asRemoteBoolean(value: unknown, fallback = false) {
+  if (typeof value === "boolean") {
+    return value;
+  }
+  const normalized = asRemoteString(value).toUpperCase();
+  if (["Y", "TRUE", "ACTIVE", "1"].includes(normalized)) {
+    return true;
+  }
+  if (["N", "FALSE", "INACTIVE", "0"].includes(normalized)) {
+    return false;
+  }
+  return fallback;
+}
+
 function timestamp() {
   const now = new Date();
   const pad = (value: number) => String(value).padStart(2, "0");
@@ -1366,6 +1751,10 @@ function nextId<T extends Record<K, number>, K extends keyof T>(
   key: K
 ) {
   return Math.max(0, ...items.map((item) => item[key])) + 1;
+}
+
+function nextRemoteId(items: RemoteListRecord[], key: string) {
+  return Math.max(0, ...items.map((item) => asRemoteNumber(item[key]))) + 1;
 }
 
 function buildIncidentImpacts({

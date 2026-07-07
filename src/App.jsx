@@ -479,7 +479,7 @@ function DynamicAdminListPage({ activeMenu, menu }) {
       })),
     },
     users: {
-      readOnly: true,
+      actionLabel: "＋ 사용자 등록",
       columns: ["userId", "사번", "이름", "조직", "부서", "역할", "연락처", "이메일", "활성"],
       rows: portalData.users.map((user) => ({
         key: recordKey(user, "userId", "employeeNo"),
@@ -498,7 +498,7 @@ function DynamicAdminListPage({ activeMenu, menu }) {
       })),
     },
     groups: {
-      readOnly: true,
+      actionLabel: "＋ 그룹 등록",
       columns: ["groupId", "groupCode", "그룹명", "설명"],
       rows: portalData.groups.map((group) => ({
         key: recordKey(group, "groupId", "groupCode"),
@@ -512,7 +512,7 @@ function DynamicAdminListPage({ activeMenu, menu }) {
       })),
     },
     categories: {
-      readOnly: true,
+      actionLabel: "＋ 분류 등록",
       columns: ["categoryId", "분류코드", "분류명", "레벨", "상위 ID", "정렬", "수정일"],
       rows: portalData.categories.map((category) => ({
         key: recordKey(category, "categoryId", "categoryCode"),
@@ -529,7 +529,7 @@ function DynamicAdminListPage({ activeMenu, menu }) {
       })),
     },
     codes: {
-      readOnly: true,
+      actionLabel: "＋ 코드 등록",
       columns: ["코드그룹", "코드", "코드명", "정렬", "사용", "비고"],
       rows: portalData.codes.map((code) => ({
         key: `${field(code, "codeGroup")}-${field(code, "code")}`,
@@ -545,7 +545,7 @@ function DynamicAdminListPage({ activeMenu, menu }) {
       })),
     },
     deployments: {
-      readOnly: true,
+      actionLabel: "＋ 배포 등록",
       columns: ["서비스", "서버", "배포 경로", "포트", "상태", "인스턴스"],
       rows: portalData.deployments.map((deployment) => ({
         key: field(deployment, "deploymentKey") || recordKey(deployment, "deploymentId", "serverId"),
@@ -822,6 +822,16 @@ function AdminRecordModal({ modal, onClose, portalData, serverById, serviceById 
         portalData.removeRelation(record.relationId);
       } else if (menu === "techstacks") {
         portalData.deleteTechStack(record.techStackId);
+      } else if (menu === "users") {
+        portalData.deleteUser(Number(record.userId));
+      } else if (menu === "groups") {
+        portalData.deleteGroup(Number(record.groupId));
+      } else if (menu === "categories") {
+        portalData.deleteCategory(Number(record.categoryId));
+      } else if (menu === "codes") {
+        portalData.deleteCode(String(record.codeGroup), String(record.code));
+      } else if (menu === "deployments") {
+        portalData.deleteDeployment(record);
       }
       onClose();
       return;
@@ -919,6 +929,98 @@ function AdminRecordModal({ modal, onClose, portalData, serverById, serviceById 
       } else {
         portalData.updateTechStack(record.techStackId, payload);
       }
+    } else if (menu === "users") {
+      const employeeNo = requireValue(form.employeeNo, "사번");
+      const userName = requireValue(form.userName, "이름");
+      if (!employeeNo || !userName) return;
+      const payload = {
+        employeeNo,
+        userName,
+        orgName: form.orgName.trim(),
+        departmentName: form.departmentName.trim(),
+        roleName: form.roleName.trim(),
+        phoneNumber: form.phoneNumber.trim(),
+        email: form.email.trim(),
+        active: form.active === "true",
+      };
+      if (isCreate) {
+        portalData.createUser(payload);
+      } else {
+        portalData.updateUser(Number(record.userId), payload);
+      }
+    } else if (menu === "groups") {
+      const groupCode = requireValue(form.groupCode, "groupCode");
+      const groupName = requireValue(form.groupName, "그룹명");
+      if (!groupCode || !groupName) return;
+      const payload = {
+        groupCode,
+        groupName,
+        description: form.description.trim(),
+      };
+      if (isCreate) {
+        portalData.createGroup(payload);
+      } else {
+        portalData.updateGroup(Number(record.groupId), payload);
+      }
+    } else if (menu === "categories") {
+      const categoryCode = requireValue(form.categoryCode, "분류코드");
+      const categoryName = requireValue(form.categoryName, "분류명");
+      if (!categoryCode || !categoryName) return;
+      const payload = {
+        parentCategoryId: Number(form.parentCategoryId) || null,
+        categoryLevel: Number(form.categoryLevel) || 1,
+        categoryCode,
+        categoryName,
+        sortOrder: Number(form.sortOrder) || 0,
+      };
+      if (isCreate) {
+        portalData.createCategory(payload);
+      } else {
+        portalData.updateCategory(Number(record.categoryId), payload);
+      }
+    } else if (menu === "codes") {
+      const codeGroup = requireValue(form.codeGroup, "코드그룹");
+      const code = requireValue(form.code, "코드");
+      const codeName = requireValue(form.codeName, "코드명");
+      if (!codeGroup || !code || !codeName) return;
+      const payload = {
+        codeGroup,
+        code,
+        codeName,
+        sortOrder: Number(form.sortOrder) || 0,
+        useYn: form.useYn,
+        remarks: form.remarks.trim(),
+      };
+      if (isCreate) {
+        portalData.createCode(payload);
+      } else {
+        portalData.updateCode(String(record.codeGroup), String(record.code), payload);
+      }
+    } else if (menu === "deployments") {
+      const serviceId = Number(form.serviceId);
+      const serverId = Number(form.serverId);
+      const deployPath = requireValue(form.deployPath, "배포 경로");
+      if (!serviceId || !serverId || !deployPath) return;
+      const service = portalData.services.find((item) => item.serviceId === serviceId);
+      const server = portalData.servers.find((item) => item.serverId === serverId);
+      const payload = {
+        ...(record ?? {}),
+        serviceId,
+        serverId,
+        serviceCode: service?.serviceCode,
+        serviceName: service?.serviceName,
+        serverName: server?.serverName,
+        hostName: server?.hostName,
+        deployPath,
+        portInfo: form.portInfo.trim(),
+        deploymentStatusCode: form.deploymentStatusCode,
+        instanceCount: Number(form.instanceCount) || 1,
+      };
+      if (isCreate) {
+        portalData.createDeployment(payload);
+      } else {
+        portalData.updateDeployment(payload);
+      }
     }
 
     onClose();
@@ -959,6 +1061,15 @@ function AdminRecordModal({ modal, onClose, portalData, serverById, serviceById 
           ) : null}
           {menu === "techstacks" ? (
             <TechStackAdminForm form={form} onChange={updateField} services={portalData.services} isEdit={isEdit} />
+          ) : null}
+          {["users", "groups", "categories", "codes", "deployments"].includes(menu) ? (
+            <RemoteAdminForm
+              form={form}
+              isEdit={isEdit}
+              menu={menu}
+              onChange={updateField}
+              portalData={portalData}
+            />
           ) : null}
         </div>
         <div className="modal__foot">
@@ -1117,6 +1228,90 @@ function TechStackAdminForm({ form, onChange, services, isEdit }) {
   );
 }
 
+function RemoteAdminForm({ form, isEdit, menu, onChange, portalData }) {
+  if (menu === "users") {
+    return (
+      <>
+        <div className="form-section">
+          <h4 className="form-section__title">사용자 정보</h4>
+          <div className="form-grid">
+            <div className="form-row"><label>사번<span className="req">*</span></label><input type="text" value={form.employeeNo} onChange={(event) => onChange("employeeNo", event.target.value)} disabled={isEdit} /></div>
+            <div className="form-row"><label>이름<span className="req">*</span></label><input type="text" value={form.userName} onChange={(event) => onChange("userName", event.target.value)} /></div>
+            <div className="form-row"><label>조직</label><input type="text" value={form.orgName} onChange={(event) => onChange("orgName", event.target.value)} /></div>
+            <div className="form-row"><label>부서</label><input type="text" value={form.departmentName} onChange={(event) => onChange("departmentName", event.target.value)} /></div>
+            <div className="form-row"><label>역할</label><input type="text" value={form.roleName} onChange={(event) => onChange("roleName", event.target.value)} /></div>
+            <div className="form-row"><label>활성</label><select value={form.active} onChange={(event) => onChange("active", event.target.value)}><option value="true">활성</option><option value="false">비활성</option></select></div>
+            <div className="form-row"><label>연락처</label><input type="text" value={form.phoneNumber} onChange={(event) => onChange("phoneNumber", event.target.value)} /></div>
+            <div className="form-row"><label>이메일</label><input type="email" value={form.email} onChange={(event) => onChange("email", event.target.value)} /></div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  if (menu === "groups") {
+    return (
+      <div className="form-section">
+        <h4 className="form-section__title">그룹 정보</h4>
+        <div className="form-grid">
+          <div className="form-row"><label>groupCode<span className="req">*</span></label><input type="text" value={form.groupCode} onChange={(event) => onChange("groupCode", event.target.value.toUpperCase())} disabled={isEdit} /></div>
+          <div className="form-row"><label>그룹명<span className="req">*</span></label><input type="text" value={form.groupName} onChange={(event) => onChange("groupName", event.target.value)} /></div>
+          <div className="form-row full"><label>설명</label><textarea value={form.description} onChange={(event) => onChange("description", event.target.value)} /></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (menu === "categories") {
+    return (
+      <div className="form-section">
+        <h4 className="form-section__title">분류 정보</h4>
+        <div className="form-grid">
+          <div className="form-row"><label>분류코드<span className="req">*</span></label><input type="text" value={form.categoryCode} onChange={(event) => onChange("categoryCode", event.target.value.toUpperCase())} disabled={isEdit} /></div>
+          <div className="form-row"><label>분류명<span className="req">*</span></label><input type="text" value={form.categoryName} onChange={(event) => onChange("categoryName", event.target.value)} /></div>
+          <div className="form-row"><label>레벨</label><input type="number" min="1" max="3" value={form.categoryLevel} onChange={(event) => onChange("categoryLevel", event.target.value)} disabled={isEdit} /></div>
+          <div className="form-row"><label>상위 categoryId</label><input type="number" min="0" value={form.parentCategoryId} onChange={(event) => onChange("parentCategoryId", event.target.value)} disabled={isEdit} /></div>
+          <div className="form-row"><label>정렬</label><input type="number" value={form.sortOrder} onChange={(event) => onChange("sortOrder", event.target.value)} /></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (menu === "codes") {
+    return (
+      <div className="form-section">
+        <h4 className="form-section__title">공통코드 정보</h4>
+        <div className="form-grid">
+          <div className="form-row"><label>코드그룹<span className="req">*</span></label><input type="text" value={form.codeGroup} onChange={(event) => onChange("codeGroup", event.target.value.toUpperCase())} disabled={isEdit} /></div>
+          <div className="form-row"><label>코드<span className="req">*</span></label><input type="text" value={form.code} onChange={(event) => onChange("code", event.target.value.toUpperCase())} disabled={isEdit} /></div>
+          <div className="form-row"><label>코드명<span className="req">*</span></label><input type="text" value={form.codeName} onChange={(event) => onChange("codeName", event.target.value)} /></div>
+          <div className="form-row"><label>정렬</label><input type="number" value={form.sortOrder} onChange={(event) => onChange("sortOrder", event.target.value)} /></div>
+          <div className="form-row"><label>사용</label><select value={form.useYn} onChange={(event) => onChange("useYn", event.target.value)}><option value="Y">Y</option><option value="N">N</option></select></div>
+          <div className="form-row full"><label>비고</label><textarea value={form.remarks} onChange={(event) => onChange("remarks", event.target.value)} /></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (menu === "deployments") {
+    return (
+      <div className="form-section">
+        <h4 className="form-section__title">배포 정보</h4>
+        <div className="form-grid">
+          <div className="form-row"><label>서비스<span className="req">*</span></label><select value={form.serviceId} onChange={(event) => onChange("serviceId", event.target.value)} disabled={isEdit}>{portalData.services.map((service) => <option key={service.serviceId} value={service.serviceId}>{service.serviceCode} {service.serviceName}</option>)}</select></div>
+          <div className="form-row"><label>서버<span className="req">*</span></label><select value={form.serverId} onChange={(event) => onChange("serverId", event.target.value)}>{portalData.servers.map((server) => <option key={server.serverId} value={server.serverId}>{server.serverName}</option>)}</select></div>
+          <div className="form-row"><label>배포 상태</label><CodeSelect labels={codeLabels.deploymentStatus} value={form.deploymentStatusCode} onChange={(value) => onChange("deploymentStatusCode", value)} /></div>
+          <div className="form-row"><label>인스턴스 수</label><input type="number" min="1" value={form.instanceCount} onChange={(event) => onChange("instanceCount", event.target.value)} /></div>
+          <div className="form-row"><label>배포 경로<span className="req">*</span></label><input type="text" value={form.deployPath} onChange={(event) => onChange("deployPath", event.target.value)} /></div>
+          <div className="form-row"><label>포트</label><input type="text" value={form.portInfo} onChange={(event) => onChange("portInfo", event.target.value)} /></div>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+}
+
 function CodeSelect({ labels, value, onChange }) {
   return (
     <select value={value} onChange={(event) => onChange(event.target.value)}>
@@ -1183,6 +1378,60 @@ function buildAdminFormState(menu, record, portalData) {
     };
   }
 
+  if (menu === "users") {
+    const active = String(record?.active ?? record?.activeYn ?? "Y").toUpperCase();
+    return {
+      employeeNo: field(record, "employeeNo", ""),
+      userName: field(record, "userName", ""),
+      orgName: field(record, "orgName", ""),
+      departmentName: field(record, "departmentName", ""),
+      roleName: field(record, "roleName", ""),
+      phoneNumber: field(record, "phoneNumber", ""),
+      email: field(record, "email", ""),
+      active: active === "N" || active === "FALSE" ? "false" : "true",
+    };
+  }
+
+  if (menu === "groups") {
+    return {
+      groupCode: field(record, "groupCode", ""),
+      groupName: field(record, "groupName", ""),
+      description: field(record, "description", ""),
+    };
+  }
+
+  if (menu === "categories") {
+    return {
+      categoryCode: field(record, "categoryCode", ""),
+      categoryName: field(record, "categoryName", ""),
+      categoryLevel: field(record, "categoryLevel", "1"),
+      parentCategoryId: field(record, "parentCategoryId", ""),
+      sortOrder: field(record, "sortOrder", "0"),
+    };
+  }
+
+  if (menu === "codes") {
+    return {
+      codeGroup: field(record, "codeGroup", ""),
+      code: field(record, "code", ""),
+      codeName: field(record, "codeName", ""),
+      sortOrder: field(record, "sortOrder", "0"),
+      useYn: field(record, "useYn", "Y"),
+      remarks: field(record, "remarks", ""),
+    };
+  }
+
+  if (menu === "deployments") {
+    return {
+      serviceId: field(record, "serviceId", String(portalData.services[0]?.serviceId ?? "")),
+      serverId: field(record, "serverId", String(portalData.servers[0]?.serverId ?? "")),
+      deployPath: field(record, "deployPath", ""),
+      portInfo: field(record, "portInfo", ""),
+      deploymentStatusCode: field(record, "deploymentStatusCode", "RUNNING"),
+      instanceCount: field(record, "instanceCount", "1"),
+    };
+  }
+
   return {};
 }
 
@@ -1194,6 +1443,11 @@ function getAdminModalTitle(menu, mode, record) {
     servers: "서버",
     relations: "서비스 관계",
     techstacks: "기술스택",
+    users: "사용자",
+    groups: "그룹",
+    categories: "서비스 분류",
+    codes: "공통코드",
+    deployments: "배포",
   };
   const id = record ? getAdminRecordId(menu, record) : "";
   return `${action} ${labels[menu]} ${verb}${id && mode !== "create" ? ` — ${id}` : ""}`;
@@ -1204,6 +1458,11 @@ function getAdminRecordId(menu, record) {
   if (menu === "servers") return record.serverName;
   if (menu === "relations") return `REL-${String(record.relationId).padStart(4, "0")}`;
   if (menu === "techstacks") return `TECH-${String(record.techStackId).padStart(3, "0")}`;
+  if (menu === "users") return record.employeeNo;
+  if (menu === "groups") return record.groupCode;
+  if (menu === "categories") return record.categoryCode;
+  if (menu === "codes") return `${record.codeGroup}/${record.code}`;
+  if (menu === "deployments") return `${record.serviceCode ?? record.serviceId}/${record.serverName ?? record.serverId}`;
   return "";
 }
 
@@ -1212,6 +1471,11 @@ function getAdminRecordLabel(menu, record, serviceById, serverById) {
   if (menu === "servers") return `${record.serverName} (${record.ipAddress})`;
   if (menu === "relations") return `${serviceLabel(serviceById.get(record.sourceServiceId))} → ${serviceLabel(serviceById.get(record.targetServiceId))}`;
   if (menu === "techstacks") return `${serviceLabel(serviceById.get(record.serviceId))} / ${record.techName}`;
+  if (menu === "users") return `${record.employeeNo} ${record.userName}`;
+  if (menu === "groups") return `${record.groupCode} ${record.groupName}`;
+  if (menu === "categories") return `${record.categoryCode} ${record.categoryName}`;
+  if (menu === "codes") return `${record.codeGroup}/${record.code} ${record.codeName}`;
+  if (menu === "deployments") return `${record.serviceCode ?? record.serviceId} / ${record.serverName ?? record.serverId}`;
   return getAdminRecordId(menu, record);
 }
 
