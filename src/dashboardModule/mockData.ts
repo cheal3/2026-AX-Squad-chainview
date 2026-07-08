@@ -151,6 +151,7 @@ export interface TechStackRecord {
 export interface ServiceOwnerRecord {
   serviceOwnerId: number;
   serviceId: number;
+  serviceCode?: string;
   ownerTypeCode: "GROUP" | "USER";
   groupId?: number | null;
   userId?: number | null;

@@ -1004,6 +1004,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       },
       createOwner: (input) => {
         const serviceId = asRemoteNumber(input.serviceId);
+        const service = services.find((item) => item.serviceId === serviceId);
         const ownerTypeCode = asRemoteString(input.ownerTypeCode) || "GROUP";
         const ownerName =
           ownerTypeCode === "USER"
@@ -1013,6 +1014,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           {
             serviceOwnerId: nextRemoteId(current as unknown as RemoteListRecord[], "serviceOwnerId"),
             serviceId,
+            serviceCode: service?.serviceCode,
             ownerTypeCode,
             ownerName,
             responsibilityCode: asRemoteString(input.responsibilityCode) || "MAIN",
@@ -1035,6 +1037,9 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
               ? {
                   ...owner,
                   serviceId: asRemoteNumber(input.serviceId) || owner.serviceId,
+                  serviceCode:
+                    services.find((item) => item.serviceId === asRemoteNumber(input.serviceId))?.serviceCode ??
+                    owner.serviceCode,
                   ownerTypeCode:
                     asRemoteString(input.ownerTypeCode) === "USER" ? "USER" : "GROUP",
                   groupId: asRemoteNumber(input.groupId) || null,

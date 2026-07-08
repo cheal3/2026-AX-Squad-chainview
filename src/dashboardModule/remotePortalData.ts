@@ -258,9 +258,11 @@ function mapTechStack(row: RemoteRecord): TechStackRecord {
 }
 
 function mapOwner(row: RemoteRecord): ServiceOwnerRecord {
+  const service = isRecord(row.service) ? row.service : null;
   return {
     serviceOwnerId: asNumber(row.serviceOwnerId),
-    serviceId: asNumber(row.serviceId),
+    serviceId: asNumber(row.serviceId ?? service?.serviceId),
+    serviceCode: asString(row.serviceCode ?? service?.serviceCode),
     ownerTypeCode:
       asString(row.ownerTypeCode) === "USER" ? "USER" : "GROUP",
     groupId: asNumber(row.groupId) || null,

@@ -379,10 +379,24 @@ function DynamicAdminListPage({ activeMenu, menu }) {
   const ownersByServiceId = useMemo(() => {
     const map = new Map();
     portalData.owners.forEach((owner) => {
-      if (!map.has(owner.serviceId)) {
-        map.set(owner.serviceId, []);
+      const key = String(owner.serviceId || "");
+      if (!key) return;
+      if (!map.has(key)) {
+        map.set(key, []);
       }
-      map.get(owner.serviceId).push(owner);
+      map.get(key).push(owner);
+    });
+    return map;
+  }, [portalData.owners]);
+  const ownersByServiceCode = useMemo(() => {
+    const map = new Map();
+    portalData.owners.forEach((owner) => {
+      const key = String(owner.serviceCode || "").trim();
+      if (!key) return;
+      if (!map.has(key)) {
+        map.set(key, []);
+      }
+      map.get(key).push(owner);
     });
     return map;
   }, [portalData.owners]);
@@ -409,23 +423,29 @@ function DynamicAdminListPage({ activeMenu, menu }) {
     services: {
       actionLabel: "＋ 서비스 등록",
       columns: ["serviceId", "서비스", "분류", "유형", "중요도", "상태", "엔드포인트", "서버"],
-      rows: portalData.services.map((service) => ({
-        key: service.serviceId,
-        record: service,
-        owner: ownersByServiceId.get(service.serviceId)?.[0] ?? null,
-        hasOwner: Boolean(ownersByServiceId.get(service.serviceId)?.length),
-        onClick: () => navigate(`/admin-services/${service.serviceCode}`),
-        cells: [
-          <code>{service.serviceId}</code>,
-          <><code>{service.serviceCode}</code> {service.serviceName}</>,
-          service.categoryPath?.join(" > ") || "미분류",
-          codeLabels.serviceType[service.serviceTypeCode] || service.serviceTypeCode,
-          codeLabels.importance[service.importanceCode] || service.importanceCode || "-",
-          codeLabels.serviceStatus[service.statusCode] || service.statusCode,
-          service.endpointUrl || "-",
-          serverById.get(service.serverId)?.serverName || "-",
-        ],
-      })),
+      rows: portalData.services.map((service) => {
+        const serviceOwners =
+          ownersByServiceId.get(String(service.serviceId)) ??
+          ownersByServiceCode.get(String(service.serviceCode)) ??
+          [];
+        return {
+          key: service.serviceId,
+          record: service,
+          owner: serviceOwners[0] ?? null,
+          hasOwner: serviceOwners.length > 0,
+          onClick: () => navigate(`/admin-services/${service.serviceCode}`),
+          cells: [
+            <code>{service.serviceId}</code>,
+            <><code>{service.serviceCode}</code> {service.serviceName}</>,
+            service.categoryPath?.join(" > ") || "미분류",
+            codeLabels.serviceType[service.serviceTypeCode] || service.serviceTypeCode,
+            codeLabels.importance[service.importanceCode] || service.importanceCode || "-",
+            codeLabels.serviceStatus[service.statusCode] || service.statusCode,
+            service.endpointUrl || "-",
+            serverById.get(service.serverId)?.serverName || "-",
+          ],
+        };
+      }),
     },
     servers: {
       actionLabel: "＋ 서버 등록",
