@@ -152,6 +152,8 @@ export interface ServiceOwnerRecord {
   serviceOwnerId: number;
   serviceId: number;
   ownerTypeCode: "GROUP" | "USER";
+  groupId?: number | null;
+  userId?: number | null;
   ownerName: string;
   responsibilityCode: "MAIN" | "SUB" | "ALERT";
 }

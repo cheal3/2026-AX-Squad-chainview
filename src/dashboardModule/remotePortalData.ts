@@ -263,6 +263,8 @@ function mapOwner(row: RemoteRecord): ServiceOwnerRecord {
     serviceId: asNumber(row.serviceId),
     ownerTypeCode:
       asString(row.ownerTypeCode) === "USER" ? "USER" : "GROUP",
+    groupId: asNumber(row.groupId) || null,
+    userId: asNumber(row.userId) || null,
     ownerName:
       asString(row.assigneeDisplay) ||
       asString(row.groupName) ||

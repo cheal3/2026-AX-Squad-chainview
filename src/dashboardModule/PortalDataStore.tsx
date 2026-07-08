@@ -1034,6 +1034,15 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             owner.serviceOwnerId === serviceOwnerId
               ? {
                   ...owner,
+                  serviceId: asRemoteNumber(input.serviceId) || owner.serviceId,
+                  ownerTypeCode:
+                    asRemoteString(input.ownerTypeCode) === "USER" ? "USER" : "GROUP",
+                  groupId: asRemoteNumber(input.groupId) || null,
+                  userId: asRemoteNumber(input.userId) || null,
+                  ownerName:
+                    asRemoteString(input.ownerTypeCode) === "USER"
+                      ? asRemoteString(input.userName) || owner.ownerName
+                      : asRemoteString(input.groupName) || owner.ownerName,
                   responsibilityCode: asRemoteString(input.responsibilityCode) || owner.responsibilityCode,
                 }
               : owner
@@ -1569,7 +1578,12 @@ function toServiceOwnerCreatePayload(input: RemoteListRecord) {
 }
 
 function toServiceOwnerUpdatePayload(input: RemoteListRecord) {
+  const ownerTypeCode = asRemoteString(input.ownerTypeCode) || "GROUP";
   return {
+    serviceId: asRemoteNumber(input.serviceId),
+    ownerTypeCode,
+    groupId: ownerTypeCode === "GROUP" ? asRemoteNumber(input.groupId) : null,
+    userId: ownerTypeCode === "USER" ? asRemoteNumber(input.userId) : null,
     responsibilityCode: asRemoteString(input.responsibilityCode) || "MAIN",
   };
 }
