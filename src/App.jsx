@@ -1164,13 +1164,29 @@ const categoryPrefixOverrides = {
   "EAM": "EAM",
   "계약": "POL",
   "고객": "CUST",
+  "고객상담센터": "CS",
   "계좌": "ACC",
   "결제": "PAY",
+  "대출": "LOAN",
+  "대출 신청/관리": "LOAN",
+  "문서/이미지 솔루션": "DOC",
+  "메시징/알림 솔루션": "MSG",
+  "병카 포털": "BANK",
+  "수납/출납": "PAY",
+  "수수료": "FEE",
   "승인": "APV",
   "취소": "CNL",
   "조회": "INQ",
   "이체": "TRF",
+  "인사": "HR",
+  "자동차TM": "TM",
+  "정보계 마트": "MART",
+  "퇴직연금 공통": "RET",
   "방카": "BANC",
+  "BI/리포팅": "BI",
+  "IFRS": "IFRS",
+  "ITSM": "ITSM",
+  "VOC": "VOC",
 };
 
 function compactText(value) {
@@ -1240,7 +1256,7 @@ function uniqueByName(options) {
 function codePartFromCategoryCode(code, level) {
   const parts = compactText(code).toUpperCase().split("-").filter(Boolean);
   const cleanParts = parts[0] === "CAT" ? parts.slice(1) : parts;
-  return cleanParts[level - 1] ?? cleanParts.at(-1) ?? "";
+  return sanitizeServiceCodePart(cleanParts[level - 1] ?? cleanParts.at(-1) ?? "");
 }
 
 function getCategoryCodeDepth(code) {
@@ -1271,16 +1287,28 @@ function inferCategoryLevels(categories) {
 function fallbackCategoryPrefix(name) {
   const cleaned = compactText(name);
   if (!cleaned) return "";
-  if (categoryPrefixOverrides[cleaned]) return categoryPrefixOverrides[cleaned];
+  if (categoryPrefixOverrides[cleaned]) return sanitizeServiceCodePart(categoryPrefixOverrides[cleaned]);
   const ascii = cleaned
     .normalize("NFKD")
     .replace(/[^A-Za-z0-9\s/_-]/g, " ")
     .split(/[\s/_-]+/)
     .filter(Boolean);
   if (ascii.length) {
-    return ascii.map((part) => part[0]).join("").slice(0, 4).toUpperCase();
+    return sanitizeServiceCodePart(ascii.map((part) => part[0]).join("").slice(0, 4));
   }
-  return cleaned.replace(/\s+/g, "").slice(0, 3).toUpperCase();
+  return `CAT${hashTextToNumber(cleaned)}`;
+}
+
+function hashTextToNumber(value) {
+  let hash = 0;
+  Array.from(value).forEach((char) => {
+    hash = (hash * 31 + char.charCodeAt(0)) % 1000;
+  });
+  return String(hash).padStart(3, "0");
+}
+
+function sanitizeServiceCodePart(value) {
+  return compactText(value).toUpperCase().replace(/[^A-Z0-9_-]/g, "").slice(0, 12);
 }
 
 function buildCategoryCatalog(categories = [], services = []) {
@@ -1341,7 +1369,7 @@ function filterChildCategories(options, parentName, grandParentName = "") {
 }
 
 function getSelectedCategoryPrefix(options, name) {
-  return options.find((option) => option.name === name)?.prefix || fallbackCategoryPrefix(name);
+  return sanitizeServiceCodePart(options.find((option) => option.name === name)?.prefix) || fallbackCategoryPrefix(name);
 }
 
 function normalizeServiceCodeSuffix(value) {
@@ -1353,7 +1381,7 @@ function buildServiceCode(form, catalog) {
     getSelectedCategoryPrefix(catalog.level1, form.categoryL1),
     getSelectedCategoryPrefix(catalog.level2, form.categoryL2),
     getSelectedCategoryPrefix(catalog.level3, form.categoryL3),
-  ].filter(Boolean);
+  ].map(sanitizeServiceCodePart).filter(Boolean);
   const suffix = normalizeServiceCodeSuffix(form.serviceCodeSuffix || "001");
   return [...prefixParts, suffix].filter(Boolean).join("-");
 }
