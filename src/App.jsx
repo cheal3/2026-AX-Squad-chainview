@@ -906,13 +906,11 @@ function AdminRecordModal({ modal, onClose, portalData, serverById, serviceById 
       const serviceCode = requireValue(form.serviceCode, "serviceCode")?.toUpperCase();
       const serviceName = requireValue(form.serviceName, "서비스명");
       const categoryL1 = requireValue(form.categoryL1, "대분류");
-      const categoryL2 = requireValue(form.categoryL2, "중분류");
-      const categoryL3 = requireValue(form.categoryL3, "소분류");
-      if (!serviceCode || !serviceName || !categoryL1 || !categoryL2 || !categoryL3) return;
+      if (!serviceCode || !serviceName || !categoryL1) return;
       const payload = {
         serviceCode,
         serviceName,
-        categoryPath: [categoryL1, categoryL2, categoryL3],
+        categoryPath: [categoryL1, form.categoryL2, form.categoryL3].map((item) => item.trim()).filter(Boolean),
         serviceTypeCode: form.serviceTypeCode,
         importanceCode: form.importanceCode,
         statusCode: form.statusCode,
@@ -1184,7 +1182,13 @@ function getCategoryId(category) {
 }
 
 function getCategoryParentId(category) {
-  return Number(category?.parentCategoryId ?? category?.parentId ?? 0) || 0;
+  return Number(
+    category?.parentCategoryId ??
+    category?.parentId ??
+    category?.parent?.categoryId ??
+    category?.parentCategory?.categoryId ??
+    0
+  ) || 0;
 }
 
 function getCategoryName(category) {
@@ -1192,11 +1196,35 @@ function getCategoryName(category) {
 }
 
 function getCategoryLevel(category) {
-  return Number(category?.categoryLevel ?? category?.level ?? 0) || 0;
+  const rawLevel = category?.categoryLevel ?? category?.level ?? category?.depth;
+  const numericLevel = Number(rawLevel);
+  if (Number.isFinite(numericLevel) && numericLevel > 0) {
+    return numericLevel;
+  }
+
+  const textLevel = compactText(category?.levelName ?? category?.categoryLevelName).toUpperCase();
+  if (textLevel.includes("L1") || textLevel.includes("대분류")) return 1;
+  if (textLevel.includes("L2") || textLevel.includes("중분류")) return 2;
+  if (textLevel.includes("L3") || textLevel.includes("소분류")) return 3;
+
+  const code = getCategoryCode(category);
+  const codeDepth = getCategoryCodeDepth(code);
+  if (codeDepth) return codeDepth;
+
+  return getCategoryParentId(category) ? 0 : 1;
 }
 
 function getCategoryCode(category) {
   return compactText(category?.categoryCode ?? category?.code);
+}
+
+function getCategoryParentCode(category) {
+  return compactText(
+    category?.parentCategoryCode ??
+    category?.parentCode ??
+    category?.parent?.categoryCode ??
+    category?.parentCategory?.categoryCode
+  );
 }
 
 function uniqueByName(options) {
@@ -1215,6 +1243,31 @@ function codePartFromCategoryCode(code, level) {
   return cleanParts[level - 1] ?? cleanParts.at(-1) ?? "";
 }
 
+function getCategoryCodeDepth(code) {
+  const parts = compactText(code).toUpperCase().split("-").filter(Boolean);
+  if (!parts.length) return 0;
+  const cleanParts = parts[0] === "CAT" ? parts.slice(1) : parts;
+  return cleanParts.length >= 1 && cleanParts.length <= 3 ? cleanParts.length : 0;
+}
+
+function inferCategoryLevels(categories) {
+  const byId = new Map(categories.filter((category) => category.id).map((category) => [category.id, category]));
+  const byCode = new Map(categories.filter((category) => category.code).map((category) => [category.code, category]));
+  const infer = (category, seen = new Set()) => {
+    if (category.level > 0) return category.level;
+    const key = category.id || category.code || category.name;
+    if (seen.has(key)) return 1;
+    seen.add(key);
+
+    const parent = byId.get(category.parentId) || byCode.get(category.parentCode);
+    if (parent) return Math.min(infer(parent, seen) + 1, 3);
+    if (category.parentId || category.parentCode) return getCategoryCodeDepth(category.parentCode) + 1 || 2;
+    return 1;
+  };
+
+  return categories.map((category) => ({ ...category, level: infer(category) }));
+}
+
 function fallbackCategoryPrefix(name) {
   const cleaned = compactText(name);
   if (!cleaned) return "";
@@ -1231,20 +1284,22 @@ function fallbackCategoryPrefix(name) {
 }
 
 function buildCategoryCatalog(categories = [], services = []) {
-  const remoteCategories = categories.map((category) => ({
+  const remoteCategories = inferCategoryLevels(categories.map((category) => ({
     id: getCategoryId(category),
     parentId: getCategoryParentId(category),
+    parentCode: getCategoryParentCode(category),
     level: getCategoryLevel(category),
     name: getCategoryName(category),
     code: getCategoryCode(category),
-  })).filter((category) => category.name);
+  })).filter((category) => category.name));
 
   if (remoteCategories.length) {
     const byId = new Map(remoteCategories.map((category) => [category.id, category]));
+    const byCode = new Map(remoteCategories.map((category) => [category.code, category]));
     const optionsByLevel = [1, 2, 3].map((level) =>
       uniqueByName(remoteCategories.filter((category) => category.level === level).map((category) => {
-        const parent = byId.get(category.parentId);
-        const grandParent = parent ? byId.get(parent.parentId) : null;
+        const parent = byId.get(category.parentId) || byCode.get(category.parentCode);
+        const grandParent = parent ? byId.get(parent.parentId) || byCode.get(parent.parentCode) : null;
         return {
           ...category,
           parentName: parent?.name ?? "",
@@ -1472,8 +1527,8 @@ function ServiceAdminForm({ form, onChange, portalData, servers, isEdit }) {
         <h4 className="form-section__title">분류 및 상태</h4>
         <div className="form-grid">
           <div className="form-row"><label>대분류 (categoryL1)<span className="req">*</span></label><select value={form.categoryL1} onChange={(event) => changeCategory("categoryL1", event.target.value)}><option value="">선택</option>{categoryCatalog.level1.map((option) => <option key={option.name} value={option.name}>{option.name}</option>)}</select></div>
-          <div className="form-row"><label>중분류 (categoryL2)<span className="req">*</span></label><SearchableCategorySelect disabled={!form.categoryL1} options={level2Options} value={form.categoryL2} onChange={(value) => changeCategory("categoryL2", value)} /></div>
-          <div className="form-row"><label>소분류 (categoryL3)<span className="req">*</span></label><SearchableCategorySelect disabled={!form.categoryL2} options={level3Options} value={form.categoryL3} onChange={(value) => changeCategory("categoryL3", value)} /></div>
+          <div className="form-row"><label>중분류 (categoryL2)</label><SearchableCategorySelect disabled={!form.categoryL1 || !level2Options.length} options={level2Options} value={form.categoryL2} onChange={(value) => changeCategory("categoryL2", value)} placeholder={level2Options.length ? "검색 또는 선택하세요" : "등록된 중분류가 없습니다"} /></div>
+          <div className="form-row"><label>소분류 (categoryL3)</label><SearchableCategorySelect disabled={!form.categoryL2 || !level3Options.length} options={level3Options} value={form.categoryL3} onChange={(value) => changeCategory("categoryL3", value)} placeholder={level3Options.length ? "검색 또는 선택하세요" : "등록된 소분류가 없습니다"} /></div>
           <div className="form-row"><label>중요도 (IMPORTANCE)<span className="req">*</span></label><CodeSelect labels={codeLabels.importance} value={form.importanceCode} onChange={(value) => onChange("importanceCode", value)} /></div>
           <div className="form-row"><label>상태 (STATUS)<span className="req">*</span></label><CodeSelect labels={codeLabels.serviceStatus} value={form.statusCode} onChange={(value) => onChange("statusCode", value)} /></div>
           <div className="form-row"><label>서비스 유형 (SERVICE_TYPE)<span className="req">*</span></label><CodeSelect labels={codeLabels.serviceType} value={form.serviceTypeCode} onChange={(value) => onChange("serviceTypeCode", value)} /></div>

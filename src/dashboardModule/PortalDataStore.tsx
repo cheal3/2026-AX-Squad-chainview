@@ -1722,10 +1722,16 @@ async function findCategoryId(categoryPath: string[]) {
   const categories = asRemoteRecordArray(
     await chainViewApi.serviceCategories.list()
   );
+  const categoryLevel = cleanedPath.length || 1;
   const leafCategories = categories.filter(
     (category) => asRemoteNumber(category.categoryLevel) === 3
   );
   const match =
+    categories.find(
+      (category) =>
+        asRemoteNumber(category.categoryLevel, categoryLevel) === categoryLevel &&
+        asRemoteString(category.categoryName) === categoryName
+    ) ??
     leafCategories.find(
       (category) => asRemoteString(category.categoryName) === categoryName
     ) ??
