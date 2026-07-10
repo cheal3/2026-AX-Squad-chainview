@@ -1309,6 +1309,21 @@ function sanitizeServiceCodePart(value) {
 }
 
 function buildCategoryCatalog(categories = [], services = []) {
+  const paths = services.map((service) => service.categoryPath ?? []).filter((path) => path.length);
+  const servicePathCatalog = {
+    level1: uniqueByName(paths.map((path) => ({ name: compactText(path[0]), prefix: fallbackCategoryPrefix(path[0]) }))),
+    level2: uniqueByName(paths.map((path) => ({
+      name: compactText(path[1]),
+      parentName: compactText(path[0]),
+      prefix: fallbackCategoryPrefix(path[1]),
+    }))),
+    level3: uniqueByName(paths.map((path) => ({
+      name: compactText(path[2]),
+      parentName: compactText(path[1]),
+      grandParentName: compactText(path[0]),
+      prefix: fallbackCategoryPrefix(path[2]),
+    }))),
+  };
   const remoteCategories = inferCategoryLevels(categories.map((category) => ({
     id: getCategoryId(category),
     parentId: getCategoryParentId(category),
@@ -1334,27 +1349,13 @@ function buildCategoryCatalog(categories = [], services = []) {
       }))
     );
     return {
-      level1: optionsByLevel[0],
-      level2: optionsByLevel[1],
-      level3: optionsByLevel[2],
+      level1: uniqueByName([...optionsByLevel[0], ...servicePathCatalog.level1]),
+      level2: uniqueByName([...optionsByLevel[1], ...servicePathCatalog.level2]),
+      level3: uniqueByName([...optionsByLevel[2], ...servicePathCatalog.level3]),
     };
   }
 
-  const paths = services.map((service) => service.categoryPath ?? []).filter((path) => path.length);
-  return {
-    level1: uniqueByName(paths.map((path) => ({ name: compactText(path[0]), prefix: fallbackCategoryPrefix(path[0]) }))),
-    level2: uniqueByName(paths.map((path) => ({
-      name: compactText(path[1]),
-      parentName: compactText(path[0]),
-      prefix: fallbackCategoryPrefix(path[1]),
-    }))),
-    level3: uniqueByName(paths.map((path) => ({
-      name: compactText(path[2]),
-      parentName: compactText(path[1]),
-      grandParentName: compactText(path[0]),
-      prefix: fallbackCategoryPrefix(path[2]),
-    }))),
-  };
+  return servicePathCatalog;
 }
 
 function filterChildCategories(options, parentName, grandParentName = "") {
@@ -1363,6 +1364,11 @@ function filterChildCategories(options, parentName, grandParentName = "") {
     if (grandParentName && option.grandParentName && option.grandParentName !== grandParentName) return false;
     return true;
   });
+}
+
+function selectableChildCategories(options, parentName, grandParentName = "") {
+  const filtered = filterChildCategories(options, parentName, grandParentName);
+  return filtered.length ? filtered : options;
 }
 
 function getSelectedCategoryPrefix(options, name) {
@@ -1519,8 +1525,8 @@ function ServiceAdminForm({ form, onChange, portalData, servers, isEdit }) {
     () => buildCategoryCatalog(portalData.categories, portalData.services),
     [portalData.categories, portalData.services]
   );
-  const level2Options = filterChildCategories(categoryCatalog.level2, form.categoryL1);
-  const level3Options = filterChildCategories(categoryCatalog.level3, form.categoryL2, form.categoryL1);
+  const level2Options = form.categoryL1 ? selectableChildCategories(categoryCatalog.level2, form.categoryL1) : [];
+  const level3Options = form.categoryL2 ? selectableChildCategories(categoryCatalog.level3, form.categoryL2, form.categoryL1) : [];
   const serviceCodePreview = buildServiceCode(form, categoryCatalog);
   const changeCategory = (field, value) => {
     if (field === "categoryL1") {
