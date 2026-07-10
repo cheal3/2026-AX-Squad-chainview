@@ -628,11 +628,11 @@ function DynamicAdminListPage({ activeMenu, menu }) {
   };
   const handleOwnerAction = (row) => {
     if (row.hasOwner && row.owner) {
-      openOwnerModal("edit", row.owner);
+      openOwnerModal("edit", { ...row.owner, lockedService: true });
       return;
     }
 
-    openOwnerModal("create", { serviceId: row.record.serviceId });
+    openOwnerModal("create", { serviceId: row.record.serviceId, lockedService: true });
   };
 
   return (
@@ -2051,6 +2051,7 @@ function OwnerManagementModals({ modal, onClose, owner, portalData, services }) 
   }
 
   const isEdit = modal === "edit";
+  const serviceLocked = Boolean(owner?.lockedService);
 
   return (
     <div className="modal-backdrop is-open" onClick={onClose}>
@@ -2064,12 +2065,18 @@ function OwnerManagementModals({ modal, onClose, owner, portalData, services }) 
             <h4 className="form-section__title">연결 서비스</h4>
             <div className="form-row">
               <label>서비스 (serviceCode)<span className="req">*</span></label>
-              <select value={form.serviceId} onChange={(event) => updateField("serviceId", event.target.value)}>
-                <option value="">선택</option>
-                {services.map((item) => (
-                  <option key={item.serviceId} value={item.serviceId}>{item.serviceCode} {item.serviceName}</option>
-                ))}
-              </select>
+              {serviceLocked ? (
+                <div className="readonly-field">
+                  {service ? <><code>{service.serviceCode}</code> {service.serviceName}</> : "서비스 미지정"}
+                </div>
+              ) : (
+                <select value={form.serviceId} onChange={(event) => updateField("serviceId", event.target.value)}>
+                  <option value="">선택</option>
+                  {services.map((item) => (
+                    <option key={item.serviceId} value={item.serviceId}>{item.serviceCode} {item.serviceName}</option>
+                  ))}
+                </select>
+              )}
             </div>
           </div>
           <div className="form-section">
