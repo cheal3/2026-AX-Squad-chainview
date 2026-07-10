@@ -85,7 +85,7 @@ table.tbl tbody td{overflow:hidden;text-overflow:ellipsis}
 table.tbl tbody td{padding:10px 12px;border-bottom:1px solid var(--line-2);vertical-align:middle;white-space:nowrap}
 table.tbl tbody tr:hover{background:#fafafa}
 table.tbl tbody tr:last-child td{border-bottom:0}
-table.tbl .row-actions{display:flex;gap:4px;justify-content:flex-end}
+table.tbl .row-actions{display:flex;gap:4px;justify-content:center}
 table.tbl .row-actions .ibtn{cursor:pointer}
 table.tbl .row-actions .ibtn--owner{display:inline-flex;align-items:center;justify-content:center}
 table.tbl .row-actions .ibtn--owner.is-registered{color:#050b1f;border-color:#d7dde8;background:#fff}
@@ -96,7 +96,7 @@ table.tbl .row-actions .ibtn--owner.is-empty .owner-status-icon__shape{fill:none
 table.tbl .row-actions .ibtn--owner:hover{border-color:var(--brand);box-shadow:0 0 0 3px rgba(31,42,68,.08)}
 table.tbl code{display:inline-block;max-width:100%;overflow:hidden;background:#f3f4f6;padding:2px 7px;border-radius:5px;font-size:11px;font-family:'JetBrains Mono','Consolas',monospace;text-overflow:ellipsis;vertical-align:middle;white-space:nowrap}
 table.tbl .col-check{width:42px;text-align:center}
-table.tbl .col-actions{width:112px;text-align:right}
+table.tbl .col-actions{width:112px;text-align:center}
 
 /* Badges/Pills */
 .pill{display:inline-block;background:var(--info-bg);color:var(--info);padding:2px 9px;border-radius:10px;font-size:11px;font-weight:600;white-space:nowrap}
