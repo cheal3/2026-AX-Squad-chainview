@@ -728,7 +728,12 @@ function DynamicAdminListPage({ activeMenu, menu }) {
                           title={row.hasOwner ? "담당자 관리" : "담당자 등록"}
                           type="button"
                         >
-                          <span className="owner-status-icon" aria-hidden="true" />
+                          <svg className="owner-status-icon" viewBox="0 0 28 22" aria-hidden="true">
+                            <path
+                              className="owner-status-icon__shape"
+                              d="M10.2 10.7c3.2 0 5.8 2.6 5.8 5.8V19H1.5v-2.5c0-3.2 2.7-5.8 5.9-5.8h2.8Zm-1.4-9C11.3 1.7 13.3 3.7 13.3 6s-2 4.3-4.5 4.3S4.3 8.3 4.3 6s2-4.3 4.5-4.3Zm12 10.2c2.6 0 4.7 2.1 4.7 4.7V19h-7.8v-2.4c0-1.7-.5-3.3-1.4-4.7h4.5Zm-1-8.7c2 0 3.6 1.6 3.6 3.5s-1.6 3.5-3.6 3.5-3.6-1.6-3.6-3.5 1.6-3.5 3.6-3.5Z"
+                            />
+                          </svg>
                         </button>
                       ) : null}
                       <button
