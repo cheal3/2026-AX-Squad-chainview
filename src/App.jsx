@@ -16,7 +16,6 @@ import {
   Settings,
   Trash2,
   UserRound,
-  UsersRound,
 } from "lucide-react";
 import { initAdminInteractions } from "./adminInteractions.js";
 import { pages } from "./pagesData.js";
@@ -729,7 +728,7 @@ function DynamicAdminListPage({ activeMenu, menu }) {
                           title={row.hasOwner ? "담당자 관리" : "담당자 등록"}
                           type="button"
                         >
-                          <UsersRound size={15} />
+                          <span className="owner-status-icon" aria-hidden="true" />
                         </button>
                       ) : null}
                       <button
@@ -755,13 +754,6 @@ function DynamicAdminListPage({ activeMenu, menu }) {
           <div className="pager__nav"><button disabled>‹</button><button className="is-on">1</button><button disabled>›</button></div>
         </div>
       </div>
-      {menu === "services" ? (
-        <div className="service-owner-legend">
-          <span><UsersRound size={18} className="is-registered" />등록 완료 (진한 색상)<small>담당자 관리 가능</small></span>
-          <span><UsersRound size={18} className="is-empty" />미등록 (회색 아이콘)<small>담당자 등록 필요</small></span>
-          <span><span className="service-owner-legend__cursor">☝</span>모든 아이콘에<small>cursor: pointer 적용</small></span>
-        </div>
-      ) : null}
       {ownerModal ? (
         <OwnerManagementModals
           modal={ownerModal}
