@@ -121,6 +121,13 @@ function DashboardCase({
 }) {
   const portalData = usePortalData();
   const stableDataRef = useRef(portalData);
+  useEffect(() => {
+    if (portalData.services.length > 0) {
+      stableDataRef.current = portalData;
+    }
+  }, [portalData]);
+  const dashboardData =
+    stableDataRef.current.services.length > 0 ? stableDataRef.current : portalData;
   const activeIncident = portalData.incidents.find(
     (incident) =>
       incident.incidentId === activeIncidentId &&
@@ -128,7 +135,7 @@ function DashboardCase({
   ) ?? portalData.incidents.find(
     (incident) => incident.incidentStatusCode !== "RESOLVED"
   );
-  const { relations, services } = stableDataRef.current;
+  const { relations, services } = dashboardData;
   const relationCountByServiceId = useMemo(() => {
     const counts = new Map<number, number>();
 
@@ -339,6 +346,9 @@ function RelationMap({
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const coreServiceIdSet = useMemo(() => new Set(coreServiceIds), [coreServiceIds]);
+  const serviceFilter = coreServiceIdSet.size
+    ? (service: ServiceRecord) => coreServiceIdSet.has(service.serviceId)
+    : undefined;
 
   return (
     <>
@@ -371,7 +381,7 @@ function RelationMap({
             initialRelationDepth={2}
             initialServiceId={selectedServiceId}
             onSelectService={onSelectService}
-            serviceFilter={(service) => coreServiceIdSet.has(service.serviceId)}
+            serviceFilter={serviceFilter}
           />
         </div>
       </section>
@@ -383,14 +393,13 @@ function RelationMap({
             embedded
             embeddedHeightClassName="h-full"
             frameless
-            hideDepthToggle
             hideTopControl
             highlightServiceId={selectedServiceId}
             initialFitView
             initialRelationDepth={2}
             initialServiceId={selectedServiceId}
             onSelectService={onSelectService}
-            serviceFilter={(service) => coreServiceIdSet.has(service.serviceId)}
+            serviceFilter={serviceFilter}
           />
         </RelationFlowModal>
       ) : null}

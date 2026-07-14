@@ -60,7 +60,15 @@ type LaneNodeData = {
   lane: number;
 };
 
-type GraphNodeData = ServiceNodeData | LaneNodeData;
+type ServerInfraNodeData = {
+  kind: "server" | "infra";
+  label: string;
+  code: string;
+  meta: string;
+  statusCode?: keyof typeof codeLabels.serverStatus;
+};
+
+type GraphNodeData = ServiceNodeData | LaneNodeData | ServerInfraNodeData;
 
 const NODE_WIDTH = 240;
 const X_SPACING = 470;
@@ -78,6 +86,7 @@ const RELATION_COLLAPSED_HEIGHT = 40;
 const RELATION_WIDTH_ANIMATION_MS = 180;
 const RELATION_HEIGHT_ANIMATION_MS = 300;
 type TopControlMode = "select" | "search";
+type GraphViewMode = "service" | "infra";
 
 function centeredOffset(index: number, count: number, spacing: number) {
   return (index - (count - 1) / 2) * spacing;
@@ -132,6 +141,7 @@ export function ServiceRelationFlow({
   hideTopControl = false,
   highlightServiceId,
   initialFitView = false,
+  initialInfraDepth = 0,
   initialRelationDepth,
   initialViewport,
   incidentMode = false,
@@ -150,6 +160,7 @@ export function ServiceRelationFlow({
   hideTopControl?: boolean;
   highlightServiceId?: number;
   initialFitView?: boolean;
+  initialInfraDepth?: number;
   initialRelationDepth?: number;
   initialViewport?: { x: number; y: number; zoom: number };
   incidentMode?: boolean;
@@ -199,6 +210,9 @@ export function ServiceRelationFlow({
     initialFocusedServiceId
   );
   const [relationDepth, setRelationDepth] = useState(initialRelationDepth ?? 1);
+  const [graphViewMode, setGraphViewMode] = useState<GraphViewMode>(
+    initialInfraDepth > 0 ? "infra" : "service"
+  );
   const [topControlMode, setTopControlMode] =
     useState<TopControlMode>("select");
   const [flowInstance, setFlowInstance] =
@@ -738,8 +752,64 @@ export function ServiceRelationFlow({
     yByServiceId,
   ]);
 
+  const topologyNodes = useMemo<Node<ServerInfraNodeData>[]>(() => {
+    if (graphViewMode === "service") {
+      return [];
+    }
+
+    const visibleServices = filteredServices.filter((service) =>
+      visibleServiceIds.has(service.serviceId)
+    );
+    const nodes: Node<ServerInfraNodeData>[] = [];
+    const addedInfra = new Set<string>();
+
+    visibleServices.forEach((service) => {
+      const server = serverById.get(service.serverId);
+      if (!server) {
+        return;
+      }
+
+      const lane = laneByServiceId.get(service.serviceId) ?? 0;
+      const y = yByServiceId.get(service.serviceId) ?? 0;
+
+      const infraId = server.infraNodeId
+        ? `infra-${server.infraNodeId}`
+        : `infra-server-${server.serverId}`;
+
+      if (addedInfra.has(infraId)) {
+        return;
+      }
+
+      addedInfra.add(infraId);
+      nodes.push({
+        id: infraId,
+        type: "serverInfraNode",
+        position: {
+          x: lane * X_SPACING,
+          y: y + 16,
+        },
+        data: {
+          kind: "infra",
+          label: server.infraNodeName || `${server.serverName} 인프라 노드`,
+          code: server.infraNodeCode || `INFRA-${server.serverId}`,
+          meta: server.serverRoleName || "인프라 노드",
+        },
+        draggable: false,
+      });
+    });
+
+    return nodes;
+  }, [
+    filteredServices,
+    graphViewMode,
+    laneByServiceId,
+    serverById,
+    visibleServiceIds,
+    yByServiceId,
+  ]);
+
   const edges = useMemo<Edge[]>(() => {
-    return activeRelations
+    const serviceRelationEdges = activeRelations
       .filter(
         (relation) => {
           const sourceLane = laneByServiceId.get(relation.sourceServiceId);
@@ -800,23 +870,107 @@ export function ServiceRelationFlow({
           },
         };
       });
+
+    if (graphViewMode === "service") {
+      return serviceRelationEdges;
+    }
+
+    const topologyRelationEdges: Edge[] = [];
+    const addedTopologyRelationEdges = new Set<string>();
+
+    activeRelations.forEach((relation) => {
+      if (
+        !visibleRelationIds.has(relation.relationId) ||
+        !visibleServiceIds.has(relation.sourceServiceId) ||
+        !visibleServiceIds.has(relation.targetServiceId)
+      ) {
+        return;
+      }
+
+      const sourceService = serviceById.get(relation.sourceServiceId);
+      const targetService = serviceById.get(relation.targetServiceId);
+      const sourceServer = sourceService
+        ? serverById.get(sourceService.serverId)
+        : undefined;
+      const targetServer = targetService
+        ? serverById.get(targetService.serverId)
+        : undefined;
+
+      if (
+        !sourceServer ||
+        !targetServer ||
+        sourceServer.serverId === targetServer.serverId
+      ) {
+        return;
+      }
+
+      const sourceLane = laneByServiceId.get(relation.sourceServiceId);
+      const targetLane = laneByServiceId.get(relation.targetServiceId);
+      if (
+        sourceLane === undefined ||
+        targetLane === undefined ||
+        (!showAllServices && Math.abs(targetLane - sourceLane) !== 1)
+      ) {
+        return;
+      }
+
+      const sourceNodeId = sourceServer.infraNodeId
+        ? `infra-${sourceServer.infraNodeId}`
+        : `infra-server-${sourceServer.serverId}`;
+      const targetNodeId = targetServer.infraNodeId
+        ? `infra-${targetServer.infraNodeId}`
+        : `infra-server-${targetServer.serverId}`;
+
+      if (sourceNodeId === targetNodeId) {
+        return;
+      }
+
+      const edgeId = `${graphViewMode}-relation-${sourceNodeId}-${targetNodeId}`;
+      if (addedTopologyRelationEdges.has(edgeId)) {
+        return;
+      }
+
+      addedTopologyRelationEdges.add(edgeId);
+      topologyRelationEdges.push({
+        id: edgeId,
+        source: sourceNodeId,
+        target: targetNodeId,
+        type: "default",
+        className: "chainview-flow-edge chainview-flow-edge-normal-dashed",
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          color: "#0f766e",
+        },
+        style: {
+          stroke: "#0f766e",
+          strokeWidth: 2.2,
+          opacity: 0.82,
+        },
+      });
+    });
+
+    return topologyRelationEdges;
   }, [
     activeRelations,
+    filteredServices,
+    graphViewMode,
     focusedServiceId,
     highlightServiceId,
     incidentMode,
     laneByServiceId,
+    serviceById,
+    serverById,
     showAllServices,
     visibleRelationIds,
     visibleServiceIds,
   ]);
 
   const nodes = useMemo<Node<GraphNodeData>[]>(
-    () => [...laneNodes, ...serviceNodes],
-    [laneNodes, serviceNodes]
+    () => [...laneNodes, ...(graphViewMode === "service" ? serviceNodes : topologyNodes)],
+    [graphViewMode, laneNodes, serviceNodes, topologyNodes]
   );
   const nodeTypes = useMemo(
-    () => ({ laneNode: LaneNode, serviceNode: ServiceNode }),
+    () => ({ laneNode: LaneNode, serviceNode: ServiceNode, serverInfraNode: ServerInfraNode }),
     []
   );
   const focusedService = serviceById.get(focusedServiceId) ?? services[0];
@@ -990,9 +1144,16 @@ export function ServiceRelationFlow({
           )}
 
           {!hideDepthToggle && (
-            <RelationDepthToggle
-              depth={relationDepth}
-              onDepthChange={setRelationDepth}
+              <RelationDepthToggle
+                depth={relationDepth}
+                onDepthChange={setRelationDepth}
+              />
+          )}
+
+          {!incidentMode && (
+            <GraphViewModeToggle
+              mode={graphViewMode}
+              onModeChange={setGraphViewMode}
             />
           )}
         </div>
@@ -1027,6 +1188,29 @@ export function ServiceRelationFlow({
           border-color: #0ea5e9;
           box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.2),
             0 14px 30px rgba(14, 165, 233, 0.18);
+        }
+
+        .chainview-infra-node {
+          width: 198px;
+          border: 1px solid #d8dee8;
+          border-radius: 8px;
+          background: rgba(255, 255, 255, 0.94);
+          color: #0f172a;
+          padding: 10px 12px;
+          box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
+        }
+
+        .chainview-infra-node-server {
+          border-color: rgba(37, 99, 235, 0.28);
+        }
+
+        .chainview-infra-node-infra {
+          border-color: rgba(20, 184, 166, 0.32);
+          background: rgba(248, 250, 252, 0.96);
+        }
+
+        .chainview-flow-edge-infra path {
+          stroke-linecap: round;
         }
 
         .chainview-flow-node-compact {
@@ -1483,6 +1667,59 @@ function RelationDepthToggle({
   );
 }
 
+function GraphViewModeToggle({
+  mode,
+  onModeChange,
+}: {
+  mode: GraphViewMode;
+  onModeChange: (mode: GraphViewMode) => void;
+}) {
+  const options: Array<{ mode: GraphViewMode; label: string }> = [
+    { mode: "service", label: "서비스" },
+    { mode: "infra", label: "인프라" },
+  ];
+  const activeIndex = options.findIndex((option) => option.mode === mode);
+
+  return (
+    <div className="pointer-events-none absolute right-5 top-5 z-40">
+      <div className="pointer-events-auto relative grid h-10 grid-cols-2 overflow-hidden rounded-full border border-slate-200 bg-white/95 p-1 text-sm font-black shadow-sm backdrop-blur">
+        <span
+          className="absolute bottom-1 top-1 w-[calc(50%-4px)] rounded-full bg-[#0f766e] shadow-sm transition-transform duration-200"
+          style={{
+            left: "4px",
+            borderRadius: "9999px",
+            transform: `translate3d(${Math.max(activeIndex, 0) * 100}%, 0, 0)`,
+            willChange: "transform",
+          }}
+        />
+        {options.map((option) => {
+          const active = option.mode === mode;
+          return (
+            <button
+              key={option.mode}
+              type="button"
+              onClick={() => onModeChange(option.mode)}
+              className={`relative z-10 flex h-8 min-w-[82px] items-center justify-center rounded-full px-4 transition-colors duration-200 ${
+                active
+                  ? "text-white"
+                  : "text-slate-700 hover:text-slate-950"
+              }`}
+              style={{ borderRadius: "9999px" }}
+              title={
+                option.mode === "service"
+                  ? "서비스 간 호출 관계만 표시합니다."
+                  : "서비스 관계를 기준으로 인프라 노드 간 연결만 표시합니다."
+              }
+            >
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function RelationServiceDetailPanel({
   open,
   incomingCount,
@@ -1857,6 +2094,43 @@ function LaneNode({ data }: { data: LaneNodeData }) {
       }`}
     >
       <div className="chainview-lane-label">{data.label}</div>
+    </div>
+  );
+}
+
+function ServerInfraNode({ data }: { data: ServerInfraNodeData }) {
+  const isServer = data.kind === "server";
+
+  return (
+    <div
+      className={`chainview-infra-node ${
+        isServer ? "chainview-infra-node-server" : "chainview-infra-node-infra"
+      }`}
+    >
+      <Handle type="target" position={Position.Left} />
+      <div className="flex min-w-0 items-start gap-2">
+        <div
+          className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${
+            isServer
+              ? "bg-blue-50 text-blue-600"
+              : "bg-teal-50 text-teal-700"
+          }`}
+        >
+          <Server size={16} />
+        </div>
+        <div className="min-w-0">
+          <div className="truncate text-xs font-black text-slate-950">
+            {data.label}
+          </div>
+          <div className="mt-0.5 truncate text-[11px] font-semibold text-slate-500">
+            {data.code}
+          </div>
+          <div className="mt-1 truncate text-[10px] font-bold text-slate-400">
+            {data.meta}
+          </div>
+        </div>
+      </div>
+      <Handle type="source" position={Position.Right} />
     </div>
   );
 }

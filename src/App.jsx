@@ -131,6 +131,8 @@ const menuMetaByKey = {
   techstacks: { section: "서비스", label: "기술 스택", icon: "🧩" },
   servers: { section: "인프라", label: "서버 조회", icon: "🖥️" },
   deployments: { section: "인프라", label: "배포 현황", icon: "🚀" },
+  "infra-topology": { section: "인프라", label: "인프라 토폴로지", icon: "🧱" },
+  "infra-relations": { section: "인프라", label: "인프라 관계조회", icon: "🔌" },
   owners: { section: "담당자", label: "담당자 조회", icon: "👨‍💼" },
   groups: { section: "담당자", label: "그룹 조회", icon: "📁" },
   users: { section: "시스템 관리", label: "사용자 관리", icon: "👥" },
@@ -2206,6 +2208,8 @@ const sidebarSections = [
   {
     label: "인프라",
     items: [
+      { key: "infra-topology", icon: "🧱", label: "인프라 토폴로지", to: "/admin-infra-topology" },
+      { key: "infra-relations", icon: "🔌", label: "인프라 관계조회", to: "/admin-infra-relations" },
       { key: "servers", icon: "🖥️", label: "서버 조회", to: "/admin-servers" },
       { key: "deployments", icon: "🚀", label: "배포 현황", to: "/admin-deployments" },
     ],
@@ -2347,8 +2351,513 @@ function Sidebar({ activeMenu = "", isDark = false }) {
   );
 }
 
+const infraNodeTypeLabels = {
+  RACK: "랙/위치",
+  PHYSICAL_HOST: "물리 호스트",
+  HYPERVISOR: "하이퍼바이저",
+  NETWORK_DEVICE: "네트워크 장비",
+  STORAGE: "스토리지",
+  DB_CLUSTER: "DB 클러스터",
+};
+
+const infraStatusLabels = {
+  NORMAL: "정상",
+  INCIDENT: "장애",
+  MAINTENANCE: "점검중",
+  INACTIVE: "비활성",
+};
+
+const initialInfraNodes = [
+  { infraNodeId: 17, nodeCode: "ORA-RAC-DR-01", nodeName: "Oracle RAC DR 클러스터", nodeTypeCode: "DB_CLUSTER", statusCode: "NORMAL", locationLabel: "IDC-B DB Zone", vendorModel: "Oracle Exadata X9M", serverCount: 0 },
+  { infraNodeId: 16, nodeCode: "ORA-RAC-PRD-02", nodeName: "Oracle RAC 운영 클러스터 #2", nodeTypeCode: "DB_CLUSTER", statusCode: "NORMAL", locationLabel: "IDC-A DB Zone", vendorModel: "Oracle Exadata X9M", serverCount: 0 },
+  { infraNodeId: 15, nodeCode: "ORA-RAC-PRD-01", nodeName: "Oracle RAC 운영 클러스터 #1", nodeTypeCode: "DB_CLUSTER", statusCode: "NORMAL", locationLabel: "IDC-A DB Zone", vendorModel: "Oracle Exadata X9M", serverCount: 0 },
+  { infraNodeId: 14, nodeCode: "L3SW-IDC-A-02", nodeName: "IDC-A L3 코어 스위치 #2", nodeTypeCode: "NETWORK_DEVICE", statusCode: "NORMAL", locationLabel: "IDC-A Core", vendorModel: "Cisco Catalyst 9500", serverCount: 0 },
+  { infraNodeId: 13, nodeCode: "L3SW-IDC-A-01", nodeName: "IDC-A L3 코어 스위치 #1", nodeTypeCode: "NETWORK_DEVICE", statusCode: "NORMAL", locationLabel: "IDC-A Core", vendorModel: "Cisco Catalyst 9500", serverCount: 0 },
+  { infraNodeId: 12, nodeCode: "SAN-PRD-01", nodeName: "IBM DS8900 SAN 스토리지", nodeTypeCode: "STORAGE", statusCode: "NORMAL", locationLabel: "IDC-A Storage", vendorModel: "IBM DS8900F", serverCount: 0 },
+  { infraNodeId: 11, nodeCode: "LPAR-DR-WAS-02", nodeName: "DR 기간계 WAS LPAR #2", nodeTypeCode: "HYPERVISOR", statusCode: "NORMAL", locationLabel: "P770-DR-01 / LPAR02", vendorModel: "IBM AIX LPAR", serverCount: 1 },
+  { infraNodeId: 10, nodeCode: "LPAR-DR-WAS-01", nodeName: "DR 기간계 WAS LPAR #1", nodeTypeCode: "HYPERVISOR", statusCode: "NORMAL", locationLabel: "P770-DR-01 / LPAR01", vendorModel: "IBM AIX LPAR", serverCount: 1 },
+  { infraNodeId: 9, nodeCode: "LPAR-BATCH-01", nodeName: "기간계 배치 LPAR #1", nodeTypeCode: "HYPERVISOR", statusCode: "NORMAL", locationLabel: "P770-PRD-01 / LPAR03", vendorModel: "IBM AIX LPAR", serverCount: 2 },
+  { infraNodeId: 8, nodeCode: "P770-DR-01", nodeName: "IBM Power 770 (DR 기간계)", nodeTypeCode: "PHYSICAL_HOST", statusCode: "NORMAL", locationLabel: "IDC-B Rack-03", vendorModel: "IBM Power 770", serverCount: 0 },
+  { infraNodeId: 7, nodeCode: "X86-IF-PRD-01", nodeName: "X86 대외계 물리서버 #1", nodeTypeCode: "PHYSICAL_HOST", statusCode: "NORMAL", locationLabel: "IDC-A Rack-04", vendorModel: "Dell PowerEdge R750", serverCount: 3 },
+  { infraNodeId: 6, nodeCode: "X86-CMM-PRD-01", nodeName: "X86 공통플랫폼 물리서버 #1", nodeTypeCode: "PHYSICAL_HOST", statusCode: "NORMAL", locationLabel: "IDC-A Rack-02", vendorModel: "Dell PowerEdge R750", serverCount: 7 },
+  { infraNodeId: 5, nodeCode: "X86-CHN-PRD-02", nodeName: "X86 채널계 물리서버 #2", nodeTypeCode: "PHYSICAL_HOST", statusCode: "NORMAL", locationLabel: "IDC-A Rack-01", vendorModel: "HPE ProLiant DL380 Gen10", serverCount: 3 },
+  { infraNodeId: 4, nodeCode: "X86-CHN-PRD-01", nodeName: "X86 채널계 물리서버 #1", nodeTypeCode: "PHYSICAL_HOST", statusCode: "NORMAL", locationLabel: "IDC-A Rack-01", vendorModel: "HPE ProLiant DL380 Gen10", serverCount: 4 },
+  { infraNodeId: 3, nodeCode: "LPAR-WAS-02", nodeName: "기간계 WAS LPAR #2", nodeTypeCode: "HYPERVISOR", statusCode: "NORMAL", locationLabel: "P770-PRD-01 / LPAR02", vendorModel: "IBM AIX LPAR", serverCount: 1 },
+  { infraNodeId: 2, nodeCode: "LPAR-WAS-01", nodeName: "기간계 WAS LPAR #1", nodeTypeCode: "HYPERVISOR", statusCode: "NORMAL", locationLabel: "P770-PRD-01 / LPAR01", vendorModel: "IBM AIX LPAR", serverCount: 1 },
+  { infraNodeId: 1, nodeCode: "P770-PRD-01", nodeName: "IBM Power 770 (기간계)", nodeTypeCode: "PHYSICAL_HOST", statusCode: "NORMAL", locationLabel: "IDC-A Rack-03", vendorModel: "IBM Power 770", serverCount: 0 },
+];
+
+const infraRelationTypeLabels = {
+  NETWORK: "네트워크 연결",
+  HOSTING: "호스팅/가상화",
+  STORAGE_PATH: "스토리지 경로",
+  DB_REPLICATION: "DB 복제",
+  DEPENDENCY: "인프라 의존",
+};
+
+const infraRelationStatusLabels = {
+  ACTIVE: "활성",
+  INACTIVE: "비활성",
+  MAINTENANCE: "점검중",
+};
+
+const initialInfraRelations = [
+  { infraRelationId: 1, sourceInfraNodeId: 4, targetInfraNodeId: 13, relationTypeCode: "NETWORK", mandatoryYn: "Y", relationStatusCode: "ACTIVE", description: "채널계 서버의 IDC-A 코어 스위치 연결" },
+  { infraRelationId: 2, sourceInfraNodeId: 5, targetInfraNodeId: 13, relationTypeCode: "NETWORK", mandatoryYn: "Y", relationStatusCode: "ACTIVE", description: "채널계 이중화 구간 네트워크 연결" },
+  { infraRelationId: 3, sourceInfraNodeId: 6, targetInfraNodeId: 12, relationTypeCode: "STORAGE_PATH", mandatoryYn: "Y", relationStatusCode: "ACTIVE", description: "공통 플랫폼 스토리지 접근 경로" },
+  { infraRelationId: 4, sourceInfraNodeId: 15, targetInfraNodeId: 17, relationTypeCode: "DB_REPLICATION", mandatoryYn: "Y", relationStatusCode: "ACTIVE", description: "Oracle RAC 운영-DR 복제 관계" },
+  { infraRelationId: 5, sourceInfraNodeId: 1, targetInfraNodeId: 3, relationTypeCode: "HOSTING", mandatoryYn: "Y", relationStatusCode: "ACTIVE", description: "Power 770 내 기간계 WAS LPAR 구동" },
+  { infraRelationId: 6, sourceInfraNodeId: 8, targetInfraNodeId: 11, relationTypeCode: "HOSTING", mandatoryYn: "N", relationStatusCode: "MAINTENANCE", description: "DR Power 770 내 WAS LPAR 연결" },
+];
+
+function InfraRelationsPage() {
+  const [relations, setRelations] = useState(initialInfraRelations);
+  const [keyword, setKeyword] = useState("");
+  const [typeFilter, setTypeFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [modal, setModal] = useState(null);
+  const [graphOpen, setGraphOpen] = useState(false);
+  const [graphFocusNodeId, setGraphFocusNodeId] = useState(initialInfraNodes[0]?.infraNodeId ?? "");
+  const nodeById = useMemo(
+    () => new Map(initialInfraNodes.map((node) => [node.infraNodeId, node])),
+    []
+  );
+  const filteredRelations = relations.filter((relation) => {
+    const sourceNode = nodeById.get(Number(relation.sourceInfraNodeId));
+    const targetNode = nodeById.get(Number(relation.targetInfraNodeId));
+    const haystack = `${relation.infraRelationId} ${sourceNode?.nodeCode} ${sourceNode?.nodeName} ${targetNode?.nodeCode} ${targetNode?.nodeName} ${relation.description}`.toLowerCase();
+    if (keyword.trim() && !haystack.includes(keyword.trim().toLowerCase())) return false;
+    if (typeFilter && relation.relationTypeCode !== typeFilter) return false;
+    if (statusFilter && relation.relationStatusCode !== statusFilter) return false;
+    return true;
+  });
+  const nodeLabel = (nodeId) => {
+    const node = nodeById.get(Number(nodeId));
+    return node ? `${node.nodeCode} ${node.nodeName}` : "노드 미지정";
+  };
+  const openCreateModal = () => {
+    setModal({
+      mode: "create",
+      form: {
+        sourceInfraNodeId: initialInfraNodes[0]?.infraNodeId ?? "",
+        targetInfraNodeId: initialInfraNodes[1]?.infraNodeId ?? "",
+        relationTypeCode: "NETWORK",
+        mandatoryYn: "Y",
+        relationStatusCode: "ACTIVE",
+        description: "",
+      },
+    });
+  };
+  const openEditModal = (relation) => setModal({ mode: "edit", form: { ...relation } });
+  const updateModalField = (fieldName, value) => {
+    setModal((current) => current ? { ...current, form: { ...current.form, [fieldName]: value } } : current);
+  };
+  const saveModal = () => {
+    const form = modal?.form;
+    if (!form?.sourceInfraNodeId || !form?.targetInfraNodeId) {
+      window.alert("source/target 인프라 노드를 선택해주세요.");
+      return;
+    }
+    if (Number(form.sourceInfraNodeId) === Number(form.targetInfraNodeId)) {
+      window.alert("source와 target 인프라 노드는 달라야 합니다.");
+      return;
+    }
+    const nextRelation = {
+      ...form,
+      sourceInfraNodeId: Number(form.sourceInfraNodeId),
+      targetInfraNodeId: Number(form.targetInfraNodeId),
+    };
+    if (modal.mode === "edit") {
+      setRelations((current) => current.map((relation) => relation.infraRelationId === form.infraRelationId ? nextRelation : relation));
+    } else {
+      const nextId = Math.max(...relations.map((relation) => relation.infraRelationId), 0) + 1;
+      setRelations((current) => [{ ...nextRelation, infraRelationId: nextId }, ...current]);
+    }
+    setModal(null);
+  };
+  const deleteRelation = (relation) => {
+    if (!window.confirm(`${nodeLabel(relation.sourceInfraNodeId)} → ${nodeLabel(relation.targetInfraNodeId)} 관계를 삭제할까요?`)) return;
+    setRelations((current) => current.filter((item) => item.infraRelationId !== relation.infraRelationId));
+  };
+
+  return (
+    <AppShell activeMenu="infra-relations">
+      <main className="main infra-page">
+        <div className="page-header-stack">
+          <div className="crumb crumb--standardized"><span>인프라</span><span className="sep">/</span><span>인프라 관계조회</span></div>
+          <div className="page-head page-head--standardized">
+            <div>
+              <h1 className="page-head__title"><span className="page-head__icon" aria-hidden="true">🔌</span><span>인프라 관계조회</span></h1>
+            </div>
+            <div className="page-head__right">
+              <button className="btn" onClick={() => setGraphOpen(true)} type="button">🗺️ 관계도 보기</button>
+              <button className="btn">📥 CSV 내보내기</button>
+              <button className="btn btn--primary" onClick={openCreateModal} type="button">＋ 관계 등록</button>
+            </div>
+          </div>
+        </div>
+
+        <div className="toolbar">
+          <div className="search">🔍<input type="text" value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="노드 코드, 이름, 설명 검색..." /></div>
+          <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
+            <option value="">관계 유형 전체</option>
+            {Object.entries(infraRelationTypeLabels).map(([code, label]) => <option key={code} value={code}>{label}</option>)}
+          </select>
+          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+            <option value="">상태 전체</option>
+            {Object.entries(infraRelationStatusLabels).map(([code, label]) => <option key={code} value={code}>{label}</option>)}
+          </select>
+          <div className="right"><button className="btn btn--ghost btn--sm" onClick={() => { setKeyword(""); setTypeFilter(""); setStatusFilter(""); }} type="button">초기화</button></div>
+        </div>
+
+        <div className="card">
+          <table className="tbl infra-table">
+            <thead>
+              <tr>
+                <th>relationId</th><th>source 인프라</th><th>target 인프라</th><th>관계 유형</th><th>필수</th><th>상태</th><th>설명</th><th className="col-actions">관리</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredRelations.map((relation) => (
+                <tr key={relation.infraRelationId}>
+                  <td><code>{relation.infraRelationId}</code></td>
+                  <td>{formatInfraNodeCell(nodeById.get(Number(relation.sourceInfraNodeId)))}</td>
+                  <td>{formatInfraNodeCell(nodeById.get(Number(relation.targetInfraNodeId)))}</td>
+                  <td>{infraRelationTypeLabels[relation.relationTypeCode] || relation.relationTypeCode}</td>
+                  <td><span className={`pill ${relation.mandatoryYn === "Y" ? "pill--crit" : "pill--gray"}`}>{relation.mandatoryYn === "Y" ? "필수" : "선택"}</span></td>
+                  <td><InfraRelationStatusBadge code={relation.relationStatusCode} /></td>
+                  <td>{relation.description || "-"}</td>
+                  <td className="col-actions">
+                    <div className="row-actions">
+                      <button className="ibtn" onClick={() => openEditModal(relation)} title="수정" type="button">✏️</button>
+                      <button className="ibtn ibtn--danger" onClick={() => deleteRelation(relation)} title="삭제" type="button">🗑</button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {!filteredRelations.length ? <tr><td colSpan={8}><div className="empty">조회된 인프라 관계가 없습니다.</div></td></tr> : null}
+            </tbody>
+          </table>
+          <div className="pager">
+            <div className="pager__info">전체 {filteredRelations.length}건 · 로컬 관리 화면</div>
+          </div>
+        </div>
+
+        {modal ? (
+          <div className="modal-backdrop is-open" onClick={() => setModal(null)}>
+            <div className="modal" onClick={(event) => event.stopPropagation()}>
+              <div className="modal__head">
+                <h3>{modal.mode === "edit" ? "✏️ 인프라 관계 수정" : "＋ 인프라 관계 등록"}</h3>
+                <button className="close" onClick={() => setModal(null)} type="button">×</button>
+              </div>
+              <div className="modal__body">
+                <div className="form-section">
+                  <h4 className="form-section__title">연결 인프라</h4>
+                  <div className="form-grid">
+                    <div className="form-row"><label>source 인프라<span className="req">*</span></label><select value={modal.form.sourceInfraNodeId} onChange={(event) => updateModalField("sourceInfraNodeId", event.target.value)}>{initialInfraNodes.map((node) => <option key={node.infraNodeId} value={node.infraNodeId}>{node.nodeCode} {node.nodeName}</option>)}</select><span className="help">영향을 주는 쪽</span></div>
+                    <div className="form-row"><label>target 인프라<span className="req">*</span></label><select value={modal.form.targetInfraNodeId} onChange={(event) => updateModalField("targetInfraNodeId", event.target.value)}>{initialInfraNodes.map((node) => <option key={node.infraNodeId} value={node.infraNodeId}>{node.nodeCode} {node.nodeName}</option>)}</select><span className="help">영향을 받는 쪽</span></div>
+                    <div className="form-row"><label>관계 유형<span className="req">*</span></label><select value={modal.form.relationTypeCode} onChange={(event) => updateModalField("relationTypeCode", event.target.value)}>{Object.entries(infraRelationTypeLabels).map(([code, label]) => <option key={code} value={code}>{label} ({code})</option>)}</select></div>
+                    <div className="form-row"><label>상태</label><select value={modal.form.relationStatusCode} onChange={(event) => updateModalField("relationStatusCode", event.target.value)}>{Object.entries(infraRelationStatusLabels).map(([code, label]) => <option key={code} value={code}>{label} ({code})</option>)}</select></div>
+                    <div className="form-row"><label>필수 여부</label><select value={modal.form.mandatoryYn} onChange={(event) => updateModalField("mandatoryYn", event.target.value)}><option value="Y">Y (필수)</option><option value="N">N (선택)</option></select></div>
+                  </div>
+                  <div className="form-row"><label>설명</label><textarea value={modal.form.description} onChange={(event) => updateModalField("description", event.target.value)} placeholder="장애 발생 시 어떤 인프라 영향이 있는지 작성" /></div>
+                </div>
+              </div>
+              <div className="modal__foot"><button className="btn" onClick={() => setModal(null)} type="button">취소</button><button className="btn btn--primary" onClick={saveModal} type="button">저장</button></div>
+            </div>
+          </div>
+        ) : null}
+        {graphOpen ? (
+          <InfraRelationGraphModal
+            focusNodeId={Number(graphFocusNodeId)}
+            nodeById={nodeById}
+            nodes={initialInfraNodes}
+            onClose={() => setGraphOpen(false)}
+            onFocusChange={(nodeId) => setGraphFocusNodeId(Number(nodeId))}
+            relations={relations}
+          />
+        ) : null}
+      </main>
+    </AppShell>
+  );
+}
+
+function InfraRelationGraphModal({
+  focusNodeId,
+  nodeById,
+  nodes,
+  onClose,
+  onFocusChange,
+  relations,
+}) {
+  const focusNode = nodeById.get(Number(focusNodeId)) ?? nodes[0];
+  const connectedRelations = relations.filter(
+    (relation) =>
+      Number(relation.sourceInfraNodeId) === Number(focusNode?.infraNodeId) ||
+      Number(relation.targetInfraNodeId) === Number(focusNode?.infraNodeId)
+  );
+  const incomingRelations = connectedRelations.filter(
+    (relation) => Number(relation.targetInfraNodeId) === Number(focusNode?.infraNodeId)
+  );
+  const outgoingRelations = connectedRelations.filter(
+    (relation) => Number(relation.sourceInfraNodeId) === Number(focusNode?.infraNodeId)
+  );
+  const nodeWidth = 220;
+  const nodeHeight = 86;
+  const positions = new Map();
+  const center = { x: 410, y: 220 };
+  positions.set(`node-${focusNode?.infraNodeId}`, center);
+  incomingRelations.forEach((relation, index) => {
+    positions.set(`node-${relation.sourceInfraNodeId}`, {
+      x: 70,
+      y: 110 + index * 136,
+    });
+  });
+  outgoingRelations.forEach((relation, index) => {
+    positions.set(`node-${relation.targetInfraNodeId}`, {
+      x: 750,
+      y: 110 + index * 136,
+    });
+  });
+  const graphNodes = [...positions.entries()].map(([key, position]) => {
+    const nodeId = Number(key.replace("node-", ""));
+    return { node: nodeById.get(nodeId), position };
+  }).filter((item) => item.node);
+  const edgePath = (sourceId, targetId) => {
+    const source = positions.get(`node-${sourceId}`);
+    const target = positions.get(`node-${targetId}`);
+    if (!source || !target) return "";
+    const sourceCenterX = source.x + nodeWidth / 2;
+    const targetCenterX = target.x + nodeWidth / 2;
+    const sourceCenterY = source.y + nodeHeight / 2;
+    const targetCenterY = target.y + nodeHeight / 2;
+    const sourceIsLeft = sourceCenterX < targetCenterX;
+    const startX = sourceIsLeft ? source.x + nodeWidth : source.x;
+    const endX = sourceIsLeft ? target.x : target.x + nodeWidth;
+    const curve = Math.max(90, Math.abs(endX - startX) * 0.42);
+    const controlOneX = sourceIsLeft ? startX + curve : startX - curve;
+    const controlTwoX = sourceIsLeft ? endX - curve : endX + curve;
+    return `M ${startX} ${sourceCenterY} C ${controlOneX} ${sourceCenterY}, ${controlTwoX} ${targetCenterY}, ${endX} ${targetCenterY}`;
+  };
+
+  return (
+    <div className="modal-backdrop is-open" onClick={onClose}>
+      <div className="modal modal--xl infra-graph-modal" onClick={(event) => event.stopPropagation()}>
+        <div className="modal__head">
+          <h3>🗺️ 인프라 관계도</h3>
+          <button className="close" onClick={onClose} type="button">×</button>
+        </div>
+        <div className="modal__body">
+          <div className="infra-graph-toolbar">
+            <label>
+              기준 인프라
+              <select value={focusNode?.infraNodeId ?? ""} onChange={(event) => onFocusChange(event.target.value)}>
+                {nodes.map((node) => (
+                  <option key={node.infraNodeId} value={node.infraNodeId}>{node.nodeCode} {node.nodeName}</option>
+                ))}
+              </select>
+            </label>
+            <span>{incomingRelations.length}개 수신 · {outgoingRelations.length}개 송신</span>
+          </div>
+          <div className="infra-graph-canvas">
+            <svg viewBox="0 0 1040 520" aria-hidden="true">
+              {connectedRelations.map((relation) => (
+                <path
+                  className="infra-graph-edge"
+                  d={edgePath(relation.sourceInfraNodeId, relation.targetInfraNodeId)}
+                  key={relation.infraRelationId}
+                />
+              ))}
+            </svg>
+            {graphNodes.map(({ node, position }) => (
+              <button
+                className={`infra-graph-node ${Number(node.infraNodeId) === Number(focusNode?.infraNodeId) ? "is-focus" : ""}`}
+                key={node.infraNodeId}
+                onClick={() => onFocusChange(node.infraNodeId)}
+                style={{ left: position.x, top: position.y }}
+                type="button"
+              >
+                <b>{node.nodeName}</b>
+                <code>{node.nodeCode}</code>
+                <span>{infraNodeTypeLabels[node.nodeTypeCode] || node.nodeTypeCode}</span>
+              </button>
+            ))}
+            {!graphNodes.length ? (
+              <div className="infra-graph-empty">선택한 인프라에 연결된 관계가 없습니다.</div>
+            ) : null}
+          </div>
+        </div>
+        <div className="modal__foot">
+          <button className="btn btn--primary" onClick={onClose} type="button">확인</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function InfraTopologyPage() {
+  const [nodes, setNodes] = useState(initialInfraNodes);
+  const [keyword, setKeyword] = useState("");
+  const [typeFilter, setTypeFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [modal, setModal] = useState(null);
+  const filteredNodes = nodes.filter((node) => {
+    const haystack = `${node.nodeCode} ${node.nodeName} ${node.locationLabel} ${node.vendorModel}`.toLowerCase();
+    if (keyword.trim() && !haystack.includes(keyword.trim().toLowerCase())) return false;
+    if (typeFilter && node.nodeTypeCode !== typeFilter) return false;
+    if (statusFilter && node.statusCode !== statusFilter) return false;
+    return true;
+  });
+  const openCreateModal = () => {
+    setModal({
+      mode: "create",
+      form: {
+        nodeCode: "",
+        nodeName: "",
+        nodeTypeCode: "PHYSICAL_HOST",
+        statusCode: "NORMAL",
+        locationLabel: "",
+        vendorModel: "",
+        serverCount: 0,
+      },
+    });
+  };
+  const openEditModal = (node) => {
+    setModal({ mode: "edit", form: { ...node } });
+  };
+  const updateModalField = (field, value) => {
+    setModal((current) => current ? { ...current, form: { ...current.form, [field]: value } } : current);
+  };
+  const saveModal = () => {
+    const form = modal?.form;
+    if (!form?.nodeCode?.trim() || !form?.nodeName?.trim()) {
+      window.alert("노드 코드와 노드 이름은 필수입니다.");
+      return;
+    }
+    if (modal.mode === "edit") {
+      setNodes((current) => current.map((node) => node.infraNodeId === form.infraNodeId ? { ...form, serverCount: Number(form.serverCount) || 0 } : node));
+    } else {
+      const nextId = Math.max(...nodes.map((node) => node.infraNodeId), 0) + 1;
+      setNodes((current) => [{ ...form, infraNodeId: nextId, serverCount: Number(form.serverCount) || 0 }, ...current]);
+    }
+    setModal(null);
+  };
+  const deleteNode = (node) => {
+    if (!window.confirm(`${node.nodeName} 노드를 삭제할까요?`)) return;
+    setNodes((current) => current.filter((item) => item.infraNodeId !== node.infraNodeId));
+  };
+
+  return (
+    <AppShell activeMenu="infra-topology">
+      <main className="main infra-page">
+        <div className="page-header-stack">
+          <div className="crumb crumb--standardized"><span>인프라</span><span className="sep">/</span><span>인프라 토폴로지</span></div>
+          <div className="page-head page-head--standardized">
+            <div>
+              <h1 className="page-head__title"><span className="page-head__icon" aria-hidden="true">🧱</span><span>인프라 토폴로지</span></h1>
+            </div>
+            <div className="page-head__right">
+              <button className="btn btn--primary" onClick={openCreateModal} type="button">＋ 노드 등록</button>
+            </div>
+          </div>
+        </div>
+
+        <div className="toolbar">
+          <div className="search">🔍<input type="text" value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="노드 코드, 이름, 위치 검색..." /></div>
+          <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
+            <option value="">노드 유형 전체</option>
+            {Object.entries(infraNodeTypeLabels).map(([code, label]) => <option key={code} value={code}>{label}</option>)}
+          </select>
+          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+            <option value="">상태 전체</option>
+            {Object.entries(infraStatusLabels).map(([code, label]) => <option key={code} value={code}>{label}</option>)}
+          </select>
+          <div className="right"><button className="btn btn--ghost btn--sm" onClick={() => { setKeyword(""); setTypeFilter(""); setStatusFilter(""); }} type="button">초기화</button></div>
+        </div>
+
+        <div className="card">
+          <table className="tbl infra-table">
+            <thead>
+              <tr>
+                <th>노드 코드</th><th>노드 이름</th><th>유형</th><th>상태</th><th>위치</th><th>벤더/모델</th><th>연결 서버</th><th className="col-actions">관리</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredNodes.map((node) => (
+                <tr key={node.infraNodeId}>
+                  <td><code>{node.nodeCode}</code></td>
+                  <td><b>{node.nodeName}</b></td>
+                  <td>{infraNodeTypeLabels[node.nodeTypeCode] || node.nodeTypeCode}</td>
+                  <td><InfraStatusBadge code={node.statusCode} /></td>
+                  <td>{node.locationLabel || "-"}</td>
+                  <td>{node.vendorModel || "-"}</td>
+                  <td>{node.serverCount}대</td>
+                  <td className="col-actions">
+                    <div className="row-actions">
+                      <button className="ibtn" onClick={() => openEditModal(node)} title="수정" type="button">✏️</button>
+                      <button className="ibtn ibtn--danger" onClick={() => deleteNode(node)} title="삭제" type="button">🗑</button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {!filteredNodes.length ? <tr><td colSpan={8}><div className="empty">조회된 인프라 노드가 없습니다.</div></td></tr> : null}
+            </tbody>
+          </table>
+          <div className="pager">
+            <div className="pager__info">전체 {filteredNodes.length}건 · 로컬 관리 화면</div>
+          </div>
+        </div>
+
+        {modal ? (
+          <div className="modal-backdrop is-open" onClick={() => setModal(null)}>
+            <div className="modal" onClick={(event) => event.stopPropagation()}>
+              <div className="modal__head">
+                <h3>{modal.mode === "edit" ? "✏️ 인프라 노드 수정" : "＋ 인프라 노드 등록"}</h3>
+                <button className="close" onClick={() => setModal(null)} type="button">×</button>
+              </div>
+              <div className="modal__body">
+                <div className="form-section">
+                  <h4 className="form-section__title">노드 정보</h4>
+                  <div className="form-grid">
+                    <div className="form-row"><label>노드 코드<span className="req">*</span></label><input type="text" value={modal.form.nodeCode} onChange={(event) => updateModalField("nodeCode", event.target.value.toUpperCase())} disabled={modal.mode === "edit"} /></div>
+                    <div className="form-row"><label>노드 이름<span className="req">*</span></label><input type="text" value={modal.form.nodeName} onChange={(event) => updateModalField("nodeName", event.target.value)} /></div>
+                    <div className="form-row"><label>노드 유형</label><select value={modal.form.nodeTypeCode} onChange={(event) => updateModalField("nodeTypeCode", event.target.value)}>{Object.entries(infraNodeTypeLabels).map(([code, label]) => <option key={code} value={code}>{label}</option>)}</select></div>
+                    <div className="form-row"><label>상태</label><select value={modal.form.statusCode} onChange={(event) => updateModalField("statusCode", event.target.value)}>{Object.entries(infraStatusLabels).map(([code, label]) => <option key={code} value={code}>{label}</option>)}</select></div>
+                    <div className="form-row"><label>위치</label><input type="text" value={modal.form.locationLabel} onChange={(event) => updateModalField("locationLabel", event.target.value)} /></div>
+                    <div className="form-row"><label>벤더/모델</label><input type="text" value={modal.form.vendorModel} onChange={(event) => updateModalField("vendorModel", event.target.value)} /></div>
+                    <div className="form-row"><label>연결 서버 수</label><input type="number" min="0" value={modal.form.serverCount} onChange={(event) => updateModalField("serverCount", event.target.value)} /></div>
+                  </div>
+                </div>
+              </div>
+              <div className="modal__foot"><button className="btn" onClick={() => setModal(null)} type="button">취소</button><button className="btn btn--primary" onClick={saveModal} type="button">저장</button></div>
+            </div>
+          </div>
+        ) : null}
+      </main>
+    </AppShell>
+  );
+}
+
+function InfraStatusBadge({ code }) {
+  const tone = code === "NORMAL" ? "pill--ok" : code === "INCIDENT" ? "pill--crit" : code === "MAINTENANCE" ? "pill--warn" : "pill--idle";
+  return <span className={`pill ${tone}`}>{infraStatusLabels[code] || code}</span>;
+}
+
+function InfraRelationStatusBadge({ code }) {
+  const tone = code === "ACTIVE" ? "pill--ok" : code === "MAINTENANCE" ? "pill--warn" : "pill--idle";
+  return <span className={`pill ${tone}`}>{infraRelationStatusLabels[code] || code}</span>;
+}
+
+function formatInfraNodeCell(node) {
+  if (!node) {
+    return "-";
+  }
+  return <><code>{node.nodeCode}</code> {node.nodeName}</>;
+}
+
 function StatisticsPage() {
   const portalData = usePortalData();
+  const [activeStatsTab, setActiveStatsTab] = useState("service");
   const serviceById = useMemo(
     () => new Map(portalData.services.map((service) => [service.serviceId, service])),
     [portalData.services]
@@ -2401,8 +2910,12 @@ function StatisticsPage() {
   const shallowCategoryServices = portalData.services.filter((service) => (service.categoryPath ?? []).length < 2);
   const missingImpactRelations = portalData.relations.filter((relation) => !compactText(relation.description));
   const openIncidents = portalData.incidents.filter((incident) => incident.incidentStatusCode !== "RESOLVED");
+  const normalServices = portalData.services.filter((service) =>
+    ["NORMAL", "ACTIVE", "RUNNING"].includes(String(service.statusCode || "").toUpperCase())
+  );
   const activeRelations = portalData.relations.filter((relation) => relation.relationStatusCode === "ACTIVE").length;
   const mandatoryRelations = portalData.relations.filter((relation) => String(relation.mandatoryYn).toUpperCase() === "Y").length;
+  const incidentMonthlyStats = buildMonthlyIncidentTrend(portalData.incidents);
   const criticalWithoutOwner = servicesWithoutOwner.filter((service) =>
     ["CRITICAL", "HIGH", "IMPORTANT"].includes(String(service.importanceCode || "").toUpperCase())
   );
@@ -2437,6 +2950,12 @@ function StatisticsPage() {
       meta: `${service.serviceCode} ${service.serviceName}`,
     })),
   ].slice(0, 8);
+  const graphTabs = [
+    { key: "service", label: "서비스" },
+    { key: "incident", label: "인시던트" },
+    { key: "relation", label: "관계·인프라" },
+    { key: "quality", label: "품질 점검" },
+  ];
 
   return (
     <AppShell activeMenu="statistics">
@@ -2456,64 +2975,105 @@ function StatisticsPage() {
         </div>
 
         <section className="statistics-kpis" aria-label="주요 지표">
-          <StatKpi label="전체 서비스" value={portalData.services.length} hint="등록된 서비스 기준" />
+          <StatKpi label="전체 서비스" value={portalData.services.length} hint="서비스 카탈로그" />
+          <StatKpi label="정상 운영 서비스" value={normalServices.length} hint="상태 정상 기준" tone="ok" />
+          <StatKpi label="전체 서버" value={portalData.servers.length} hint="등록 인프라 노드" />
+          <StatKpi label="활성 관계" value={activeRelations} hint="서비스 의존 관계" />
           <StatKpi label="담당자 미등록" value={servicesWithoutOwner.length} hint="담당자 연결 필요" tone={servicesWithoutOwner.length ? "warn" : "ok"} />
-          <StatKpi label="오픈 인시던트" value={openIncidents.length} hint="해결 전 상태" tone={openIncidents.length ? "danger" : "ok"} />
           <StatKpi label="영향도 설명 누락" value={missingImpactRelations.length} hint="토폴로지 노출 품질" tone={missingImpactRelations.length ? "warn" : "ok"} />
         </section>
 
-        <section className="statistics-layout">
-          <div className="statistics-panel">
-            <h2>서비스 분포</h2>
-            <StatBarGroup title="대분류별 서비스" rows={categoryStats} />
-            <StatBarGroup title="서비스 유형" rows={typeStats} />
+        <section className="statistics-graph-section" aria-label="통계 그래프">
+          <div className="statistics-tabs" role="tablist" aria-label="통계 그래프 탭">
+            {graphTabs.map((tab) => (
+              <button
+                aria-selected={activeStatsTab === tab.key}
+                className={activeStatsTab === tab.key ? "is-active" : ""}
+                key={tab.key}
+                onClick={() => setActiveStatsTab(tab.key)}
+                role="tab"
+                type="button"
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
-          <div className="statistics-panel">
-            <h2>운영 상태</h2>
-            <StatBarGroup title="중요도" rows={importanceStats} />
-            <StatBarGroup title="상태" rows={statusStats} />
-          </div>
-          <div className="statistics-panel">
-            <h2>담당자/관계</h2>
-            <StatBarGroup title="담당 유형" rows={ownerTypeStats} />
-            <div className="statistics-metrics">
-              <span><b>{portalData.owners.length}</b> 담당자 매핑</span>
-              <span><b>{activeRelations}</b> 활성 관계</span>
-              <span><b>{mandatoryRelations}</b> 필수 관계</span>
-            </div>
-          </div>
-          <div className="statistics-panel">
-            <h2>인프라 집중도</h2>
-            <StatBarGroup title="서버별 배포 수" rows={deploymentStats} />
-            <StatBarGroup title="관계 연결 Top" rows={relationHotspots} />
-          </div>
-        </section>
 
-        <section className="statistics-bottom">
-          <div className="statistics-panel statistics-panel--wide">
-            <h2>조치 필요 항목</h2>
-            {actionItems.length ? (
-              <div className="statistics-action-list">
-                {actionItems.map((item, index) => (
-                  <div className={`statistics-action is-${item.tone}`} key={`${item.title}-${index}`}>
-                    <strong>{item.title}</strong>
-                    <span>{item.meta}</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="statistics-empty">현재 우선 조치가 필요한 항목이 없습니다.</div>
-            )}
-          </div>
-          <div className="statistics-panel">
-            <h2>데이터 품질</h2>
-            <div className="statistics-checks">
-              <span><b>{shallowCategoryServices.length}</b> 중/소분류 미지정 서비스</span>
-              <span><b>{missingEndpointServices.length}</b> 엔드포인트 미등록 서비스</span>
-              <span><b>{servicesWithoutOwner.length}</b> 담당자 미등록 서비스</span>
-              <span><b>{missingImpactRelations.length}</b> 영향도 설명 누락 관계</span>
+          {activeStatsTab === "service" ? (
+            <div className="statistics-chart-grid statistics-chart-grid--service">
+              <ChartCard title="중요도별 서비스 분포">
+                <DonutChart rows={importanceStats} />
+              </ChartCard>
+              <ChartCard title="대분류별 서비스 수">
+                <HorizontalBarChart rows={categoryStats} />
+              </ChartCard>
+              <ChartCard title="서비스 유형">
+                <HorizontalBarChart rows={typeStats} />
+              </ChartCard>
+              <ChartCard title="서비스 상태">
+                <HorizontalBarChart rows={statusStats} />
+              </ChartCard>
             </div>
-          </div>
+          ) : null}
+
+          {activeStatsTab === "incident" ? (
+            <div className="statistics-chart-grid statistics-chart-grid--single">
+              <ChartCard title="월별 인시던트 발생 추이 (최근 12개월)">
+                <MonthlyBarChart rows={incidentMonthlyStats} />
+              </ChartCard>
+            </div>
+          ) : null}
+
+          {activeStatsTab === "relation" ? (
+            <div className="statistics-chart-grid">
+              <ChartCard title="관계 연결 서비스 TOP 5">
+                <HorizontalBarChart rows={relationHotspots} />
+              </ChartCard>
+              <ChartCard title="서버별 배포 수">
+                <HorizontalBarChart rows={deploymentStats} />
+              </ChartCard>
+              <ChartCard title="담당 유형">
+                <HorizontalBarChart rows={ownerTypeStats} />
+              </ChartCard>
+              <div className="statistics-panel">
+                <h2>관계/담당자 요약</h2>
+                <div className="statistics-metrics">
+                  <span><b>{portalData.owners.length}</b> 담당자 매핑</span>
+                  <span><b>{activeRelations}</b> 활성 관계</span>
+                  <span><b>{mandatoryRelations}</b> 필수 관계</span>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {activeStatsTab === "quality" ? (
+            <div className="statistics-chart-grid statistics-chart-grid--quality">
+              <div className="statistics-panel statistics-panel--wide">
+                <h2>조치 필요 항목</h2>
+                {actionItems.length ? (
+                  <div className="statistics-action-list">
+                    {actionItems.map((item, index) => (
+                      <div className={`statistics-action is-${item.tone}`} key={`${item.title}-${index}`}>
+                        <strong>{item.title}</strong>
+                        <span>{item.meta}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="statistics-empty">현재 우선 조치가 필요한 항목이 없습니다.</div>
+                )}
+              </div>
+              <div className="statistics-panel">
+                <h2>데이터 품질</h2>
+                <div className="statistics-checks">
+                  <span><b>{shallowCategoryServices.length}</b> 중/소분류 미지정 서비스</span>
+                  <span><b>{missingEndpointServices.length}</b> 엔드포인트 미등록 서비스</span>
+                  <span><b>{servicesWithoutOwner.length}</b> 담당자 미등록 서비스</span>
+                  <span><b>{missingImpactRelations.length}</b> 영향도 설명 누락 관계</span>
+                </div>
+              </div>
+            </div>
+          ) : null}
         </section>
       </main>
     </AppShell>
@@ -2526,6 +3086,152 @@ function StatKpi({ label, value, hint, tone = "default" }) {
       <span>{label}</span>
       <strong>{value}</strong>
       <small>{hint}</small>
+    </div>
+  );
+}
+
+const chartColors = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#64748b"];
+
+function ChartCard({ children, className = "", title }) {
+  return (
+    <div className={`statistics-panel statistics-chart-card ${className}`}>
+      <h2>{title}</h2>
+      {children}
+    </div>
+  );
+}
+
+function MonthlyBarChart({ rows }) {
+  const width = 760;
+  const height = 300;
+  const padding = { top: 18, right: 12, bottom: 38, left: 42 };
+  const plotWidth = width - padding.left - padding.right;
+  const plotHeight = height - padding.top - padding.bottom;
+  const max = Math.max(...rows.map((row) => row.value), 1);
+  const yTicks = Array.from({ length: 6 }, (_, index) => Math.round((max / 5) * index));
+  const slot = plotWidth / rows.length;
+  const barWidth = Math.min(46, slot * 0.62);
+
+  return (
+    <svg className="monthly-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="월별 인시던트 발생 추이">
+      {yTicks.map((tick) => {
+        const y = padding.top + plotHeight - (tick / max) * plotHeight;
+        return (
+          <g key={tick}>
+            <line className="chart-grid-line" x1={padding.left} x2={width - padding.right} y1={y} y2={y} />
+            <text className="chart-axis-text" x={padding.left - 12} y={y + 4} textAnchor="end">{tick}</text>
+          </g>
+        );
+      })}
+      <line className="chart-axis-line" x1={padding.left} x2={padding.left} y1={padding.top} y2={padding.top + plotHeight} />
+      <line className="chart-axis-line" x1={padding.left} x2={width - padding.right} y1={padding.top + plotHeight} y2={padding.top + plotHeight} />
+      {rows.map((row, index) => {
+        const x = padding.left + index * slot + (slot - barWidth) / 2;
+        const barHeight = (row.value / max) * plotHeight;
+        const y = padding.top + plotHeight - barHeight;
+        return (
+          <g key={row.label}>
+            <rect className="monthly-chart__bar" x={x} y={y} width={barWidth} height={Math.max(barHeight, row.value ? 2 : 0)} rx="2" />
+            <text className="chart-axis-text" x={x + barWidth / 2} y={height - 12} textAnchor="middle">{row.label}</text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+function DonutChart({ rows }) {
+  const total = rows.reduce((sum, row) => sum + row.value, 0);
+  const radius = 42;
+  const circumference = 2 * Math.PI * radius;
+  let offset = 0;
+
+  return (
+    <div className="donut-chart">
+      <div className="donut-chart__body">
+        <svg className="donut-chart__svg" viewBox="0 0 124 124" role="img" aria-label="도넛 차트">
+          <circle className="donut-chart__base" cx="62" cy="62" r={radius} />
+          {rows.map((row, index) => {
+            const length = total ? (row.value / total) * circumference : 0;
+            const segment = (
+              <circle
+                className="donut-chart__segment"
+                cx="62"
+                cy="62"
+                key={row.label}
+                r={radius}
+                stroke={chartColors[index % chartColors.length]}
+                strokeDasharray={`${length} ${circumference - length}`}
+                strokeDashoffset={-offset}
+              />
+            );
+            offset += length;
+            return segment;
+          })}
+        </svg>
+        <div className="donut-chart__center">
+          <strong>{total}</strong>
+          <span>전체</span>
+        </div>
+      </div>
+      <div className="chart-legend">
+        {rows.map((row, index) => (
+          <span key={row.label}>
+            <i style={{ background: chartColors[index % chartColors.length] }} />
+            {row.label}
+            <b>{row.value}</b>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function HorizontalBarChart({ rows }) {
+  const max = Math.max(...rows.map((row) => row.value), 1);
+
+  return (
+    <div className="horizontal-chart">
+      {rows.length ? rows.map((row, index) => (
+        <div className="horizontal-chart__row" key={row.label}>
+          <span>{row.label}</span>
+          <div className="horizontal-chart__track">
+            <i style={{ background: chartColors[index % chartColors.length], width: `${Math.max(5, (row.value / max) * 100)}%` }} />
+          </div>
+          <b>{row.value}</b>
+        </div>
+      )) : <div className="statistics-empty">표시할 데이터가 없습니다.</div>}
+    </div>
+  );
+}
+
+function MiniLineChart({ rows, title }) {
+  const width = 360;
+  const height = 150;
+  const max = Math.max(...rows.map((row) => row.value), 1);
+  const step = rows.length > 1 ? width / (rows.length - 1) : width;
+  const points = rows.map((row, index) => {
+    const x = rows.length > 1 ? index * step : width / 2;
+    const y = height - (row.value / max) * 110 - 22;
+    return { ...row, x, y };
+  });
+  const path = points.map((point, index) => `${index ? "L" : "M"}${point.x},${point.y}`).join(" ");
+  const area = `${path} L${points.at(-1)?.x ?? width},${height - 8} L${points[0]?.x ?? 0},${height - 8} Z`;
+
+  return (
+    <div className="line-chart">
+      <h2>{title}</h2>
+      <svg className="line-chart__svg" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={title}>
+        <path className="line-chart__area" d={area} />
+        <path className="line-chart__line" d={path} />
+        {points.map((point) => (
+          <g key={point.label}>
+            <circle className="line-chart__dot" cx={point.x} cy={point.y} r="4" />
+            <text className="line-chart__value" x={point.x} y={Math.max(12, point.y - 10)}>{point.value}</text>
+            <text className="line-chart__label" x={point.x} y={height - 1}>{point.label}</text>
+          </g>
+        ))}
+      </svg>
     </div>
   );
 }
@@ -2543,6 +3249,32 @@ function StatBarGroup({ title, rows }) {
       )) : <div className="statistics-empty">표시할 데이터가 없습니다.</div>}
     </div>
   );
+}
+
+function buildMonthlyIncidentTrend(incidents) {
+  const map = new Map();
+  const now = new Date();
+  const months = Array.from({ length: 12 }, (_, index) => {
+    const date = new Date(now.getFullYear(), now.getMonth() - 11 + index, 1);
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+    return {
+      key,
+      label: key.slice(2),
+      value: 0,
+    };
+  });
+  months.forEach((month) => map.set(month.key, month));
+  incidents.forEach((incident) => {
+    const rawDate = incident.startedAt || incident.occurredAt || incident.createdAt || incident.detectedAt;
+    const date = new Date(rawDate);
+    if (Number.isNaN(date.getTime())) return;
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+    const month = map.get(key);
+    if (month) {
+      month.value += 1;
+    }
+  });
+  return months;
 }
 
 function countBy(items, getKey) {
@@ -3808,6 +4540,8 @@ function AppRoutes() {
       <Route path="/dashboard" element={<DashboardPage />} />
       <Route path="/statistics" element={<StatisticsPage />} />
       <Route path="/topology" element={<TopologyPage />} />
+      <Route path="/admin-infra-topology" element={<InfraTopologyPage />} />
+      <Route path="/admin-infra-relations" element={<InfraRelationsPage />} />
       <Route path="/dashboard-proto" element={<Navigate to="/dashboard" replace />} />
       <Route path="/dashboard-proto-detail" element={<IncidentDetailPage />} />
       <Route path="/dashboard-proto-topology" element={<Navigate to="/topology" replace />} />

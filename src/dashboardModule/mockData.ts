@@ -102,6 +102,13 @@ export interface ServerRecord {
   osVersion: string;
   statusCode: ServerStatusCode;
   description: string;
+  infraNodeId?: number;
+  infraNodeCode?: string;
+  infraNodeName?: string;
+  serverRoleCode?: string;
+  serverRoleName?: string;
+  serviceCount?: number;
+  instanceCount?: number;
   createdAt: string;
   updatedAt: string;
 }

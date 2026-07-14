@@ -170,6 +170,13 @@ function mapServer(row: RemoteRecord): ServerRecord {
     osVersion: asString(row.osVersion) || "-",
     statusCode: knownCode(row.statusCode, codeLabels.serverStatus, "NORMAL"),
     description: asString(row.description),
+    infraNodeId: asNumber(row.infraNodeId) || undefined,
+    infraNodeCode: asString(row.infraNodeCode) || undefined,
+    infraNodeName: asString(row.infraNodeName) || undefined,
+    serverRoleCode: asString(row.serverRoleCode) || undefined,
+    serverRoleName: asString(row.serverRoleName) || undefined,
+    serviceCount: asNumber(row.serviceCount) || undefined,
+    instanceCount: asNumber(row.instanceCount) || undefined,
     createdAt: formatDateTime(row.createdAt) || now,
     updatedAt: now,
   };
