@@ -2190,6 +2190,12 @@ const sidebarSections = [
     ],
   },
   {
+    label: "통계",
+    items: [
+      { key: "statistics", icon: "📈", label: "운영 통계", to: "/statistics" },
+    ],
+  },
+  {
     label: "서비스",
     items: [
       { key: "services", icon: "📦", label: "서비스 조회", to: "/admin-services" },
@@ -2339,6 +2345,220 @@ function Sidebar({ activeMenu = "", isDark = false }) {
       ))}
     </aside>
   );
+}
+
+function StatisticsPage() {
+  const portalData = usePortalData();
+  const serviceById = useMemo(
+    () => new Map(portalData.services.map((service) => [service.serviceId, service])),
+    [portalData.services]
+  );
+  const serverById = useMemo(
+    () => new Map(portalData.servers.map((server) => [server.serverId, server])),
+    [portalData.servers]
+  );
+  const ownerServiceKeys = useMemo(() => {
+    const keys = new Set();
+    portalData.owners.forEach((owner) => {
+      if (owner.serviceId) keys.add(`id:${owner.serviceId}`);
+      if (owner.serviceCode) keys.add(`code:${owner.serviceCode}`);
+    });
+    return keys;
+  }, [portalData.owners]);
+  const hasOwner = (service) =>
+    ownerServiceKeys.has(`id:${service.serviceId}`) || ownerServiceKeys.has(`code:${service.serviceCode}`);
+  const categoryStats = topEntries(
+    countBy(portalData.services, (service) => service.categoryPath?.[0] || "미분류"),
+    6
+  );
+  const typeStats = topEntries(
+    countBy(portalData.services, (service) => codeLabels.serviceType[service.serviceTypeCode] || service.serviceTypeCode || "미지정"),
+    6
+  );
+  const importanceStats = topEntries(
+    countBy(portalData.services, (service) => codeLabels.importance[service.importanceCode] || service.importanceCode || "미지정"),
+    6
+  );
+  const statusStats = topEntries(
+    countBy(portalData.services, (service) => codeLabels.serviceStatus[service.statusCode] || service.statusCode || "미지정"),
+    6
+  );
+  const deploymentStats = topEntries(
+    countBy(portalData.deployments, (deployment) =>
+      deployment.serverName ||
+      serverById.get(Number(deployment.serverId))?.serverName ||
+      deployment.hostName ||
+      `서버 ${deployment.serverId ?? "-"}`
+    ),
+    6
+  );
+  const ownerTypeStats = topEntries(
+    countBy(portalData.owners, (owner) => codeLabels.ownerType[owner.ownerTypeCode] || owner.ownerTypeCode || "미지정"),
+    4
+  );
+  const servicesWithoutOwner = portalData.services.filter((service) => !hasOwner(service));
+  const missingEndpointServices = portalData.services.filter((service) => !compactText(service.endpointUrl));
+  const shallowCategoryServices = portalData.services.filter((service) => (service.categoryPath ?? []).length < 2);
+  const missingImpactRelations = portalData.relations.filter((relation) => !compactText(relation.description));
+  const openIncidents = portalData.incidents.filter((incident) => incident.incidentStatusCode !== "RESOLVED");
+  const activeRelations = portalData.relations.filter((relation) => relation.relationStatusCode === "ACTIVE").length;
+  const mandatoryRelations = portalData.relations.filter((relation) => String(relation.mandatoryYn).toUpperCase() === "Y").length;
+  const criticalWithoutOwner = servicesWithoutOwner.filter((service) =>
+    ["CRITICAL", "HIGH", "IMPORTANT"].includes(String(service.importanceCode || "").toUpperCase())
+  );
+  const relationDegree = new Map();
+  portalData.relations.forEach((relation) => {
+    [relation.sourceServiceId, relation.targetServiceId].forEach((serviceId) => {
+      if (!serviceId) return;
+      relationDegree.set(serviceId, (relationDegree.get(serviceId) || 0) + 1);
+    });
+  });
+  const relationHotspots = [...relationDegree.entries()]
+    .map(([serviceId, count]) => ({
+      label: serviceLabel(serviceById.get(serviceId)),
+      value: count,
+    }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 5);
+  const actionItems = [
+    ...criticalWithoutOwner.slice(0, 4).map((service) => ({
+      tone: "danger",
+      title: "중요 서비스 담당자 미등록",
+      meta: `${service.serviceCode} ${service.serviceName}`,
+    })),
+    ...missingImpactRelations.slice(0, 4).map((relation) => ({
+      tone: "warn",
+      title: "서비스 영향도 설명 누락",
+      meta: `${serviceLabel(serviceById.get(relation.sourceServiceId))} → ${serviceLabel(serviceById.get(relation.targetServiceId))}`,
+    })),
+    ...missingEndpointServices.slice(0, 3).map((service) => ({
+      tone: "info",
+      title: "엔드포인트 URL 미등록",
+      meta: `${service.serviceCode} ${service.serviceName}`,
+    })),
+  ].slice(0, 8);
+
+  return (
+    <AppShell activeMenu="statistics">
+      <main className="main statistics-page">
+        <div className="statistics-head">
+          <div>
+            <div className="crumb crumb--standardized">
+              <span>통계</span><span className="sep">/</span><span>운영 통계</span>
+            </div>
+            <h1><span aria-hidden="true">📈</span> 운영 통계</h1>
+          </div>
+          <div className="statistics-head__meta">
+            <span>서비스 {portalData.services.length}건</span>
+            <span>관계 {portalData.relations.length}건</span>
+            <span>배포 {portalData.deployments.length}건</span>
+          </div>
+        </div>
+
+        <section className="statistics-kpis" aria-label="주요 지표">
+          <StatKpi label="전체 서비스" value={portalData.services.length} hint="등록된 서비스 기준" />
+          <StatKpi label="담당자 미등록" value={servicesWithoutOwner.length} hint="담당자 연결 필요" tone={servicesWithoutOwner.length ? "warn" : "ok"} />
+          <StatKpi label="오픈 인시던트" value={openIncidents.length} hint="해결 전 상태" tone={openIncidents.length ? "danger" : "ok"} />
+          <StatKpi label="영향도 설명 누락" value={missingImpactRelations.length} hint="토폴로지 노출 품질" tone={missingImpactRelations.length ? "warn" : "ok"} />
+        </section>
+
+        <section className="statistics-layout">
+          <div className="statistics-panel">
+            <h2>서비스 분포</h2>
+            <StatBarGroup title="대분류별 서비스" rows={categoryStats} />
+            <StatBarGroup title="서비스 유형" rows={typeStats} />
+          </div>
+          <div className="statistics-panel">
+            <h2>운영 상태</h2>
+            <StatBarGroup title="중요도" rows={importanceStats} />
+            <StatBarGroup title="상태" rows={statusStats} />
+          </div>
+          <div className="statistics-panel">
+            <h2>담당자/관계</h2>
+            <StatBarGroup title="담당 유형" rows={ownerTypeStats} />
+            <div className="statistics-metrics">
+              <span><b>{portalData.owners.length}</b> 담당자 매핑</span>
+              <span><b>{activeRelations}</b> 활성 관계</span>
+              <span><b>{mandatoryRelations}</b> 필수 관계</span>
+            </div>
+          </div>
+          <div className="statistics-panel">
+            <h2>인프라 집중도</h2>
+            <StatBarGroup title="서버별 배포 수" rows={deploymentStats} />
+            <StatBarGroup title="관계 연결 Top" rows={relationHotspots} />
+          </div>
+        </section>
+
+        <section className="statistics-bottom">
+          <div className="statistics-panel statistics-panel--wide">
+            <h2>조치 필요 항목</h2>
+            {actionItems.length ? (
+              <div className="statistics-action-list">
+                {actionItems.map((item, index) => (
+                  <div className={`statistics-action is-${item.tone}`} key={`${item.title}-${index}`}>
+                    <strong>{item.title}</strong>
+                    <span>{item.meta}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="statistics-empty">현재 우선 조치가 필요한 항목이 없습니다.</div>
+            )}
+          </div>
+          <div className="statistics-panel">
+            <h2>데이터 품질</h2>
+            <div className="statistics-checks">
+              <span><b>{shallowCategoryServices.length}</b> 중/소분류 미지정 서비스</span>
+              <span><b>{missingEndpointServices.length}</b> 엔드포인트 미등록 서비스</span>
+              <span><b>{servicesWithoutOwner.length}</b> 담당자 미등록 서비스</span>
+              <span><b>{missingImpactRelations.length}</b> 영향도 설명 누락 관계</span>
+            </div>
+          </div>
+        </section>
+      </main>
+    </AppShell>
+  );
+}
+
+function StatKpi({ label, value, hint, tone = "default" }) {
+  return (
+    <div className={`stat-kpi is-${tone}`}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <small>{hint}</small>
+    </div>
+  );
+}
+
+function StatBarGroup({ title, rows }) {
+  const max = Math.max(...rows.map((row) => row.value), 1);
+  return (
+    <div className="stat-bars">
+      <h3>{title}</h3>
+      {rows.length ? rows.map((row) => (
+        <div className="stat-bar" key={row.label}>
+          <div className="stat-bar__label"><span>{row.label}</span><b>{row.value}</b></div>
+          <div className="stat-bar__track"><i style={{ width: `${Math.max(8, (row.value / max) * 100)}%` }} /></div>
+        </div>
+      )) : <div className="statistics-empty">표시할 데이터가 없습니다.</div>}
+    </div>
+  );
+}
+
+function countBy(items, getKey) {
+  const map = new Map();
+  items.forEach((item) => {
+    const key = compactText(getKey(item)) || "미지정";
+    map.set(key, (map.get(key) || 0) + 1);
+  });
+  return map;
+}
+
+function topEntries(map, limit) {
+  return [...map.entries()]
+    .map(([label, value]) => ({ label, value }))
+    .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label))
+    .slice(0, limit);
 }
 
 function IncidentAdminPage() {
@@ -3586,6 +3806,7 @@ function AppRoutes() {
     <Routes>
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="/dashboard" element={<DashboardPage />} />
+      <Route path="/statistics" element={<StatisticsPage />} />
       <Route path="/topology" element={<TopologyPage />} />
       <Route path="/dashboard-proto" element={<Navigate to="/dashboard" replace />} />
       <Route path="/dashboard-proto-detail" element={<IncidentDetailPage />} />
