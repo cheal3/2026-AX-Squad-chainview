@@ -1,4 +1,4 @@
-const REMOTE_ORIGIN = "http://chainview.kro.kr:8080";
+const REMOTE_ORIGIN = "https://chainview.kro.kr";
 const DEFAULT_EMPLOYEE_NO = "8913812";
 const DEFAULT_DEV_LOGIN_PATH = "/admin/dashboard";
 

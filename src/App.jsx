@@ -23,6 +23,8 @@ import { PortalDataProvider, usePortalData } from "./dashboardModule/PortalDataS
 import { IncidentDemoDashboard } from "./dashboardModule/pages/IncidentDemoDashboard";
 import { ServiceRelationFlow } from "./dashboardModule/pages/ServiceRelationFlow";
 import { codeLabels } from "./dashboardModule/mockData";
+import { chainViewApi } from "./dashboardModule/chainViewApi";
+import { infraNodesSnapshot, infraRelationsSnapshot } from "./dashboardModule/infraSnapshot";
 
 const htmlPageToRoute = (href) => {
   if (!href || /^(https?:|mailto:|tel:|#)/i.test(href)) {
@@ -2367,27 +2369,12 @@ const infraStatusLabels = {
   INACTIVE: "비활성",
 };
 
-const initialInfraNodes = [
-  { infraNodeId: 17, nodeCode: "ORA-RAC-DR-01", nodeName: "Oracle RAC DR 클러스터", nodeTypeCode: "DB_CLUSTER", statusCode: "NORMAL", locationLabel: "IDC-B DB Zone", vendorModel: "Oracle Exadata X9M", serverCount: 0 },
-  { infraNodeId: 16, nodeCode: "ORA-RAC-PRD-02", nodeName: "Oracle RAC 운영 클러스터 #2", nodeTypeCode: "DB_CLUSTER", statusCode: "NORMAL", locationLabel: "IDC-A DB Zone", vendorModel: "Oracle Exadata X9M", serverCount: 0 },
-  { infraNodeId: 15, nodeCode: "ORA-RAC-PRD-01", nodeName: "Oracle RAC 운영 클러스터 #1", nodeTypeCode: "DB_CLUSTER", statusCode: "NORMAL", locationLabel: "IDC-A DB Zone", vendorModel: "Oracle Exadata X9M", serverCount: 0 },
-  { infraNodeId: 14, nodeCode: "L3SW-IDC-A-02", nodeName: "IDC-A L3 코어 스위치 #2", nodeTypeCode: "NETWORK_DEVICE", statusCode: "NORMAL", locationLabel: "IDC-A Core", vendorModel: "Cisco Catalyst 9500", serverCount: 0 },
-  { infraNodeId: 13, nodeCode: "L3SW-IDC-A-01", nodeName: "IDC-A L3 코어 스위치 #1", nodeTypeCode: "NETWORK_DEVICE", statusCode: "NORMAL", locationLabel: "IDC-A Core", vendorModel: "Cisco Catalyst 9500", serverCount: 0 },
-  { infraNodeId: 12, nodeCode: "SAN-PRD-01", nodeName: "IBM DS8900 SAN 스토리지", nodeTypeCode: "STORAGE", statusCode: "NORMAL", locationLabel: "IDC-A Storage", vendorModel: "IBM DS8900F", serverCount: 0 },
-  { infraNodeId: 11, nodeCode: "LPAR-DR-WAS-02", nodeName: "DR 기간계 WAS LPAR #2", nodeTypeCode: "HYPERVISOR", statusCode: "NORMAL", locationLabel: "P770-DR-01 / LPAR02", vendorModel: "IBM AIX LPAR", serverCount: 1 },
-  { infraNodeId: 10, nodeCode: "LPAR-DR-WAS-01", nodeName: "DR 기간계 WAS LPAR #1", nodeTypeCode: "HYPERVISOR", statusCode: "NORMAL", locationLabel: "P770-DR-01 / LPAR01", vendorModel: "IBM AIX LPAR", serverCount: 1 },
-  { infraNodeId: 9, nodeCode: "LPAR-BATCH-01", nodeName: "기간계 배치 LPAR #1", nodeTypeCode: "HYPERVISOR", statusCode: "NORMAL", locationLabel: "P770-PRD-01 / LPAR03", vendorModel: "IBM AIX LPAR", serverCount: 2 },
-  { infraNodeId: 8, nodeCode: "P770-DR-01", nodeName: "IBM Power 770 (DR 기간계)", nodeTypeCode: "PHYSICAL_HOST", statusCode: "NORMAL", locationLabel: "IDC-B Rack-03", vendorModel: "IBM Power 770", serverCount: 0 },
-  { infraNodeId: 7, nodeCode: "X86-IF-PRD-01", nodeName: "X86 대외계 물리서버 #1", nodeTypeCode: "PHYSICAL_HOST", statusCode: "NORMAL", locationLabel: "IDC-A Rack-04", vendorModel: "Dell PowerEdge R750", serverCount: 3 },
-  { infraNodeId: 6, nodeCode: "X86-CMM-PRD-01", nodeName: "X86 공통플랫폼 물리서버 #1", nodeTypeCode: "PHYSICAL_HOST", statusCode: "NORMAL", locationLabel: "IDC-A Rack-02", vendorModel: "Dell PowerEdge R750", serverCount: 7 },
-  { infraNodeId: 5, nodeCode: "X86-CHN-PRD-02", nodeName: "X86 채널계 물리서버 #2", nodeTypeCode: "PHYSICAL_HOST", statusCode: "NORMAL", locationLabel: "IDC-A Rack-01", vendorModel: "HPE ProLiant DL380 Gen10", serverCount: 3 },
-  { infraNodeId: 4, nodeCode: "X86-CHN-PRD-01", nodeName: "X86 채널계 물리서버 #1", nodeTypeCode: "PHYSICAL_HOST", statusCode: "NORMAL", locationLabel: "IDC-A Rack-01", vendorModel: "HPE ProLiant DL380 Gen10", serverCount: 4 },
-  { infraNodeId: 3, nodeCode: "LPAR-WAS-02", nodeName: "기간계 WAS LPAR #2", nodeTypeCode: "HYPERVISOR", statusCode: "NORMAL", locationLabel: "P770-PRD-01 / LPAR02", vendorModel: "IBM AIX LPAR", serverCount: 1 },
-  { infraNodeId: 2, nodeCode: "LPAR-WAS-01", nodeName: "기간계 WAS LPAR #1", nodeTypeCode: "HYPERVISOR", statusCode: "NORMAL", locationLabel: "P770-PRD-01 / LPAR01", vendorModel: "IBM AIX LPAR", serverCount: 1 },
-  { infraNodeId: 1, nodeCode: "P770-PRD-01", nodeName: "IBM Power 770 (기간계)", nodeTypeCode: "PHYSICAL_HOST", statusCode: "NORMAL", locationLabel: "IDC-A Rack-03", vendorModel: "IBM Power 770", serverCount: 0 },
-];
+const initialInfraNodes = infraNodesSnapshot;
 
 const infraRelationTypeLabels = {
+  CONTAINS: "포함",
+  NETWORK_LINK: "네트워크 연결",
+  STORAGE: "스토리지 연결",
   NETWORK: "네트워크 연결",
   HOSTING: "호스팅/가상화",
   STORAGE_PATH: "스토리지 경로",
@@ -2401,16 +2388,58 @@ const infraRelationStatusLabels = {
   MAINTENANCE: "점검중",
 };
 
-const initialInfraRelations = [
-  { infraRelationId: 1, sourceInfraNodeId: 4, targetInfraNodeId: 13, relationTypeCode: "NETWORK", mandatoryYn: "Y", relationStatusCode: "ACTIVE", description: "채널계 서버의 IDC-A 코어 스위치 연결" },
-  { infraRelationId: 2, sourceInfraNodeId: 5, targetInfraNodeId: 13, relationTypeCode: "NETWORK", mandatoryYn: "Y", relationStatusCode: "ACTIVE", description: "채널계 이중화 구간 네트워크 연결" },
-  { infraRelationId: 3, sourceInfraNodeId: 6, targetInfraNodeId: 12, relationTypeCode: "STORAGE_PATH", mandatoryYn: "Y", relationStatusCode: "ACTIVE", description: "공통 플랫폼 스토리지 접근 경로" },
-  { infraRelationId: 4, sourceInfraNodeId: 15, targetInfraNodeId: 17, relationTypeCode: "DB_REPLICATION", mandatoryYn: "Y", relationStatusCode: "ACTIVE", description: "Oracle RAC 운영-DR 복제 관계" },
-  { infraRelationId: 5, sourceInfraNodeId: 1, targetInfraNodeId: 3, relationTypeCode: "HOSTING", mandatoryYn: "Y", relationStatusCode: "ACTIVE", description: "Power 770 내 기간계 WAS LPAR 구동" },
-  { infraRelationId: 6, sourceInfraNodeId: 8, targetInfraNodeId: 11, relationTypeCode: "HOSTING", mandatoryYn: "N", relationStatusCode: "MAINTENANCE", description: "DR Power 770 내 WAS LPAR 연결" },
-];
+const initialInfraRelations = infraRelationsSnapshot;
+
+const shouldUseRemoteInfraApi = () => !import.meta.env.DEV && typeof window !== "undefined";
+
+const normalizeInfraNode = (node) => ({
+  infraNodeId: Number(node.infraNodeId ?? node.id),
+  nodeCode: node.nodeCode ?? "",
+  nodeName: node.nodeName ?? "",
+  nodeTypeCode: node.nodeTypeCode ?? "PHYSICAL_HOST",
+  nodeTypeName: node.nodeTypeName,
+  statusCode: node.statusCode ?? "NORMAL",
+  statusName: node.statusName,
+  locationLabel: node.locationLabel ?? "",
+  vendorModel: node.vendorModel ?? "",
+  serverCount: Number(node.serverCount ?? 0),
+  updatedAt: node.updatedAt,
+});
+
+const normalizeInfraRelation = (edge) => ({
+  infraRelationId: Number(edge.infraEdgeId ?? edge.infraRelationId ?? edge.id),
+  sourceInfraNodeId: Number(edge.fromNodeId ?? edge.sourceInfraNodeId),
+  targetInfraNodeId: Number(edge.toNodeId ?? edge.targetInfraNodeId),
+  relationTypeCode: edge.relationTypeCode ?? "NETWORK_LINK",
+  relationTypeName: edge.relationTypeName,
+  mandatoryYn: edge.mandatoryYn ?? "Y",
+  relationStatusCode: edge.statusCode ?? edge.relationStatusCode ?? "ACTIVE",
+  relationStatusName: edge.statusName ?? edge.relationStatusName,
+  description: edge.remarks ?? edge.description ?? "",
+});
+
+async function fetchInfraNodesFromApi() {
+  const nodes = await chainViewApi.infraNodes.list();
+  return nodes.map(normalizeInfraNode).filter((node) => node.infraNodeId);
+}
+
+async function fetchInfraRelationsFromApi(nodes) {
+  const edgeLists = await Promise.all(
+    nodes.map((node) =>
+      chainViewApi.infraNodes.edges(Number(node.infraNodeId)).catch(() => [])
+    )
+  );
+  const edgeById = new Map();
+  edgeLists.flat().forEach((edge) => {
+    const relation = normalizeInfraRelation(edge);
+    if (!relation.infraRelationId || !relation.sourceInfraNodeId || !relation.targetInfraNodeId) return;
+    edgeById.set(relation.infraRelationId, relation);
+  });
+  return [...edgeById.values()].sort((left, right) => left.infraRelationId - right.infraRelationId);
+}
 
 function InfraRelationsPage() {
+  const [nodes, setNodes] = useState(initialInfraNodes);
   const [relations, setRelations] = useState(initialInfraRelations);
   const [keyword, setKeyword] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
@@ -2418,10 +2447,32 @@ function InfraRelationsPage() {
   const [modal, setModal] = useState(null);
   const [graphOpen, setGraphOpen] = useState(false);
   const [graphFocusNodeId, setGraphFocusNodeId] = useState(initialInfraNodes[0]?.infraNodeId ?? "");
+  const [dataSourceLabel, setDataSourceLabel] = useState("스냅샷 기준");
   const nodeById = useMemo(
-    () => new Map(initialInfraNodes.map((node) => [node.infraNodeId, node])),
-    []
+    () => new Map(nodes.map((node) => [node.infraNodeId, node])),
+    [nodes]
   );
+  useEffect(() => {
+    if (!shouldUseRemoteInfraApi()) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const nextNodes = await fetchInfraNodesFromApi();
+        const nextRelations = await fetchInfraRelationsFromApi(nextNodes);
+        if (cancelled) return;
+        setNodes(nextNodes);
+        setRelations(nextRelations);
+        setGraphFocusNodeId((current) => nextNodes.some((node) => Number(node.infraNodeId) === Number(current)) ? current : nextNodes[0]?.infraNodeId ?? "");
+        setDataSourceLabel("운영 API 기준");
+      } catch (error) {
+        console.warn("인프라 관계 API 조회 실패, 스냅샷 데이터를 사용합니다.", error);
+        if (!cancelled) setDataSourceLabel("스냅샷 기준");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const filteredRelations = relations.filter((relation) => {
     const sourceNode = nodeById.get(Number(relation.sourceInfraNodeId));
     const targetNode = nodeById.get(Number(relation.targetInfraNodeId));
@@ -2439,9 +2490,9 @@ function InfraRelationsPage() {
     setModal({
       mode: "create",
       form: {
-        sourceInfraNodeId: initialInfraNodes[0]?.infraNodeId ?? "",
-        targetInfraNodeId: initialInfraNodes[1]?.infraNodeId ?? "",
-        relationTypeCode: "NETWORK",
+        sourceInfraNodeId: nodes[0]?.infraNodeId ?? "",
+        targetInfraNodeId: nodes[1]?.infraNodeId ?? "",
+        relationTypeCode: "NETWORK_LINK",
         mandatoryYn: "Y",
         relationStatusCode: "ACTIVE",
         description: "",
@@ -2539,7 +2590,7 @@ function InfraRelationsPage() {
             </tbody>
           </table>
           <div className="pager">
-            <div className="pager__info">전체 {filteredRelations.length}건 · 로컬 관리 화면</div>
+            <div className="pager__info">전체 {filteredRelations.length}건 · {dataSourceLabel}</div>
           </div>
         </div>
 
@@ -2554,8 +2605,8 @@ function InfraRelationsPage() {
                 <div className="form-section">
                   <h4 className="form-section__title">연결 인프라</h4>
                   <div className="form-grid">
-                    <div className="form-row"><label>source 인프라<span className="req">*</span></label><select value={modal.form.sourceInfraNodeId} onChange={(event) => updateModalField("sourceInfraNodeId", event.target.value)}>{initialInfraNodes.map((node) => <option key={node.infraNodeId} value={node.infraNodeId}>{node.nodeCode} {node.nodeName}</option>)}</select><span className="help">영향을 주는 쪽</span></div>
-                    <div className="form-row"><label>target 인프라<span className="req">*</span></label><select value={modal.form.targetInfraNodeId} onChange={(event) => updateModalField("targetInfraNodeId", event.target.value)}>{initialInfraNodes.map((node) => <option key={node.infraNodeId} value={node.infraNodeId}>{node.nodeCode} {node.nodeName}</option>)}</select><span className="help">영향을 받는 쪽</span></div>
+                    <div className="form-row"><label>source 인프라<span className="req">*</span></label><select value={modal.form.sourceInfraNodeId} onChange={(event) => updateModalField("sourceInfraNodeId", event.target.value)}>{nodes.map((node) => <option key={node.infraNodeId} value={node.infraNodeId}>{node.nodeCode} {node.nodeName}</option>)}</select><span className="help">영향을 주는 쪽</span></div>
+                    <div className="form-row"><label>target 인프라<span className="req">*</span></label><select value={modal.form.targetInfraNodeId} onChange={(event) => updateModalField("targetInfraNodeId", event.target.value)}>{nodes.map((node) => <option key={node.infraNodeId} value={node.infraNodeId}>{node.nodeCode} {node.nodeName}</option>)}</select><span className="help">영향을 받는 쪽</span></div>
                     <div className="form-row"><label>관계 유형<span className="req">*</span></label><select value={modal.form.relationTypeCode} onChange={(event) => updateModalField("relationTypeCode", event.target.value)}>{Object.entries(infraRelationTypeLabels).map(([code, label]) => <option key={code} value={code}>{label} ({code})</option>)}</select></div>
                     <div className="form-row"><label>상태</label><select value={modal.form.relationStatusCode} onChange={(event) => updateModalField("relationStatusCode", event.target.value)}>{Object.entries(infraRelationStatusLabels).map(([code, label]) => <option key={code} value={code}>{label} ({code})</option>)}</select></div>
                     <div className="form-row"><label>필수 여부</label><select value={modal.form.mandatoryYn} onChange={(event) => updateModalField("mandatoryYn", event.target.value)}><option value="Y">Y (필수)</option><option value="N">N (선택)</option></select></div>
@@ -2571,7 +2622,7 @@ function InfraRelationsPage() {
           <InfraRelationGraphModal
             focusNodeId={Number(graphFocusNodeId)}
             nodeById={nodeById}
-            nodes={initialInfraNodes}
+            nodes={nodes}
             onClose={() => setGraphOpen(false)}
             onFocusChange={(nodeId) => setGraphFocusNodeId(Number(nodeId))}
             relations={relations}
@@ -2590,6 +2641,10 @@ function InfraRelationGraphModal({
   onFocusChange,
   relations,
 }) {
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [dragStart, setDragStart] = useState(null);
+  const canvasRef = useRef(null);
   const focusNode = nodeById.get(Number(focusNodeId)) ?? nodes[0];
   const connectedRelations = relations.filter(
     (relation) =>
@@ -2604,6 +2659,7 @@ function InfraRelationGraphModal({
   );
   const nodeWidth = 220;
   const nodeHeight = 86;
+  const anchorPadding = 18;
   const positions = new Map();
   const center = { x: 410, y: 220 };
   positions.set(`node-${focusNode?.infraNodeId}`, center);
@@ -2623,21 +2679,93 @@ function InfraRelationGraphModal({
     const nodeId = Number(key.replace("node-", ""));
     return { node: nodeById.get(nodeId), position };
   }).filter((item) => item.node);
+  useEffect(() => {
+    setPan({ x: 0, y: 0 });
+    setZoom(1);
+    setDragStart(null);
+  }, [focusNodeId]);
+  const getFocusAnchorY = (relation) => {
+    const list = Number(relation.targetInfraNodeId) === Number(focusNode?.infraNodeId)
+      ? incomingRelations
+      : outgoingRelations;
+    const index = Math.max(0, list.findIndex((item) => item.infraRelationId === relation.infraRelationId));
+    const count = Math.max(list.length, 1);
+    if (count === 1) {
+      return center.y + nodeHeight / 2;
+    }
+    const usableHeight = nodeHeight - anchorPadding * 2;
+    return center.y + anchorPadding + (usableHeight * index) / (count - 1);
+  };
+  const getAnchorPoint = (nodeId, side, relation) => {
+    const position = positions.get(`node-${nodeId}`);
+    if (!position) return null;
+    const isFocus = Number(nodeId) === Number(focusNode?.infraNodeId);
+    return {
+      x: side === "right" ? position.x + nodeWidth : position.x,
+      y: isFocus && relation ? getFocusAnchorY(relation) : position.y + nodeHeight / 2,
+    };
+  };
   const edgePath = (sourceId, targetId) => {
+    const relation = connectedRelations.find(
+      (item) =>
+        Number(item.sourceInfraNodeId) === Number(sourceId) &&
+        Number(item.targetInfraNodeId) === Number(targetId)
+    );
     const source = positions.get(`node-${sourceId}`);
     const target = positions.get(`node-${targetId}`);
     if (!source || !target) return "";
     const sourceCenterX = source.x + nodeWidth / 2;
     const targetCenterX = target.x + nodeWidth / 2;
-    const sourceCenterY = source.y + nodeHeight / 2;
-    const targetCenterY = target.y + nodeHeight / 2;
     const sourceIsLeft = sourceCenterX < targetCenterX;
-    const startX = sourceIsLeft ? source.x + nodeWidth : source.x;
-    const endX = sourceIsLeft ? target.x : target.x + nodeWidth;
-    const curve = Math.max(90, Math.abs(endX - startX) * 0.42);
-    const controlOneX = sourceIsLeft ? startX + curve : startX - curve;
-    const controlTwoX = sourceIsLeft ? endX - curve : endX + curve;
-    return `M ${startX} ${sourceCenterY} C ${controlOneX} ${sourceCenterY}, ${controlTwoX} ${targetCenterY}, ${endX} ${targetCenterY}`;
+    const start = getAnchorPoint(sourceId, sourceIsLeft ? "right" : "left", relation);
+    const end = getAnchorPoint(targetId, sourceIsLeft ? "left" : "right", relation);
+    if (!start || !end) return "";
+    const distance = Math.abs(end.x - start.x);
+    const curve = Math.min(160, Math.max(34, distance * 0.36));
+    const controlOneX = sourceIsLeft ? start.x + curve : start.x - curve;
+    const controlTwoX = sourceIsLeft ? end.x - curve : end.x + curve;
+    return `M ${start.x} ${start.y} C ${controlOneX} ${start.y}, ${controlTwoX} ${end.y}, ${end.x} ${end.y}`;
+  };
+  const startCanvasDrag = (event) => {
+    if (event.target.closest(".infra-graph-node")) return;
+    setDragStart({
+      mouseX: event.clientX,
+      mouseY: event.clientY,
+      panX: pan.x,
+      panY: pan.y,
+    });
+  };
+  const moveCanvasDrag = (event) => {
+    if (!dragStart) return;
+    setPan({
+      x: dragStart.panX + event.clientX - dragStart.mouseX,
+      y: dragStart.panY + event.clientY - dragStart.mouseY,
+    });
+  };
+  const stopCanvasDrag = () => setDragStart(null);
+  const setZoomAroundPoint = (nextZoom, originX = 520, originY = 260) => {
+    const clampedZoom = Math.min(1.8, Math.max(0.45, nextZoom));
+    setPan((currentPan) => {
+      const worldX = (originX - currentPan.x) / zoom;
+      const worldY = (originY - currentPan.y) / zoom;
+      return {
+        x: originX - worldX * clampedZoom,
+        y: originY - worldY * clampedZoom,
+      };
+    });
+    setZoom(clampedZoom);
+  };
+  const handleCanvasWheel = (event) => {
+    event.preventDefault();
+    const rect = canvasRef.current?.getBoundingClientRect();
+    const originX = rect ? event.clientX - rect.left : 520;
+    const originY = rect ? event.clientY - rect.top : 260;
+    const direction = event.deltaY > 0 ? -1 : 1;
+    setZoomAroundPoint(zoom + direction * 0.12, originX, originY);
+  };
+  const resetViewport = () => {
+    setPan({ x: 0, y: 0 });
+    setZoom(1);
   };
 
   return (
@@ -2659,29 +2787,47 @@ function InfraRelationGraphModal({
             </label>
             <span>{incomingRelations.length}개 수신 · {outgoingRelations.length}개 송신</span>
           </div>
-          <div className="infra-graph-canvas">
-            <svg viewBox="0 0 1040 520" aria-hidden="true">
-              {connectedRelations.map((relation) => (
-                <path
-                  className="infra-graph-edge"
-                  d={edgePath(relation.sourceInfraNodeId, relation.targetInfraNodeId)}
-                  key={relation.infraRelationId}
-                />
+          <div
+            className={`infra-graph-canvas ${dragStart ? "is-dragging" : ""}`}
+            ref={canvasRef}
+            onMouseDown={startCanvasDrag}
+            onMouseLeave={stopCanvasDrag}
+            onMouseMove={moveCanvasDrag}
+            onMouseUp={stopCanvasDrag}
+            onWheel={handleCanvasWheel}
+          >
+            <div className="infra-graph-zoom-controls" onMouseDown={(event) => event.stopPropagation()}>
+              <button onClick={() => setZoomAroundPoint(zoom + 0.14)} type="button">＋</button>
+              <button onClick={() => setZoomAroundPoint(zoom - 0.14)} type="button">−</button>
+              <button onClick={resetViewport} type="button">초기화</button>
+            </div>
+            <div
+              className="infra-graph-stage"
+              style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}
+            >
+              <svg viewBox="0 0 1040 520" aria-hidden="true">
+                {connectedRelations.map((relation) => (
+                  <path
+                    className="infra-graph-edge"
+                    d={edgePath(relation.sourceInfraNodeId, relation.targetInfraNodeId)}
+                    key={relation.infraRelationId}
+                  />
+                ))}
+              </svg>
+              {graphNodes.map(({ node, position }) => (
+                <button
+                  className={`infra-graph-node ${Number(node.infraNodeId) === Number(focusNode?.infraNodeId) ? "is-focus" : ""}`}
+                  key={node.infraNodeId}
+                  onClick={() => onFocusChange(node.infraNodeId)}
+                  style={{ left: position.x, top: position.y }}
+                  type="button"
+                >
+                  <b>{node.nodeName}</b>
+                  <code>{node.nodeCode}</code>
+                  <span>{infraNodeTypeLabels[node.nodeTypeCode] || node.nodeTypeCode}</span>
+                </button>
               ))}
-            </svg>
-            {graphNodes.map(({ node, position }) => (
-              <button
-                className={`infra-graph-node ${Number(node.infraNodeId) === Number(focusNode?.infraNodeId) ? "is-focus" : ""}`}
-                key={node.infraNodeId}
-                onClick={() => onFocusChange(node.infraNodeId)}
-                style={{ left: position.x, top: position.y }}
-                type="button"
-              >
-                <b>{node.nodeName}</b>
-                <code>{node.nodeCode}</code>
-                <span>{infraNodeTypeLabels[node.nodeTypeCode] || node.nodeTypeCode}</span>
-              </button>
-            ))}
+            </div>
             {!graphNodes.length ? (
               <div className="infra-graph-empty">선택한 인프라에 연결된 관계가 없습니다.</div>
             ) : null}
@@ -2701,6 +2847,25 @@ function InfraTopologyPage() {
   const [typeFilter, setTypeFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [modal, setModal] = useState(null);
+  const [dataSourceLabel, setDataSourceLabel] = useState("스냅샷 기준");
+  useEffect(() => {
+    if (!shouldUseRemoteInfraApi()) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const nextNodes = await fetchInfraNodesFromApi();
+        if (cancelled) return;
+        setNodes(nextNodes);
+        setDataSourceLabel("운영 API 기준");
+      } catch (error) {
+        console.warn("인프라 노드 API 조회 실패, 스냅샷 데이터를 사용합니다.", error);
+        if (!cancelled) setDataSourceLabel("스냅샷 기준");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const filteredNodes = nodes.filter((node) => {
     const haystack = `${node.nodeCode} ${node.nodeName} ${node.locationLabel} ${node.vendorModel}`.toLowerCase();
     if (keyword.trim() && !haystack.includes(keyword.trim().toLowerCase())) return false;
@@ -2804,7 +2969,7 @@ function InfraTopologyPage() {
             </tbody>
           </table>
           <div className="pager">
-            <div className="pager__info">전체 {filteredNodes.length}건 · 로컬 관리 화면</div>
+            <div className="pager__info">전체 {filteredNodes.length}건 · {dataSourceLabel}</div>
           </div>
         </div>
 

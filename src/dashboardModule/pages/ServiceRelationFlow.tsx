@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Background,
   Controls,
@@ -33,6 +33,11 @@ import {
   type ServiceRecord,
   type TechStackRecord,
 } from "../mockData";
+import { chainViewApi } from "../chainViewApi";
+import {
+  infraNodesSnapshot,
+  infraRelationsSnapshot,
+} from "../infraSnapshot";
 
 type ServiceNodeData = {
   compact: boolean;
@@ -61,10 +66,15 @@ type LaneNodeData = {
 };
 
 type ServerInfraNodeData = {
+  connected: boolean;
+  dimmed: boolean;
+  focused: boolean;
+  infraNodeId: number;
   kind: "server" | "infra";
   label: string;
   code: string;
   meta: string;
+  onSelect: (infraNodeId: number) => void;
   statusCode?: keyof typeof codeLabels.serverStatus;
 };
 
@@ -87,6 +97,68 @@ const RELATION_WIDTH_ANIMATION_MS = 180;
 const RELATION_HEIGHT_ANIMATION_MS = 300;
 type TopControlMode = "select" | "search";
 type GraphViewMode = "service" | "infra";
+
+type InfraGraphNodeRecord = {
+  infraNodeId: number;
+  nodeCode: string;
+  nodeName: string;
+  nodeTypeCode: string;
+};
+
+type InfraGraphRelationRecord = {
+  infraRelationId: number;
+  sourceInfraNodeId: number;
+  targetInfraNodeId: number;
+  relationTypeCode: string;
+};
+
+const shouldUseRemoteInfraApi = () =>
+  !import.meta.env.DEV && typeof window !== "undefined";
+
+const normalizeInfraNode = (node: any): InfraGraphNodeRecord => ({
+  infraNodeId: Number(node.infraNodeId ?? node.id),
+  nodeCode: String(node.nodeCode ?? ""),
+  nodeName: String(node.nodeName ?? ""),
+  nodeTypeCode: String(node.nodeTypeCode ?? "INFRA"),
+});
+
+const normalizeInfraRelation = (edge: any): InfraGraphRelationRecord => ({
+  infraRelationId: Number(edge.infraEdgeId ?? edge.infraRelationId ?? edge.id),
+  sourceInfraNodeId: Number(edge.fromNodeId ?? edge.sourceInfraNodeId),
+  targetInfraNodeId: Number(edge.toNodeId ?? edge.targetInfraNodeId),
+  relationTypeCode: String(edge.relationTypeCode ?? "LINK"),
+});
+
+async function fetchInfraGraphSnapshot() {
+  const nodes = (await chainViewApi.infraNodes.list())
+    .map(normalizeInfraNode)
+    .filter((node) => node.infraNodeId);
+  const edgeLists = await Promise.all(
+    nodes.map((node) =>
+      chainViewApi.infraNodes.edges(node.infraNodeId).catch(() => [])
+    )
+  );
+  const relationById = new Map<number, InfraGraphRelationRecord>();
+
+  edgeLists.flat().forEach((edge) => {
+    const relation = normalizeInfraRelation(edge);
+    if (
+      !relation.infraRelationId ||
+      !relation.sourceInfraNodeId ||
+      !relation.targetInfraNodeId
+    ) {
+      return;
+    }
+    relationById.set(relation.infraRelationId, relation);
+  });
+
+  return {
+    nodes,
+    relations: [...relationById.values()].sort(
+      (first, second) => first.infraRelationId - second.infraRelationId
+    ),
+  };
+}
 
 function centeredOffset(index: number, count: number, spacing: number) {
   return (index - (count - 1) / 2) * spacing;
@@ -213,6 +285,15 @@ export function ServiceRelationFlow({
   const [graphViewMode, setGraphViewMode] = useState<GraphViewMode>(
     initialInfraDepth > 0 ? "infra" : "service"
   );
+  const [infraGraphNodes, setInfraGraphNodes] = useState<InfraGraphNodeRecord[]>(
+    () => infraNodesSnapshot.map(normalizeInfraNode)
+  );
+  const [infraGraphRelations, setInfraGraphRelations] = useState<
+    InfraGraphRelationRecord[]
+  >(() => infraRelationsSnapshot.map(normalizeInfraRelation));
+  const [selectedInfraNodeId, setSelectedInfraNodeId] = useState<number | null>(
+    null
+  );
   const [topControlMode, setTopControlMode] =
     useState<TopControlMode>("select");
   const [flowInstance, setFlowInstance] =
@@ -220,6 +301,59 @@ export function ServiceRelationFlow({
   const userMovedViewportRef = useRef(false);
   const autoCenteredKeyRef = useRef("");
   const initialFitViewDoneRef = useRef(false);
+
+  useEffect(() => {
+    if (!shouldUseRemoteInfraApi()) {
+      return;
+    }
+
+    let cancelled = false;
+
+    fetchInfraGraphSnapshot()
+      .then(({ nodes, relations }) => {
+        if (cancelled) {
+          return;
+        }
+        setInfraGraphNodes(nodes);
+        setInfraGraphRelations(relations);
+      })
+      .catch((error) => {
+        console.warn(
+          "[ChainView API] infra graph load failed, snapshot data will be used",
+          error
+        );
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const selectedInfraConnectedNodeIds = useMemo(() => {
+    const next = new Set<number>();
+
+    if (!selectedInfraNodeId) {
+      return next;
+    }
+
+    next.add(selectedInfraNodeId);
+    infraGraphRelations.forEach((relation) => {
+      if (relation.sourceInfraNodeId === selectedInfraNodeId) {
+        next.add(relation.targetInfraNodeId);
+      }
+      if (relation.targetInfraNodeId === selectedInfraNodeId) {
+        next.add(relation.sourceInfraNodeId);
+      }
+    });
+
+    return next;
+  }, [infraGraphRelations, selectedInfraNodeId]);
+
+  const toggleSelectedInfraNode = useCallback((infraNodeId: number) => {
+    setSelectedInfraNodeId((current) =>
+      current === infraNodeId ? null : infraNodeId
+    );
+  }, []);
 
   const serviceById = useMemo(
     () => new Map(services.map((service) => [service.serviceId, service])),
@@ -757,56 +891,134 @@ export function ServiceRelationFlow({
       return [];
     }
 
-    const visibleServices = filteredServices.filter((service) =>
-      visibleServiceIds.has(service.serviceId)
+    const nodeById = new Map(
+      infraGraphNodes.map((node) => [node.infraNodeId, node])
     );
-    const nodes: Node<ServerInfraNodeData>[] = [];
-    const addedInfra = new Set<string>();
+    const outgoing = new Map<number, number[]>();
+    const indegree = new Map<number, number>();
 
-    visibleServices.forEach((service) => {
-      const server = serverById.get(service.serverId);
-      if (!server) {
-        return;
-      }
-
-      const lane = laneByServiceId.get(service.serviceId) ?? 0;
-      const y = yByServiceId.get(service.serviceId) ?? 0;
-
-      const infraId = server.infraNodeId
-        ? `infra-${server.infraNodeId}`
-        : `infra-server-${server.serverId}`;
-
-      if (addedInfra.has(infraId)) {
-        return;
-      }
-
-      addedInfra.add(infraId);
-      nodes.push({
-        id: infraId,
-        type: "serverInfraNode",
-        position: {
-          x: lane * X_SPACING,
-          y: y + 16,
-        },
-        data: {
-          kind: "infra",
-          label: server.infraNodeName || `${server.serverName} 인프라 노드`,
-          code: server.infraNodeCode || `INFRA-${server.serverId}`,
-          meta: server.serverRoleName || "인프라 노드",
-        },
-        draggable: false,
-      });
+    infraGraphNodes.forEach((node) => {
+      outgoing.set(node.infraNodeId, []);
+      indegree.set(node.infraNodeId, 0);
     });
+
+    infraGraphRelations.forEach((relation) => {
+      if (
+        !nodeById.has(relation.sourceInfraNodeId) ||
+        !nodeById.has(relation.targetInfraNodeId)
+      ) {
+        return;
+      }
+
+      outgoing.set(relation.sourceInfraNodeId, [
+        ...(outgoing.get(relation.sourceInfraNodeId) ?? []),
+        relation.targetInfraNodeId,
+      ]);
+      indegree.set(
+        relation.targetInfraNodeId,
+        (indegree.get(relation.targetInfraNodeId) ?? 0) + 1
+      );
+    });
+
+    const laneByNodeId = new Map<number, number>();
+    const queue = infraGraphNodes
+      .filter((node) => (indegree.get(node.infraNodeId) ?? 0) === 0)
+      .sort((first, second) =>
+        first.nodeName.localeCompare(second.nodeName, "ko") ||
+        first.infraNodeId - second.infraNodeId
+      )
+      .map((node) => node.infraNodeId);
+
+    if (!queue.length && infraGraphNodes[0]) {
+      queue.push(infraGraphNodes[0].infraNodeId);
+    }
+
+    queue.forEach((nodeId) => laneByNodeId.set(nodeId, 0));
+
+    while (queue.length > 0) {
+      const currentId = queue.shift();
+      if (!currentId) continue;
+      const currentLane = laneByNodeId.get(currentId) ?? 0;
+
+      (outgoing.get(currentId) ?? []).forEach((targetId) => {
+        const nextLane = Math.max(laneByNodeId.get(targetId) ?? 0, currentLane + 1);
+        if (nextLane !== laneByNodeId.get(targetId)) {
+          laneByNodeId.set(targetId, nextLane);
+          queue.push(targetId);
+        }
+      });
+    }
+
+    infraGraphNodes.forEach((node) => {
+      if (!laneByNodeId.has(node.infraNodeId)) {
+        laneByNodeId.set(node.infraNodeId, 0);
+      }
+    });
+
+    const groups = new Map<number, InfraGraphNodeRecord[]>();
+    infraGraphNodes.forEach((node) => {
+      const lane = laneByNodeId.get(node.infraNodeId) ?? 0;
+      groups.set(lane, [...(groups.get(lane) ?? []), node]);
+    });
+
+    const INFRA_X_SPACING = 430;
+    const INFRA_Y_SPACING = 148;
+    const nodes: Node<ServerInfraNodeData>[] = [];
+
+    Array.from(groups.entries())
+      .sort(([firstLane], [secondLane]) => firstLane - secondLane)
+      .forEach(([lane, groupNodes]) => {
+        const sortedNodes = [...groupNodes].sort(
+          (first, second) =>
+            first.nodeTypeCode.localeCompare(second.nodeTypeCode, "ko") ||
+            first.nodeName.localeCompare(second.nodeName, "ko") ||
+            first.infraNodeId - second.infraNodeId
+        );
+
+        sortedNodes.forEach((node, index) => {
+          nodes.push({
+            id: `infra-${node.infraNodeId}`,
+            type: "serverInfraNode",
+            position: {
+              x: lane * INFRA_X_SPACING,
+              y: centeredOffset(index, sortedNodes.length, INFRA_Y_SPACING),
+            },
+            data: {
+              connected: selectedInfraConnectedNodeIds.has(node.infraNodeId),
+              dimmed:
+                Boolean(selectedInfraNodeId) &&
+                !selectedInfraConnectedNodeIds.has(node.infraNodeId),
+              focused: selectedInfraNodeId === node.infraNodeId,
+              infraNodeId: node.infraNodeId,
+              kind: "infra",
+              label: node.nodeName,
+              code: node.nodeCode,
+              meta: node.nodeTypeCode,
+              onSelect: toggleSelectedInfraNode,
+            },
+            draggable: false,
+          });
+        });
+      });
 
     return nodes;
   }, [
-    filteredServices,
     graphViewMode,
-    laneByServiceId,
-    serverById,
-    visibleServiceIds,
-    yByServiceId,
+    infraGraphNodes,
+    infraGraphRelations,
+    selectedInfraConnectedNodeIds,
+    selectedInfraNodeId,
   ]);
+  const topologyNodePositionById = useMemo(
+    () =>
+      new Map(
+        topologyNodes.map((node) => [
+          node.id,
+          { x: node.position.x, y: node.position.y },
+        ])
+      ),
+    [topologyNodes]
+  );
 
   const edges = useMemo<Edge[]>(() => {
     const serviceRelationEdges = activeRelations
@@ -877,74 +1089,56 @@ export function ServiceRelationFlow({
 
     const topologyRelationEdges: Edge[] = [];
     const addedTopologyRelationEdges = new Set<string>();
+    const visibleNodeIds = new Set(topologyNodes.map((node) => node.id));
 
-    activeRelations.forEach((relation) => {
+    infraGraphRelations.forEach((relation) => {
+      const sourceNodeId = `infra-${relation.sourceInfraNodeId}`;
+      const targetNodeId = `infra-${relation.targetInfraNodeId}`;
+
       if (
-        !visibleRelationIds.has(relation.relationId) ||
-        !visibleServiceIds.has(relation.sourceServiceId) ||
-        !visibleServiceIds.has(relation.targetServiceId)
+        sourceNodeId === targetNodeId ||
+        !visibleNodeIds.has(sourceNodeId) ||
+        !visibleNodeIds.has(targetNodeId)
       ) {
         return;
       }
 
-      const sourceService = serviceById.get(relation.sourceServiceId);
-      const targetService = serviceById.get(relation.targetServiceId);
-      const sourceServer = sourceService
-        ? serverById.get(sourceService.serverId)
-        : undefined;
-      const targetServer = targetService
-        ? serverById.get(targetService.serverId)
-        : undefined;
-
-      if (
-        !sourceServer ||
-        !targetServer ||
-        sourceServer.serverId === targetServer.serverId
-      ) {
-        return;
-      }
-
-      const sourceLane = laneByServiceId.get(relation.sourceServiceId);
-      const targetLane = laneByServiceId.get(relation.targetServiceId);
-      if (
-        sourceLane === undefined ||
-        targetLane === undefined ||
-        (!showAllServices && Math.abs(targetLane - sourceLane) !== 1)
-      ) {
-        return;
-      }
-
-      const sourceNodeId = sourceServer.infraNodeId
-        ? `infra-${sourceServer.infraNodeId}`
-        : `infra-server-${sourceServer.serverId}`;
-      const targetNodeId = targetServer.infraNodeId
-        ? `infra-${targetServer.infraNodeId}`
-        : `infra-server-${targetServer.serverId}`;
-
-      if (sourceNodeId === targetNodeId) {
-        return;
-      }
-
-      const edgeId = `${graphViewMode}-relation-${sourceNodeId}-${targetNodeId}`;
+      const edgeId = `infra-relation-${relation.infraRelationId}`;
       if (addedTopologyRelationEdges.has(edgeId)) {
         return;
       }
+
+      const sourcePosition = topologyNodePositionById.get(sourceNodeId);
+      const targetPosition = topologyNodePositionById.get(targetNodeId);
+      const sourceIsLeft =
+        !sourcePosition ||
+        !targetPosition ||
+        sourcePosition.x <= targetPosition.x;
+
+      const directlyConnectedToSelected =
+        selectedInfraNodeId === null ||
+        relation.sourceInfraNodeId === selectedInfraNodeId ||
+        relation.targetInfraNodeId === selectedInfraNodeId;
 
       addedTopologyRelationEdges.add(edgeId);
       topologyRelationEdges.push({
         id: edgeId,
         source: sourceNodeId,
         target: targetNodeId,
+        sourceHandle: sourceIsLeft ? "right-source" : "left-source",
+        targetHandle: sourceIsLeft ? "left-target" : "right-target",
         type: "default",
-        className: "chainview-flow-edge chainview-flow-edge-normal-dashed",
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-          color: "#0f766e",
-        },
+        animated: true,
+        className:
+          `chainview-flow-edge chainview-flow-edge-normal-dashed chainview-flow-edge-infra ${
+            directlyConnectedToSelected
+              ? "chainview-flow-edge-infra-active"
+              : "chainview-flow-edge-infra-muted"
+          }`,
         style: {
           stroke: "#0f766e",
-          strokeWidth: 2.2,
-          opacity: 0.82,
+          strokeWidth: directlyConnectedToSelected ? 2.7 : 1.8,
+          opacity: directlyConnectedToSelected ? 0.88 : 0.16,
         },
       });
     });
@@ -957,16 +1151,23 @@ export function ServiceRelationFlow({
     focusedServiceId,
     highlightServiceId,
     incidentMode,
+    infraGraphRelations,
     laneByServiceId,
     serviceById,
     serverById,
+    selectedInfraNodeId,
     showAllServices,
+    topologyNodes,
+    topologyNodePositionById,
     visibleRelationIds,
     visibleServiceIds,
   ]);
 
   const nodes = useMemo<Node<GraphNodeData>[]>(
-    () => [...laneNodes, ...(graphViewMode === "service" ? serviceNodes : topologyNodes)],
+    () =>
+      graphViewMode === "service"
+        ? [...laneNodes, ...serviceNodes]
+        : topologyNodes,
     [graphViewMode, laneNodes, serviceNodes, topologyNodes]
   );
   const nodeTypes = useMemo(
@@ -1196,8 +1397,15 @@ export function ServiceRelationFlow({
           border-radius: 8px;
           background: rgba(255, 255, 255, 0.94);
           color: #0f172a;
+          cursor: pointer;
           padding: 10px 12px;
+          text-align: left;
           box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
+          transition:
+            border-color 160ms ease,
+            box-shadow 160ms ease,
+            opacity 160ms ease,
+            transform 160ms ease;
         }
 
         .chainview-infra-node-server {
@@ -1209,8 +1417,31 @@ export function ServiceRelationFlow({
           background: rgba(248, 250, 252, 0.96);
         }
 
+        .chainview-infra-node-connected {
+          border-color: rgba(15, 118, 110, 0.5);
+          box-shadow: 0 12px 26px rgba(15, 118, 110, 0.12);
+        }
+
+        .chainview-infra-node-focused {
+          border-color: #0f766e;
+          box-shadow:
+            0 0 0 4px rgba(15, 118, 110, 0.15),
+            0 14px 30px rgba(15, 118, 110, 0.18);
+          transform: translateY(-1px);
+        }
+
+        .chainview-infra-node-dimmed {
+          opacity: 0.24;
+        }
+
         .chainview-flow-edge-infra path {
           stroke-linecap: round;
+          stroke-dasharray: 14 12;
+          animation: chainview-edge-flow 1.15s linear infinite;
+        }
+
+        .chainview-flow-edge-infra-muted path {
+          animation: none;
         }
 
         .chainview-flow-node-compact {
@@ -2102,12 +2333,22 @@ function ServerInfraNode({ data }: { data: ServerInfraNodeData }) {
   const isServer = data.kind === "server";
 
   return (
-    <div
+    <button
+      type="button"
       className={`chainview-infra-node ${
         isServer ? "chainview-infra-node-server" : "chainview-infra-node-infra"
+      } ${data.focused ? "chainview-infra-node-focused" : ""} ${
+        data.connected ? "chainview-infra-node-connected" : ""
+      } ${data.dimmed ? "chainview-infra-node-dimmed" : ""
       }`}
+      onClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        data.onSelect(data.infraNodeId);
+      }}
     >
-      <Handle type="target" position={Position.Left} />
+      <Handle id="left-target" type="target" position={Position.Left} />
+      <Handle id="left-source" type="source" position={Position.Left} />
       <div className="flex min-w-0 items-start gap-2">
         <div
           className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${
@@ -2130,8 +2371,9 @@ function ServerInfraNode({ data }: { data: ServerInfraNodeData }) {
           </div>
         </div>
       </div>
-      <Handle type="source" position={Position.Right} />
-    </div>
+      <Handle id="right-target" type="target" position={Position.Right} />
+      <Handle id="right-source" type="source" position={Position.Right} />
+    </button>
   );
 }
 

@@ -1706,13 +1706,65 @@
   background:
     radial-gradient(circle at 1px 1px, #dbeafe 1px, transparent 0) 0 0 / 18px 18px,
     #fff;
+  cursor: grab;
+  user-select: none;
 }
 
-.infra-graph-canvas svg {
+.infra-graph-canvas.is-dragging {
+  cursor: grabbing;
+}
+
+.infra-graph-stage {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1040px;
+  height: 520px;
+  transform-origin: 0 0;
+}
+
+.infra-graph-zoom-controls {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  z-index: 5;
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+}
+
+.infra-graph-zoom-controls button {
+  min-width: 38px;
+  height: 34px;
+  border: 0;
+  border-right: 1px solid var(--line);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.infra-graph-zoom-controls button:last-child {
+  min-width: 56px;
+  border-right: 0;
+  font-size: 11px;
+}
+
+.infra-graph-zoom-controls button:hover {
+  background: #f8fafc;
+}
+
+.infra-graph-stage svg {
   position: absolute;
   inset: 0;
-  width: 100%;
-  height: 100%;
+  width: 1040px;
+  height: 520px;
+  overflow: visible;
+  pointer-events: none;
 }
 
 .infra-graph-edge {
@@ -1740,6 +1792,8 @@
   color: var(--text);
   padding: 13px 15px;
   text-align: left;
+  cursor: pointer;
+  user-select: none;
 }
 
 .infra-graph-node:hover {
