@@ -582,10 +582,6 @@ function InfraInfoPanel({ node }: { node: InfraGraphNodeRecord }) {
           {node.updatedAt ? node.updatedAt.replace("T", " ").slice(0, 19) : "-"}
         </dd>
       </dl>
-      <div className="mt-4 rounded-lg border border-teal-100 bg-teal-50 px-3 py-3 text-xs font-semibold leading-5 text-teal-800">
-        인프라 관계도에서 선택한 요소입니다. 연결된 앞/뒤 노드는 관계도에서
-        진한 색상으로 함께 강조됩니다.
-      </div>
     </aside>
   );
 }
