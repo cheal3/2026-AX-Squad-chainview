@@ -128,13 +128,13 @@ function DashboardCase({
   }, [portalData]);
   const dashboardData =
     stableDataRef.current.services.length > 0 ? stableDataRef.current : portalData;
-  const activeIncident = portalData.incidents.find(
-    (incident) =>
-      incident.incidentId === activeIncidentId &&
-      incident.incidentStatusCode !== "RESOLVED"
-  ) ?? portalData.incidents.find(
-    (incident) => incident.incidentStatusCode !== "RESOLVED"
-  );
+  const activeIncident = activeIncidentId
+    ? portalData.incidents.find(
+        (incident) =>
+          incident.incidentId === activeIncidentId &&
+          incident.incidentStatusCode !== "RESOLVED"
+      )
+    : undefined;
   const { relations, services } = dashboardData;
   const relationCountByServiceId = useMemo(() => {
     const counts = new Map<number, number>();

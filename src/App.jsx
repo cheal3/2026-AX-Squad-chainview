@@ -4454,8 +4454,15 @@ function TopologyInfo({ children, title }) {
 function DashboardFrame() {
   const location = useLocation();
   const { incidents } = usePortalData();
-  const isIncidentMode = incidents.some((incident) => incident.incidentStatusCode !== "RESOLVED");
   const activeIncidentId = Number(new URLSearchParams(location.search).get("incidentId")) || undefined;
+  const isIncidentMode = Boolean(
+    activeIncidentId &&
+      incidents.some(
+        (incident) =>
+          incident.incidentId === activeIncidentId &&
+          incident.incidentStatusCode !== "RESOLVED"
+      )
+  );
 
   return (
     <AppShell activeMenu="dashboard" isDark={isIncidentMode}>
