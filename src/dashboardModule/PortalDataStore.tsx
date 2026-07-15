@@ -141,7 +141,8 @@ type RemoteApiCallDetail = {
 };
 
 type NewIncidentInput = {
-  serviceId: number;
+  incidentTypeCode?: IncidentRecord["incidentTypeCode"];
+  serviceId?: number;
   severityCode: SeverityCode;
   externalIncidentCode?: string;
   targetCode?: string;
@@ -602,17 +603,19 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
     const now = timestamp();
     const nextIncident: IncidentRecord = {
       incidentId: nextId(incidents, "incidentId"),
-      incidentTypeCode: "SERVICE",
+      incidentTypeCode: input.incidentTypeCode ?? "SERVICE",
       incidentStatusCode: "OPEN",
       ...input,
       startedAt: input.startedAt || now,
     };
-    const impacts = buildIncidentImpacts({
-      incidentId: nextIncident.incidentId,
-      relations,
-      serviceId: input.serviceId,
-      services,
-    });
+    const impacts = input.serviceId
+      ? buildIncidentImpacts({
+          incidentId: nextIncident.incidentId,
+          relations,
+          serviceId: input.serviceId,
+          services,
+        })
+      : [];
     const events = buildInitialIncidentEvents({
       incident: nextIncident,
       impactCount: impacts.length,
@@ -626,7 +629,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
     setIncidentEvents((current) => [...events, ...current]);
     setServices((current) =>
       current.map((service) =>
-        service.serviceId === input.serviceId
+        input.serviceId && service.serviceId === input.serviceId
           ? {
               ...service,
               statusCode:
@@ -645,7 +648,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       setServices((current) =>
         current.map((service) =>
           impactedIds.has(service.serviceId) &&
-          service.serviceId !== input.serviceId &&
+          (!input.serviceId || service.serviceId !== input.serviceId) &&
           service.statusCode === "NORMAL"
             ? { ...service, statusCode: "IMPACTED", updatedAt: now }
             : service
@@ -1686,9 +1689,11 @@ function deploymentKey(input: RemoteListRecord) {
 
 function toIncidentCreatePayload(input: NewIncidentInput, startedAt: string) {
   return {
-    incidentTypeCode: "SERVICE",
+    incidentTypeCode: input.incidentTypeCode ?? "SERVICE",
     serviceId: input.serviceId,
     severityCode: input.severityCode,
+    targetCode: input.targetCode,
+    targetLabel: input.targetLabel,
     title: input.title,
     description: input.description,
     startedAt: toApiDateTime(startedAt),

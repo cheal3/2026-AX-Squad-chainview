@@ -204,6 +204,16 @@ function DashboardCase({
     setSelectedInfraNode(undefined);
     setSelectedServiceId(serviceId);
   };
+  const nextIncidentCode = () => {
+    const maxIncidentSeq = portalData.incidents.reduce((maxSeq, incident) => {
+      const [, seqText] =
+        incident.externalIncidentCode?.match(/^INC-\d{4}-(\d+)$/) ?? [];
+      const seq = Number(seqText);
+      return Number.isFinite(seq) ? Math.max(maxSeq, seq) : maxSeq;
+    }, 142);
+
+    return `INC-2026-${String(maxIncidentSeq + 1).padStart(4, "0")}`;
+  };
   const selectedService =
     services.find((service) => service.serviceId === selectedServiceId) ??
     coreServices.find((service) => service.serviceId === defaultSelectedServiceId) ??
@@ -234,21 +244,32 @@ function DashboardCase({
         />
         <ServiceInfoPanel
           infraNode={selectedInfraNode}
+          onCreateInfraIncident={() => {
+            if (!selectedInfraNode) {
+              return;
+            }
+
+            portalData.createIncident({
+              incidentTypeCode: "SERVER",
+              severityCode: "CRITICAL",
+              externalIncidentCode: nextIncidentCode(),
+              targetCode: selectedInfraNode.nodeCode,
+              targetLabel: `INFRA · ${selectedInfraNode.nodeCode}`,
+              title: `${selectedInfraNode.nodeName} 장애 발생`,
+              description: "대시보드에서 등록한 인프라 장애입니다.",
+              manualRegisteredYn: "Y",
+              registeredBy: "admin",
+            });
+          }}
           onCreateIncident={() => {
             if (!selectedService) {
               return;
             }
 
-            const maxIncidentSeq = portalData.incidents.reduce((maxSeq, incident) => {
-              const [, seqText] = incident.externalIncidentCode?.match(/^INC-\d{4}-(\d+)$/) ?? [];
-              const seq = Number(seqText);
-              return Number.isFinite(seq) ? Math.max(maxSeq, seq) : maxSeq;
-            }, 142);
-
             portalData.createIncident({
               serviceId: selectedService.serviceId,
               severityCode: "CRITICAL",
-              externalIncidentCode: `INC-2026-${String(maxIncidentSeq + 1).padStart(4, "0")}`,
+              externalIncidentCode: nextIncidentCode(),
               targetCode: selectedService.serviceCode,
               targetLabel: `SERVICE · ${selectedService.serviceCode}`,
               title: `${selectedService.serviceName} 장애 발생`,
@@ -263,6 +284,9 @@ function DashboardCase({
               : 0
           }
           service={selectedService}
+          onBeforeCreateInfraIncident={() =>
+            window.confirm(`${selectedInfraNode?.nodeName ?? "선택 인프라"} 인시던트를 생성하시겠습니까?`)
+          }
           onBeforeCreateIncident={() =>
             window.confirm(`${selectedService?.serviceName ?? "선택 서비스"} 인시던트를 생성하시겠습니까?`)
           }
@@ -486,13 +510,17 @@ function RelationFlowModal({
 
 function ServiceInfoPanel({
   infraNode,
+  onBeforeCreateInfraIncident,
   onBeforeCreateIncident,
+  onCreateInfraIncident,
   onCreateIncident,
   relationCount,
   service,
 }: {
   infraNode?: InfraGraphNodeRecord;
+  onBeforeCreateInfraIncident: () => boolean;
   onBeforeCreateIncident: () => boolean;
+  onCreateInfraIncident: () => void;
   onCreateIncident: () => void;
   relationCount: number;
   service?: ServiceRecord;
@@ -501,7 +529,13 @@ function ServiceInfoPanel({
   const [isDetailOpen, setIsDetailOpen] = useState(false);
 
   if (infraNode) {
-    return <InfraInfoPanel node={infraNode} />;
+    return (
+      <InfraInfoPanel
+        node={infraNode}
+        onBeforeCreateIncident={onBeforeCreateInfraIncident}
+        onCreateIncident={onCreateInfraIncident}
+      />
+    );
   }
 
   return (
@@ -549,40 +583,161 @@ function ServiceInfoPanel({
   );
 }
 
-function InfraInfoPanel({ node }: { node: InfraGraphNodeRecord }) {
+function InfraInfoPanel({
+  node,
+  onBeforeCreateIncident,
+  onCreateIncident,
+}: {
+  node: InfraGraphNodeRecord;
+  onBeforeCreateIncident: () => boolean;
+  onCreateIncident: () => void;
+}) {
+  const statusLabel = node.statusName ?? node.statusCode ?? "상태 미지정";
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+
+  return (
+    <>
+      <aside className="h-full min-h-[430px] min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white p-4">
+        <div className="mb-3 flex min-w-0 items-center justify-between gap-3">
+          <h2 className="truncate text-sm font-black">선택 인프라 정보</h2>
+          <span className="shrink-0 whitespace-nowrap rounded-full bg-[#e8fbf4] px-3 py-1 text-xs font-black text-[#008f72]">
+            ● {statusLabel}
+          </span>
+        </div>
+        <div className="flex min-w-0 items-center gap-2 text-base font-black">
+          <Server size={18} className="shrink-0 text-[#008f72]" />
+          <span className="truncate">{node.nodeName}</span>
+        </div>
+        <InfraInfoRows node={node} />
+        <div className="mt-4 grid min-w-0 grid-cols-2 gap-3">
+          <button
+            className="h-[28px] min-w-0 rounded border border-[#126cf0] px-2 text-sm font-black text-[#126cf0]"
+            type="button"
+            onClick={() => setIsDetailOpen(true)}
+          >
+            인프라 상세
+          </button>
+          <button
+            className="h-[28px] min-w-0 rounded bg-[#126cf0] px-2 text-sm font-black text-white"
+            onClick={() => {
+              if (onBeforeCreateIncident()) {
+                onCreateIncident();
+              }
+            }}
+            type="button"
+          >
+            인시던트 생성
+          </button>
+        </div>
+      </aside>
+
+      {isDetailOpen ? (
+        <InfraDetailModal node={node} onClose={() => setIsDetailOpen(false)} />
+      ) : null}
+    </>
+  );
+}
+
+function InfraInfoRows({ node }: { node: InfraGraphNodeRecord }) {
   const statusLabel = node.statusName ?? node.statusCode ?? "상태 미지정";
 
   return (
-    <aside className="h-full min-h-[430px] min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white p-4">
-      <div className="mb-3 flex min-w-0 items-center justify-between gap-3">
-        <h2 className="truncate text-sm font-black">선택 인프라 정보</h2>
-        <span className="shrink-0 whitespace-nowrap rounded-full bg-[#e8fbf4] px-3 py-1 text-xs font-black text-[#008f72]">
-          ● {statusLabel}
-        </span>
+    <dl className="mt-4 grid min-w-0 grid-cols-[110px_minmax(0,1fr)] gap-y-2 text-sm leading-5">
+      <dt className="font-bold text-slate-700">노드 코드</dt>
+      <dd className="truncate">{node.nodeCode}</dd>
+      <dt className="font-bold text-slate-700">인프라 유형</dt>
+      <dd className="truncate">{node.nodeTypeName ?? node.nodeTypeCode}</dd>
+      <dt className="font-bold text-slate-700">상태</dt>
+      <dd className="truncate">{statusLabel}</dd>
+      <dt className="font-bold text-slate-700">위치</dt>
+      <dd className="truncate">{node.locationLabel ?? "-"}</dd>
+      <dt className="font-bold text-slate-700">모델</dt>
+      <dd className="truncate">{node.vendorModel ?? "-"}</dd>
+      <dt className="font-bold text-slate-700">서버 매핑</dt>
+      <dd className="truncate">{node.serverCount ?? 0}개</dd>
+      <dt className="font-bold text-slate-700">최근 수정</dt>
+      <dd className="truncate">
+        {node.updatedAt ? node.updatedAt.replace("T", " ").slice(0, 19) : "-"}
+      </dd>
+    </dl>
+  );
+}
+
+function InfraDetailModal({
+  node,
+  onClose,
+}: {
+  node: InfraGraphNodeRecord;
+  onClose: () => void;
+}) {
+  const backdropHandlers = useSafeBackdropClose(onClose);
+  const rows = [
+    ["노드 ID", String(node.infraNodeId)],
+    ["노드 코드", node.nodeCode],
+    ["노드명", node.nodeName],
+    ["인프라 유형", node.nodeTypeName ?? node.nodeTypeCode],
+    ["상태", node.statusName ?? node.statusCode ?? "상태 미지정"],
+    ["위치", node.locationLabel ?? "-"],
+    ["모델", node.vendorModel ?? "-"],
+    ["서버 매핑", `${node.serverCount ?? 0}개`],
+    ["최근 수정", node.updatedAt ? node.updatedAt.replace("T", " ").slice(0, 19) : "-"],
+  ];
+
+  return (
+    <div
+      className="fixed inset-0 z-[1000] grid place-items-center bg-slate-950/45 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label="인프라 상세"
+      {...backdropHandlers}
+    >
+      <div
+        className="flex max-h-[86vh] w-full max-w-[820px] flex-col overflow-hidden rounded-lg border border-slate-200 bg-white text-slate-950 shadow-2xl"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <header className="flex h-12 shrink-0 items-center justify-between border-b border-slate-200 px-5">
+          <h2 className="text-base font-black">인프라 상세</h2>
+          <button
+            aria-label="인프라 상세 닫기"
+            className="grid h-8 w-8 place-items-center rounded border border-slate-200 bg-white text-slate-600"
+            type="button"
+            onClick={onClose}
+          >
+            <X size={17} />
+          </button>
+        </header>
+        <div className="min-h-0 overflow-y-auto p-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0">
+              <div className="text-xs font-black text-slate-500">INFRA</div>
+              <h3 className="mt-1 break-words text-xl font-black">
+                {node.nodeName}
+              </h3>
+              <p className="mt-2 break-words text-sm text-slate-600">
+                {node.nodeCode}
+              </p>
+            </div>
+            <span className="rounded-full bg-teal-50 px-3 py-1 text-xs font-black text-teal-700">
+              {node.statusName ?? node.statusCode ?? "UNKNOWN"}
+            </span>
+          </div>
+          <section className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <h4 className="mb-3 text-sm font-black">기본 정보</h4>
+            <div className="grid gap-3">
+              {rows.map(([label, value]) => (
+                <div
+                  className="grid grid-cols-[112px_minmax(0,1fr)] gap-3 text-sm"
+                  key={label}
+                >
+                  <div className="font-black text-slate-500">{label}</div>
+                  <div className="min-w-0 break-words">{value}</div>
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
       </div>
-      <div className="flex min-w-0 items-center gap-2 text-base font-black">
-        <Server size={18} className="shrink-0 text-[#008f72]" />
-        <span className="truncate">{node.nodeName}</span>
-      </div>
-      <dl className="mt-4 grid min-w-0 grid-cols-[110px_minmax(0,1fr)] gap-y-2 text-sm leading-5">
-        <dt className="font-bold text-slate-700">노드 코드</dt>
-        <dd className="truncate">{node.nodeCode}</dd>
-        <dt className="font-bold text-slate-700">인프라 유형</dt>
-        <dd className="truncate">{node.nodeTypeName ?? node.nodeTypeCode}</dd>
-        <dt className="font-bold text-slate-700">상태</dt>
-        <dd className="truncate">{statusLabel}</dd>
-        <dt className="font-bold text-slate-700">위치</dt>
-        <dd className="truncate">{node.locationLabel ?? "-"}</dd>
-        <dt className="font-bold text-slate-700">모델</dt>
-        <dd className="truncate">{node.vendorModel ?? "-"}</dd>
-        <dt className="font-bold text-slate-700">서버 매핑</dt>
-        <dd className="truncate">{node.serverCount ?? 0}개</dd>
-        <dt className="font-bold text-slate-700">최근 수정</dt>
-        <dd className="truncate">
-          {node.updatedAt ? node.updatedAt.replace("T", " ").slice(0, 19) : "-"}
-        </dd>
-      </dl>
-    </aside>
+    </div>
   );
 }
 
