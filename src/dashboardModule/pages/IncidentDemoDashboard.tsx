@@ -418,6 +418,7 @@ function RelationFlowModal({
   onClose: () => void;
   title: string;
 }) {
+  const backdropHandlers = useSafeBackdropClose(onClose);
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -435,7 +436,7 @@ function RelationFlowModal({
       role="dialog"
       aria-modal="true"
       aria-label={title}
-      onMouseDown={onClose}
+      {...backdropHandlers}
     >
       <section
         className={`flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-lg border shadow-2xl ${
@@ -585,6 +586,7 @@ function ServiceDetailModal({
   relationCount: number;
   service?: ServiceRecord;
 }) {
+  const backdropHandlers = useSafeBackdropClose(onClose);
   const sections = [
     {
       title: "서비스 정보",
@@ -632,7 +634,7 @@ function ServiceDetailModal({
       role="dialog"
       aria-modal="true"
       aria-label="서비스 상세"
-      onMouseDown={onClose}
+      {...backdropHandlers}
     >
       <div
         className={`flex max-h-[86vh] w-full max-w-[1040px] flex-col overflow-hidden rounded-lg border shadow-2xl ${
@@ -683,6 +685,34 @@ function ServiceDetailModal({
       </div>
     </div>
   );
+}
+
+function useSafeBackdropClose(onClose: () => void) {
+  const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
+
+  return {
+    onClick: (event: React.MouseEvent<HTMLElement>) => {
+      if (event.target !== event.currentTarget) {
+        return;
+      }
+      const start = pointerStartRef.current;
+      pointerStartRef.current = null;
+      if (!start) {
+        return;
+      }
+      const moved = Math.hypot(event.clientX - start.x, event.clientY - start.y);
+      if (moved <= 6) {
+        onClose();
+      }
+    },
+    onMouseDown: (event: React.MouseEvent<HTMLElement>) => {
+      if (event.target !== event.currentTarget) {
+        pointerStartRef.current = null;
+        return;
+      }
+      pointerStartRef.current = { x: event.clientX, y: event.clientY };
+    },
+  };
 }
 
 function parseDashboardDate(value: string) {

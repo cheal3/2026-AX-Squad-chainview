@@ -147,6 +147,41 @@ function getMenuMeta(menu) {
   return menuMetaByKey[menu] || { section: "서비스", label: "화면", icon: "📄" };
 }
 
+function ModalBackdrop({ children, className = "modal-backdrop is-open", onClose }) {
+  const pointerStartRef = useRef(null);
+  const rememberPointerStart = (event) => {
+    if (event.target !== event.currentTarget) {
+      pointerStartRef.current = null;
+      return;
+    }
+    pointerStartRef.current = { x: event.clientX, y: event.clientY };
+  };
+  const handleBackdropClick = (event) => {
+    if (event.target !== event.currentTarget) {
+      return;
+    }
+    const start = pointerStartRef.current;
+    pointerStartRef.current = null;
+    if (!start) {
+      return;
+    }
+    const moved = Math.hypot(event.clientX - start.x, event.clientY - start.y);
+    if (moved <= 6) {
+      onClose();
+    }
+  };
+
+  return (
+    <div
+      className={className}
+      onClick={handleBackdropClick}
+      onMouseDown={rememberPointerStart}
+    >
+      {children}
+    </div>
+  );
+}
+
 function LegacyPage({ onIncidentOpen, page }) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -802,7 +837,7 @@ function ApiQueryDetailModal({ detail, onClose }) {
   const previewText = JSON.stringify(detail.responsePreview ?? null, null, 2);
 
   return (
-    <div className="modal-backdrop is-open" onClick={onClose}>
+    <ModalBackdrop onClose={onClose}>
       <div className="modal modal--lg api-detail-modal" onClick={(event) => event.stopPropagation()}>
         <div className="modal__head">
           <h3>API 조회 상세</h3>
@@ -842,7 +877,7 @@ function ApiQueryDetailModal({ detail, onClose }) {
           <button className="btn btn--primary" onClick={onClose} type="button">확인</button>
         </div>
       </div>
-    </div>
+    </ModalBackdrop>
   );
 }
 
@@ -1095,7 +1130,7 @@ function AdminRecordModal({ modal, onClose, portalData, serverById, serviceById 
 
   if (isDelete) {
     return (
-      <div className="modal-backdrop is-open" onClick={onClose}>
+      <ModalBackdrop onClose={onClose}>
         <div className="modal confirm" onClick={(event) => event.stopPropagation()}>
           <div className="modal__head"><h3>{title}</h3><button className="close" onClick={onClose} type="button">×</button></div>
           <div className="modal__body">
@@ -1105,12 +1140,12 @@ function AdminRecordModal({ modal, onClose, portalData, serverById, serviceById 
           </div>
           <div className="modal__foot"><button className="btn" onClick={onClose} type="button">취소</button><button className="btn btn--danger" onClick={handleSubmit} type="button">삭제</button></div>
         </div>
-      </div>
+      </ModalBackdrop>
     );
   }
 
   return (
-    <div className="modal-backdrop is-open" onClick={onClose}>
+    <ModalBackdrop onClose={onClose}>
       <div className={menu === "techstacks" ? "modal" : "modal modal--lg"} onClick={(event) => event.stopPropagation()}>
         <div className="modal__head">
           <h3>{title}</h3>
@@ -1144,7 +1179,7 @@ function AdminRecordModal({ modal, onClose, portalData, serverById, serviceById 
           <button className="btn btn--primary" onClick={handleSubmit} type="button">{isCreate ? "등록" : "저장"}</button>
         </div>
       </div>
-    </div>
+    </ModalBackdrop>
   );
 }
 
@@ -2046,7 +2081,7 @@ function OwnerManagementModals({ modal, onClose, owner, portalData, services }) 
 
   if (modal === "delete") {
     return (
-      <div className="modal-backdrop is-open" onClick={onClose}>
+      <ModalBackdrop onClose={onClose}>
         <div className="modal confirm" onClick={(event) => event.stopPropagation()}>
           <div className="modal__head"><h3>🗑 담당자 해제</h3><button className="close" onClick={onClose} type="button">×</button></div>
           <div className="modal__body">
@@ -2056,7 +2091,7 @@ function OwnerManagementModals({ modal, onClose, owner, portalData, services }) 
           </div>
           <div className="modal__foot"><button className="btn" onClick={handleClose} type="button">취소</button><button className="btn btn--danger" onClick={handleSubmit} type="button">해제</button></div>
         </div>
-      </div>
+      </ModalBackdrop>
     );
   }
 
@@ -2064,7 +2099,7 @@ function OwnerManagementModals({ modal, onClose, owner, portalData, services }) 
   const serviceLocked = Boolean(owner?.lockedService);
 
   return (
-    <div className="modal-backdrop is-open" onClick={onClose}>
+    <ModalBackdrop onClose={onClose}>
       <div className="modal" onClick={(event) => event.stopPropagation()}>
         <div className="modal__head">
           <h3>{isEdit ? `✏️ 담당자 관리 — ${ownerId}` : "＋ 담당자 등록"}</h3>
@@ -2133,7 +2168,7 @@ function OwnerManagementModals({ modal, onClose, owner, portalData, services }) 
         </div>
         <div className="modal__foot"><button className="btn" onClick={handleClose} type="button">취소</button><button className="btn btn--primary" onClick={handleSubmit} type="button">{isEdit ? "저장" : "등록"}</button></div>
       </div>
-    </div>
+    </ModalBackdrop>
   );
 }
 
@@ -2595,7 +2630,7 @@ function InfraRelationsPage() {
         </div>
 
         {modal ? (
-          <div className="modal-backdrop is-open" onClick={() => setModal(null)}>
+          <ModalBackdrop onClose={() => setModal(null)}>
             <div className="modal" onClick={(event) => event.stopPropagation()}>
               <div className="modal__head">
                 <h3>{modal.mode === "edit" ? "✏️ 인프라 관계 수정" : "＋ 인프라 관계 등록"}</h3>
@@ -2616,7 +2651,7 @@ function InfraRelationsPage() {
               </div>
               <div className="modal__foot"><button className="btn" onClick={() => setModal(null)} type="button">취소</button><button className="btn btn--primary" onClick={saveModal} type="button">저장</button></div>
             </div>
-          </div>
+          </ModalBackdrop>
         ) : null}
         {graphOpen ? (
           <InfraRelationGraphModal
@@ -2769,7 +2804,7 @@ function InfraRelationGraphModal({
   };
 
   return (
-    <div className="modal-backdrop is-open" onClick={onClose}>
+    <ModalBackdrop onClose={onClose}>
       <div className="modal modal--xl infra-graph-modal" onClick={(event) => event.stopPropagation()}>
         <div className="modal__head">
           <h3>🗺️ 인프라 관계도</h3>
@@ -2837,7 +2872,7 @@ function InfraRelationGraphModal({
           <button className="btn btn--primary" onClick={onClose} type="button">확인</button>
         </div>
       </div>
-    </div>
+    </ModalBackdrop>
   );
 }
 
@@ -2974,7 +3009,7 @@ function InfraTopologyPage() {
         </div>
 
         {modal ? (
-          <div className="modal-backdrop is-open" onClick={() => setModal(null)}>
+          <ModalBackdrop onClose={() => setModal(null)}>
             <div className="modal" onClick={(event) => event.stopPropagation()}>
               <div className="modal__head">
                 <h3>{modal.mode === "edit" ? "✏️ 인프라 노드 수정" : "＋ 인프라 노드 등록"}</h3>
@@ -2996,7 +3031,7 @@ function InfraTopologyPage() {
               </div>
               <div className="modal__foot"><button className="btn" onClick={() => setModal(null)} type="button">취소</button><button className="btn btn--primary" onClick={saveModal} type="button">저장</button></div>
             </div>
-          </div>
+          </ModalBackdrop>
         ) : null}
       </main>
     </AppShell>

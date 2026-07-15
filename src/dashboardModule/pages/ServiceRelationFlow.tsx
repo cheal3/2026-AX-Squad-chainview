@@ -103,6 +103,13 @@ type InfraGraphNodeRecord = {
   nodeCode: string;
   nodeName: string;
   nodeTypeCode: string;
+  nodeTypeName?: string;
+  statusCode?: string;
+  statusName?: string;
+  locationLabel?: string;
+  vendorModel?: string;
+  serverCount?: number;
+  updatedAt?: string;
 };
 
 type InfraGraphRelationRecord = {
@@ -120,6 +127,16 @@ const normalizeInfraNode = (node: any): InfraGraphNodeRecord => ({
   nodeCode: String(node.nodeCode ?? ""),
   nodeName: String(node.nodeName ?? ""),
   nodeTypeCode: String(node.nodeTypeCode ?? "INFRA"),
+  nodeTypeName: node.nodeTypeName ? String(node.nodeTypeName) : undefined,
+  statusCode: node.statusCode ? String(node.statusCode) : undefined,
+  statusName: node.statusName ? String(node.statusName) : undefined,
+  locationLabel: node.locationLabel ? String(node.locationLabel) : undefined,
+  vendorModel: node.vendorModel ? String(node.vendorModel) : undefined,
+  serverCount:
+    node.serverCount === undefined || node.serverCount === null
+      ? undefined
+      : Number(node.serverCount),
+  updatedAt: node.updatedAt ? String(node.updatedAt) : undefined,
 });
 
 const normalizeInfraRelation = (edge: any): InfraGraphRelationRecord => ({
@@ -349,10 +366,40 @@ export function ServiceRelationFlow({
     return next;
   }, [infraGraphRelations, selectedInfraNodeId]);
 
+  const selectedInfraNode = useMemo(
+    () =>
+      selectedInfraNodeId
+        ? infraGraphNodes.find(
+            (node) => node.infraNodeId === selectedInfraNodeId
+          )
+        : undefined,
+    [infraGraphNodes, selectedInfraNodeId]
+  );
+  const selectedInfraIncomingCount = useMemo(
+    () =>
+      selectedInfraNodeId
+        ? infraGraphRelations.filter(
+            (relation) => relation.targetInfraNodeId === selectedInfraNodeId
+          ).length
+        : 0,
+    [infraGraphRelations, selectedInfraNodeId]
+  );
+  const selectedInfraOutgoingCount = useMemo(
+    () =>
+      selectedInfraNodeId
+        ? infraGraphRelations.filter(
+            (relation) => relation.sourceInfraNodeId === selectedInfraNodeId
+          ).length
+        : 0,
+    [infraGraphRelations, selectedInfraNodeId]
+  );
+
   const toggleSelectedInfraNode = useCallback((infraNodeId: number) => {
-    setSelectedInfraNodeId((current) =>
-      current === infraNodeId ? null : infraNodeId
-    );
+    setSelectedInfraNodeId((current) => {
+      const next = current === infraNodeId ? null : infraNodeId;
+      setDetailOpen(Boolean(next));
+      return next;
+    });
   }, []);
 
   const serviceById = useMemo(
@@ -1327,7 +1374,20 @@ export function ServiceRelationFlow({
             />
           )}
 
-          {detailService && !hideDetailPanel && (
+          {graphViewMode === "infra" && selectedInfraNode && !hideDetailPanel ? (
+            <RelationInfraDetailPanel
+              open={detailOpen}
+              connectedCount={Math.max(
+                selectedInfraConnectedNodeIds.size - 1,
+                0
+              )}
+              incomingCount={selectedInfraIncomingCount}
+              node={selectedInfraNode}
+              outgoingCount={selectedInfraOutgoingCount}
+              onPanelWideChange={setDetailPanelWide}
+              onOpenChange={setDetailOpen}
+            />
+          ) : detailService && !hideDetailPanel ? (
             <RelationServiceDetailPanel
               open={detailOpen}
               incomingCount={directIncomingCount}
@@ -1342,7 +1402,7 @@ export function ServiceRelationFlow({
               onPanelWideChange={setDetailPanelWide}
               onOpenChange={setDetailOpen}
             />
-          )}
+          ) : null}
 
           {!hideDepthToggle && (
               <RelationDepthToggle
@@ -1948,6 +2008,174 @@ function GraphViewModeToggle({
         })}
       </div>
     </div>
+  );
+}
+
+function RelationInfraDetailPanel({
+  open,
+  connectedCount,
+  incomingCount,
+  node,
+  outgoingCount,
+  onPanelWideChange,
+  onOpenChange,
+}: {
+  open: boolean;
+  connectedCount: number;
+  incomingCount: number;
+  node: InfraGraphNodeRecord;
+  outgoingCount: number;
+  onPanelWideChange: (wide: boolean) => void;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const [panelWide, setPanelWide] = useState(open);
+  const [panelTall, setPanelTall] = useState(open);
+
+  useEffect(() => {
+    let frame = 0;
+    let widthTimer = 0;
+    let heightTimer = 0;
+
+    if (open) {
+      frame = window.requestAnimationFrame(() => {
+        setPanelWide(true);
+        onPanelWideChange(true);
+        heightTimer = window.setTimeout(() => {
+          setPanelTall(true);
+        }, RELATION_WIDTH_ANIMATION_MS);
+      });
+    } else {
+      setPanelTall(false);
+      widthTimer = window.setTimeout(() => {
+        setPanelWide(false);
+        onPanelWideChange(false);
+      }, RELATION_HEIGHT_ANIMATION_MS);
+    }
+
+    return () => {
+      if (frame) {
+        window.cancelAnimationFrame(frame);
+      }
+      if (widthTimer) {
+        window.clearTimeout(widthTimer);
+      }
+      if (heightTimer) {
+        window.clearTimeout(heightTimer);
+      }
+    };
+  }, [onPanelWideChange, open]);
+
+  return (
+    <aside
+      className={`absolute right-4 top-4 z-30 flex origin-top-right transform-gpu flex-col overflow-hidden border border-teal-200 bg-white/96 text-slate-900 transition-[width,max-height,box-shadow,border-radius,transform] ease-out ${
+        panelTall
+          ? "rounded-2xl shadow-xl"
+          : "rounded-[22px] shadow-sm hover:-translate-y-0.5 hover:border-teal-300 hover:shadow-md"
+      } ${open ? "" : "cursor-pointer"}`}
+      style={{
+        width: panelWide ? RELATION_DETAIL_WIDTH : RELATION_COLLAPSED_WIDTH,
+        maxHeight: panelTall
+          ? "calc(100% - 32px)"
+          : RELATION_COLLAPSED_HEIGHT,
+        transitionDuration: `${panelWide && !panelTall ? RELATION_HEIGHT_ANIMATION_MS : RELATION_WIDTH_ANIMATION_MS}ms`,
+      }}
+      onClick={() => {
+        if (!open) {
+          onOpenChange(true);
+        }
+      }}
+    >
+      <div
+        aria-hidden="true"
+        className={`pointer-events-none absolute right-0 top-0 flex h-10 w-[112px] items-center justify-center gap-1.5 px-3 text-sm font-black text-slate-800 transition-opacity duration-150 ${
+          panelTall ? "opacity-0" : "opacity-100"
+        }`}
+      >
+        <PanelRightOpen size={15} className="shrink-0 text-slate-600" />
+        <span>상세</span>
+      </div>
+
+      <div
+        className={`flex min-h-0 min-w-[340px] flex-1 flex-col transition-opacity duration-150 ${
+          panelTall ? "opacity-100" : "opacity-0"
+        }`}
+      >
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-200 px-4 py-4">
+          <div className="min-w-0">
+            <div className="text-xs font-bold text-teal-700">
+              선택 인프라 상세
+            </div>
+            <h3 className="mt-1 break-words text-lg font-black leading-tight">
+              {node.nodeName}
+            </h3>
+            <div className="mt-1 text-xs font-bold text-slate-500">
+              {node.nodeCode}
+            </div>
+          </div>
+          <button
+            onClick={(event) => {
+              event.stopPropagation();
+              onOpenChange(false);
+            }}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200"
+            title="상세 접기"
+            type="button"
+          >
+            <ChevronRight size={18} />
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
+          <div className="rounded-xl border border-teal-100 bg-teal-50 p-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-xs font-semibold text-teal-700">유형</div>
+                <div className="mt-1 break-words text-sm font-black text-slate-900">
+                  {node.nodeTypeName ?? node.nodeTypeCode}
+                </div>
+              </div>
+              <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-xs font-black text-teal-700 shadow-sm">
+                {node.statusName ?? node.statusCode ?? "상태 미지정"}
+              </span>
+            </div>
+          </div>
+
+          <RelationDetailItem
+            label="위치"
+            value={node.locationLabel ?? "위치 미지정"}
+          />
+          <RelationDetailItem
+            label="모델"
+            value={node.vendorModel ?? "모델 미지정"}
+          />
+          <RelationDetailItem label="노드 코드" value={node.nodeCode} />
+
+          <div className="grid grid-cols-3 gap-2">
+            <ImpactBox label="직접 연결" value={connectedCount} />
+            <ImpactBox label="수신" value={incomingCount} />
+            <ImpactBox label="송신" value={outgoingCount} />
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <div className="flex items-center gap-2 text-xs font-black text-slate-700">
+              <Server size={14} />
+              서버 매핑
+            </div>
+            <div className="mt-2 text-lg font-black text-slate-950">
+              {node.serverCount ?? 0}
+            </div>
+            <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
+              해당 인프라 요소에 연결된 서버 수입니다.
+            </p>
+          </div>
+
+          <RelationDetailItem
+            label="최근 수정"
+            value={node.updatedAt ? node.updatedAt.replace("T", " ").slice(0, 19) : "수정일 미지정"}
+          />
+        </div>
+      </div>
+    </aside>
   );
 }
 
