@@ -23,7 +23,10 @@ import {
   UsersRound,
   X,
 } from "lucide-react";
-import { ServiceRelationFlow } from "./ServiceRelationFlow";
+import {
+  ServiceRelationFlow,
+  type InfraGraphNodeRecord,
+} from "./ServiceRelationFlow";
 import { usePortalData } from "../PortalDataStore";
 import type { IncidentRecord, ServiceRecord, ServiceRelationRecord } from "../mockData";
 import { useNavigate } from "react-router-dom";
@@ -184,6 +187,8 @@ function DashboardCase({
   const [selectedServiceId, setSelectedServiceId] = useState<number | undefined>(
     defaultSelectedServiceId
   );
+  const [selectedInfraNode, setSelectedInfraNode] =
+    useState<InfraGraphNodeRecord | undefined>();
 
   useEffect(() => {
     setSelectedServiceId((current) => {
@@ -196,6 +201,7 @@ function DashboardCase({
   }, [coreServices, defaultSelectedServiceId]);
 
   const handleSelectService = (serviceId: number) => {
+    setSelectedInfraNode(undefined);
     setSelectedServiceId(serviceId);
   };
   const selectedService =
@@ -223,9 +229,11 @@ function DashboardCase({
         <RelationMap
           coreServiceIds={coreServices.map((service) => service.serviceId)}
           selectedServiceId={selectedServiceId}
+          onSelectInfraNode={setSelectedInfraNode}
           onSelectService={handleSelectService}
         />
         <ServiceInfoPanel
+          infraNode={selectedInfraNode}
           onCreateIncident={() => {
             if (!selectedService) {
               return;
@@ -337,10 +345,12 @@ function MetricStrip({
 
 function RelationMap({
   coreServiceIds,
+  onSelectInfraNode,
   onSelectService,
   selectedServiceId,
 }: {
   coreServiceIds: number[];
+  onSelectInfraNode: (node?: InfraGraphNodeRecord) => void;
   onSelectService: (serviceId: number) => void;
   selectedServiceId?: number;
 }) {
@@ -380,6 +390,7 @@ function RelationMap({
             initialFitView
             initialRelationDepth={2}
             initialServiceId={selectedServiceId}
+            onSelectInfraNode={onSelectInfraNode}
             onSelectService={onSelectService}
             serviceFilter={serviceFilter}
           />
@@ -398,6 +409,7 @@ function RelationMap({
             initialFitView
             initialRelationDepth={2}
             initialServiceId={selectedServiceId}
+            onSelectInfraNode={onSelectInfraNode}
             onSelectService={onSelectService}
             serviceFilter={serviceFilter}
           />
@@ -473,11 +485,13 @@ function RelationFlowModal({
 }
 
 function ServiceInfoPanel({
+  infraNode,
   onBeforeCreateIncident,
   onCreateIncident,
   relationCount,
   service,
 }: {
+  infraNode?: InfraGraphNodeRecord;
   onBeforeCreateIncident: () => boolean;
   onCreateIncident: () => void;
   relationCount: number;
@@ -485,6 +499,10 @@ function ServiceInfoPanel({
 }) {
   const serviceName = service?.serviceName ?? "-";
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+
+  if (infraNode) {
+    return <InfraInfoPanel node={infraNode} />;
+  }
 
   return (
     <>
@@ -528,6 +546,47 @@ function ServiceInfoPanel({
         />
       ) : null}
     </>
+  );
+}
+
+function InfraInfoPanel({ node }: { node: InfraGraphNodeRecord }) {
+  const statusLabel = node.statusName ?? node.statusCode ?? "상태 미지정";
+
+  return (
+    <aside className="h-full min-h-[430px] min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white p-4">
+      <div className="mb-3 flex min-w-0 items-center justify-between gap-3">
+        <h2 className="truncate text-sm font-black">선택 인프라 정보</h2>
+        <span className="shrink-0 whitespace-nowrap rounded-full bg-[#e8fbf4] px-3 py-1 text-xs font-black text-[#008f72]">
+          ● {statusLabel}
+        </span>
+      </div>
+      <div className="flex min-w-0 items-center gap-2 text-base font-black">
+        <Server size={18} className="shrink-0 text-[#008f72]" />
+        <span className="truncate">{node.nodeName}</span>
+      </div>
+      <dl className="mt-4 grid min-w-0 grid-cols-[110px_minmax(0,1fr)] gap-y-2 text-sm leading-5">
+        <dt className="font-bold text-slate-700">노드 코드</dt>
+        <dd className="truncate">{node.nodeCode}</dd>
+        <dt className="font-bold text-slate-700">인프라 유형</dt>
+        <dd className="truncate">{node.nodeTypeName ?? node.nodeTypeCode}</dd>
+        <dt className="font-bold text-slate-700">상태</dt>
+        <dd className="truncate">{statusLabel}</dd>
+        <dt className="font-bold text-slate-700">위치</dt>
+        <dd className="truncate">{node.locationLabel ?? "-"}</dd>
+        <dt className="font-bold text-slate-700">모델</dt>
+        <dd className="truncate">{node.vendorModel ?? "-"}</dd>
+        <dt className="font-bold text-slate-700">서버 매핑</dt>
+        <dd className="truncate">{node.serverCount ?? 0}개</dd>
+        <dt className="font-bold text-slate-700">최근 수정</dt>
+        <dd className="truncate">
+          {node.updatedAt ? node.updatedAt.replace("T", " ").slice(0, 19) : "-"}
+        </dd>
+      </dl>
+      <div className="mt-4 rounded-lg border border-teal-100 bg-teal-50 px-3 py-3 text-xs font-semibold leading-5 text-teal-800">
+        인프라 관계도에서 선택한 요소입니다. 연결된 앞/뒤 노드는 관계도에서
+        진한 색상으로 함께 강조됩니다.
+      </div>
+    </aside>
   );
 }
 

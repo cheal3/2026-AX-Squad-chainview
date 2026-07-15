@@ -98,7 +98,7 @@ const RELATION_HEIGHT_ANIMATION_MS = 300;
 type TopControlMode = "select" | "search";
 type GraphViewMode = "service" | "infra";
 
-type InfraGraphNodeRecord = {
+export type InfraGraphNodeRecord = {
   infraNodeId: number;
   nodeCode: string;
   nodeName: string;
@@ -235,6 +235,7 @@ export function ServiceRelationFlow({
   initialViewport,
   incidentMode = false,
   initialServiceId,
+  onSelectInfraNode,
   onSelectService,
   serviceFilter,
   showAllServices = false,
@@ -254,6 +255,7 @@ export function ServiceRelationFlow({
   initialViewport?: { x: number; y: number; zoom: number };
   incidentMode?: boolean;
   initialServiceId?: number;
+  onSelectInfraNode?: (node?: InfraGraphNodeRecord) => void;
   onSelectService?: (serviceId: number) => void;
   serviceFilter?: (service: ServiceRecord) => boolean;
   showAllServices?: boolean;
@@ -398,9 +400,25 @@ export function ServiceRelationFlow({
     setSelectedInfraNodeId((current) => {
       const next = current === infraNodeId ? null : infraNodeId;
       setDetailOpen(Boolean(next));
+      onSelectInfraNode?.(
+        next
+          ? infraGraphNodes.find((node) => node.infraNodeId === next)
+          : undefined
+      );
       return next;
     });
-  }, []);
+  }, [infraGraphNodes, onSelectInfraNode]);
+
+  const handleGraphViewModeChange = useCallback(
+    (mode: GraphViewMode) => {
+      setGraphViewMode(mode);
+      if (mode === "service") {
+        setSelectedInfraNodeId(null);
+        onSelectInfraNode?.(undefined);
+      }
+    },
+    [onSelectInfraNode]
+  );
 
   const serviceById = useMemo(
     () => new Map(services.map((service) => [service.serviceId, service])),
@@ -847,6 +865,7 @@ export function ServiceRelationFlow({
     setFocusedServiceId(serviceId);
     setDetailOpen(false);
     setQuery("");
+    onSelectInfraNode?.(undefined);
     onSelectService?.(serviceId);
   };
 
@@ -1414,7 +1433,7 @@ export function ServiceRelationFlow({
           {!incidentMode && (
             <GraphViewModeToggle
               mode={graphViewMode}
-              onModeChange={setGraphViewMode}
+              onModeChange={handleGraphViewModeChange}
             />
           )}
         </div>
