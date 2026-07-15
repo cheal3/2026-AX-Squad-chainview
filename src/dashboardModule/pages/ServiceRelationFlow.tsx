@@ -300,7 +300,9 @@ export function ServiceRelationFlow({
   const [detailServiceId, setDetailServiceId] = useState<number>(
     initialFocusedServiceId
   );
-  const [relationDepth, setRelationDepth] = useState(initialRelationDepth ?? 1);
+  const [relationDepth, setRelationDepth] = useState(
+    initialRelationDepth ?? (hideDepthToggle ? MAX_RELATION_DEPTH : 1)
+  );
   const [graphViewMode, setGraphViewMode] = useState<GraphViewMode>(
     initialInfraDepth > 0 ? "infra" : "service"
   );
@@ -1991,8 +1993,8 @@ function GraphViewModeToggle({
   const activeIndex = options.findIndex((option) => option.mode === mode);
 
   return (
-    <div className="pointer-events-none absolute right-5 top-5 z-40">
-      <div className="pointer-events-auto relative grid h-10 grid-cols-2 overflow-hidden rounded-full border border-slate-200 bg-white/95 p-1 text-sm font-black shadow-sm backdrop-blur">
+    <div className="pointer-events-none absolute bottom-5 left-1/2 z-40 -translate-x-1/2">
+      <div className="pointer-events-auto relative grid h-12 grid-cols-2 overflow-hidden rounded-full border border-slate-200 bg-white/95 p-1 text-base font-black shadow-md backdrop-blur">
         <span
           className="absolute bottom-1 top-1 w-[calc(50%-4px)] rounded-full bg-[#0f766e] shadow-sm transition-transform duration-200"
           style={{
@@ -2009,7 +2011,7 @@ function GraphViewModeToggle({
               key={option.mode}
               type="button"
               onClick={() => onModeChange(option.mode)}
-              className={`relative z-10 flex h-8 min-w-[82px] items-center justify-center rounded-full px-4 transition-colors duration-200 ${
+              className={`relative z-10 flex h-10 min-w-[118px] items-center justify-center rounded-full px-7 transition-colors duration-200 ${
                 active
                   ? "text-white"
                   : "text-slate-700 hover:text-slate-950"

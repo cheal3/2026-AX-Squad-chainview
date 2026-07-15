@@ -428,6 +428,7 @@ function RelationMap({
             embedded
             embeddedHeightClassName="h-full"
             frameless
+            hideDepthToggle
             hideTopControl
             highlightServiceId={selectedServiceId}
             initialFitView
