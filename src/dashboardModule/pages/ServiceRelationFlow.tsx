@@ -58,6 +58,7 @@ type ServiceNodeData = {
   lane: number;
   onMoveToFocus: (serviceId: number) => void;
   onOpenDetail: (serviceId: number) => void;
+  onSelectServiceNode: (serviceId: number) => void;
 };
 
 type LaneNodeData = {
@@ -97,6 +98,7 @@ const RELATION_WIDTH_ANIMATION_MS = 180;
 const RELATION_HEIGHT_ANIMATION_MS = 300;
 type TopControlMode = "select" | "search";
 type GraphViewMode = "service" | "infra";
+type GraphModeTogglePlacement = "top-right" | "bottom-center";
 
 export type InfraGraphNodeRecord = {
   infraNodeId: number;
@@ -235,6 +237,7 @@ export function ServiceRelationFlow({
   initialViewport,
   incidentMode = false,
   initialServiceId,
+  modeTogglePlacement = "top-right",
   onSelectInfraNode,
   onSelectService,
   serviceFilter,
@@ -255,6 +258,7 @@ export function ServiceRelationFlow({
   initialViewport?: { x: number; y: number; zoom: number };
   incidentMode?: boolean;
   initialServiceId?: number;
+  modeTogglePlacement?: GraphModeTogglePlacement;
   onSelectInfraNode?: (node?: InfraGraphNodeRecord) => void;
   onSelectService?: (serviceId: number) => void;
   serviceFilter?: (service: ServiceRecord) => boolean;
@@ -300,6 +304,9 @@ export function ServiceRelationFlow({
   const [detailServiceId, setDetailServiceId] = useState<number>(
     initialFocusedServiceId
   );
+  const [selectedServiceNodeId, setSelectedServiceNodeId] = useState<
+    number | null
+  >(initialFocusedServiceId || null);
   const [relationDepth, setRelationDepth] = useState(
     initialRelationDepth ?? (hideDepthToggle ? MAX_RELATION_DEPTH : 1)
   );
@@ -322,6 +329,12 @@ export function ServiceRelationFlow({
   const userMovedViewportRef = useRef(false);
   const autoCenteredKeyRef = useRef("");
   const initialFitViewDoneRef = useRef(false);
+
+  useEffect(() => {
+    if (graphViewMode === "service") {
+      setSelectedServiceNodeId(initialFocusedServiceId || null);
+    }
+  }, [graphViewMode, initialFocusedServiceId]);
 
   useEffect(() => {
     if (!shouldUseRemoteInfraApi()) {
@@ -411,12 +424,29 @@ export function ServiceRelationFlow({
     });
   }, [infraGraphNodes, onSelectInfraNode]);
 
+  const toggleSelectedServiceNode = useCallback(
+    (serviceId: number) => {
+      setSelectedServiceNodeId((current) => {
+        const next = current === serviceId ? null : serviceId;
+        setDetailOpen(false);
+        if (next) {
+          onSelectInfraNode?.(undefined);
+          onSelectService?.(next);
+        }
+        return next;
+      });
+    },
+    [onSelectInfraNode, onSelectService]
+  );
+
   const handleGraphViewModeChange = useCallback(
     (mode: GraphViewMode) => {
       setGraphViewMode(mode);
       if (mode === "service") {
         setSelectedInfraNodeId(null);
         onSelectInfraNode?.(undefined);
+      } else {
+        setSelectedServiceNodeId(null);
       }
     },
     [onSelectInfraNode]
@@ -544,25 +574,8 @@ export function ServiceRelationFlow({
       const laneGroups = new Map<number, number[]>();
       const visible = new Set<number>();
       const relationIds = new Set<number>();
-
-      const getAllServicesLane = (service: ServiceRecord) => {
-        const rootCategory = service.categoryPath[0] ?? "";
-
-        if (rootCategory.includes("공동") || rootCategory.includes("공통")) {
-          return 0;
-        }
-        if (rootCategory.includes("기간계")) {
-          return 1;
-        }
-        if (rootCategory.includes("채널계")) {
-          return 2;
-        }
-        if (rootCategory.includes("대외")) {
-          return 3;
-        }
-
-        return 4;
-      };
+      const incomingCountByServiceId = new Map<number, number>();
+      const outgoingBySource = new Map<number, number[]>();
 
       const compareServiceIds = (firstId: number, secondId: number) => {
         const firstService = serviceById.get(firstId);
@@ -580,13 +593,9 @@ export function ServiceRelationFlow({
       };
 
       filteredServices.forEach((service) => {
-        const lane = getAllServicesLane(service);
-        const laneServiceIds = laneGroups.get(lane) ?? [];
-
         visible.add(service.serviceId);
-        laneMap.set(service.serviceId, lane);
-        laneServiceIds.push(service.serviceId);
-        laneGroups.set(lane, laneServiceIds);
+        incomingCountByServiceId.set(service.serviceId, 0);
+        outgoingBySource.set(service.serviceId, []);
       });
 
       activeRelations.forEach((relation) => {
@@ -595,7 +604,62 @@ export function ServiceRelationFlow({
           visible.has(relation.targetServiceId)
         ) {
           relationIds.add(relation.relationId);
+          outgoingBySource.set(relation.sourceServiceId, [
+            ...(outgoingBySource.get(relation.sourceServiceId) ?? []),
+            relation.targetServiceId,
+          ]);
+          incomingCountByServiceId.set(
+            relation.targetServiceId,
+            (incomingCountByServiceId.get(relation.targetServiceId) ?? 0) + 1
+          );
         }
+      });
+
+      const queue = [...visible]
+        .filter((serviceId) => (incomingCountByServiceId.get(serviceId) ?? 0) === 0)
+        .sort(compareServiceIds);
+      const roots = queue.length > 0 ? queue : [...visible].sort(compareServiceIds);
+
+      roots.forEach((serviceId) => {
+        if (!laneMap.has(serviceId)) {
+          laneMap.set(serviceId, 0);
+        }
+      });
+
+      const visitQueue = [...roots];
+      while (visitQueue.length > 0) {
+        const currentId = visitQueue.shift();
+        if (!currentId) {
+          continue;
+        }
+
+        const currentLane = laneMap.get(currentId) ?? 0;
+        const targets = [...(outgoingBySource.get(currentId) ?? [])].sort(compareServiceIds);
+
+        targets.forEach((targetId) => {
+          const nextLane = Math.max(laneMap.get(targetId) ?? 0, currentLane + 1);
+          if (nextLane !== laneMap.get(targetId)) {
+            laneMap.set(targetId, nextLane);
+            visitQueue.push(targetId);
+          }
+        });
+      }
+
+      visible.forEach((serviceId) => {
+        if (!laneMap.has(serviceId)) {
+          laneMap.set(serviceId, 0);
+        }
+      });
+
+      const lanes = [...laneMap.values()];
+      const laneOffset = lanes.length
+        ? (Math.min(...lanes) + Math.max(...lanes)) / 2
+        : 0;
+
+      visible.forEach((serviceId) => {
+        laneMap.set(serviceId, (laneMap.get(serviceId) ?? 0) - laneOffset);
+        const lane = laneMap.get(serviceId) ?? 0;
+        laneGroups.set(lane, [...(laneGroups.get(lane) ?? []), serviceId]);
       });
 
       const yMap = new Map<number, number>();
@@ -867,6 +931,7 @@ export function ServiceRelationFlow({
     setFocusedServiceId(serviceId);
     setDetailOpen(false);
     setQuery("");
+    setSelectedServiceNodeId(serviceId);
     onSelectInfraNode?.(undefined);
     onSelectService?.(serviceId);
   };
@@ -875,7 +940,9 @@ export function ServiceRelationFlow({
     const visibleServices = filteredServices.filter((service) => {
       return visibleServiceIds.has(service.serviceId);
     });
-    const highlightedServiceId = showAllServices ? highlightServiceId : focusedServiceId;
+    const highlightedServiceId = showAllServices
+      ? selectedServiceNodeId
+      : selectedServiceNodeId ?? focusedServiceId;
     const highlightedConnectedServiceIds = new Set<number>();
 
     activeRelations.forEach((relation) => {
@@ -897,10 +964,9 @@ export function ServiceRelationFlow({
       const connected =
         Boolean(highlightedServiceId) &&
         (service.serviceId === highlightedServiceId ||
-          highlightedConnectedServiceIds.has(service.serviceId) ||
-          (!showAllServices && connectedServiceIds.has(service.serviceId)));
+          highlightedConnectedServiceIds.has(service.serviceId));
       const focused = Boolean(highlightedServiceId) && service.serviceId === highlightedServiceId;
-      const dimmed = showAllServices && Boolean(highlightedServiceId) && !connected;
+      const dimmed = Boolean(highlightedServiceId) && !connected;
 
       return {
         id: String(service.serviceId),
@@ -931,12 +997,12 @@ export function ServiceRelationFlow({
           hideActions: hideNodeActions,
           onMoveToFocus: moveToFocusedService,
           onOpenDetail: openServiceDetail,
+          onSelectServiceNode: toggleSelectedServiceNode,
         },
       };
     });
   }, [
     focusedServiceId,
-    connectedServiceIds,
     activeRelations,
     detailOpen,
     detailServiceId,
@@ -949,7 +1015,9 @@ export function ServiceRelationFlow({
     ownerByServiceId,
     relationCountByServiceId,
     filteredServices,
+    selectedServiceNodeId,
     showAllServices,
+    toggleSelectedServiceNode,
     visibleServiceIds,
     yByServiceId,
   ]);
@@ -1112,8 +1180,8 @@ export function ServiceRelationFlow({
         const sourceLane = laneByServiceId.get(relation.sourceServiceId) ?? 0;
         const targetLane = laneByServiceId.get(relation.targetServiceId) ?? 0;
         const highlightedServiceId = showAllServices
-          ? highlightServiceId
-          : highlightServiceId ?? focusedServiceId;
+          ? selectedServiceNodeId
+          : selectedServiceNodeId ?? highlightServiceId ?? focusedServiceId;
         const hasHighlight = !incidentMode && Boolean(highlightedServiceId);
         const directlyConnected =
           hasHighlight &&
@@ -1145,8 +1213,8 @@ export function ServiceRelationFlow({
           },
           style: {
             stroke,
-            strokeWidth: incidentMode ? 2.8 : showAllServices ? (directlyConnected ? 2.8 : 1.75) : 2.4,
-            opacity: incidentMode ? 0.95 : showAllServices ? (directlyConnected ? 0.98 : hasHighlight ? 0.36 : 0.42) : 0.92,
+            strokeWidth: incidentMode ? 2.8 : directlyConnected ? 2.8 : 1.75,
+            opacity: incidentMode ? 0.95 : directlyConnected ? 0.98 : hasHighlight ? 0.12 : 0.42,
           },
         };
       });
@@ -1224,6 +1292,7 @@ export function ServiceRelationFlow({
     serviceById,
     serverById,
     selectedInfraNodeId,
+    selectedServiceNodeId,
     showAllServices,
     topologyNodes,
     topologyNodePositionById,
@@ -1434,6 +1503,7 @@ export function ServiceRelationFlow({
 
           {!incidentMode && (
             <GraphViewModeToggle
+              placement={modeTogglePlacement}
               mode={graphViewMode}
               onModeChange={handleGraphViewModeChange}
             />
@@ -1449,7 +1519,18 @@ export function ServiceRelationFlow({
           background: #fff;
           box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
           color: #0f172a;
+          cursor: pointer;
           padding: 14px 16px;
+          text-align: left;
+          transition:
+            border-color 0.18s ease,
+            box-shadow 0.18s ease,
+            opacity 0.18s ease,
+            transform 0.18s ease;
+        }
+
+        .chainview-flow-node:hover {
+          transform: translateY(-1px);
         }
 
         .chainview-flow-node-focused {
@@ -1463,7 +1544,7 @@ export function ServiceRelationFlow({
         }
 
         .chainview-flow-node-dimmed {
-          opacity: 0.5;
+          opacity: 0.24;
         }
 
         .chainview-flow-node-detail-selected {
@@ -1982,19 +2063,32 @@ function RelationDepthToggle({
 function GraphViewModeToggle({
   mode,
   onModeChange,
+  placement,
 }: {
   mode: GraphViewMode;
   onModeChange: (mode: GraphViewMode) => void;
+  placement: GraphModeTogglePlacement;
 }) {
   const options: Array<{ mode: GraphViewMode; label: string }> = [
     { mode: "service", label: "서비스" },
     { mode: "infra", label: "인프라" },
   ];
   const activeIndex = options.findIndex((option) => option.mode === mode);
+  const isBottom = placement === "bottom-center";
 
   return (
-    <div className="pointer-events-none absolute bottom-5 left-1/2 z-40 -translate-x-1/2">
-      <div className="pointer-events-auto relative grid h-12 grid-cols-2 overflow-hidden rounded-full border border-slate-200 bg-white/95 p-1 text-base font-black shadow-md backdrop-blur">
+    <div
+      className={`pointer-events-none absolute z-40 ${
+        isBottom
+          ? "bottom-5 left-1/2 -translate-x-1/2"
+          : "right-5 top-5"
+      }`}
+    >
+      <div
+        className={`pointer-events-auto relative grid grid-cols-2 overflow-hidden rounded-full border border-slate-200 bg-white/95 p-1 font-black shadow-md backdrop-blur ${
+          isBottom ? "h-12 text-base" : "h-10 text-sm"
+        }`}
+      >
         <span
           className="absolute bottom-1 top-1 w-[calc(50%-4px)] rounded-full bg-[#0f766e] shadow-sm transition-transform duration-200"
           style={{
@@ -2011,7 +2105,9 @@ function GraphViewModeToggle({
               key={option.mode}
               type="button"
               onClick={() => onModeChange(option.mode)}
-              className={`relative z-10 flex h-10 min-w-[118px] items-center justify-center rounded-full px-7 transition-colors duration-200 ${
+              className={`relative z-10 flex items-center justify-center rounded-full transition-colors duration-200 ${
+                isBottom ? "h-10 min-w-[118px] px-7" : "h-8 min-w-[82px] px-4"
+              } ${
                 active
                   ? "text-white"
                   : "text-slate-700 hover:text-slate-950"
@@ -2474,7 +2570,7 @@ function ServiceNode({ data }: { data: ServiceNodeData }) {
         onClick={(event) => {
           event.preventDefault();
           event.stopPropagation();
-          data.onOpenDetail(data.serviceId);
+          data.onSelectServiceNode(data.serviceId);
         }}
       >
         <Handle type="target" position={Position.Left} />
@@ -2497,12 +2593,19 @@ function ServiceNode({ data }: { data: ServiceNodeData }) {
   }
 
   return (
-    <div
+    <button
+      type="button"
       className={`chainview-flow-node ${
         data.focused ? "chainview-flow-node-focused" : ""
       } ${data.detailSelected ? "chainview-flow-node-detail-selected" : ""} ${
         data.connected ? "chainview-flow-node-connected" : ""
+      } ${data.dimmed ? "chainview-flow-node-dimmed" : ""
       }`}
+      onClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        data.onSelectServiceNode(data.serviceId);
+      }}
     >
       <Handle type="target" position={Position.Left} />
       <div className="flex items-start justify-between gap-3">
@@ -2533,36 +2636,8 @@ function ServiceNode({ data }: { data: ServiceNodeData }) {
           {data.ownerGroup}
         </span>
       </div>
-      {!data.hideActions ? (
-        <div className="nodrag nopan mt-3 grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              data.onOpenDetail(data.serviceId);
-            }}
-            className="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 text-[11px] font-black text-slate-700 transition hover:bg-slate-100"
-          >
-            <PanelRightOpen size={13} />
-            상세보기
-          </button>
-          <button
-            type="button"
-            onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              data.onMoveToFocus(data.serviceId);
-            }}
-            className="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-black text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
-          >
-            <ChevronRight size={13} />
-            이동
-          </button>
-        </div>
-      ) : null}
       <Handle type="source" position={Position.Right} />
-    </div>
+    </button>
   );
 }
 

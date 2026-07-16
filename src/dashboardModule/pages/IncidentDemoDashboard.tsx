@@ -417,6 +417,7 @@ function RelationMap({
             onSelectInfraNode={onSelectInfraNode}
             onSelectService={onSelectService}
             serviceFilter={serviceFilter}
+            showAllServices
           />
         </div>
       </section>
@@ -434,9 +435,11 @@ function RelationMap({
             initialFitView
             initialRelationDepth={2}
             initialServiceId={selectedServiceId}
+            modeTogglePlacement="bottom-center"
             onSelectInfraNode={onSelectInfraNode}
             onSelectService={onSelectService}
             serviceFilter={serviceFilter}
+            showAllServices
           />
         </RelationFlowModal>
       ) : null}
