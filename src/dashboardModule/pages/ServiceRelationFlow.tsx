@@ -3,7 +3,6 @@ import {
   Background,
   Controls,
   Handle,
-  MarkerType,
   Position,
   ReactFlow,
   type Edge,
@@ -99,6 +98,8 @@ const RELATION_HEIGHT_ANIMATION_MS = 300;
 type TopControlMode = "select" | "search";
 type GraphViewMode = "service" | "infra";
 type GraphModeTogglePlacement = "top-right" | "bottom-center";
+type RelationLegendPlacement = "bottom-right" | "top-left";
+type IncidentCanvasTone = "dark" | "light";
 
 export type InfraGraphNodeRecord = {
   infraNodeId: number;
@@ -232,11 +233,14 @@ export function ServiceRelationFlow({
   hideTopControl = false,
   highlightServiceId,
   initialFitView = false,
+  initialFitZoom,
   initialInfraDepth = 0,
   initialRelationDepth,
   initialViewport,
   incidentMode = false,
+  incidentCanvasTone = "dark",
   initialServiceId,
+  legendPlacement = "bottom-right",
   modeTogglePlacement = "top-right",
   onSelectInfraNode,
   onSelectService,
@@ -253,11 +257,14 @@ export function ServiceRelationFlow({
   hideTopControl?: boolean;
   highlightServiceId?: number;
   initialFitView?: boolean;
+  initialFitZoom?: number;
   initialInfraDepth?: number;
   initialRelationDepth?: number;
   initialViewport?: { x: number; y: number; zoom: number };
   incidentMode?: boolean;
+  incidentCanvasTone?: IncidentCanvasTone;
   initialServiceId?: number;
+  legendPlacement?: RelationLegendPlacement;
   modeTogglePlacement?: GraphModeTogglePlacement;
   onSelectInfraNode?: (node?: InfraGraphNodeRecord) => void;
   onSelectService?: (serviceId: number) => void;
@@ -313,7 +320,7 @@ export function ServiceRelationFlow({
   );
   const [selectedServiceNodeId, setSelectedServiceNodeId] = useState<
     number | null
-  >(initialFocusedServiceId || null);
+  >(null);
   const [relationDepth, setRelationDepth] = useState(
     initialRelationDepth ?? (hideDepthToggle ? MAX_RELATION_DEPTH : 1)
   );
@@ -339,9 +346,9 @@ export function ServiceRelationFlow({
 
   useEffect(() => {
     if (graphViewMode === "service") {
-      setSelectedServiceNodeId(initialFocusedServiceId || null);
+      setSelectedServiceNodeId(null);
     }
-  }, [graphViewMode, initialFocusedServiceId]);
+  }, [graphViewMode]);
 
   useEffect(() => {
     if (!shouldUseRemoteInfraApi()) {
@@ -458,6 +465,18 @@ export function ServiceRelationFlow({
     },
     [onSelectInfraNode]
   );
+
+  const handlePaneClick = useCallback(() => {
+    if (graphViewMode === "infra") {
+      setSelectedInfraNodeId(null);
+      setDetailOpen(false);
+      onSelectInfraNode?.(undefined);
+      return;
+    }
+
+    setSelectedServiceNodeId(null);
+    setDetailOpen(false);
+  }, [graphViewMode, onSelectInfraNode]);
 
   const serviceById = useMemo(
     () => new Map(services.map((service) => [service.serviceId, service])),
@@ -1214,10 +1233,6 @@ export function ServiceRelationFlow({
               : showAllServices
                 ? "chainview-flow-edge chainview-flow-edge-default-dashed"
                 : "chainview-flow-edge chainview-flow-edge-normal-dashed",
-          markerEnd: {
-            type: MarkerType.ArrowClosed,
-            color: stroke,
-          },
           style: {
             stroke,
             strokeWidth: incidentMode ? 2.8 : directlyConnected ? 2.8 : 1.75,
@@ -1360,17 +1375,27 @@ export function ServiceRelationFlow({
     }
 
     const frame = window.requestAnimationFrame(() => {
+      const fitZoom =
+        initialFitZoom ?? (showAllServices ? 0.18 : 0.46);
+
       flowInstance.fitView({
         duration: 0,
-        maxZoom: showAllServices ? 0.18 : 0.46,
-        minZoom: showAllServices ? 0.18 : 0.46,
+        maxZoom: fitZoom,
+        minZoom: fitZoom,
         padding: showAllServices ? 0.18 : 0.26,
       });
       initialFitViewDoneRef.current = true;
     });
 
     return () => window.cancelAnimationFrame(frame);
-  }, [edges.length, flowInstance, initialFitView, nodes.length, showAllServices]);
+  }, [
+    edges.length,
+    flowInstance,
+    initialFitView,
+    initialFitZoom,
+    nodes.length,
+    showAllServices,
+  ]);
 
   useEffect(() => {
     if (!autoCenter) {
@@ -1410,6 +1435,8 @@ export function ServiceRelationFlow({
   const canvasClassName = embedded
     ? `relative ${embeddedHeightClassName ?? "h-[680px] min-h-[620px]"}`
     : "relative h-[calc(100vh-188px)] min-h-[620px]";
+  const useDarkIncidentCanvas = incidentMode && incidentCanvasTone === "dark";
+  const useLightIncidentCanvas = incidentMode && incidentCanvasTone === "light";
 
   return (
     <div className={shellClassName}>
@@ -1425,8 +1452,10 @@ export function ServiceRelationFlow({
         className={
           frameless
             ? `h-full overflow-hidden ${
-                incidentMode
+                useDarkIncidentCanvas
                   ? "chainview-flow-dark bg-[#081b2d]"
+                  : useLightIncidentCanvas
+                    ? "chainview-flow-incident bg-[#f8fafc]"
                   : showAllServices
                     ? "chainview-flow-all bg-[#f8fafc]"
                     : "bg-white"
@@ -1445,6 +1474,7 @@ export function ServiceRelationFlow({
                 userMovedViewportRef.current = true;
               }
             }}
+            onPaneClick={handlePaneClick}
             defaultViewport={initialViewport}
             minZoom={0.18}
             maxZoom={1.4}
@@ -1453,7 +1483,7 @@ export function ServiceRelationFlow({
             <Background
               gap={24}
               size={1.1}
-              color={incidentMode ? "#1f3549" : "#dbe4f0"}
+              color={useDarkIncidentCanvas ? "#1f3549" : "#dbe4f0"}
             />
             <Controls />
           </ReactFlow>
@@ -1469,6 +1499,10 @@ export function ServiceRelationFlow({
               onQueryChange={setQuery}
               onSelectService={moveToFocusedService}
             />
+          )}
+
+          {graphViewMode === "service" && !incidentMode && (
+            <RelationEdgeLegend placement={legendPlacement} />
           )}
 
           {graphViewMode === "infra" && selectedInfraNode && !hideDetailPanel ? (
@@ -1691,6 +1725,20 @@ export function ServiceRelationFlow({
 
         .chainview-flow-dark .react-flow {
           background: #081b2d;
+        }
+
+        .chainview-flow-incident .react-flow {
+          background: #f8fafc;
+        }
+
+        .chainview-flow-incident .chainview-flow-node-focused {
+          border-color: #ff3344;
+          box-shadow: 0 0 0 4px rgba(255, 51, 68, 0.14),
+            0 14px 30px rgba(255, 51, 68, 0.12);
+        }
+
+        .chainview-flow-incident .chainview-flow-node-connected {
+          border-color: rgba(255, 51, 68, 0.38);
         }
 
         .chainview-flow-all .react-flow {
@@ -2063,6 +2111,38 @@ function RelationDepthToggle({
       >
         <span>{expanded ? "Depth 축소" : "Depth 확장"}</span>
       </button>
+    </div>
+  );
+}
+
+function RelationEdgeLegend({
+  placement,
+}: {
+  placement: RelationLegendPlacement;
+}) {
+  const positionClass =
+    placement === "top-left" ? "left-5 top-5" : "bottom-5 right-5";
+
+  return (
+    <div
+      className={`pointer-events-none absolute ${positionClass} z-30 rounded-lg border border-slate-200 bg-white/90 px-3 py-2 text-[11px] font-black text-slate-600 shadow-sm backdrop-blur`}
+    >
+      <div className="flex items-center gap-3">
+        <span className="inline-flex items-center gap-1.5">
+          <span
+            className="h-0.5 w-6 rounded-full"
+            style={{ backgroundColor: IMPACT_COLOR }}
+          />
+          송신/영향
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span
+            className="h-0.5 w-6 rounded-full"
+            style={{ backgroundColor: DEPENDS_ON_COLOR }}
+          />
+          수신/의존
+        </span>
+      </div>
     </div>
   );
 }

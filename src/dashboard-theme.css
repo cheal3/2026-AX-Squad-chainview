@@ -1013,6 +1013,32 @@
 
 .incident-detail__scroll-area {
   scrollbar-gutter: stable;
+  scrollbar-color: #486179 #061625;
+  scrollbar-width: thin;
+}
+
+.incident-detail-page::-webkit-scrollbar,
+.incident-detail__scroll-area::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.incident-detail-page::-webkit-scrollbar-track,
+.incident-detail__scroll-area::-webkit-scrollbar-track {
+  background: #061625;
+  border-radius: 999px;
+}
+
+.incident-detail-page::-webkit-scrollbar-thumb,
+.incident-detail__scroll-area::-webkit-scrollbar-thumb {
+  background: #486179;
+  border: 2px solid #061625;
+  border-radius: 999px;
+}
+
+.incident-detail-page::-webkit-scrollbar-thumb:hover,
+.incident-detail__scroll-area::-webkit-scrollbar-thumb:hover {
+  background: #5d7894;
 }
 
 .incident-detail__owner b {

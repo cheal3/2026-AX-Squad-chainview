@@ -2245,7 +2245,6 @@ const sidebarSections = [
   {
     label: "인프라",
     items: [
-      { key: "infra-topology", icon: "🧱", label: "인프라 토폴로지", to: "/admin-infra-topology" },
       { key: "infra-relations", icon: "🔌", label: "인프라 관계조회", to: "/admin-infra-relations" },
       { key: "servers", icon: "🖥️", label: "서버 조회", to: "/admin-servers" },
       { key: "deployments", icon: "🚀", label: "배포 현황", to: "/admin-deployments" },

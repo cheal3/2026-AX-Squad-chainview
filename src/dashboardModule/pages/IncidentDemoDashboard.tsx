@@ -123,6 +123,8 @@ function DashboardCase({
   activeIncidentId?: number;
 }) {
   const portalData = usePortalData();
+  const navigate = useNavigate();
+  const [createdIncidentId, setCreatedIncidentId] = useState<number | undefined>();
   const stableDataRef = useRef(portalData);
   useEffect(() => {
     if (portalData.services.length > 0) {
@@ -131,10 +133,11 @@ function DashboardCase({
   }, [portalData]);
   const dashboardData =
     stableDataRef.current.services.length > 0 ? stableDataRef.current : portalData;
-  const activeIncident = activeIncidentId
+  const effectiveActiveIncidentId = activeIncidentId ?? createdIncidentId;
+  const activeIncident = effectiveActiveIncidentId
     ? portalData.incidents.find(
         (incident) =>
-          incident.incidentId === activeIncidentId &&
+          incident.incidentId === effectiveActiveIncidentId &&
           incident.incidentStatusCode !== "RESOLVED"
       )
     : undefined;
@@ -249,7 +252,7 @@ function DashboardCase({
               return;
             }
 
-            portalData.createIncident({
+            const incident = portalData.createIncident({
               incidentTypeCode: "SERVER",
               severityCode: "CRITICAL",
               externalIncidentCode: nextIncidentCode(),
@@ -260,13 +263,15 @@ function DashboardCase({
               manualRegisteredYn: "Y",
               registeredBy: "admin",
             });
+            setCreatedIncidentId(incident.incidentId);
+            navigate(`/dashboard?incidentId=${incident.incidentId}`);
           }}
           onCreateIncident={() => {
             if (!selectedService) {
               return;
             }
 
-            portalData.createIncident({
+            const incident = portalData.createIncident({
               serviceId: selectedService.serviceId,
               severityCode: "CRITICAL",
               externalIncidentCode: nextIncidentCode(),
@@ -277,6 +282,8 @@ function DashboardCase({
               manualRegisteredYn: "Y",
               registeredBy: "admin",
             });
+            setCreatedIncidentId(incident.incidentId);
+            navigate(`/dashboard?incidentId=${incident.incidentId}`);
           }}
           relationCount={
             selectedService
@@ -412,6 +419,7 @@ function RelationMap({
             hideTopControl
             highlightServiceId={selectedServiceId}
             initialFitView
+            initialFitZoom={0.28}
             initialRelationDepth={2}
             initialServiceId={selectedServiceId}
             onSelectInfraNode={onSelectInfraNode}
@@ -435,6 +443,7 @@ function RelationMap({
             initialFitView
             initialRelationDepth={2}
             initialServiceId={selectedServiceId}
+            legendPlacement="top-left"
             modeTogglePlacement="bottom-center"
             onSelectInfraNode={onSelectInfraNode}
             onSelectService={onSelectService}
