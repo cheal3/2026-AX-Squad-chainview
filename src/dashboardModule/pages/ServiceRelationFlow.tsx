@@ -266,8 +266,15 @@ export function ServiceRelationFlow({
 } = {}) {
   const portalData = usePortalData();
   const stableDashboardDataRef = useRef(portalData);
+  useEffect(() => {
+    if (portalData.services.length > 0) {
+      stableDashboardDataRef.current = portalData;
+    }
+  }, [portalData]);
   const dataSource = showAllServices
-    ? stableDashboardDataRef.current
+    ? stableDashboardDataRef.current.services.length > 0
+      ? stableDashboardDataRef.current
+      : portalData
     : portalData;
   const { services, relations, owners, servers, techStacks, incidents } =
     dataSource;
