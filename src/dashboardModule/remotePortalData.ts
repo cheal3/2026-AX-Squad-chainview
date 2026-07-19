@@ -192,6 +192,7 @@ function mapService(row: RemoteRecord, detail?: RemoteRecord): ServiceRecord {
 
   return {
     serviceId: asNumber(row.serviceId),
+    categoryId: asNumber(detail?.categoryId ?? row.categoryId) || undefined,
     categoryPath: parseCategoryPath(detail?.categoryPath ?? row.categoryPath),
     serviceCode: asString(detail?.serviceCode ?? row.serviceCode),
     serviceName:

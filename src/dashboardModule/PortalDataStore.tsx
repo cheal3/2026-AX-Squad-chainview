@@ -48,6 +48,7 @@ type NewServerInput = Pick<
 
 type NewServiceInput = {
   serverId: number;
+  categoryId?: number;
   categoryPath: string[];
   serviceCode: string;
   serviceName: string;
@@ -254,7 +255,7 @@ const remoteQueryLoaders: Record<RemoteQueryKey, () => Promise<unknown>> = {
   incidents: () => chainViewApi.incidents.list(),
   users: () => chainViewApi.ownership.users.list(),
   groups: () => chainViewApi.ownership.groups.list(),
-  categories: () => chainViewApi.serviceCategories.list(),
+  categories: loadServiceCategories,
   codes: () => chainViewApi.commonCodes.list(),
   deployments: loadServiceDeployments,
 };
@@ -311,6 +312,68 @@ async function loadServiceDeployments() {
       serviceName: asRemoteString(detail.serviceName ?? service.serviceName),
     }));
   });
+}
+
+async function loadServiceCategories() {
+  const listRows = asRemoteRecordArray(
+    await chainViewApi.serviceCategories.list().catch(() => [])
+  );
+  if (hasCategoryHierarchy(listRows)) {
+    return listRows;
+  }
+
+  const treeRows = flattenCategoryTree(
+    asRemoteRecordArray(await chainViewApi.serviceCategories.tree().catch(() => []))
+  );
+  return treeRows.length ? treeRows : listRows;
+}
+
+function hasCategoryHierarchy(rows: RemoteListRecord[]) {
+  return rows.some((row) => {
+    const level = asRemoteNumber(row.categoryLevel ?? row.level ?? row.depth);
+    const parentId = asRemoteNumber(row.parentCategoryId ?? row.parentId);
+    const parentCode = asRemoteString(row.parentCategoryCode ?? row.parentCode);
+    return level > 1 || parentId > 0 || Boolean(parentCode);
+  });
+}
+
+function flattenCategoryTree(
+  rows: RemoteListRecord[],
+  parent: RemoteListRecord | null = null,
+  level = 1
+): RemoteListRecord[] {
+  return rows.flatMap((row) => {
+    const children = findCategoryChildren(row);
+    const categoryId = asRemoteNumber(row.categoryId ?? row.id);
+    const categoryCode = asRemoteString(row.categoryCode ?? row.code);
+    const normalizedRow: RemoteListRecord = {
+      ...row,
+      categoryLevel: asRemoteNumber(row.categoryLevel ?? row.level ?? row.depth, level),
+      parentCategoryId:
+        asRemoteNumber(row.parentCategoryId ?? row.parentId) ||
+        asRemoteNumber(parent?.categoryId ?? parent?.id) ||
+        undefined,
+      parentCategoryCode:
+        asRemoteString(row.parentCategoryCode ?? row.parentCode) ||
+        asRemoteString(parent?.categoryCode ?? parent?.code) ||
+        undefined,
+      categoryId: categoryId || row.categoryId,
+      categoryCode: categoryCode || row.categoryCode,
+    };
+    return [
+      normalizedRow,
+      ...flattenCategoryTree(children, normalizedRow, level + 1),
+    ];
+  });
+}
+
+function findCategoryChildren(row: RemoteListRecord) {
+  const childKeys = ["children", "childCategories", "subCategories", "items"];
+  for (const key of childKeys) {
+    const children = asRemoteRecordArray(row[key]);
+    if (children.length) return children;
+  }
+  return [];
 }
 
 function nowLabel() {
@@ -1466,7 +1529,7 @@ function toServerPayload(input: NewServerInput) {
 
 async function toServicePayload(input: NewServiceInput | ServiceRecord) {
   return {
-    categoryId: await findCategoryId(input.categoryPath),
+    categoryId: input.categoryId || (await findCategoryId(input.categoryPath)),
     serviceCode: input.serviceCode,
     serviceName: input.serviceName,
     serviceTypeCode: input.serviceTypeCode,
@@ -1490,6 +1553,7 @@ async function toServiceUpdatePayload(
 
   return {
     categoryId:
+      input.categoryId ||
       asRemoteNumber(detailRecord?.categoryId) ||
       (await findCategoryId(input.categoryPath)),
     serviceCode: input.serviceCode,

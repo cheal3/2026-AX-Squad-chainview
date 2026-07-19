@@ -3094,6 +3094,43 @@
   gap: 16px;
 }
 
+.service-api-lookup {
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding: 12px 14px;
+}
+
+.service-api-lookup > div:first-child b,
+.service-api-lookup > div:first-child span {
+  display: block;
+}
+
+.service-api-lookup > div:first-child b {
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.service-api-lookup > div:first-child span {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.45;
+  margin-top: 3px;
+}
+
+.service-api-lookup__actions {
+  align-items: center;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+
 .api-detail-summary {
   align-items: center;
   background: #f8fafc;

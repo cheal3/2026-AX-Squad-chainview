@@ -115,6 +115,7 @@ export interface ServerRecord {
 
 export interface ServiceRecord {
   serviceId: number;
+  categoryId?: number;
   categoryPath: string[];
   serviceCode: string;
   serviceName: string;

@@ -818,6 +818,7 @@ function DynamicAdminListPage({ activeMenu, menu }) {
       {adminModal ? (
         <AdminRecordModal
           modal={adminModal}
+          onOpenApiDetail={setApiDetailModal}
           onClose={closeAdminModal}
           portalData={portalData}
           serverById={serverById}
@@ -896,7 +897,7 @@ function formatApiDate(value) {
   return value.replace("T", " ").slice(0, 19);
 }
 
-function AdminRecordModal({ modal, onClose, portalData, serverById, serviceById }) {
+function AdminRecordModal({ modal, onClose, onOpenApiDetail, portalData, serverById, serviceById }) {
   const { mode, menu, record } = modal;
   const isEdit = mode === "edit";
   const isCreate = mode === "create";
@@ -949,12 +950,14 @@ function AdminRecordModal({ modal, onClose, portalData, serverById, serviceById 
     if (menu === "services") {
       const serviceCode = requireValue(form.serviceCode, "serviceCode")?.toUpperCase();
       const serviceName = requireValue(form.serviceName, "서비스명");
-      const categoryL1 = requireValue(form.categoryL1, "대분류");
+      const categoryPath = buildSelectedCategoryPath(form, portalData.categories);
+      const categoryL1 = requireValue(categoryPath[0], "대분류");
       if (!serviceCode || !serviceName || !categoryL1) return;
       const payload = {
+        categoryId: Number(form.categoryId || form.categoryL3Id || form.categoryL2Id || form.categoryL1Id) || undefined,
         serviceCode,
         serviceName,
-        categoryPath: [categoryL1, form.categoryL2, form.categoryL3].map((item) => item.trim()).filter(Boolean),
+        categoryPath,
         serviceTypeCode: form.serviceTypeCode,
         importanceCode: form.importanceCode,
         statusCode: form.statusCode,
@@ -1161,7 +1164,14 @@ function AdminRecordModal({ modal, onClose, portalData, serverById, serviceById 
         </div>
         <div className="modal__body">
           {menu === "services" ? (
-            <ServiceAdminForm form={form} onChange={updateField} portalData={portalData} servers={portalData.servers} isEdit={isEdit} />
+            <ServiceAdminForm
+              form={form}
+              isEdit={isEdit}
+              onChange={updateField}
+              onOpenApiDetail={onOpenApiDetail}
+              portalData={portalData}
+              servers={portalData.servers}
+            />
           ) : null}
           {menu === "servers" ? (
             <ServerAdminForm form={form} onChange={updateField} isEdit={isEdit} />
@@ -1405,6 +1415,64 @@ function buildCategoryCatalog(categories = [], services = []) {
   return servicePathCatalog;
 }
 
+function findCategoryOptionById(options, id) {
+  const numericId = Number(id);
+  if (!numericId) return null;
+  return options.find((option) => Number(option.id) === numericId) ?? null;
+}
+
+function getCategoryOptionValue(option) {
+  if (!option) return "";
+  if (option.id) return `id:${option.id}`;
+  return `name:${option.grandParentName ?? ""}|${option.parentName ?? ""}|${option.name}`;
+}
+
+function findCategoryOptionByValue(options, value) {
+  return options.find((option) => getCategoryOptionValue(option) === value) ?? null;
+}
+
+function findCategoryOptionByName(options, name, parentName = "", grandParentName = "") {
+  const cleanedName = compactText(name);
+  if (!cleanedName) return null;
+  return options.find((option) => {
+    if (option.name !== cleanedName) return false;
+    if (parentName && option.parentName && option.parentName !== parentName) return false;
+    if (grandParentName && option.grandParentName && option.grandParentName !== grandParentName) return false;
+    return true;
+  }) ?? null;
+}
+
+function buildSelectedCategoryPath(form, categories = []) {
+  const catalog = buildCategoryCatalog(categories);
+  const selectedL1 = findCategoryOptionById(catalog.level1, form.categoryL1Id) ||
+    findCategoryOptionByName(catalog.level1, form.categoryL1);
+  const selectedL2 = findCategoryOptionById(catalog.level2, form.categoryL2Id) ||
+    findCategoryOptionByName(catalog.level2, form.categoryL2, selectedL1?.name);
+  const selectedL3 = findCategoryOptionById(catalog.level3, form.categoryL3Id) ||
+    findCategoryOptionByName(catalog.level3, form.categoryL3, selectedL2?.name, selectedL1?.name);
+
+  return [
+    selectedL1?.name ?? form.categoryL1,
+    selectedL2?.name ?? form.categoryL2,
+    selectedL3?.name ?? form.categoryL3,
+  ].map((item) => compactText(item)).filter(Boolean);
+}
+
+function resolveCategorySelection(categoryPath = [], categories = []) {
+  const catalog = buildCategoryCatalog(categories);
+  const selectedL1 = findCategoryOptionByName(catalog.level1, categoryPath[0]);
+  const selectedL2 = findCategoryOptionByName(catalog.level2, categoryPath[1], selectedL1?.name);
+  const selectedL3 = findCategoryOptionByName(catalog.level3, categoryPath[2], selectedL2?.name, selectedL1?.name);
+  const leaf = selectedL3 || selectedL2 || selectedL1;
+
+  return {
+    categoryL1Id: selectedL1?.id ? String(selectedL1.id) : "",
+    categoryL2Id: selectedL2?.id ? String(selectedL2.id) : "",
+    categoryL3Id: selectedL3?.id ? String(selectedL3.id) : "",
+    categoryId: leaf?.id ? String(leaf.id) : "",
+  };
+}
+
 function filterChildCategories(options, parentName, grandParentName = "") {
   return options.filter((option) => {
     if (parentName && option.parentName && option.parentName !== parentName) return false;
@@ -1416,6 +1484,22 @@ function filterChildCategories(options, parentName, grandParentName = "") {
 function selectableChildCategories(options, parentName, grandParentName = "") {
   const filtered = filterChildCategories(options, parentName, grandParentName);
   return filtered.length ? filtered : options;
+}
+
+function selectableChildCategoryOptions(options, parentOption, grandParentOption = null) {
+  if (!parentOption) return [];
+  const filtered = options.filter((option) => {
+    const matchesParentId = parentOption.id && Number(option.parentId) === Number(parentOption.id);
+    const matchesParentCode = parentOption.code && option.parentCode && option.parentCode === parentOption.code;
+    const matchesParentName = option.parentName && option.parentName === parentOption.name;
+    const parentMatches = matchesParentId || matchesParentCode || matchesParentName || (!option.parentId && !option.parentCode && !option.parentName);
+    if (!parentMatches) return false;
+
+    if (!grandParentOption) return true;
+    const matchesGrandParentName = !option.grandParentName || option.grandParentName === grandParentOption.name;
+    return matchesGrandParentName;
+  });
+  return filtered;
 }
 
 function getSelectedCategoryPrefix(options, name) {
@@ -1482,10 +1566,10 @@ function SearchableCategorySelect({ disabled = false, onChange, options, placeho
             {filteredOptions.length ? filteredOptions.map((option) => (
               <button
                 className={option.name === value ? "is-selected" : ""}
-                key={`${option.parentName ?? ""}-${option.name}`}
+                key={option.id ? `category-${option.id}` : `${option.grandParentName ?? ""}-${option.parentName ?? ""}-${option.name}`}
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => {
-                  onChange(option.name);
+                  onChange(option.name, option);
                   setOpen(false);
                 }}
                 type="button"
@@ -1567,30 +1651,58 @@ function SearchableServiceSelect({ disabled = false, onChange, placeholder = "�
   );
 }
 
-function ServiceAdminForm({ form, onChange, portalData, servers, isEdit }) {
+function ServiceAdminForm({ form, onChange, onOpenApiDetail, portalData, servers, isEdit }) {
   const categoryCatalog = useMemo(
     () => buildCategoryCatalog(portalData.categories, portalData.services),
     [portalData.categories, portalData.services]
   );
-  const level2Options = form.categoryL1 ? selectableChildCategories(categoryCatalog.level2, form.categoryL1) : [];
-  const level3Options = form.categoryL2 ? selectableChildCategories(categoryCatalog.level3, form.categoryL2, form.categoryL1) : [];
+  const serviceApiStatus = portalData.remoteApi.status;
+  const isServiceApiLoading =
+    serviceApiStatus.state === "loading" && serviceApiStatus.source === "services";
+  const showServiceApiStatus = serviceApiStatus.source === "services";
+  const selectedL1 = findCategoryOptionById(categoryCatalog.level1, form.categoryL1Id) ||
+    findCategoryOptionByName(categoryCatalog.level1, form.categoryL1);
+  const selectedL2 = findCategoryOptionById(categoryCatalog.level2, form.categoryL2Id) ||
+    findCategoryOptionByName(categoryCatalog.level2, form.categoryL2, selectedL1?.name);
+  const selectedL3 = findCategoryOptionById(categoryCatalog.level3, form.categoryL3Id) ||
+    findCategoryOptionByName(categoryCatalog.level3, form.categoryL3, selectedL2?.name, selectedL1?.name);
+  const level2Options = selectedL1 ? selectableChildCategoryOptions(categoryCatalog.level2, selectedL1) : [];
+  const level3Options = selectedL2 ? selectableChildCategoryOptions(categoryCatalog.level3, selectedL2, selectedL1) : [];
   const serviceCodePreview = buildServiceCode(form, categoryCatalog);
-  const changeCategory = (field, value) => {
-    if (field === "categoryL1") {
-      onChange("categoryL1", value);
+  const changeCategory = (level, option) => {
+    const nextOption = option ?? null;
+    const nextId = nextOption?.id ? String(nextOption.id) : "";
+    const nextName = nextOption?.name ?? "";
+    if (level === 1) {
+      onChange("categoryL1", nextName);
+      onChange("categoryL1Id", nextId);
       onChange("categoryL2", "");
+      onChange("categoryL2Id", "");
       onChange("categoryL3", "");
+      onChange("categoryL3Id", "");
+      onChange("categoryId", nextId);
       return;
     }
-    if (field === "categoryL2") {
-      onChange("categoryL2", value);
+    if (level === 2) {
+      onChange("categoryL2", nextName);
+      onChange("categoryL2Id", nextId);
       onChange("categoryL3", "");
+      onChange("categoryL3Id", "");
+      onChange("categoryId", nextId || form.categoryL1Id);
       return;
     }
-    onChange(field, value);
+    onChange("categoryL3", nextName);
+    onChange("categoryL3Id", nextId);
+    onChange("categoryId", nextId || form.categoryL2Id || form.categoryL1Id);
   };
   const changeSuffix = (value) => {
     onChange("serviceCodeSuffix", normalizeServiceCodeSuffix(value));
+  };
+  const handleServiceApiLookup = async () => {
+    const status = await portalData.remoteApi.testQuery("services");
+    if (status.detail) {
+      onOpenApiDetail?.(status.detail);
+    }
   };
 
   useEffect(() => {
@@ -1601,12 +1713,45 @@ function ServiceAdminForm({ form, onChange, portalData, servers, isEdit }) {
 
   return (
     <>
+      <div className="service-api-lookup">
+        <div>
+          <b>서비스 리스트 API</b>
+          <span>/api/services 응답으로 categoryId, categoryPath, serviceCode 값을 확인합니다.</span>
+        </div>
+        <div className="service-api-lookup__actions">
+          {showServiceApiStatus ? (
+            <span className={`pill ${serviceApiStatus.state === "success" ? "pill--ok" : serviceApiStatus.state === "error" || serviceApiStatus.state === "blocked" ? "pill--warn" : "pill--gray"}`}>
+              {serviceApiStatus.message}
+            </span>
+          ) : null}
+          <button
+            className="btn btn--ghost btn--sm"
+            disabled={isServiceApiLoading}
+            onClick={handleServiceApiLookup}
+            type="button"
+          >
+            <RefreshCw size={14} />
+            {isServiceApiLoading ? "조회 중" : "API 결과 조회"}
+          </button>
+        </div>
+      </div>
       <div className="form-section">
         <h4 className="form-section__title">분류 및 상태</h4>
         <div className="form-grid">
-          <div className="form-row"><label>대분류 (categoryL1)<span className="req">*</span></label><select value={form.categoryL1} onChange={(event) => changeCategory("categoryL1", event.target.value)}><option value="">선택</option>{categoryCatalog.level1.map((option) => <option key={option.name} value={option.name}>{option.name}</option>)}</select></div>
-          <div className="form-row"><label>중분류 (categoryL2)</label><SearchableCategorySelect disabled={!form.categoryL1 || !level2Options.length} options={level2Options} value={form.categoryL2} onChange={(value) => changeCategory("categoryL2", value)} placeholder={level2Options.length ? "검색 또는 선택하세요" : "등록된 중분류가 없습니다"} /></div>
-          <div className="form-row"><label>소분류 (categoryL3)</label><SearchableCategorySelect disabled={!form.categoryL2 || !level3Options.length} options={level3Options} value={form.categoryL3} onChange={(value) => changeCategory("categoryL3", value)} placeholder={level3Options.length ? "검색 또는 선택하세요" : "등록된 소분류가 없습니다"} /></div>
+          <div className="form-row">
+            <label>대분류 (categoryL1)<span className="req">*</span></label>
+            <select
+              value={getCategoryOptionValue(selectedL1)}
+              onChange={(event) => changeCategory(1, findCategoryOptionByValue(categoryCatalog.level1, event.target.value))}
+            >
+              <option value="">선택</option>
+              {categoryCatalog.level1.map((option) => (
+                <option key={getCategoryOptionValue(option)} value={getCategoryOptionValue(option)}>{option.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="form-row"><label>중분류 (categoryL2)</label><SearchableCategorySelect disabled={!selectedL1 || !level2Options.length} options={level2Options} value={selectedL2?.name ?? form.categoryL2} onChange={(_value, option) => changeCategory(2, option)} placeholder={level2Options.length ? "검색 또는 선택하세요" : "등록된 중분류가 없습니다"} /></div>
+          <div className="form-row"><label>소분류 (categoryL3)</label><SearchableCategorySelect disabled={!selectedL2 || !level3Options.length} options={level3Options} value={selectedL3?.name ?? form.categoryL3} onChange={(_value, option) => changeCategory(3, option)} placeholder={level3Options.length ? "검색 또는 선택하세요" : "등록된 소분류가 없습니다"} /></div>
           <div className="form-row"><label>중요도 (IMPORTANCE)<span className="req">*</span></label><CodeSelect labels={codeLabels.importance} value={form.importanceCode} onChange={(value) => onChange("importanceCode", value)} /></div>
           <div className="form-row"><label>상태 (STATUS)<span className="req">*</span></label><CodeSelect labels={codeLabels.serviceStatus} value={form.statusCode} onChange={(value) => onChange("statusCode", value)} /></div>
           <div className="form-row"><label>서비스 유형 (SERVICE_TYPE)<span className="req">*</span></label><CodeSelect labels={codeLabels.serviceType} value={form.serviceTypeCode} onChange={(value) => onChange("serviceTypeCode", value)} /></div>
@@ -1856,6 +2001,8 @@ function CodeSelect({ labels, value, onChange }) {
 function buildAdminFormState(menu, record, portalData) {
   if (menu === "services") {
     const categoryPath = record?.categoryPath ?? [];
+    const categorySelection = resolveCategorySelection(categoryPath, portalData.categories);
+    const categoryId = record?.categoryId ? String(record.categoryId) : categorySelection.categoryId;
     return {
       serviceCode: record?.serviceCode ?? "",
       serviceCodeSuffix: record?.serviceCode?.split("-").at(-1) ?? "001",
@@ -1863,6 +2010,10 @@ function buildAdminFormState(menu, record, portalData) {
       categoryL1: categoryPath[0] ?? "",
       categoryL2: categoryPath[1] ?? "",
       categoryL3: categoryPath[2] ?? "",
+      categoryL1Id: categorySelection.categoryL1Id,
+      categoryL2Id: categorySelection.categoryL2Id,
+      categoryL3Id: categorySelection.categoryL3Id,
+      categoryId,
       serviceTypeCode: record?.serviceTypeCode ?? "API",
       importanceCode: record?.importanceCode ?? "NORMAL",
       statusCode: record?.statusCode ?? "NORMAL",
