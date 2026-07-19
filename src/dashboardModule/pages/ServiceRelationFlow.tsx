@@ -1294,7 +1294,7 @@ export function ServiceRelationFlow({
               : "chainview-flow-edge-infra-muted"
           }`,
         style: {
-          stroke: "#0f766e",
+          stroke: "#2563eb",
           strokeWidth: directlyConnectedToSelected ? 2.7 : 1.8,
           opacity: directlyConnectedToSelected ? 0.88 : 0.16,
         },
@@ -1616,20 +1616,20 @@ export function ServiceRelationFlow({
         }
 
         .chainview-infra-node-infra {
-          border-color: rgba(20, 184, 166, 0.32);
+          border-color: rgba(37, 99, 235, 0.32);
           background: rgba(248, 250, 252, 0.96);
         }
 
         .chainview-infra-node-connected {
-          border-color: rgba(15, 118, 110, 0.5);
-          box-shadow: 0 12px 26px rgba(15, 118, 110, 0.12);
+          border-color: rgba(37, 99, 235, 0.5);
+          box-shadow: 0 12px 26px rgba(37, 99, 235, 0.12);
         }
 
         .chainview-infra-node-focused {
-          border-color: #0f766e;
+          border-color: #2563eb;
           box-shadow:
-            0 0 0 4px rgba(15, 118, 110, 0.15),
-            0 14px 30px rgba(15, 118, 110, 0.18);
+            0 0 0 4px rgba(37, 99, 235, 0.15),
+            0 14px 30px rgba(37, 99, 235, 0.18);
           transform: translateY(-1px);
         }
 
@@ -2177,7 +2177,7 @@ function GraphViewModeToggle({
         }`}
       >
         <span
-          className="absolute bottom-1 top-1 w-[calc(50%-4px)] rounded-full bg-[#0f766e] shadow-sm transition-transform duration-200"
+          className="absolute bottom-1 top-1 w-[calc(50%-4px)] rounded-full bg-[#2563eb] shadow-sm transition-transform duration-200"
           style={{
             left: "4px",
             borderRadius: "9999px",
@@ -2271,10 +2271,10 @@ function RelationInfraDetailPanel({
 
   return (
     <aside
-      className={`absolute right-4 top-4 z-30 flex origin-top-right transform-gpu flex-col overflow-hidden border border-teal-200 bg-white/96 text-slate-900 transition-[width,max-height,box-shadow,border-radius,transform] ease-out ${
+      className={`absolute right-4 top-4 z-30 flex origin-top-right transform-gpu flex-col overflow-hidden border border-blue-200 bg-white/96 text-slate-900 transition-[width,max-height,box-shadow,border-radius,transform] ease-out ${
         panelTall
           ? "rounded-2xl shadow-xl"
-          : "rounded-[22px] shadow-sm hover:-translate-y-0.5 hover:border-teal-300 hover:shadow-md"
+          : "rounded-[22px] shadow-sm hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md"
       } ${open ? "" : "cursor-pointer"}`}
       style={{
         width: panelWide ? RELATION_DETAIL_WIDTH : RELATION_COLLAPSED_WIDTH,
@@ -2306,7 +2306,7 @@ function RelationInfraDetailPanel({
       >
         <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-200 px-4 py-4">
           <div className="min-w-0">
-            <div className="text-xs font-bold text-teal-700">
+            <div className="text-xs font-bold text-blue-700">
               선택 인프라 상세
             </div>
             <h3 className="mt-1 break-words text-lg font-black leading-tight">
@@ -2330,15 +2330,15 @@ function RelationInfraDetailPanel({
         </div>
 
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
-          <div className="rounded-xl border border-teal-100 bg-teal-50 p-3">
+          <div className="rounded-xl border border-blue-100 bg-blue-50 p-3">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <div className="text-xs font-semibold text-teal-700">유형</div>
+                <div className="text-xs font-semibold text-blue-700">유형</div>
                 <div className="mt-1 break-words text-sm font-black text-slate-900">
                   {node.nodeTypeName ?? node.nodeTypeCode}
                 </div>
               </div>
-              <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-xs font-black text-teal-700 shadow-sm">
+              <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-xs font-black text-blue-700 shadow-sm">
                 {node.statusName ?? node.statusCode ?? "상태 미지정"}
               </span>
             </div>
@@ -2765,7 +2765,7 @@ function ServerInfraNode({ data }: { data: ServerInfraNodeData }) {
           className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${
             isServer
               ? "bg-blue-50 text-blue-600"
-              : "bg-teal-50 text-teal-700"
+              : "bg-blue-50 text-blue-700"
           }`}
         >
           <Server size={16} />

@@ -34,8 +34,8 @@ import { useNavigate } from "react-router-dom";
 const categories = [
   { key: "all", label: "전체 서비스", value: 48, icon: <Server size={26} />, tone: "slate" },
   { key: "platform", label: "공통 플랫폼", value: 12, icon: <Network size={28} />, tone: "blue" },
-  { key: "core", label: "기간계/업무계", value: 18, icon: <Building2 size={28} />, tone: "teal" },
-  { key: "channel", label: "채널계", value: 10, icon: <Monitor size={27} />, tone: "green" },
+  { key: "core", label: "기간계/업무계", value: 18, icon: <Building2 size={28} />, tone: "navy" },
+  { key: "channel", label: "채널계", value: 10, icon: <Monitor size={27} />, tone: "blue" },
   { key: "external", label: "대외채널", value: 8, icon: <Globe2 size={27} />, tone: "blue" },
 ];
 
@@ -360,11 +360,11 @@ function MetricStrip({
           <div className="flex min-w-0 items-center justify-between gap-3">
             <div className="min-w-0">
               <div className="truncate text-xs font-black text-slate-500">{item.label}</div>
-              <div className={`mt-2 text-3xl font-black ${item.tone === "teal" ? "text-[#00796c]" : "text-slate-950"}`}>
+              <div className={`mt-2 text-3xl font-black ${item.tone === "navy" ? "text-[#1f2a44]" : "text-slate-950"}`}>
                 {item.value}
               </div>
             </div>
-            <div className={`shrink-0 ${item.tone === "slate" ? "text-slate-500" : item.tone === "teal" ? "text-[#009fbd]" : item.tone === "green" ? "text-[#10b981]" : "text-[#1473ff]"}`}>
+            <div className={`shrink-0 ${item.tone === "slate" ? "text-slate-500" : item.tone === "navy" ? "text-[#1f2a44]" : "text-[#2563eb]"}`}>
               {item.icon}
             </div>
           </div>
@@ -730,7 +730,7 @@ function InfraDetailModal({
                 {node.nodeCode}
               </p>
             </div>
-            <span className="rounded-full bg-teal-50 px-3 py-1 text-xs font-black text-teal-700">
+            <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700">
               {node.statusName ?? node.statusCode ?? "UNKNOWN"}
             </span>
           </div>
@@ -1125,8 +1125,8 @@ function IncidentCommandDashboard({
         </DarkPanel>
         <DarkPanel title="유사 장애 이력 & 권장 조치">
           <div className="grid grid-cols-[minmax(0,1fr)_48px_minmax(0,1fr)_48px] gap-2 text-sm leading-5 text-slate-300">
-            <span>Connection Pool 고갈</span><b className="text-emerald-400">92%</b>
-            <span>DB Timeout 증가</span><b className="text-emerald-400">85%</b>
+            <span>Connection Pool 고갈</span><b className="text-blue-300">92%</b>
+            <span>DB Timeout 증가</span><b className="text-blue-300">85%</b>
           </div>
           <div className="mt-4 space-y-2 text-sm leading-5 text-slate-300">
             {["Payment Failover 상태 확인", "DB Connection Pool 상태 확인", "Order-Service 지연 확인"].map((item, index) => (
@@ -1431,7 +1431,7 @@ function TinyRow({
     tone === "danger"
       ? "bg-red-50 text-red-600"
       : tone === "success"
-        ? "bg-emerald-50 text-emerald-600"
+        ? "bg-blue-50 text-blue-600"
         : "bg-slate-100 text-slate-500";
 
   return (

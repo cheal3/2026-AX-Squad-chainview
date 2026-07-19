@@ -33,8 +33,9 @@ const modeEnvDefaults = {
 const viteBin = path.join(
   projectRoot,
   "node_modules",
-  ".bin",
-  process.platform === "win32" ? "vite.cmd" : "vite"
+  "vite",
+  "bin",
+  "vite.js"
 );
 const whaleCandidates = (
   process.env.CHAINVIEW_BROWSER_APP ||
@@ -46,7 +47,7 @@ const whaleCandidates = (
 
 let opened = false;
 
-const vite = spawn(viteBin, ["--host", "0.0.0.0", "--mode", mode], {
+const vite = spawn(process.execPath, [viteBin, "--host", "0.0.0.0", "--mode", mode], {
   cwd: projectRoot,
   env: {
     ...(modeEnvDefaults[mode] || modeEnvDefaults.development),
@@ -58,7 +59,8 @@ const vite = spawn(viteBin, ["--host", "0.0.0.0", "--mode", mode], {
 vite.stdout.on("data", (chunk) => {
   const text = chunk.toString();
   process.stdout.write(text);
-  const url = text.match(/Local:\s+(http:\/\/[^\s]+)/)?.[1];
+  const plainText = stripAnsi(text);
+  const url = plainText.match(/Local:\s+(http:\/\/[^\s]+)/)?.[1];
   if (url && !opened) {
     opened = true;
     openWhale(url);
@@ -84,8 +86,13 @@ vite.on("exit", (code, signal) => {
 });
 
 async function openWhale(url) {
+  if (process.platform === "win32") {
+    spawnDetached("cmd", ["/c", "start", "", url]);
+    return;
+  }
+
   if (process.platform !== "darwin") {
-    spawnDetached("open", [url]);
+    spawnDetached("xdg-open", [url]);
     return;
   }
 
@@ -115,5 +122,10 @@ function spawnDetached(command, args) {
     detached: true,
     stdio: "ignore",
   });
+  child.on("error", () => {});
   child.unref();
+}
+
+function stripAnsi(text) {
+  return text.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, "");
 }
