@@ -53,6 +53,8 @@ type ServiceNodeData = {
   dimmed: boolean;
   detailSelected: boolean;
   hideActions: boolean;
+  relationImpactPath?: string;
+  relationImpactText?: string;
   relationCount: number;
   lane: number;
   onMoveToFocus: (serviceId: number) => void;
@@ -79,6 +81,11 @@ type ServerInfraNodeData = {
 };
 
 type GraphNodeData = ServiceNodeData | LaneNodeData | ServerInfraNodeData;
+
+type RelationImpactSummary = {
+  path: string;
+  text: string;
+};
 
 const NODE_WIDTH = 240;
 const X_SPACING = 470;
@@ -182,6 +189,14 @@ async function fetchInfraGraphSnapshot() {
 
 function centeredOffset(index: number, count: number, spacing: number) {
   return (index - (count - 1) / 2) * spacing;
+}
+
+function formatRelationImpactDescription(value: string | undefined) {
+  const text = String(value ?? "").trim();
+  if (!text || text === "-") {
+    return "";
+  }
+  return text;
 }
 
 function enforceVerticalGap(
@@ -962,6 +977,52 @@ export function ServiceRelationFlow({
     onSelectService?.(serviceId);
   };
 
+  const relationImpactByServiceId = useMemo(() => {
+    const impactMap = new Map<number, RelationImpactSummary[]>();
+
+    activeRelations.forEach((relation) => {
+      if (!visibleRelationIds.has(relation.relationId)) {
+        return;
+      }
+
+      const impactText = formatRelationImpactDescription(relation.description);
+      if (!impactText) {
+        return;
+      }
+
+      const sourceLane = laneByServiceId.get(relation.sourceServiceId);
+      const targetLane = laneByServiceId.get(relation.targetServiceId);
+      if (sourceLane === undefined || targetLane === undefined) {
+        return;
+      }
+
+      let impactedServiceId =
+        Math.abs(targetLane) >= Math.abs(sourceLane)
+          ? relation.targetServiceId
+          : relation.sourceServiceId;
+
+      if (impactedServiceId === focusedServiceId) {
+        impactedServiceId =
+          relation.sourceServiceId === focusedServiceId
+            ? relation.targetServiceId
+            : relation.sourceServiceId;
+      }
+
+      const sourceService = serviceById.get(relation.sourceServiceId);
+      const targetService = serviceById.get(relation.targetServiceId);
+      const summary = {
+        path: `${sourceService?.serviceName ?? relation.sourceServiceId} → ${targetService?.serviceName ?? relation.targetServiceId}`,
+        text: impactText,
+      };
+      const current = impactMap.get(impactedServiceId) ?? [];
+      if (!current.some((item) => item.text === summary.text && item.path === summary.path)) {
+        impactMap.set(impactedServiceId, [...current, summary]);
+      }
+    });
+
+    return impactMap;
+  }, [activeRelations, focusedServiceId, laneByServiceId, serviceById, visibleRelationIds]);
+
   const serviceNodes = useMemo<Node<ServiceNodeData>[]>(() => {
     const visibleServices = filteredServices.filter((service) => {
       return visibleServiceIds.has(service.serviceId);
@@ -1021,6 +1082,8 @@ export function ServiceRelationFlow({
           relationCount: relationCountByServiceId.get(service.serviceId) ?? 0,
           lane,
           hideActions: hideNodeActions,
+          relationImpactPath: relationImpactByServiceId.get(service.serviceId)?.[0]?.path,
+          relationImpactText: relationImpactByServiceId.get(service.serviceId)?.[0]?.text,
           onMoveToFocus: moveToFocusedService,
           onOpenDetail: openServiceDetail,
           onSelectServiceNode: toggleSelectedServiceNode,
@@ -1040,6 +1103,7 @@ export function ServiceRelationFlow({
     onSelectService,
     ownerByServiceId,
     relationCountByServiceId,
+    relationImpactByServiceId,
     filteredServices,
     selectedServiceNodeId,
     showAllServices,
@@ -1345,6 +1409,9 @@ export function ServiceRelationFlow({
   const detailTechStacks = detailService
     ? techStacksByServiceId.get(detailService.serviceId) ?? []
     : [];
+  const detailRelationImpacts = detailService
+    ? relationImpactByServiceId.get(detailService.serviceId) ?? []
+    : [];
   const directIncomingCount = activeRelations.filter(
     (relation) => relation.targetServiceId === detailService?.serviceId
   ).length;
@@ -1527,6 +1594,7 @@ export function ServiceRelationFlow({
               impactCount={activeIncidentConnectedServiceIds.size}
               outgoingCount={directOutgoingCount}
               owners={detailOwners}
+              relationImpacts={detailRelationImpacts}
               server={detailServer}
               service={detailService}
               techStacks={detailTechStacks}
@@ -1592,6 +1660,14 @@ export function ServiceRelationFlow({
           border-color: #0ea5e9;
           box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.2),
             0 14px 30px rgba(14, 165, 233, 0.18);
+        }
+
+        .chainview-flow-impact-note {
+          border: 1px solid rgba(239, 68, 68, 0.22);
+          border-radius: 8px;
+          background: rgba(254, 242, 242, 0.96);
+          color: #dc2626;
+          padding: 8px 10px;
         }
 
         .chainview-infra-node {
@@ -1786,6 +1862,13 @@ export function ServiceRelationFlow({
 
         .chainview-flow-dark .chainview-flow-node-connected {
           border-color: rgba(245, 158, 11, 0.62);
+        }
+
+        .chainview-flow-dark .chainview-flow-impact-note {
+          border-color: rgba(255, 51, 68, 0.38);
+          background: rgba(2, 6, 23, 0.82);
+          color: #ff4d5a;
+          box-shadow: inset 0 0 0 1px rgba(255, 51, 68, 0.08);
         }
 
         .chainview-flow-dark .chainview-lane-node {
@@ -2391,6 +2474,7 @@ function RelationServiceDetailPanel({
   impactCount,
   outgoingCount,
   owners,
+  relationImpacts,
   server,
   service,
   techStacks,
@@ -2404,6 +2488,7 @@ function RelationServiceDetailPanel({
   impactCount: number;
   outgoingCount: number;
   owners: string[];
+  relationImpacts: RelationImpactSummary[];
   server?: ServerRecord;
   service: ServiceRecord;
   techStacks: TechStackRecord[];
@@ -2602,12 +2687,22 @@ function RelationServiceDetailPanel({
             <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
               <div className="mb-2 flex items-center gap-2 text-xs font-black text-slate-700">
                 <FileText size={14} />
-                영향도 분석 결과
+                등록 영향도
               </div>
               <div className="space-y-1.5 text-xs font-semibold leading-5 text-slate-600">
-                <div>원인 추정: 장애 중심 서비스 응답 지연</div>
-                <div>사용자 영향: 로그인/조회/배치 처리 지연 가능</div>
-                <div>조치 방향: 담당 그룹 알림 후 타임라인에 조치 기록</div>
+                {relationImpacts.length > 0 ? (
+                  relationImpacts.slice(0, 4).map((impact) => (
+                    <div key={`${impact.path}-${impact.text}`}>
+                      <b className="text-slate-800">{impact.path}</b>
+                      <p className="mt-0.5 break-words">{impact.text}</p>
+                    </div>
+                  ))
+                ) : (
+                  <>
+                    <div>등록된 서비스 관계 영향도가 없습니다.</div>
+                    <div>서비스 관계 등록/수정 화면의 설명에 영향도를 입력하면 표시됩니다.</div>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -2709,6 +2804,17 @@ function ServiceNode({ data }: { data: ServiceNodeData }) {
       <div className="mt-3 line-clamp-2 text-xs leading-relaxed text-slate-500">
         {data.category}
       </div>
+      {data.relationImpactText ? (
+        <div className="chainview-flow-impact-note mt-3" title={`${data.relationImpactPath ?? "서비스 관계"} · ${data.relationImpactText}`}>
+          <div className="flex items-center gap-1.5 text-[11px] font-black">
+            <ShieldAlert size={12} />
+            업무영향
+          </div>
+          <div className="mt-1 line-clamp-2 break-words text-xs font-black leading-5">
+            {data.relationImpactText}
+          </div>
+        </div>
+      ) : null}
       <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] text-slate-500">
         <span className="inline-flex items-center gap-1">
           <ShieldAlert size={12} />
