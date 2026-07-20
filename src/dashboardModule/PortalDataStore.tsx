@@ -236,6 +236,16 @@ function nowLabel() {
   return new Date().toLocaleTimeString("ko-KR", { hour12: false });
 }
 
+function remoteErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+function notifyRemoteMutationFailure(error: unknown, fallback: string) {
+  const message = remoteErrorMessage(error, fallback);
+  console.warn(`[ChainView API] ${fallback}`, error);
+  window.alert(message);
+}
+
 function normalizeInitialServices(services: ServiceRecord[]) {
   return services.map((service) => ({
     ...service,
@@ -740,20 +750,18 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             .then((payload) => chainViewApi.services.create(payload))
             .then(() => refreshRemoteData(400))
             .catch((error) => {
-              console.warn("[ChainView API] service create failed", error);
               setServices((current) =>
                 current.filter((service) => service.serviceId !== nextService.serviceId)
               );
-              window.alert(
-                error instanceof Error
-                  ? error.message
-                  : "서비스 등록 API 호출에 실패했습니다."
-              );
+              notifyRemoteMutationFailure(error, "서비스 등록 API 호출에 실패했습니다.");
             });
         }
         return nextService;
       },
       updateService: (serviceId, input) => {
+        const previousService = services.find(
+          (service) => service.serviceId === serviceId
+        );
         setServices((current) =>
           current.map((service) =>
             service.serviceId === serviceId
@@ -761,19 +769,25 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
               : service
           )
         );
-        const currentService = services.find(
-          (service) => service.serviceId === serviceId
-        );
-        if (REMOTE_API_ENABLED && currentService) {
-          void toServiceUpdatePayload(serviceId, { ...currentService, ...input })
+        if (REMOTE_API_ENABLED && previousService) {
+          void toServiceUpdatePayload(serviceId, { ...previousService, ...input })
             .then((payload) => chainViewApi.services.update(serviceId, payload))
             .then(() => refreshRemoteData(400))
             .catch((error) => {
-              console.warn("[ChainView API] service update failed", error);
+              setServices((current) =>
+                current.map((service) =>
+                  service.serviceId === serviceId ? previousService : service
+                )
+              );
+              notifyRemoteMutationFailure(error, "서비스 수정 API 호출에 실패했습니다.");
             });
         }
       },
       deleteService: (serviceId) => {
+        const previousServices = services;
+        const previousRelations = relations;
+        const previousOwners = owners;
+        const previousTechStacks = techStacks;
         setServices((current) =>
           current.filter((service) => service.serviceId !== serviceId)
         );
@@ -795,7 +809,11 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             .delete(serviceId)
             .then(() => refreshRemoteData(300))
             .catch((error) => {
-              console.warn("[ChainView API] service delete failed", error);
+              setServices(previousServices);
+              setRelations(previousRelations);
+              setOwners(previousOwners);
+              setTechStacks(previousTechStacks);
+              notifyRemoteMutationFailure(error, "서비스 삭제 API 호출에 실패했습니다.");
             });
         }
       },
@@ -827,12 +845,18 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             .create(toRelationPayload(input))
             .then(() => refreshRemoteData(300))
             .catch((error) => {
-              console.warn("[ChainView API] relation create failed", error);
+              setRelations((current) =>
+                current.filter((relation) => relation.relationId !== nextRelation.relationId)
+              );
+              notifyRemoteMutationFailure(error, "서비스 관계 등록 API 호출에 실패했습니다.");
             });
         }
         return { ok: true, message: "서비스 종속 관계가 추가되었습니다." };
       },
       updateRelation: (relationId, input) => {
+        const previousRelation = relations.find(
+          (relation) => relation.relationId === relationId
+        );
         setRelations((current) =>
           current.map((relation) =>
             relation.relationId === relationId
@@ -840,20 +864,25 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
               : relation
           )
         );
-        const currentRelation = relations.find(
-          (relation) => relation.relationId === relationId
-        );
-        if (REMOTE_API_ENABLED && currentRelation) {
-          const nextRelation = { ...currentRelation, ...input };
+        if (REMOTE_API_ENABLED && previousRelation) {
+          const nextRelation = { ...previousRelation, ...input };
           void chainViewApi.serviceRelations
             .update(relationId, toRelationPayload(nextRelation))
             .then(() => refreshRemoteData(300))
             .catch((error) => {
-              console.warn("[ChainView API] relation update failed", error);
+              setRelations((current) =>
+                current.map((relation) =>
+                  relation.relationId === relationId ? previousRelation : relation
+                )
+              );
+              notifyRemoteMutationFailure(error, "서비스 관계 수정 API 호출에 실패했습니다.");
             });
         }
       },
       removeRelation: (relationId) => {
+        const previousRelation = relations.find(
+          (relation) => relation.relationId === relationId
+        );
         setRelations((current) =>
           current.filter((relation) => relation.relationId !== relationId)
         );
@@ -862,7 +891,10 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             .delete(relationId)
             .then(() => refreshRemoteData(300))
             .catch((error) => {
-              console.warn("[ChainView API] relation delete failed", error);
+              if (previousRelation) {
+                setRelations((current) => [previousRelation, ...current]);
+              }
+              notifyRemoteMutationFailure(error, "서비스 관계 삭제 API 호출에 실패했습니다.");
             });
         }
       },
@@ -886,7 +918,17 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           void addRemoteOwnerGroup(serviceId, cleaned)
             .then(() => refreshRemoteData(400))
             .catch((error) => {
-              console.warn("[ChainView API] owner group create failed", error);
+              setOwners((current) =>
+                current.filter(
+                  (owner) =>
+                    !(
+                      owner.serviceId === serviceId &&
+                      owner.ownerTypeCode === "GROUP" &&
+                      owner.ownerName === cleaned
+                    )
+                )
+              );
+              notifyRemoteMutationFailure(error, "담당 그룹 등록 API 호출에 실패했습니다.");
             });
         }
       },
@@ -898,27 +940,31 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           ownerTypeCode === "USER"
             ? asRemoteString(input.userName)
             : asRemoteString(input.groupName);
-        setOwners((current) => [
-          {
-            serviceOwnerId: nextRemoteId(current as unknown as RemoteListRecord[], "serviceOwnerId"),
-            serviceId,
-            serviceCode: service?.serviceCode,
-            ownerTypeCode,
-            ownerName,
-            responsibilityCode: asRemoteString(input.responsibilityCode) || "MAIN",
-          },
-          ...current,
-        ]);
+        const nextOwner = {
+          serviceOwnerId: nextRemoteId(owners as unknown as RemoteListRecord[], "serviceOwnerId"),
+          serviceId,
+          serviceCode: service?.serviceCode,
+          ownerTypeCode,
+          ownerName,
+          responsibilityCode: asRemoteString(input.responsibilityCode) || "MAIN",
+        };
+        setOwners((current) => [nextOwner, ...current]);
         if (REMOTE_API_ENABLED) {
           void chainViewApi.ownership.serviceOwners
             .add(toServiceOwnerCreatePayload(input))
             .then(() => testRemoteQuery("owners"))
             .catch((error) => {
-              console.warn("[ChainView API] service owner create failed", error);
+              setOwners((current) =>
+                current.filter((owner) => owner.serviceOwnerId !== nextOwner.serviceOwnerId)
+              );
+              notifyRemoteMutationFailure(error, "담당자 등록 API 호출에 실패했습니다.");
             });
         }
       },
       updateOwner: (serviceOwnerId, input) => {
+        const previousOwner = owners.find(
+          (owner) => owner.serviceOwnerId === serviceOwnerId
+        );
         setOwners((current) =>
           current.map((owner) =>
             owner.serviceOwnerId === serviceOwnerId
@@ -946,11 +992,21 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             .update(serviceOwnerId, toServiceOwnerUpdatePayload(input))
             .then(() => testRemoteQuery("owners"))
             .catch((error) => {
-              console.warn("[ChainView API] service owner update failed", error);
+              if (previousOwner) {
+                setOwners((current) =>
+                  current.map((owner) =>
+                    owner.serviceOwnerId === serviceOwnerId ? previousOwner : owner
+                  )
+                );
+              }
+              notifyRemoteMutationFailure(error, "담당자 수정 API 호출에 실패했습니다.");
             });
         }
       },
       deleteOwner: (serviceOwnerId) => {
+        const previousOwner = owners.find(
+          (owner) => owner.serviceOwnerId === serviceOwnerId
+        );
         setOwners((current) =>
           current.filter((owner) => owner.serviceOwnerId !== serviceOwnerId)
         );
@@ -959,7 +1015,10 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             .delete(serviceOwnerId)
             .then(() => testRemoteQuery("owners"))
             .catch((error) => {
-              console.warn("[ChainView API] service owner delete failed", error);
+              if (previousOwner) {
+                setOwners((current) => [previousOwner, ...current]);
+              }
+              notifyRemoteMutationFailure(error, "담당자 삭제 API 호출에 실패했습니다.");
             });
         }
       },

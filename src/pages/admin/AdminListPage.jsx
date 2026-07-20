@@ -513,6 +513,10 @@ function formatApiDate(value) {
   return value.replace("T", " ").slice(0, 19);
 }
 
+function isValidServiceCode(value) {
+  return /^[A-Z0-9_-]+(?:-[A-Z0-9_-]+)*$/.test(String(value ?? ""));
+}
+
 function AdminRecordModal({ modal, onClose, onOpenApiDetail, portalData, serverById, serviceById }) {
   const { mode, menu, record } = modal;
   const isEdit = mode === "edit";
@@ -569,6 +573,10 @@ function AdminRecordModal({ modal, onClose, onOpenApiDetail, portalData, serverB
       const categoryPath = buildSelectedCategoryPath(form, portalData.categories);
       const categoryL1 = requireValue(categoryPath[0], "대분류");
       if (!serviceCode || !serviceName || !categoryL1) return;
+      if (!isValidServiceCode(serviceCode)) {
+        window.alert("서비스 코드는 대문자, 숫자, _, - 만 사용할 수 있습니다.");
+        return;
+      }
       const payload = {
         categoryId: Number(form.categoryId || form.categoryL3Id || form.categoryL2Id || form.categoryL1Id) || undefined,
         serviceCode,
