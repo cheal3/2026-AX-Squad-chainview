@@ -89,6 +89,40 @@ async function fetchInfraRelationsFromApi(nodes) {
   return [...edgeById.values()].sort((left, right) => left.infraRelationId - right.infraRelationId);
 }
 
+function remoteErrorMessage(error, fallback) {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  return fallback;
+}
+
+function notifyInfraMutationFailure(error, fallback) {
+  window.alert(remoteErrorMessage(error, fallback));
+}
+
+function buildInfraNodePayload(form) {
+  return {
+    nodeCode: String(form.nodeCode ?? "").trim(),
+    nodeName: String(form.nodeName ?? "").trim(),
+    nodeTypeCode: form.nodeTypeCode,
+    statusCode: form.statusCode,
+    locationLabel: String(form.locationLabel ?? "").trim(),
+    vendorModel: String(form.vendorModel ?? "").trim(),
+    serverCount: Number(form.serverCount) || 0,
+  };
+}
+
+function buildInfraRelationPayload(form) {
+  return {
+    fromNodeId: Number(form.sourceInfraNodeId),
+    toNodeId: Number(form.targetInfraNodeId),
+    relationTypeCode: form.relationTypeCode,
+    mandatoryYn: form.mandatoryYn,
+    statusCode: form.relationStatusCode,
+    remarks: String(form.description ?? "").trim(),
+  };
+}
+
 export function InfraRelationsPage() {
   const [nodes, setNodes] = useState(initialInfraNodes);
   const [relations, setRelations] = useState(initialInfraRelations);
@@ -154,7 +188,7 @@ export function InfraRelationsPage() {
   const updateModalField = (fieldName, value) => {
     setModal((current) => current ? { ...current, form: { ...current.form, [fieldName]: value } } : current);
   };
-  const saveModal = () => {
+  const saveModal = async () => {
     const form = modal?.form;
     if (!form?.sourceInfraNodeId || !form?.targetInfraNodeId) {
       window.alert("source/target 인프라 노드를 선택해주세요.");
@@ -171,15 +205,44 @@ export function InfraRelationsPage() {
     };
     if (modal.mode === "edit") {
       setRelations((current) => current.map((relation) => relation.infraRelationId === form.infraRelationId ? nextRelation : relation));
+      setModal(null);
+      if (shouldUseRemoteInfraApi()) {
+        try {
+          await chainViewApi.infraNodes.deleteEdge(Number(form.infraRelationId));
+          const createdRelation = normalizeInfraRelation(await chainViewApi.infraNodes.createEdge(buildInfraRelationPayload(nextRelation)));
+          setRelations((current) => current.map((relation) => relation.infraRelationId === form.infraRelationId ? { ...nextRelation, ...createdRelation } : relation));
+        } catch (error) {
+          setRelations(relations);
+          notifyInfraMutationFailure(error, "인프라 관계 수정 API 호출에 실패했습니다.");
+        }
+      }
     } else {
       const nextId = Math.max(...relations.map((relation) => relation.infraRelationId), 0) + 1;
-      setRelations((current) => [{ ...nextRelation, infraRelationId: nextId }, ...current]);
+      const optimisticRelation = { ...nextRelation, infraRelationId: nextId };
+      setRelations((current) => [optimisticRelation, ...current]);
+      setModal(null);
+      if (shouldUseRemoteInfraApi()) {
+        try {
+          const createdRelation = normalizeInfraRelation(await chainViewApi.infraNodes.createEdge(buildInfraRelationPayload(nextRelation)));
+          setRelations((current) => current.map((relation) => relation.infraRelationId === nextId ? { ...optimisticRelation, ...createdRelation } : relation));
+        } catch (error) {
+          setRelations(relations);
+          notifyInfraMutationFailure(error, "인프라 관계 등록 API 호출에 실패했습니다.");
+        }
+      }
     }
-    setModal(null);
   };
-  const deleteRelation = (relation) => {
+  const deleteRelation = async (relation) => {
     if (!window.confirm(`${nodeLabel(relation.sourceInfraNodeId)} → ${nodeLabel(relation.targetInfraNodeId)} 관계를 삭제할까요?`)) return;
     setRelations((current) => current.filter((item) => item.infraRelationId !== relation.infraRelationId));
+    if (shouldUseRemoteInfraApi()) {
+      try {
+        await chainViewApi.infraNodes.deleteEdge(Number(relation.infraRelationId));
+      } catch (error) {
+        setRelations(relations);
+        notifyInfraMutationFailure(error, "인프라 관계 삭제 API 호출에 실패했습니다.");
+      }
+    }
   };
 
   return (
@@ -544,23 +607,53 @@ export function InfraTopologyPage() {
   const updateModalField = (field, value) => {
     setModal((current) => current ? { ...current, form: { ...current.form, [field]: value } } : current);
   };
-  const saveModal = () => {
+  const saveModal = async () => {
     const form = modal?.form;
     if (!form?.nodeCode?.trim() || !form?.nodeName?.trim()) {
       window.alert("노드 코드와 노드 이름은 필수입니다.");
       return;
     }
+    const payload = buildInfraNodePayload(form);
     if (modal.mode === "edit") {
-      setNodes((current) => current.map((node) => node.infraNodeId === form.infraNodeId ? { ...form, serverCount: Number(form.serverCount) || 0 } : node));
+      const optimisticNode = { ...form, ...payload };
+      setNodes((current) => current.map((node) => node.infraNodeId === form.infraNodeId ? optimisticNode : node));
+      setModal(null);
+      if (shouldUseRemoteInfraApi()) {
+        try {
+          const updatedNode = normalizeInfraNode(await chainViewApi.infraNodes.update(Number(form.infraNodeId), payload));
+          setNodes((current) => current.map((node) => node.infraNodeId === form.infraNodeId ? { ...optimisticNode, ...updatedNode } : node));
+        } catch (error) {
+          setNodes(nodes);
+          notifyInfraMutationFailure(error, "인프라 노드 수정 API 호출에 실패했습니다.");
+        }
+      }
     } else {
       const nextId = Math.max(...nodes.map((node) => node.infraNodeId), 0) + 1;
-      setNodes((current) => [{ ...form, infraNodeId: nextId, serverCount: Number(form.serverCount) || 0 }, ...current]);
+      const optimisticNode = { ...payload, infraNodeId: nextId };
+      setNodes((current) => [optimisticNode, ...current]);
+      setModal(null);
+      if (shouldUseRemoteInfraApi()) {
+        try {
+          const createdNode = normalizeInfraNode(await chainViewApi.infraNodes.create(payload));
+          setNodes((current) => current.map((node) => node.infraNodeId === nextId ? { ...optimisticNode, ...createdNode } : node));
+        } catch (error) {
+          setNodes(nodes);
+          notifyInfraMutationFailure(error, "인프라 노드 등록 API 호출에 실패했습니다.");
+        }
+      }
     }
-    setModal(null);
   };
-  const deleteNode = (node) => {
+  const deleteNode = async (node) => {
     if (!window.confirm(`${node.nodeName} 노드를 삭제할까요?`)) return;
     setNodes((current) => current.filter((item) => item.infraNodeId !== node.infraNodeId));
+    if (shouldUseRemoteInfraApi()) {
+      try {
+        await chainViewApi.infraNodes.delete(Number(node.infraNodeId));
+      } catch (error) {
+        setNodes(nodes);
+        notifyInfraMutationFailure(error, "인프라 노드 삭제 API 호출에 실패했습니다.");
+      }
+    }
   };
 
   return (
