@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Eye, Mail, MessageCircle, Pencil, Phone, Plus, Trash2 } from "lucide-react";
 
 import { usePortalData } from "../../dashboardModule/PortalDataStore";
+import { codeLabels } from "../../dashboardModule/mockData";
 
 const serviceDetailTabs = [
   { key: "overview", label: "개요" },
@@ -142,12 +143,48 @@ export function ServiceAdminPage() {
 function ServiceDetailPage({ service }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { servers } = usePortalData();
+  const {
+    deleteTechStack,
+    owners,
+    relations,
+    servers,
+    services,
+    techStacks,
+    updateTechStack,
+  } = usePortalData();
   const activeTab = new URLSearchParams(location.search).get("tab") || "overview";
   const [detail, setDetail] = useState(() => cloneServiceDetailSample(service.serviceCode));
   const deploymentServer = useMemo(
     () => servers.find((server) => Number(server.serverId) === Number(service.serverId)),
     [servers, service.serverId]
+  );
+  const serviceOwners = useMemo(
+    () => owners.filter((owner) => Number(owner.serviceId) === Number(service.serviceId)),
+    [owners, service.serviceId]
+  );
+  const serviceTechStacks = useMemo(
+    () => techStacks.filter((techStack) => Number(techStack.serviceId) === Number(service.serviceId)),
+    [service.serviceId, techStacks]
+  );
+  const serviceRelations = useMemo(
+    () =>
+      relations
+        .filter(
+          (relation) =>
+            Number(relation.sourceServiceId) === Number(service.serviceId) ||
+            Number(relation.targetServiceId) === Number(service.serviceId)
+        )
+        .map((relation) => {
+          const isOutgoing = Number(relation.sourceServiceId) === Number(service.serviceId);
+          const relatedServiceId = isOutgoing ? relation.targetServiceId : relation.sourceServiceId;
+          const relatedService = services.find((item) => Number(item.serviceId) === Number(relatedServiceId));
+          return {
+            ...relation,
+            direction: isOutgoing ? "송신" : "수신",
+            relatedService,
+          };
+        }),
+    [relations, service.serviceId, services]
   );
   const tabClassName = (tabKey) =>
     `service-detail__tab${activeTab === tabKey ? " is-active" : ""}`;
@@ -160,29 +197,21 @@ function ServiceDetailPage({ service }) {
     navigate(`/admin-services/${service.serviceCode}?tab=${tabKey}`);
   };
 
-  const handleTechEdit = (techName) => {
-    const nextVersion = window.prompt("적용 버전을 입력하세요.", detail.techRows.find((row) => row.name === techName)?.applied || "");
+  const handleTechEdit = (techStack) => {
+    const nextVersion = window.prompt("적용 버전을 입력하세요.", techStack.versionText || "");
     if (nextVersion === null) {
       return;
     }
 
-    setDetail((current) => ({
-      ...current,
-      techRows: current.techRows.map((row) =>
-        row.name === techName ? { ...row, applied: nextVersion } : row
-      ),
-    }));
+    updateTechStack(techStack.techStackId, { versionText: nextVersion });
   };
 
-  const handleTechDelete = (techName) => {
-    if (!window.confirm(`${techName} 기술스택을 삭제할까요?`)) {
+  const handleTechDelete = (techStack) => {
+    if (!window.confirm(`${techStack.techName} 기술스택을 삭제할까요?`)) {
       return;
     }
 
-    setDetail((current) => ({
-      ...current,
-      techRows: current.techRows.filter((row) => row.name !== techName),
-    }));
+    deleteTechStack(techStack.techStackId);
   };
 
   const handleServerDetail = (serverName) => {
@@ -235,11 +264,11 @@ function ServiceDetailPage({ service }) {
       </nav>
 
       {activeTab === "overview" ? <ServiceOverviewTab detail={detail} onOpenDeployments={() => setTab("deployments")} onOpenInfraMap={handleInfraMapOpen} server={deploymentServer} service={service} /> : null}
-      {activeTab === "techstack" ? <ServiceTechStackTab detail={detail} onDelete={handleTechDelete} onEdit={handleTechEdit} /> : null}
+      {activeTab === "techstack" ? <ServiceTechStackTab detail={detail} onDelete={handleTechDelete} onEdit={handleTechEdit} techStacks={serviceTechStacks} service={service} /> : null}
       {activeTab === "deployments" ? <ServiceDeploymentTab detail={detail} onOpenDetail={handleServerDetail} onOpenInfraMap={handleInfraMapOpen} server={deploymentServer} service={service} /> : null}
       {activeTab === "impact" ? <ServiceImpactTab detail={detail} /> : null}
-      {activeTab === "owners" ? <ServiceOwnersTab detail={detail} /> : null}
-      {activeTab === "relations" ? <ServiceRelationTab detail={detail} /> : null}
+      {activeTab === "owners" ? <ServiceOwnersTab detail={detail} owners={serviceOwners} /> : null}
+      {activeTab === "relations" ? <ServiceRelationTab detail={detail} relations={serviceRelations} /> : null}
       {activeTab === "changes" ? <ServiceChangeTab detail={detail} /> : null}
       {activeTab === "incidents" ? <ServiceIncidentTab detail={detail} onOpenDetail={handleIncidentDetail} /> : null}
     </div>
@@ -375,7 +404,20 @@ function ServiceImpactTab({ detail }) {
   );
 }
 
-function ServiceOwnersTab({ detail }) {
+function ServiceOwnersTab({ detail, owners }) {
+  const ownerRows = owners.length
+    ? owners.map((owner) => ({
+        key: owner.serviceOwnerId,
+        name: owner.ownerName,
+        role:
+          owner.responsibilityCode === "MAIN"
+            ? "주담당자"
+            : owner.responsibilityCode === "SUB"
+              ? "부담당자"
+              : "알림 담당",
+        meta: `${owner.ownerTypeCode === "GROUP" ? "담당그룹" : "사용자"} · ${owner.serviceCode || ""}`,
+      }))
+    : detail.owners.map((owner, index) => ({ ...owner, key: `${owner.name}-${index}` }));
   return (
     <section className="service-detail__panel">
       <div className="service-detail__section-head">
@@ -385,8 +427,8 @@ function ServiceOwnersTab({ detail }) {
         </div>
       </div>
       <div className="service-detail__owner-list">
-        {detail.owners.map((owner) => (
-          <div className="service-detail__owner-row" key={owner.name + owner.role}>
+        {ownerRows.map((owner) => (
+          <div className="service-detail__owner-row" key={owner.key}>
             <div className="service-detail__owner-avatar">{owner.name.slice(0, 1)}</div>
             <div className="service-detail__owner-meta">
               <strong>{owner.name}</strong>
@@ -405,7 +447,29 @@ function ServiceOwnersTab({ detail }) {
   );
 }
 
-function ServiceTechStackTab({ detail, onDelete, onEdit }) {
+function ServiceTechStackTab({ detail, onDelete, onEdit, techStacks, service }) {
+  const techRows = techStacks.length
+    ? techStacks.map((techStack) => ({
+        key: techStack.techStackId,
+        type: techStack.techTypeName,
+        name: techStack.techName,
+        master: "-",
+        applied: techStack.versionText,
+        note: techStack.vendorName || "-",
+        record: techStack,
+      }))
+    : detail.techRows.map((row, index) => ({
+        ...row,
+        key: `${row.type}-${row.name}-${index}`,
+        record: {
+          techStackId: 0,
+          serviceId: service.serviceId,
+          techTypeName: row.type,
+          techName: row.name,
+          versionText: row.applied,
+          vendorName: row.note,
+        },
+      }));
   return (
     <section className="service-detail__panel">
       <div className="service-detail__section-head">
@@ -427,8 +491,8 @@ function ServiceTechStackTab({ detail, onDelete, onEdit }) {
           </tr>
         </thead>
         <tbody>
-          {detail.techRows.map((row) => (
-            <tr key={row.type + row.name}>
+          {techRows.map((row) => (
+            <tr key={row.key}>
               <td><span className="tag">{row.type}</span></td>
               <td><strong>{row.name}</strong></td>
               <td>{row.master}</td>
@@ -436,8 +500,8 @@ function ServiceTechStackTab({ detail, onDelete, onEdit }) {
               <td>{row.note}</td>
               <td className="col-actions">
                 <div className="service-detail__text-actions">
-                  <button className="service-detail__text-action-button" onClick={() => onEdit(row.name)} type="button"><Pencil size={14} /> 수정</button>
-                  <button className="service-detail__text-action-button is-danger" onClick={() => onDelete(row.name)} type="button"><Trash2 size={14} /> 삭제</button>
+                  <button className="service-detail__text-action-button" disabled={!row.record.techStackId} onClick={() => onEdit(row.record)} type="button"><Pencil size={14} /> 수정</button>
+                  <button className="service-detail__text-action-button is-danger" disabled={!row.record.techStackId} onClick={() => onDelete(row.record)} type="button"><Trash2 size={14} /> 삭제</button>
                 </div>
               </td>
             </tr>
@@ -517,7 +581,20 @@ function ServiceDeploymentTab({ detail, onOpenDetail, onOpenInfraMap, server, se
   );
 }
 
-function ServiceRelationTab({ detail }) {
+function ServiceRelationTab({ detail, relations }) {
+  const relationRows = relations.length
+    ? relations.map((relation) => ({
+        key: relation.relationId,
+        direction: relation.direction,
+        service: relation.relatedService?.serviceName || relation.relatedService?.serviceCode || "서비스 미지정",
+        code: relation.relatedService?.serviceCode,
+        type: codeLabels.relationType[relation.relationTypeCode] || relation.relationTypeCode,
+        status: codeLabels.relationStatus[relation.relationStatusCode] || relation.relationStatusCode,
+        required: relation.mandatoryYn,
+        impact: relation.mandatoryYn === "Y" ? "직접" : "간접",
+        description: relation.description,
+      }))
+    : detail.relationRows.map((row, index) => ({ ...row, key: `${row.direction}-${row.service}-${index}` }));
   return (
     <section className="service-detail__panel">
       <div className="service-detail__section-head">
@@ -541,10 +618,10 @@ function ServiceRelationTab({ detail }) {
           </tr>
         </thead>
         <tbody>
-          {detail.relationRows.map((row) => (
-            <tr key={row.direction + row.service}>
+          {relationRows.map((row) => (
+            <tr key={row.key}>
               <td><span className={`service-detail__direction-badge ${row.direction === "송신" ? "is-outbound" : "is-inbound"}`}>{row.direction === "송신" ? "-> 송신" : "<- 수신"}</span></td>
-              <td><strong className="service-detail__linkish">{row.service}</strong></td>
+              <td><strong className="service-detail__linkish">{row.service}</strong>{row.code ? <code className="service-detail__inline-code">{row.code}</code> : null}</td>
               <td><span className="tag">{row.type}</span></td>
               <td><span className="pill pill--ok">{row.status}</span></td>
               <td>{row.required}</td>

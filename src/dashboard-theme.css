@@ -1114,6 +1114,13 @@
   color: var(--brand);
 }
 
+.service-detail__inline-code {
+  display: block;
+  width: fit-content;
+  margin-top: 4px;
+  color: #64748b;
+}
+
 .statistics-page {
   gap: 18px;
 }
