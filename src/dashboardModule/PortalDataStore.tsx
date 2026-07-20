@@ -518,6 +518,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         services.find((service) => service.serviceId === input.serviceId)
           ?.serviceName ?? input.title,
     });
+    const previousServices = services;
 
     setIncidents((current) => [nextIncident, ...current]);
     setIncidentImpacts((current) => [...impacts, ...current]);
@@ -556,7 +557,17 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         .create(toIncidentCreatePayload(input, now))
         .then(() => refreshRemoteData(300))
         .catch((error) => {
-          console.warn("[ChainView API] incident create failed", error);
+          setIncidents((current) =>
+            current.filter((incident) => incident.incidentId !== nextIncident.incidentId)
+          );
+          setIncidentImpacts((current) =>
+            current.filter((impact) => impact.incidentId !== nextIncident.incidentId)
+          );
+          setIncidentEvents((current) =>
+            current.filter((event) => event.incidentId !== nextIncident.incidentId)
+          );
+          setServices(previousServices);
+          notifyRemoteMutationFailure(error, "인시던트 생성 API 호출에 실패했습니다.");
         });
     }
 
@@ -590,6 +601,8 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       createIncident: createIncidentRecord,
       updateIncidentStatus: (incidentId, statusCode, message) => {
         const now = timestamp();
+        const previousIncident = incidents.find((incident) => incident.incidentId === incidentId);
+        const previousServices = services;
         setIncidents((current) =>
           current.map((incident) =>
             incident.incidentId === incidentId
@@ -650,7 +663,25 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           void remoteUpdate
             .then(() => refreshRemoteData(300))
             .catch((error) => {
-              console.warn("[ChainView API] incident update failed", error);
+              if (previousIncident) {
+                setIncidents((current) =>
+                  current.map((incident) =>
+                    incident.incidentId === incidentId ? previousIncident : incident
+                  )
+                );
+              }
+              setServices(previousServices);
+              setIncidentEvents((current) =>
+                current.filter(
+                  (event) =>
+                    !(
+                      event.incidentId === incidentId &&
+                      event.eventType === (statusCode === "RESOLVED" ? "RESOLVED" : "STATUS_CHANGED") &&
+                      event.createdAt === now
+                    )
+                )
+              );
+              notifyRemoteMutationFailure(error, "인시던트 상태 변경 API 호출에 실패했습니다.");
             });
         }
       },
