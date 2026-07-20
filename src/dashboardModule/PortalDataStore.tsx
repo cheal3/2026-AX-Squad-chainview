@@ -43,6 +43,13 @@ import {
   type RemoteListRecord,
   type RemoteQueryKey,
 } from "./remoteQueries";
+import {
+  asRemoteBoolean,
+  asRemoteNumber,
+  asRemoteRecordArray,
+  asRemoteString,
+  isRemoteRecord,
+} from "./remoteValue";
 
 type NewServerInput = Pick<
   ServerRecord,
@@ -1702,42 +1709,6 @@ function slugCode(value: string) {
     .toUpperCase();
 
   return normalized || `GROUP_${Date.now()}`;
-}
-
-function isRemoteRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function asRemoteRecordArray(value: unknown): Array<Record<string, unknown>> {
-  return Array.isArray(value) ? value.filter(isRemoteRecord) : [];
-}
-
-function asRemoteString(value: unknown) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function asRemoteNumber(value: unknown, fallback = 0) {
-  const numberValue =
-    typeof value === "number"
-      ? value
-      : typeof value === "string"
-        ? Number(value)
-        : NaN;
-  return Number.isFinite(numberValue) ? numberValue : fallback;
-}
-
-function asRemoteBoolean(value: unknown, fallback = false) {
-  if (typeof value === "boolean") {
-    return value;
-  }
-  const normalized = asRemoteString(value).toUpperCase();
-  if (["Y", "TRUE", "ACTIVE", "1"].includes(normalized)) {
-    return true;
-  }
-  if (["N", "FALSE", "INACTIVE", "0"].includes(normalized)) {
-    return false;
-  }
-  return fallback;
 }
 
 function timestamp() {

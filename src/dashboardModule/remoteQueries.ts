@@ -1,4 +1,11 @@
 import { chainViewApi } from "./chainViewApi";
+import {
+  asRemoteNumber,
+  asRemoteRecordArray,
+  asRemoteString,
+  isRemoteRecord,
+  type RemoteRecord,
+} from "./remoteValue";
 
 export type RemoteQueryKey =
   | "services"
@@ -13,7 +20,7 @@ export type RemoteQueryKey =
   | "codes"
   | "deployments";
 
-export type RemoteListRecord = Record<string, unknown>;
+export type RemoteListRecord = RemoteRecord;
 
 export type RemoteApiCallDetail = {
   durationMs?: number;
@@ -194,26 +201,4 @@ function findCategoryChildren(row: RemoteListRecord) {
     if (children.length) return children;
   }
   return [];
-}
-
-function asRemoteRecordArray(value: unknown): RemoteListRecord[] {
-  return Array.isArray(value) ? value.filter(isRemoteRecord) : [];
-}
-
-function isRemoteRecord(value: unknown): value is RemoteListRecord {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function asRemoteString(value: unknown) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function asRemoteNumber(value: unknown, fallback = 0) {
-  const numberValue =
-    typeof value === "number"
-      ? value
-      : typeof value === "string"
-        ? Number(value)
-        : NaN;
-  return Number.isFinite(numberValue) ? numberValue : fallback;
 }
