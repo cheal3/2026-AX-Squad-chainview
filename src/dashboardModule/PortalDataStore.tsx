@@ -33,6 +33,16 @@ import {
   loadRemotePortalSnapshot,
   type RemotePortalSnapshot,
 } from "./remotePortalData";
+import {
+  buildRemoteApiDetail,
+  countRemoteRows,
+  previewRemoteResponse,
+  remoteQueryLabels,
+  remoteQueryLoaders,
+  type RemoteApiCallDetail,
+  type RemoteListRecord,
+  type RemoteQueryKey,
+} from "./remoteQueries";
 
 type NewServerInput = Pick<
   ServerRecord,
@@ -102,43 +112,12 @@ export type IncidentEventRecord = {
   createdAt: string;
 };
 
-type RemoteQueryKey =
-  | "services"
-  | "servers"
-  | "relations"
-  | "techstacks"
-  | "owners"
-  | "incidents"
-  | "users"
-  | "groups"
-  | "categories"
-  | "codes"
-  | "deployments";
-
-type RemoteListRecord = Record<string, unknown>;
-
 type RemoteApiStatus = {
   state: "idle" | "loading" | "success" | "error" | "blocked";
   message: string;
   lastLoadedAt?: string;
   source?: RemoteQueryKey | "snapshot";
   detail?: RemoteApiCallDetail;
-};
-
-type RemoteApiCallDetail = {
-  durationMs?: number;
-  errorMessage?: string;
-  finishedAt?: string;
-  label: string;
-  method: "GET";
-  origin: string;
-  path: string;
-  queryKey: RemoteQueryKey;
-  responsePreview?: unknown;
-  rowCount?: number;
-  startedAt: string;
-  state: "loading" | "success" | "error" | "blocked";
-  url: string;
 };
 
 type NewIncidentInput = {
@@ -246,172 +225,8 @@ const REMOTE_API_ENABLED =
     ? import.meta.env.DEV
     : remoteApiEnabledFlag === "true" || remoteApiEnabledFlag === "1");
 
-const remoteQueryLoaders: Record<RemoteQueryKey, () => Promise<unknown>> = {
-  services: () => chainViewApi.services.list(),
-  servers: () => chainViewApi.servers.list(),
-  relations: () => chainViewApi.serviceRelations.list(),
-  techstacks: () => chainViewApi.serviceTechStacks.list(),
-  owners: () => chainViewApi.ownership.serviceOwners.list(),
-  incidents: () => chainViewApi.incidents.list(),
-  users: () => chainViewApi.ownership.users.list(),
-  groups: () => chainViewApi.ownership.groups.list(),
-  categories: loadServiceCategories,
-  codes: () => chainViewApi.commonCodes.list(),
-  deployments: loadServiceDeployments,
-};
-
-const remoteQueryPaths: Record<RemoteQueryKey, string> = {
-  services: "/api/services",
-  servers: "/api/servers",
-  relations: "/api/service-relations",
-  techstacks: "/api/service-tech-stacks",
-  owners: "/api/ownership/service-owners",
-  incidents: "/api/incidents",
-  users: "/api/ownership/users",
-  groups: "/api/ownership/groups",
-  categories: "/api/service-categories",
-  codes: "/api/common-codes",
-  deployments: "/api/services + /api/services/{serviceId}",
-};
-
-const remoteQueryLabels: Record<RemoteQueryKey | "snapshot", string> = {
-  services: "서비스 조회",
-  servers: "서버 조회",
-  relations: "서비스 관계 조회",
-  techstacks: "기술스택 조회",
-  owners: "담당자 조회",
-  incidents: "인시던트 조회",
-  users: "사용자 관리",
-  groups: "그룹 조회",
-  categories: "서비스 분류 관리",
-  codes: "공통코드 관리",
-  deployments: "배포 현황",
-  snapshot: "초기 데이터 조회",
-};
-
-async function loadServiceDeployments() {
-  const serviceRows = asRemoteRecordArray(await chainViewApi.services.list());
-  const settled = await Promise.allSettled(
-    serviceRows.map((service) => {
-      const serviceId = asRemoteNumber(service.serviceId);
-      return serviceId ? chainViewApi.services.detail(serviceId) : null;
-    })
-  );
-
-  return settled.flatMap((result, index) => {
-    if (result.status !== "fulfilled") {
-      return [];
-    }
-    const detail = isRemoteRecord(result.value) ? result.value : {};
-    const service = serviceRows[index];
-    return asRemoteRecordArray(detail.deployments).map((deployment, deploymentIndex) => ({
-      ...deployment,
-      deploymentKey: `${asRemoteNumber(service.serviceId)}-${asRemoteNumber(deployment.deploymentId, deploymentIndex + 1)}`,
-      serviceCode: asRemoteString(detail.serviceCode ?? service.serviceCode),
-      serviceId: asRemoteNumber(detail.serviceId ?? service.serviceId),
-      serviceName: asRemoteString(detail.serviceName ?? service.serviceName),
-    }));
-  });
-}
-
-async function loadServiceCategories() {
-  const listRows = asRemoteRecordArray(
-    await chainViewApi.serviceCategories.list().catch(() => [])
-  );
-  if (hasCategoryHierarchy(listRows)) {
-    return listRows;
-  }
-
-  const treeRows = flattenCategoryTree(
-    asRemoteRecordArray(await chainViewApi.serviceCategories.tree().catch(() => []))
-  );
-  return treeRows.length ? treeRows : listRows;
-}
-
-function hasCategoryHierarchy(rows: RemoteListRecord[]) {
-  return rows.some((row) => {
-    const level = asRemoteNumber(row.categoryLevel ?? row.level ?? row.depth);
-    const parentId = asRemoteNumber(row.parentCategoryId ?? row.parentId);
-    const parentCode = asRemoteString(row.parentCategoryCode ?? row.parentCode);
-    return level > 1 || parentId > 0 || Boolean(parentCode);
-  });
-}
-
-function flattenCategoryTree(
-  rows: RemoteListRecord[],
-  parent: RemoteListRecord | null = null,
-  level = 1
-): RemoteListRecord[] {
-  return rows.flatMap((row) => {
-    const children = findCategoryChildren(row);
-    const categoryId = asRemoteNumber(row.categoryId ?? row.id);
-    const categoryCode = asRemoteString(row.categoryCode ?? row.code);
-    const normalizedRow: RemoteListRecord = {
-      ...row,
-      categoryLevel: asRemoteNumber(row.categoryLevel ?? row.level ?? row.depth, level),
-      parentCategoryId:
-        asRemoteNumber(row.parentCategoryId ?? row.parentId) ||
-        asRemoteNumber(parent?.categoryId ?? parent?.id) ||
-        undefined,
-      parentCategoryCode:
-        asRemoteString(row.parentCategoryCode ?? row.parentCode) ||
-        asRemoteString(parent?.categoryCode ?? parent?.code) ||
-        undefined,
-      categoryId: categoryId || row.categoryId,
-      categoryCode: categoryCode || row.categoryCode,
-    };
-    return [
-      normalizedRow,
-      ...flattenCategoryTree(children, normalizedRow, level + 1),
-    ];
-  });
-}
-
-function findCategoryChildren(row: RemoteListRecord) {
-  const childKeys = ["children", "childCategories", "subCategories", "items"];
-  for (const key of childKeys) {
-    const children = asRemoteRecordArray(row[key]);
-    if (children.length) return children;
-  }
-  return [];
-}
-
 function nowLabel() {
   return new Date().toLocaleTimeString("ko-KR", { hour12: false });
-}
-
-function countRows(value: unknown) {
-  return Array.isArray(value) ? value.length : 1;
-}
-
-function buildRemoteApiDetail(
-  queryKey: RemoteQueryKey,
-  state: RemoteApiCallDetail["state"],
-  overrides: Partial<RemoteApiCallDetail> = {}
-): RemoteApiCallDetail {
-  const path = remoteQueryPaths[queryKey];
-  const origin = remoteOrigin.replace(/\/$/, "");
-  return {
-    label: remoteQueryLabels[queryKey],
-    method: "GET",
-    origin,
-    path,
-    queryKey,
-    startedAt: new Date().toISOString(),
-    state,
-    url: `${origin}${path}`,
-    ...overrides,
-  };
-}
-
-function previewResponse(value: unknown) {
-  if (Array.isArray(value)) {
-    return value.slice(0, 3);
-  }
-  if (value && typeof value === "object") {
-    return value;
-  }
-  return value ?? null;
 }
 
 function normalizeInitialServices(services: ServiceRecord[]) {
@@ -568,7 +383,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
   const testRemoteQuery = useCallback(
     async (queryKey: RemoteQueryKey): Promise<RemoteApiStatus> => {
       if (!REMOTE_API_ENABLED) {
-        const detail = buildRemoteApiDetail(queryKey, "blocked", {
+        const detail = buildRemoteApiDetail(queryKey, "blocked", remoteOrigin, {
           errorMessage: "원격 조회가 비활성화되어 있습니다.",
           finishedAt: new Date().toISOString(),
         });
@@ -583,7 +398,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       }
 
       if (isMixedContentRuntime) {
-        const detail = buildRemoteApiDetail(queryKey, "blocked", {
+        const detail = buildRemoteApiDetail(queryKey, "blocked", remoteOrigin, {
           errorMessage: "HTTPS 화면에서는 HTTP API를 브라우저가 차단합니다.",
           finishedAt: new Date().toISOString(),
         });
@@ -598,7 +413,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       }
 
       const startedAtMs = performance.now();
-      const loadingDetail = buildRemoteApiDetail(queryKey, "loading");
+      const loadingDetail = buildRemoteApiDetail(queryKey, "loading", remoteOrigin);
       setRemoteApiStatus({
         state: "loading",
         message: `${remoteQueryLabels[queryKey]} API 호출 중`,
@@ -613,13 +428,13 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           ...loadingDetail,
           durationMs: Math.round(performance.now() - startedAtMs),
           finishedAt,
-          responsePreview: previewResponse(result),
-          rowCount: countRows(result),
+          responsePreview: previewRemoteResponse(result),
+          rowCount: countRemoteRows(result),
           state: "success" as const,
         };
         const status = {
           state: "success" as const,
-          message: `${remoteQueryLabels[queryKey]} 성공: ${countRows(result)}건`,
+          message: `${remoteQueryLabels[queryKey]} 성공: ${countRemoteRows(result)}건`,
           lastLoadedAt: nowLabel(),
           source: queryKey,
           detail,
