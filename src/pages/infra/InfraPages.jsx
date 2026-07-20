@@ -123,6 +123,30 @@ function buildInfraRelationPayload(form) {
   };
 }
 
+function csvCell(value) {
+  const text = String(value ?? "");
+  if (/[",\n\r]/.test(text)) {
+    return `"${text.replaceAll('"', '""')}"`;
+  }
+  return text;
+}
+
+function downloadCsv(filename, headers, rows) {
+  const csv = [
+    headers.map(csvCell).join(","),
+    ...rows.map((row) => headers.map((header) => csvCell(row[header])).join(",")),
+  ].join("\n");
+  const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 export function InfraRelationsPage() {
   const [nodes, setNodes] = useState(initialInfraNodes);
   const [relations, setRelations] = useState(initialInfraRelations);
@@ -170,6 +194,27 @@ export function InfraRelationsPage() {
   const nodeLabel = (nodeId) => {
     const node = nodeById.get(Number(nodeId));
     return node ? `${node.nodeCode} ${node.nodeName}` : "노드 미지정";
+  };
+  const exportRelationsCsv = () => {
+    downloadCsv(
+      "infra-relations.csv",
+      ["relationId", "sourceCode", "sourceName", "targetCode", "targetName", "relationType", "mandatoryYn", "status", "description"],
+      filteredRelations.map((relation) => {
+        const sourceNode = nodeById.get(Number(relation.sourceInfraNodeId));
+        const targetNode = nodeById.get(Number(relation.targetInfraNodeId));
+        return {
+          relationId: relation.infraRelationId,
+          sourceCode: sourceNode?.nodeCode ?? "",
+          sourceName: sourceNode?.nodeName ?? "",
+          targetCode: targetNode?.nodeCode ?? "",
+          targetName: targetNode?.nodeName ?? "",
+          relationType: infraRelationTypeLabels[relation.relationTypeCode] || relation.relationTypeCode,
+          mandatoryYn: relation.mandatoryYn,
+          status: infraRelationStatusLabels[relation.relationStatusCode] || relation.relationStatusCode,
+          description: relation.description,
+        };
+      })
+    );
   };
   const openCreateModal = () => {
     setModal({
@@ -256,7 +301,7 @@ export function InfraRelationsPage() {
             </div>
             <div className="page-head__right">
               <button className="btn" onClick={() => setGraphOpen(true)} type="button">🗺️ 관계도 보기</button>
-              <button className="btn">📥 CSV 내보내기</button>
+              <button className="btn" onClick={exportRelationsCsv} type="button">📥 CSV 내보내기</button>
               <button className="btn btn--primary" onClick={openCreateModal} type="button">＋ 관계 등록</button>
             </div>
           </div>
@@ -587,6 +632,23 @@ export function InfraTopologyPage() {
     if (statusFilter && node.statusCode !== statusFilter) return false;
     return true;
   });
+  const exportNodesCsv = () => {
+    downloadCsv(
+      "infra-nodes.csv",
+      ["nodeId", "nodeCode", "nodeName", "nodeType", "status", "location", "vendorModel", "serverCount", "updatedAt"],
+      filteredNodes.map((node) => ({
+        nodeId: node.infraNodeId,
+        nodeCode: node.nodeCode,
+        nodeName: node.nodeName,
+        nodeType: infraNodeTypeLabels[node.nodeTypeCode] || node.nodeTypeCode,
+        status: infraStatusLabels[node.statusCode] || node.statusCode,
+        location: node.locationLabel,
+        vendorModel: node.vendorModel,
+        serverCount: node.serverCount,
+        updatedAt: node.updatedAt,
+      }))
+    );
+  };
   const openCreateModal = () => {
     setModal({
       mode: "create",
@@ -666,6 +728,7 @@ export function InfraTopologyPage() {
               <h1 className="page-head__title"><span className="page-head__icon" aria-hidden="true">🧱</span><span>인프라 토폴로지</span></h1>
             </div>
             <div className="page-head__right">
+              <button className="btn" onClick={exportNodesCsv} type="button">📥 CSV 내보내기</button>
               <button className="btn btn--primary" onClick={openCreateModal} type="button">＋ 노드 등록</button>
             </div>
           </div>
