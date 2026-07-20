@@ -1,15 +1,22 @@
-import { useEffect, useMemo } from "react";
+import { lazy, Suspense, useEffect, useMemo } from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { initAdminInteractions } from "./adminInteractions.js";
 import { AppShell } from "./components/AppShell.jsx";
 import { pages } from "./pagesData.js";
 import { PortalDataProvider, usePortalData } from "./dashboardModule/PortalDataStore";
-import { DynamicAdminListPage } from "./pages/admin/AdminListPage.jsx";
-import { InfraRelationsPage, InfraTopologyPage } from "./pages/infra/InfraPages.jsx";
-import { DashboardPage, IncidentAdminPage, IncidentDetailPage, TopologyPage } from "./pages/monitoring/MonitoringPages.jsx";
-import { NotificationHistoryPage, NotificationTemplatePage, ServiceCheckPage } from "./pages/operation/OperationPages.jsx";
-import { ServiceAdminPage } from "./pages/service/ServiceAdminPage.jsx";
-import { StatisticsPage } from "./pages/statistics/StatisticsPage.jsx";
+
+const DynamicAdminListPage = lazy(() => import("./pages/admin/AdminListPage.jsx").then((module) => ({ default: module.DynamicAdminListPage })));
+const InfraRelationsPage = lazy(() => import("./pages/infra/InfraPages.jsx").then((module) => ({ default: module.InfraRelationsPage })));
+const InfraTopologyPage = lazy(() => import("./pages/infra/InfraPages.jsx").then((module) => ({ default: module.InfraTopologyPage })));
+const DashboardPage = lazy(() => import("./pages/monitoring/MonitoringPages.jsx").then((module) => ({ default: module.DashboardPage })));
+const IncidentAdminPage = lazy(() => import("./pages/monitoring/MonitoringPages.jsx").then((module) => ({ default: module.IncidentAdminPage })));
+const IncidentDetailPage = lazy(() => import("./pages/monitoring/MonitoringPages.jsx").then((module) => ({ default: module.IncidentDetailPage })));
+const TopologyPage = lazy(() => import("./pages/monitoring/MonitoringPages.jsx").then((module) => ({ default: module.TopologyPage })));
+const NotificationHistoryPage = lazy(() => import("./pages/operation/OperationPages.jsx").then((module) => ({ default: module.NotificationHistoryPage })));
+const NotificationTemplatePage = lazy(() => import("./pages/operation/OperationPages.jsx").then((module) => ({ default: module.NotificationTemplatePage })));
+const ServiceCheckPage = lazy(() => import("./pages/operation/OperationPages.jsx").then((module) => ({ default: module.ServiceCheckPage })));
+const ServiceAdminPage = lazy(() => import("./pages/service/ServiceAdminPage.jsx").then((module) => ({ default: module.ServiceAdminPage })));
+const StatisticsPage = lazy(() => import("./pages/statistics/StatisticsPage.jsx").then((module) => ({ default: module.StatisticsPage })));
 
 const htmlPageToRoute = (href) => {
   if (!href || /^(https?:|mailto:|tel:|#)/i.test(href)) {
@@ -291,29 +298,31 @@ function AppRoutes() {
   const adminPages = Object.keys(pages).filter((slug) => pages[slug].isAdmin);
 
   return (
-    <Routes>
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
-      <Route path="/dashboard" element={<DashboardPage />} />
-      <Route path="/statistics" element={<StatisticsPage />} />
-      <Route path="/operation/service-checks" element={<ServiceCheckPage />} />
-      <Route path="/operation/notification-history" element={<NotificationHistoryPage />} />
-      <Route path="/operation/notification-templates" element={<NotificationTemplatePage />} />
-      <Route path="/analysis/statistics" element={<StatisticsPage />} />
-      <Route path="/analysis/incidents" element={<RoutePage activeMenuOverride="analysis-incidents" slug="admin-incidents" />} />
-      <Route path="/topology" element={<TopologyPage />} />
-      <Route path="/admin-infra-topology" element={<InfraTopologyPage />} />
-      <Route path="/admin-infra-relations" element={<InfraRelationsPage />} />
-      <Route path="/dashboard-proto" element={<Navigate to="/dashboard" replace />} />
-      <Route path="/dashboard-proto-detail" element={<IncidentDetailPage />} />
-      <Route path="/dashboard-proto-topology" element={<Navigate to="/topology" replace />} />
-      <Route path="/admin-services/:serviceCode" element={<AppShell activeMenu="services"><main className="main"><ServiceAdminPage /></main></AppShell>} />
-      <Route path="/admin-permissions" element={<RoutePage activeMenuOverride="permissions" slug="admin-users" />} />
-      <Route path="/admin-owner-management" element={<RoutePage activeMenuOverride="owner-management" slug="admin-owners" />} />
-      {adminPages.map((slug) => (
-        <Route key={slug} path={`/${slug}`} element={<RoutePage slug={slug} />} />
-      ))}
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
-    </Routes>
+    <Suspense fallback={<div className="route-loading">화면을 불러오는 중입니다.</div>}>
+      <Routes>
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/statistics" element={<StatisticsPage />} />
+        <Route path="/operation/service-checks" element={<ServiceCheckPage />} />
+        <Route path="/operation/notification-history" element={<NotificationHistoryPage />} />
+        <Route path="/operation/notification-templates" element={<NotificationTemplatePage />} />
+        <Route path="/analysis/statistics" element={<StatisticsPage />} />
+        <Route path="/analysis/incidents" element={<RoutePage activeMenuOverride="analysis-incidents" slug="admin-incidents" />} />
+        <Route path="/topology" element={<TopologyPage />} />
+        <Route path="/admin-infra-topology" element={<InfraTopologyPage />} />
+        <Route path="/admin-infra-relations" element={<InfraRelationsPage />} />
+        <Route path="/dashboard-proto" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/dashboard-proto-detail" element={<IncidentDetailPage />} />
+        <Route path="/dashboard-proto-topology" element={<Navigate to="/topology" replace />} />
+        <Route path="/admin-services/:serviceCode" element={<AppShell activeMenu="services"><main className="main"><ServiceAdminPage /></main></AppShell>} />
+        <Route path="/admin-permissions" element={<RoutePage activeMenuOverride="permissions" slug="admin-users" />} />
+        <Route path="/admin-owner-management" element={<RoutePage activeMenuOverride="owner-management" slug="admin-owners" />} />
+        {adminPages.map((slug) => (
+          <Route key={slug} path={`/${slug}`} element={<RoutePage slug={slug} />} />
+        ))}
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
+    </Suspense>
   );
 }
 
