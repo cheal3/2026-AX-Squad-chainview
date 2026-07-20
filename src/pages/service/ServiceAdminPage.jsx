@@ -145,6 +145,7 @@ function ServiceDetailPage({ service }) {
   const location = useLocation();
   const {
     deleteTechStack,
+    incidents,
     owners,
     relations,
     servers,
@@ -186,6 +187,17 @@ function ServiceDetailPage({ service }) {
         }),
     [relations, service.serviceId, services]
   );
+  const serviceIncidents = useMemo(
+    () =>
+      incidents
+        .filter(
+          (incident) =>
+            Number(incident.serviceId) === Number(service.serviceId) ||
+            incident.targetCode === service.serviceCode
+        )
+        .sort((left, right) => String(right.startedAt ?? "").localeCompare(String(left.startedAt ?? ""))),
+    [incidents, service.serviceCode, service.serviceId]
+  );
   const tabClassName = (tabKey) =>
     `service-detail__tab${activeTab === tabKey ? " is-active" : ""}`;
 
@@ -221,8 +233,12 @@ function ServiceDetailPage({ service }) {
     navigate("/admin-service-infra-mapping");
   };
 
-  const handleIncidentDetail = (incidentTitle) => {
-    window.alert(`${incidentTitle} 상세 보기 기능은 다음 단계에서 연결 예정입니다.`);
+  const handleIncidentDetail = (incident) => {
+    if (incident?.incidentId) {
+      navigate(`/dashboard-proto-detail?incidentId=${incident.incidentId}`);
+      return;
+    }
+    navigate("/dashboard-proto-detail");
   };
 
   return (
@@ -263,20 +279,40 @@ function ServiceDetailPage({ service }) {
         ))}
       </nav>
 
-      {activeTab === "overview" ? <ServiceOverviewTab detail={detail} onOpenDeployments={() => setTab("deployments")} onOpenInfraMap={handleInfraMapOpen} server={deploymentServer} service={service} /> : null}
+      {activeTab === "overview" ? <ServiceOverviewTab detail={detail} incidents={serviceIncidents} onOpenDeployments={() => setTab("deployments")} onOpenInfraMap={handleInfraMapOpen} onOpenIncidents={() => setTab("incidents")} server={deploymentServer} service={service} /> : null}
       {activeTab === "techstack" ? <ServiceTechStackTab detail={detail} onDelete={handleTechDelete} onEdit={handleTechEdit} techStacks={serviceTechStacks} service={service} /> : null}
       {activeTab === "deployments" ? <ServiceDeploymentTab detail={detail} onOpenDetail={handleServerDetail} onOpenInfraMap={handleInfraMapOpen} server={deploymentServer} service={service} /> : null}
       {activeTab === "impact" ? <ServiceImpactTab detail={detail} /> : null}
       {activeTab === "owners" ? <ServiceOwnersTab detail={detail} owners={serviceOwners} /> : null}
       {activeTab === "relations" ? <ServiceRelationTab detail={detail} relations={serviceRelations} /> : null}
       {activeTab === "changes" ? <ServiceChangeTab detail={detail} /> : null}
-      {activeTab === "incidents" ? <ServiceIncidentTab detail={detail} onOpenDetail={handleIncidentDetail} /> : null}
+      {activeTab === "incidents" ? <ServiceIncidentTab detail={detail} incidents={serviceIncidents} onOpenDetail={handleIncidentDetail} service={service} /> : null}
     </div>
   );
 }
 
-function ServiceOverviewTab({ detail, onOpenDeployments, onOpenInfraMap, server, service }) {
+function formatServiceDetailDate(value) {
+  if (!value) {
+    return "-";
+  }
+  return String(value).replace("T", " ").slice(0, 16);
+}
+
+function serviceIncidentStatusLabel(code) {
+  return codeLabels.incidentStatus?.[code] || code || "-";
+}
+
+function ServiceOverviewTab({ detail, incidents, onOpenDeployments, onOpenInfraMap, onOpenIncidents, server, service }) {
   const infraRelationHref = server?.infraNodeId ? `/admin-infra-relations?focusInfraNodeId=${server.infraNodeId}` : "/admin-service-infra-mapping";
+  const overviewIncidents = incidents.length
+    ? incidents.slice(0, 4).map((incident) => ({
+        key: incident.incidentId,
+        status: serviceIncidentStatusLabel(incident.incidentStatusCode),
+        time: formatServiceDetailDate(incident.startedAt),
+        title: `${incident.externalIncidentCode || `INC-${incident.incidentId}`} · ${incident.title}`,
+        duration: incident.endedAt ? "종료" : "진행중",
+      }))
+    : detail.overviewIncidents.map((item, index) => ({ ...item, key: `${item.time}-${index}` }));
   return (
     <div className="service-detail__overview-grid">
       <article className="service-detail__panel">
@@ -340,11 +376,11 @@ function ServiceOverviewTab({ detail, onOpenDeployments, onOpenInfraMap, server,
       <article className="service-detail__panel">
         <div className="service-detail__panel-head">
           <h2>인시던트 이력 (30일)</h2>
-          <button className="service-detail__text-action" type="button">전체 보기 →</button>
+          <button className="service-detail__text-action" onClick={onOpenIncidents} type="button">전체 보기 →</button>
         </div>
         <div className="service-detail__compact-list">
-          {detail.overviewIncidents.map((item) => (
-            <div className="service-detail__compact-row" key={`${item.time}-${item.title}`}>
+          {overviewIncidents.map((item) => (
+            <div className="service-detail__compact-row" key={item.key}>
               <span className="pill pill--ok">{item.status}</span>
               <span>{item.time}</span>
               <strong>{item.title}</strong>
@@ -673,7 +709,25 @@ function ServiceChangeTab({ detail }) {
   );
 }
 
-function ServiceIncidentTab({ detail, onOpenDetail }) {
+function ServiceIncidentTab({ detail, incidents, onOpenDetail, service }) {
+  const incidentRows = incidents.length
+    ? incidents.map((incident) => ({
+        key: incident.incidentId,
+        title: incident.title,
+        code: incident.externalIncidentCode || `INC-${incident.incidentId}`,
+        severity: incident.severityCode,
+        status: serviceIncidentStatusLabel(incident.incidentStatusCode),
+        direct: Number(incident.serviceId) === Number(service.serviceId) ? "직접" : "간접",
+        startedAt: formatServiceDetailDate(incident.startedAt),
+        endedAt: incident.endedAt ? formatServiceDetailDate(incident.endedAt) : "-",
+        record: incident,
+      }))
+    : detail.incidentRows.map((row, index) => ({
+        ...row,
+        key: `${row.title}-${index}`,
+        code: "-",
+        record: null,
+      }));
   return (
     <section className="service-detail__panel">
       <div className="service-detail__section-head">
@@ -696,22 +750,23 @@ function ServiceIncidentTab({ detail, onOpenDetail }) {
           </tr>
         </thead>
         <tbody>
-          {detail.incidentRows.map((row) => (
-            <tr key={row.title + row.startedAt}>
-              <td><strong className="service-detail__linkish">{row.title}</strong></td>
+          {incidentRows.map((row) => (
+            <tr key={row.key}>
+              <td><strong className="service-detail__linkish">{row.title}</strong><code className="service-detail__inline-code">{row.code}</code></td>
               <td><span className={`pill ${row.severity === "CRITICAL" ? "pill--crit" : "pill--warn"}`}>{row.severity}</span></td>
               <td><span className="pill pill--ok">{row.status}</span></td>
               <td><span className="tag">{row.direct}</span></td>
               <td>{row.startedAt}</td>
               <td>{row.endedAt}</td>
               <td className="col-actions">
-                <button className="service-detail__text-action-button" onClick={() => onOpenDetail(row.title)} type="button">
+                <button className="service-detail__text-action-button" onClick={() => onOpenDetail(row.record)} type="button">
                   <Eye size={14} />
                   상세
                 </button>
               </td>
             </tr>
           ))}
+          {!incidentRows.length ? <tr><td colSpan={7}><div className="empty">등록된 인시던트 이력이 없습니다.</div></td></tr> : null}
         </tbody>
       </table>
     </section>
