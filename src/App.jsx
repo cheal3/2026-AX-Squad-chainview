@@ -8,6 +8,7 @@ import { PortalDataProvider, usePortalData } from "./dashboardModule/PortalDataS
 const DynamicAdminListPage = lazy(() => import("./pages/admin/AdminListPage.jsx").then((module) => ({ default: module.DynamicAdminListPage })));
 const InfraRelationsPage = lazy(() => import("./pages/infra/InfraPages.jsx").then((module) => ({ default: module.InfraRelationsPage })));
 const InfraTopologyPage = lazy(() => import("./pages/infra/InfraPages.jsx").then((module) => ({ default: module.InfraTopologyPage })));
+const ServiceInfraMappingPage = lazy(() => import("./pages/infra/ServiceInfraMappingPage.jsx").then((module) => ({ default: module.ServiceInfraMappingPage })));
 const DashboardPage = lazy(() => import("./pages/monitoring/MonitoringPages.jsx").then((module) => ({ default: module.DashboardPage })));
 const IncidentAdminPage = lazy(() => import("./pages/monitoring/MonitoringPages.jsx").then((module) => ({ default: module.IncidentAdminPage })));
 const IncidentDetailPage = lazy(() => import("./pages/monitoring/MonitoringPages.jsx").then((module) => ({ default: module.IncidentDetailPage })));
@@ -60,6 +61,7 @@ const menuMetaByKey = {
   deployments: { section: "인프라", label: "배포 현황", icon: "🚀" },
   "infra-topology": { section: "인프라", label: "인프라 토폴로지", icon: "🧱" },
   "infra-relations": { section: "인프라", label: "인프라 관계조회", icon: "🔌" },
+  "service-infra-mapping": { section: "인프라", label: "서비스 배치 매핑", icon: "🧭" },
   "service-checks": { section: "운영", label: "서비스 점검", icon: "🧪" },
   "notification-history": { section: "운영", label: "알림 전송 이력", icon: "🔔" },
   "notification-templates": { section: "운영", label: "알림 템플릿 관리", icon: "📄" },
@@ -311,6 +313,7 @@ function AppRoutes() {
         <Route path="/topology" element={<TopologyPage />} />
         <Route path="/admin-infra-topology" element={<InfraTopologyPage />} />
         <Route path="/admin-infra-relations" element={<InfraRelationsPage />} />
+        <Route path="/admin-service-infra-mapping" element={<ServiceInfraMappingPage />} />
         <Route path="/dashboard-proto" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard-proto-detail" element={<IncidentDetailPage />} />
         <Route path="/dashboard-proto-topology" element={<Navigate to="/topology" replace />} />
