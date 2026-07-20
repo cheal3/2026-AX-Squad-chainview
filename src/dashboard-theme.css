@@ -2344,6 +2344,70 @@
   padding: 16px;
 }
 
+.service-detail__infra-card {
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #f8fbff;
+  padding: 14px;
+  margin-bottom: 12px;
+}
+
+.service-detail__infra-card--wide {
+  margin-bottom: 16px;
+}
+
+.service-detail__infra-card > div:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.service-detail__infra-card strong {
+  color: var(--text);
+  font-size: 15px;
+}
+
+.service-detail__infra-card span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.service-detail__infra-card dl {
+  display: grid;
+  grid-template-columns: 86px minmax(0, 1fr);
+  gap: 8px 12px;
+  margin: 0;
+}
+
+.service-detail__infra-card dt {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.service-detail__infra-card dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.service-detail__infra-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.service-detail__infra-actions .btn.is-disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
 .service-detail__deploy-head {
   display: flex;
   align-items: center;

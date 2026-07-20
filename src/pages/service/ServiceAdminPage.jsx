@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Eye, Mail, MessageCircle, Pencil, Phone, Plus, Trash2 } from "lucide-react";
 
@@ -142,8 +142,13 @@ export function ServiceAdminPage() {
 function ServiceDetailPage({ service }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { servers } = usePortalData();
   const activeTab = new URLSearchParams(location.search).get("tab") || "overview";
   const [detail, setDetail] = useState(() => cloneServiceDetailSample(service.serviceCode));
+  const deploymentServer = useMemo(
+    () => servers.find((server) => Number(server.serverId) === Number(service.serverId)),
+    [servers, service.serverId]
+  );
   const tabClassName = (tabKey) =>
     `service-detail__tab${activeTab === tabKey ? " is-active" : ""}`;
 
@@ -182,6 +187,9 @@ function ServiceDetailPage({ service }) {
 
   const handleServerDetail = (serverName) => {
     window.alert(`${serverName} 서버 상세 보기 기능은 다음 단계에서 연결 예정입니다.`);
+  };
+  const handleInfraMapOpen = () => {
+    navigate("/admin-service-infra-mapping");
   };
 
   const handleIncidentDetail = (incidentTitle) => {
@@ -226,9 +234,9 @@ function ServiceDetailPage({ service }) {
         ))}
       </nav>
 
-      {activeTab === "overview" ? <ServiceOverviewTab detail={detail} onOpenDeployments={() => setTab("deployments")} service={service} /> : null}
+      {activeTab === "overview" ? <ServiceOverviewTab detail={detail} onOpenDeployments={() => setTab("deployments")} onOpenInfraMap={handleInfraMapOpen} server={deploymentServer} service={service} /> : null}
       {activeTab === "techstack" ? <ServiceTechStackTab detail={detail} onDelete={handleTechDelete} onEdit={handleTechEdit} /> : null}
-      {activeTab === "deployments" ? <ServiceDeploymentTab detail={detail} onOpenDetail={handleServerDetail} /> : null}
+      {activeTab === "deployments" ? <ServiceDeploymentTab detail={detail} onOpenDetail={handleServerDetail} onOpenInfraMap={handleInfraMapOpen} server={deploymentServer} service={service} /> : null}
       {activeTab === "impact" ? <ServiceImpactTab detail={detail} /> : null}
       {activeTab === "owners" ? <ServiceOwnersTab detail={detail} /> : null}
       {activeTab === "relations" ? <ServiceRelationTab detail={detail} /> : null}
@@ -238,7 +246,8 @@ function ServiceDetailPage({ service }) {
   );
 }
 
-function ServiceOverviewTab({ detail, onOpenDeployments, service }) {
+function ServiceOverviewTab({ detail, onOpenDeployments, onOpenInfraMap, server, service }) {
+  const infraRelationHref = server?.infraNodeId ? `/admin-infra-relations?focusInfraNodeId=${server.infraNodeId}` : "/admin-service-infra-mapping";
   return (
     <div className="service-detail__overview-grid">
       <article className="service-detail__panel">
@@ -259,8 +268,25 @@ function ServiceOverviewTab({ detail, onOpenDeployments, service }) {
 
       <article className="service-detail__panel">
         <div className="service-detail__panel-head">
-          <h2>배포/서버</h2>
-          <span>1 / 3 down · DEPLOYMENT ⇄ SERVER</span>
+          <h2>배포/서버/인프라</h2>
+          <span>DEPLOYMENT ⇄ SERVER ⇄ INFRA</span>
+        </div>
+        <div className="service-detail__infra-card">
+          <div>
+            <strong>{server?.serverName || "배포 서버 미지정"}</strong>
+            <span>{server ? `${server.hostName} · ${server.ipAddress}` : "서비스 배치 매핑에서 서버를 연결해주세요."}</span>
+          </div>
+          <dl>
+            <dt>배포 경로</dt><dd>{service.deployPath || "-"}</dd>
+            <dt>포트</dt><dd>{service.portInfo || "-"}</dd>
+            <dt>인스턴스</dt><dd>{service.instanceCount ?? 0}개</dd>
+            <dt>인프라 노드</dt><dd>{server?.infraNodeName || "인프라 미매핑"}</dd>
+          </dl>
+          <div className="service-detail__infra-actions">
+            <button className="btn btn--ghost btn--sm" onClick={onOpenDeployments} type="button">서버 정보</button>
+            <button className="btn btn--ghost btn--sm" onClick={onOpenInfraMap} type="button">배치 매핑</button>
+            <Link className={`btn btn--primary btn--sm${server?.infraNodeId ? "" : " is-disabled"}`} to={infraRelationHref}>인프라 관계도</Link>
+          </div>
         </div>
         <div className="service-detail__stack-list">
           {detail.deploymentRows.map((row) => (
@@ -422,7 +448,8 @@ function ServiceTechStackTab({ detail, onDelete, onEdit }) {
   );
 }
 
-function ServiceDeploymentTab({ detail, onOpenDetail }) {
+function ServiceDeploymentTab({ detail, onOpenDetail, onOpenInfraMap, server, service }) {
+  const infraRelationHref = server?.infraNodeId ? `/admin-infra-relations?focusInfraNodeId=${server.infraNodeId}` : "/admin-service-infra-mapping";
   return (
     <section className="service-detail__panel">
       <div className="service-detail__section-head">
@@ -430,7 +457,24 @@ function ServiceDeploymentTab({ detail, onOpenDetail }) {
           <h2>서버/배포 정보</h2>
           <p>이 서비스가 배포된 서버 목록</p>
         </div>
-        <button className="btn btn--ghost btn--sm" type="button"><Plus size={14} /> 서버 연결</button>
+        <button className="btn btn--ghost btn--sm" onClick={onOpenInfraMap} type="button"><Plus size={14} /> 서버 연결</button>
+      </div>
+      <div className="service-detail__infra-card service-detail__infra-card--wide">
+        <div>
+          <strong>{server?.serverName || "배포 서버 미지정"}</strong>
+          <span>{server ? `${server.hostName} · ${server.ipAddress}` : "서비스 배치 매핑에서 서버를 연결해주세요."}</span>
+        </div>
+        <dl>
+          <dt>환경</dt><dd>{server?.envCode || "-"}</dd>
+          <dt>OS</dt><dd>{server ? `${server.osTypeCode} ${server.osVersion}` : "-"}</dd>
+          <dt>배포 경로</dt><dd>{service.deployPath || "-"}</dd>
+          <dt>포트</dt><dd>{service.portInfo || "-"}</dd>
+          <dt>인프라 노드</dt><dd>{server?.infraNodeName || "인프라 미매핑"}</dd>
+        </dl>
+        <div className="service-detail__infra-actions">
+          <button className="btn btn--ghost btn--sm" onClick={onOpenInfraMap} type="button">배치 매핑 수정</button>
+          <Link className={`btn btn--primary btn--sm${server?.infraNodeId ? "" : " is-disabled"}`} to={infraRelationHref}>인프라 관계도</Link>
+        </div>
       </div>
       <table className="tbl service-detail__full-table">
         <thead>

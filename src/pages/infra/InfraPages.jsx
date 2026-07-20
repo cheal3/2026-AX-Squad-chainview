@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { AppShell } from "../../components/AppShell.jsx";
 import { ModalBackdrop } from "../../components/ModalBackdrop.jsx";
 import { chainViewApi } from "../../dashboardModule/chainViewApi";
@@ -148,6 +149,7 @@ function downloadCsv(filename, headers, rows) {
 }
 
 export function InfraRelationsPage() {
+  const location = useLocation();
   const [nodes, setNodes] = useState(initialInfraNodes);
   const [relations, setRelations] = useState(initialInfraRelations);
   const [keyword, setKeyword] = useState("");
@@ -161,6 +163,7 @@ export function InfraRelationsPage() {
     () => new Map(nodes.map((node) => [node.infraNodeId, node])),
     [nodes]
   );
+  const focusInfraNodeId = new URLSearchParams(location.search).get("focusInfraNodeId");
   useEffect(() => {
     if (!shouldUseRemoteInfraApi()) return;
     let cancelled = false;
@@ -182,6 +185,13 @@ export function InfraRelationsPage() {
       cancelled = true;
     };
   }, []);
+  useEffect(() => {
+    if (!focusInfraNodeId) return;
+    const nextFocusNodeId = Number(focusInfraNodeId);
+    if (!nodes.some((node) => Number(node.infraNodeId) === nextFocusNodeId)) return;
+    setGraphFocusNodeId(nextFocusNodeId);
+    setGraphOpen(true);
+  }, [focusInfraNodeId, nodes]);
   const filteredRelations = relations.filter((relation) => {
     const sourceNode = nodeById.get(Number(relation.sourceInfraNodeId));
     const targetNode = nodeById.get(Number(relation.targetInfraNodeId));
