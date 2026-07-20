@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Eye, Mail, MessageCircle, Pencil, Phone, Plus, Trash2 } from "lucide-react";
 
 import { usePortalData } from "../../dashboardModule/PortalDataStore";
+import { chainViewApi } from "../../dashboardModule/chainViewApi";
 import { codeLabels } from "../../dashboardModule/mockData";
 
 const serviceDetailTabs = [
@@ -155,6 +156,8 @@ function ServiceDetailPage({ service }) {
   } = usePortalData();
   const activeTab = new URLSearchParams(location.search).get("tab") || "overview";
   const [detail, setDetail] = useState(() => cloneServiceDetailSample(service.serviceCode));
+  const [changeRows, setChangeRows] = useState([]);
+  const [changeSourceLabel, setChangeSourceLabel] = useState("샘플 기준");
   const deploymentServer = useMemo(
     () => servers.find((server) => Number(server.serverId) === Number(service.serverId)),
     [servers, service.serverId]
@@ -204,6 +207,29 @@ function ServiceDetailPage({ service }) {
   useEffect(() => {
     setDetail(cloneServiceDetailSample(service.serviceCode));
   }, [service.serviceCode]);
+
+  useEffect(() => {
+    setChangeRows([]);
+    setChangeSourceLabel("샘플 기준");
+    if (import.meta.env.DEV || !service.serviceId) {
+      return undefined;
+    }
+    let cancelled = false;
+    chainViewApi.services
+      .changeHistory(Number(service.serviceId))
+      .then((rows) => {
+        if (cancelled) return;
+        setChangeRows(rows.map(normalizeServiceChangeRow).filter(Boolean));
+        setChangeSourceLabel("운영 API 기준");
+      })
+      .catch((error) => {
+        console.warn("서비스 변경 이력 API 조회 실패, 샘플 데이터를 사용합니다.", error);
+        if (!cancelled) setChangeSourceLabel("샘플 기준");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [service.serviceId]);
 
   const setTab = (tabKey) => {
     navigate(`/admin-services/${service.serviceCode}?tab=${tabKey}`);
@@ -285,7 +311,7 @@ function ServiceDetailPage({ service }) {
       {activeTab === "impact" ? <ServiceImpactTab detail={detail} /> : null}
       {activeTab === "owners" ? <ServiceOwnersTab detail={detail} owners={serviceOwners} /> : null}
       {activeTab === "relations" ? <ServiceRelationTab detail={detail} relations={serviceRelations} /> : null}
-      {activeTab === "changes" ? <ServiceChangeTab detail={detail} /> : null}
+      {activeTab === "changes" ? <ServiceChangeTab detail={detail} rows={changeRows} sourceLabel={changeSourceLabel} /> : null}
       {activeTab === "incidents" ? <ServiceIncidentTab detail={detail} incidents={serviceIncidents} onOpenDetail={handleIncidentDetail} service={service} /> : null}
     </div>
   );
@@ -296,6 +322,49 @@ function formatServiceDetailDate(value) {
     return "-";
   }
   return String(value).replace("T", " ").slice(0, 16);
+}
+
+function normalizeServiceChangeRow(row) {
+  if (!row || typeof row !== "object") {
+    return null;
+  }
+  const type =
+    row.changeTypeName ||
+    row.changeTypeCode ||
+    row.actionType ||
+    row.action ||
+    row.type ||
+    "수정";
+  const actor =
+    row.actorName ||
+    row.changedByName ||
+    row.changedBy ||
+    row.createdBy ||
+    row.actor ||
+    "-";
+  const at =
+    row.changedAt ||
+    row.createdAt ||
+    row.updatedAt ||
+    row.occurredAt ||
+    row.at ||
+    "";
+  const field =
+    row.fieldName ||
+    row.changedField ||
+    row.propertyName ||
+    row.field ||
+    row.targetField ||
+    "-";
+  return {
+    key: row.changeHistoryId || row.historyId || row.id || `${actor}-${at}-${field}`,
+    type,
+    actor,
+    at: formatServiceDetailDate(at),
+    field,
+    before: row.beforeValue ?? row.oldValue ?? row.previousValue ?? row.before ?? "-",
+    after: row.afterValue ?? row.newValue ?? row.currentValue ?? row.after ?? "-",
+  };
 }
 
 function serviceIncidentStatusLabel(code) {
@@ -672,7 +741,13 @@ function ServiceRelationTab({ detail, relations }) {
   );
 }
 
-function ServiceChangeTab({ detail }) {
+function ServiceChangeTab({ detail, rows, sourceLabel }) {
+  const changeRows = rows.length
+    ? rows
+    : detail.changeRows.map((row, index) => ({
+        ...row,
+        key: `${row.actor}-${row.at}-${index}`,
+      }));
   return (
     <section className="service-detail__panel">
       <div className="service-detail__section-head">
@@ -680,6 +755,7 @@ function ServiceChangeTab({ detail }) {
           <h2>변경 이력</h2>
           <p>서비스 정보 변경 기록</p>
         </div>
+        <span className="service-detail__source-label">{sourceLabel}</span>
       </div>
       <table className="tbl service-detail__full-table">
         <thead>
@@ -693,8 +769,8 @@ function ServiceChangeTab({ detail }) {
           </tr>
         </thead>
         <tbody>
-          {detail.changeRows.map((row) => (
-            <tr key={row.actor + row.at}>
+          {changeRows.map((row) => (
+            <tr key={row.key}>
               <td><span className={`service-detail__change-badge ${row.type === "등록" ? "is-create" : "is-update"}`}>{row.type}</span></td>
               <td>{row.actor}</td>
               <td>{row.at}</td>
@@ -703,6 +779,7 @@ function ServiceChangeTab({ detail }) {
               <td>{row.after}</td>
             </tr>
           ))}
+          {!changeRows.length ? <tr><td colSpan={6}><div className="empty">변경 이력이 없습니다.</div></td></tr> : null}
         </tbody>
       </table>
     </section>
