@@ -87,6 +87,53 @@ type RelationImpactSummary = {
   text: string;
 };
 
+function normalizeGraphLookupValue(value?: string | null) {
+  return (value ?? "").toLowerCase().replace(/[^a-z0-9가-힣]/g, "");
+}
+
+function inferInfraNodeCodeForServer(server?: ServerRecord) {
+  if (!server) {
+    return undefined;
+  }
+
+  const host = server.hostName.toLowerCase();
+  const name = normalizeGraphLookupValue(server.serverName);
+
+  if (/chn-prd-(web|was)0?1/.test(host)) return "X86-CHN-PRD-01";
+  if (/chn-prd-(web|was)0?2/.test(host)) return "X86-CHN-PRD-02";
+  if (/core-prd-was0?1/.test(host)) return "LPAR-WAS-01";
+  if (/core-prd-was0?2/.test(host)) return "LPAR-WAS-02";
+  if (/core-prd-batch/.test(host)) return "LPAR-BATCH-01";
+  if (/dr-chn-web/.test(host)) return "LPAR-DR-WAS-01";
+  if (/if-prd-/.test(host)) return "X86-IF-PRD-01";
+  if (/db-prd-/.test(host)) return "ORA-RAC-PRD-01";
+  if (/cmm-prd-|msg-prd-|mon-prd-|data-prd-/.test(host)) {
+    return "X86-CMM-PRD-01";
+  }
+
+  if (name.includes("채널") && name.includes("1")) return "X86-CHN-PRD-01";
+  if (name.includes("채널") && name.includes("2")) return "X86-CHN-PRD-02";
+  if (name.includes("기간계") && name.includes("was") && name.includes("1")) {
+    return "LPAR-WAS-01";
+  }
+  if (name.includes("기간계") && name.includes("was") && name.includes("2")) {
+    return "LPAR-WAS-02";
+  }
+  if (name.includes("기간계") && name.includes("배치")) return "LPAR-BATCH-01";
+  if (name.includes("대외계")) return "X86-IF-PRD-01";
+  if (
+    name.includes("인증") ||
+    name.includes("공통") ||
+    name.includes("메시징") ||
+    name.includes("모니터링") ||
+    name.includes("정보계")
+  ) {
+    return "X86-CMM-PRD-01";
+  }
+
+  return undefined;
+}
+
 const NODE_WIDTH = 240;
 const X_SPACING = 470;
 const Y_SPACING = 238;
@@ -96,6 +143,7 @@ const ALL_SERVICES_CATEGORY_GAP = 36;
 const LANE_HEIGHT = 4600;
 const DEPENDS_ON_COLOR = "#475569";
 const IMPACT_COLOR = "#2563eb";
+const SERVICE_INFRA_COLOR = "#f59e0b";
 const MAX_RELATION_DEPTH = 2;
 const RELATION_DETAIL_WIDTH = 340;
 const RELATION_COLLAPSED_WIDTH = 112;
@@ -103,7 +151,7 @@ const RELATION_COLLAPSED_HEIGHT = 40;
 const RELATION_WIDTH_ANIMATION_MS = 180;
 const RELATION_HEIGHT_ANIMATION_MS = 300;
 type TopControlMode = "select" | "search";
-type GraphViewMode = "service" | "infra";
+type GraphViewMode = "all" | "service" | "infra";
 type GraphModeTogglePlacement = "top-right" | "bottom-center";
 type RelationLegendPlacement = "bottom-right" | "top-left";
 type IncidentCanvasTone = "dark" | "light";
@@ -340,7 +388,7 @@ export function ServiceRelationFlow({
     initialRelationDepth ?? (hideDepthToggle ? MAX_RELATION_DEPTH : 1)
   );
   const [graphViewMode, setGraphViewMode] = useState<GraphViewMode>(
-    initialInfraDepth > 0 ? "infra" : "service"
+    initialInfraDepth > 0 ? "infra" : showAllServices && !incidentMode ? "all" : "service"
   );
   const [infraGraphNodes, setInfraGraphNodes] = useState<InfraGraphNodeRecord[]>(
     () => infraNodesSnapshot.map(normalizeInfraNode)
@@ -444,6 +492,9 @@ export function ServiceRelationFlow({
     setSelectedInfraNodeId((current) => {
       const next = current === infraNodeId ? null : infraNodeId;
       setDetailOpen(Boolean(next));
+      if (next) {
+        setSelectedServiceNodeId(null);
+      }
       onSelectInfraNode?.(
         next
           ? infraGraphNodes.find((node) => node.infraNodeId === next)
@@ -462,6 +513,7 @@ export function ServiceRelationFlow({
         const next = current === serviceId ? null : serviceId;
         setDetailOpen(false);
         if (next) {
+          setSelectedInfraNodeId(null);
           onSelectInfraNode?.(undefined);
           onSelectService?.(next);
         }
@@ -477,8 +529,12 @@ export function ServiceRelationFlow({
       if (mode === "service") {
         setSelectedInfraNodeId(null);
         onSelectInfraNode?.(undefined);
+      } else if (mode === "infra") {
+        setSelectedServiceNodeId(null);
       } else {
         setSelectedServiceNodeId(null);
+        setSelectedInfraNodeId(null);
+        onSelectInfraNode?.(undefined);
       }
     },
     [onSelectInfraNode]
@@ -490,6 +546,14 @@ export function ServiceRelationFlow({
     }
     if (graphViewMode === "infra") {
       setSelectedInfraNodeId(null);
+      setDetailOpen(false);
+      onSelectInfraNode?.(undefined);
+      return;
+    }
+
+    if (graphViewMode === "all") {
+      setSelectedInfraNodeId(null);
+      setSelectedServiceNodeId(null);
       setDetailOpen(false);
       onSelectInfraNode?.(undefined);
       return;
@@ -507,6 +571,80 @@ export function ServiceRelationFlow({
     () => new Map(servers.map((server) => [server.serverId, server])),
     [servers]
   );
+  const serviceInfraTargetByServiceId = useMemo(() => {
+    const infraById = new Map(
+      infraGraphNodes.map((node) => [node.infraNodeId, node])
+    );
+    const infraByCode = new Map(
+      infraGraphNodes.map((node) => [
+        normalizeGraphLookupValue(node.nodeCode),
+        node.infraNodeId,
+      ])
+    );
+    const infraByName = new Map(
+      infraGraphNodes.map((node) => [
+        normalizeGraphLookupValue(node.nodeName),
+        node.infraNodeId,
+      ])
+    );
+    const next = new Map<number, number>();
+
+    services.forEach((service) => {
+      const server = serverById.get(service.serverId);
+      if (!server) {
+        return;
+      }
+
+      if (server.infraNodeId && infraById.has(server.infraNodeId)) {
+        next.set(service.serviceId, server.infraNodeId);
+        return;
+      }
+
+      const directCode = normalizeGraphLookupValue(server.infraNodeCode);
+      const directName = normalizeGraphLookupValue(server.infraNodeName);
+      const inferredCode = normalizeGraphLookupValue(
+        inferInfraNodeCodeForServer(server)
+      );
+
+      const infraNodeId =
+        infraByCode.get(directCode) ??
+        infraByName.get(directName) ??
+        infraByCode.get(inferredCode);
+
+      if (infraNodeId) {
+        next.set(service.serviceId, infraNodeId);
+      }
+    });
+
+    return next;
+  }, [infraGraphNodes, serverById, services]);
+  const selectedServiceInfraNodeIds = useMemo(() => {
+    const next = new Set<number>();
+    if (!selectedServiceNodeId) {
+      return next;
+    }
+
+    const infraNodeId = serviceInfraTargetByServiceId.get(selectedServiceNodeId);
+    if (infraNodeId) {
+      next.add(infraNodeId);
+    }
+
+    return next;
+  }, [selectedServiceNodeId, serviceInfraTargetByServiceId]);
+  const selectedInfraServiceIds = useMemo(() => {
+    const next = new Set<number>();
+    if (!selectedInfraNodeId) {
+      return next;
+    }
+
+    serviceInfraTargetByServiceId.forEach((infraNodeId, serviceId) => {
+      if (infraNodeId === selectedInfraNodeId) {
+        next.add(serviceId);
+      }
+    });
+
+    return next;
+  }, [selectedInfraNodeId, serviceInfraTargetByServiceId]);
   const ownersByServiceId = useMemo(() => {
     const next = new Map<number, string[]>();
     owners.forEach((owner) => {
@@ -1033,7 +1171,10 @@ export function ServiceRelationFlow({
     const visibleServices = filteredServices.filter((service) => {
       return visibleServiceIds.has(service.serviceId);
     });
-    const highlightedServiceId = incidentMode
+    const allMode = graphViewMode === "all";
+    const hasSelectedInfraInAllMode =
+      allMode && Boolean(selectedInfraNodeId);
+    const highlightedServiceId = incidentMode || hasSelectedInfraInAllMode
       ? null
       : showAllServices
         ? selectedServiceNodeId
@@ -1056,18 +1197,27 @@ export function ServiceRelationFlow({
 
     return visibleServices.map((service) => {
       const lane = laneByServiceId.get(service.serviceId) ?? 0;
-      const connected =
+      const connectedByService =
         Boolean(highlightedServiceId) &&
         (service.serviceId === highlightedServiceId ||
           highlightedConnectedServiceIds.has(service.serviceId));
-      const focused = Boolean(highlightedServiceId) && service.serviceId === highlightedServiceId;
-      const dimmed = Boolean(highlightedServiceId) && !connected;
+      const connectedByInfra =
+        hasSelectedInfraInAllMode &&
+        selectedInfraServiceIds.has(service.serviceId);
+      const connected = connectedByService || connectedByInfra;
+      const focused =
+        (Boolean(highlightedServiceId) &&
+          service.serviceId === highlightedServiceId) ||
+        connectedByInfra;
+      const dimmed =
+        (Boolean(highlightedServiceId) || hasSelectedInfraInAllMode) &&
+        !connected;
 
       return {
         id: String(service.serviceId),
         type: "serviceNode",
         position: {
-          x: lane * X_SPACING,
+          x: lane * X_SPACING + (allMode ? -260 : 0),
           y: yByServiceId.get(service.serviceId) ?? 0,
         },
         data: {
@@ -1103,6 +1253,7 @@ export function ServiceRelationFlow({
     activeRelations,
     detailOpen,
     detailServiceId,
+    graphViewMode,
     incidentMode,
     laneByServiceId,
     highlightServiceId,
@@ -1115,6 +1266,8 @@ export function ServiceRelationFlow({
     relationImpactByServiceId,
     filteredServices,
     selectedServiceNodeId,
+    selectedInfraNodeId,
+    selectedInfraServiceIds,
     showAllServices,
     toggleSelectedServiceNode,
     visibleServiceIds,
@@ -1125,6 +1278,7 @@ export function ServiceRelationFlow({
     if (graphViewMode === "service") {
       return [];
     }
+    const allMode = graphViewMode === "all";
 
     const nodeById = new Map(
       infraGraphNodes.map((node) => [node.infraNodeId, node])
@@ -1198,6 +1352,7 @@ export function ServiceRelationFlow({
 
     const INFRA_X_SPACING = 430;
     const INFRA_Y_SPACING = 148;
+    const INFRA_ALL_MODE_X_OFFSET = 980;
     const nodes: Node<ServerInfraNodeData>[] = [];
 
     Array.from(groups.entries())
@@ -1211,19 +1366,41 @@ export function ServiceRelationFlow({
         );
 
         sortedNodes.forEach((node, index) => {
+          const connectedToSelectedService =
+            allMode && selectedServiceInfraNodeIds.has(node.infraNodeId);
+          const hasSelectedServiceInAllMode =
+            allMode && Boolean(selectedServiceNodeId);
+          const hasSelectedInfraInAllMode =
+            allMode && Boolean(selectedInfraNodeId);
+          const connectedToSelectedInfra =
+            allMode && selectedInfraConnectedNodeIds.has(node.infraNodeId);
           nodes.push({
             id: `infra-${node.infraNodeId}`,
             type: "serverInfraNode",
             position: {
-              x: lane * INFRA_X_SPACING,
+              x: lane * INFRA_X_SPACING + (allMode ? INFRA_ALL_MODE_X_OFFSET : 0),
               y: centeredOffset(index, sortedNodes.length, INFRA_Y_SPACING),
             },
             data: {
-              connected: selectedInfraConnectedNodeIds.has(node.infraNodeId),
+              connected:
+                allMode
+                  ? (!hasSelectedServiceInAllMode &&
+                      !hasSelectedInfraInAllMode) ||
+                    connectedToSelectedService ||
+                    connectedToSelectedInfra
+                  : selectedInfraConnectedNodeIds.has(node.infraNodeId),
               dimmed:
-                Boolean(selectedInfraNodeId) &&
-                !selectedInfraConnectedNodeIds.has(node.infraNodeId),
-              focused: selectedInfraNodeId === node.infraNodeId,
+                allMode
+                  ? (hasSelectedServiceInAllMode ||
+                      hasSelectedInfraInAllMode) &&
+                    !connectedToSelectedService &&
+                    !connectedToSelectedInfra
+                  : Boolean(selectedInfraNodeId) &&
+                    !selectedInfraConnectedNodeIds.has(node.infraNodeId),
+              focused: allMode
+                ? connectedToSelectedService ||
+                  selectedInfraNodeId === node.infraNodeId
+                : selectedInfraNodeId === node.infraNodeId,
               infraNodeId: node.infraNodeId,
               kind: "infra",
               label: node.nodeName,
@@ -1243,6 +1420,8 @@ export function ServiceRelationFlow({
     infraGraphRelations,
     selectedInfraConnectedNodeIds,
     selectedInfraNodeId,
+    selectedServiceInfraNodeIds,
+    selectedServiceNodeId,
   ]);
   const topologyNodePositionById = useMemo(
     () =>
@@ -1281,11 +1460,22 @@ export function ServiceRelationFlow({
         const highlightedServiceId = showAllServices
           ? selectedServiceNodeId
           : selectedServiceNodeId ?? highlightServiceId ?? focusedServiceId;
-        const hasHighlight = !incidentMode && Boolean(highlightedServiceId);
+        const hasInfraHighlight =
+          graphViewMode === "all" && selectedInfraServiceIds.size > 0;
+        const sourceInInfraScope = selectedInfraServiceIds.has(
+          relation.sourceServiceId
+        );
+        const targetInInfraScope = selectedInfraServiceIds.has(
+          relation.targetServiceId
+        );
+        const hasHighlight =
+          !incidentMode && (Boolean(highlightedServiceId) || hasInfraHighlight);
         const directlyConnected =
-          hasHighlight &&
-          (relation.sourceServiceId === highlightedServiceId ||
-            relation.targetServiceId === highlightedServiceId);
+          !incidentMode &&
+          ((Boolean(highlightedServiceId) &&
+            (relation.sourceServiceId === highlightedServiceId ||
+              relation.targetServiceId === highlightedServiceId)) ||
+            (hasInfraHighlight && sourceInInfraScope && targetInInfraScope));
         const stroke = incidentMode
           ? "#ff3344"
           : sourceLane >= 0 && targetLane > sourceLane
@@ -1313,10 +1503,6 @@ export function ServiceRelationFlow({
           },
         };
       });
-
-    if (graphViewMode === "service") {
-      return serviceRelationEdges;
-    }
 
     const topologyRelationEdges: Edge[] = [];
     const addedTopologyRelationEdges = new Set<string>();
@@ -1346,10 +1532,21 @@ export function ServiceRelationFlow({
         !targetPosition ||
         sourcePosition.x <= targetPosition.x;
 
+      const hasSelectedServiceInAllMode =
+        graphViewMode === "all" && Boolean(selectedServiceNodeId);
+      const hasSelectedInfraInAllMode =
+        graphViewMode === "all" && Boolean(selectedInfraNodeId);
       const directlyConnectedToSelected =
-        selectedInfraNodeId === null ||
-        relation.sourceInfraNodeId === selectedInfraNodeId ||
-        relation.targetInfraNodeId === selectedInfraNodeId;
+        graphViewMode === "all"
+          ? hasSelectedServiceInAllMode
+            ? selectedServiceInfraNodeIds.has(relation.sourceInfraNodeId) &&
+              selectedServiceInfraNodeIds.has(relation.targetInfraNodeId)
+            : !hasSelectedInfraInAllMode ||
+              relation.sourceInfraNodeId === selectedInfraNodeId ||
+              relation.targetInfraNodeId === selectedInfraNodeId
+          : selectedInfraNodeId === null ||
+            relation.sourceInfraNodeId === selectedInfraNodeId ||
+            relation.targetInfraNodeId === selectedInfraNodeId;
 
       addedTopologyRelationEdges.add(edgeId);
       topologyRelationEdges.push({
@@ -1374,7 +1571,67 @@ export function ServiceRelationFlow({
       });
     });
 
-    return topologyRelationEdges;
+    const serviceInfraEdges: Edge[] =
+      graphViewMode === "all"
+        ? filteredServices
+            .filter((service) => visibleServiceIds.has(service.serviceId))
+            .flatMap((service) => {
+              const infraNodeId = serviceInfraTargetByServiceId.get(
+                service.serviceId
+              );
+              if (!infraNodeId) {
+                return [];
+              }
+
+              const sourceNodeId = String(service.serviceId);
+              const targetNodeId = `infra-${infraNodeId}`;
+              if (
+                !visibleServiceIds.has(service.serviceId) ||
+                !visibleNodeIds.has(targetNodeId)
+              ) {
+                return [];
+              }
+              const hasSelection =
+                Boolean(selectedServiceNodeId) || Boolean(selectedInfraNodeId);
+              const active =
+                selectedServiceNodeId === service.serviceId ||
+                selectedInfraNodeId === infraNodeId;
+
+              return [
+                {
+                  id: `service-infra-${service.serviceId}-${infraNodeId}`,
+                  source: sourceNodeId,
+                  target: targetNodeId,
+                  targetHandle: "left-target",
+                  type: "default",
+                  animated: true,
+                  className:
+                    `chainview-flow-edge chainview-flow-edge-service-infra ${
+                      active
+                        ? "chainview-flow-edge-service-infra-active"
+                        : hasSelection
+                          ? "chainview-flow-edge-service-infra-muted"
+                          : ""
+                    }`,
+                  style: {
+                    stroke: SERVICE_INFRA_COLOR,
+                    strokeWidth: active ? 2.8 : 2,
+                    opacity: active ? 0.95 : hasSelection ? 0.14 : 0.72,
+                  },
+                },
+              ];
+            })
+        : [];
+
+    if (graphViewMode === "service") {
+      return serviceRelationEdges;
+    }
+
+    if (graphViewMode === "infra") {
+      return topologyRelationEdges;
+    }
+
+    return [...serviceRelationEdges, ...topologyRelationEdges, ...serviceInfraEdges];
   }, [
     activeRelations,
     filteredServices,
@@ -1386,7 +1643,10 @@ export function ServiceRelationFlow({
     laneByServiceId,
     serviceById,
     serverById,
+    serviceInfraTargetByServiceId,
     selectedInfraNodeId,
+    selectedInfraServiceIds,
+    selectedServiceInfraNodeIds,
     selectedServiceNodeId,
     showAllServices,
     topologyNodes,
@@ -1396,10 +1656,17 @@ export function ServiceRelationFlow({
   ]);
 
   const nodes = useMemo<Node<GraphNodeData>[]>(
-    () =>
-      graphViewMode === "service"
-        ? [...laneNodes, ...serviceNodes]
-        : topologyNodes,
+    () => {
+      if (graphViewMode === "service") {
+        return [...laneNodes, ...serviceNodes];
+      }
+
+      if (graphViewMode === "infra") {
+        return topologyNodes;
+      }
+
+      return [...serviceNodes, ...topologyNodes];
+    },
     [graphViewMode, laneNodes, serviceNodes, topologyNodes]
   );
   const nodeTypes = useMemo(
@@ -1577,11 +1844,16 @@ export function ServiceRelationFlow({
             />
           )}
 
-          {graphViewMode === "service" && !incidentMode && (
-            <RelationEdgeLegend placement={legendPlacement} />
+          {(graphViewMode === "service" || graphViewMode === "all") && !incidentMode && (
+            <RelationEdgeLegend
+              includeServiceInfra={graphViewMode === "all"}
+              placement={legendPlacement}
+            />
           )}
 
-          {graphViewMode === "infra" && selectedInfraNode && !hideDetailPanel ? (
+          {(graphViewMode === "infra" || graphViewMode === "all") &&
+          selectedInfraNode &&
+          !hideDetailPanel ? (
             <RelationInfraDetailPanel
               open={detailOpen}
               connectedCount={Math.max(
@@ -1806,6 +2078,20 @@ export function ServiceRelationFlow({
         .chainview-flow-edge-normal-dashed path {
           stroke-dasharray: 12 10;
           animation: chainview-edge-flow 1.2s linear infinite;
+        }
+
+        .chainview-flow-edge-service-infra path {
+          stroke-dasharray: 8 8;
+          animation: chainview-edge-flow 1.25s linear infinite;
+        }
+
+        .chainview-flow-edge-service-infra-active path {
+          stroke-dasharray: 10 8;
+          animation: chainview-edge-flow 0.95s linear infinite;
+        }
+
+        .chainview-flow-edge-service-infra-muted path {
+          animation: none;
         }
 
         .chainview-flow-dark .react-flow {
@@ -2208,8 +2494,10 @@ function RelationDepthToggle({
 }
 
 function RelationEdgeLegend({
+  includeServiceInfra = false,
   placement,
 }: {
+  includeServiceInfra?: boolean;
   placement: RelationLegendPlacement;
 }) {
   const positionClass =
@@ -2234,6 +2522,15 @@ function RelationEdgeLegend({
           />
           수신/의존
         </span>
+        {includeServiceInfra ? (
+          <span className="inline-flex items-center gap-1.5">
+            <span
+              className="h-0.5 w-6 rounded-full"
+              style={{ backgroundColor: SERVICE_INFRA_COLOR }}
+            />
+            서비스-인프라
+          </span>
+        ) : null}
       </div>
     </div>
   );
@@ -2249,6 +2546,7 @@ function GraphViewModeToggle({
   placement: GraphModeTogglePlacement;
 }) {
   const options: Array<{ mode: GraphViewMode; label: string }> = [
+    { mode: "all", label: "전체" },
     { mode: "service", label: "서비스" },
     { mode: "infra", label: "인프라" },
   ];
@@ -2264,12 +2562,12 @@ function GraphViewModeToggle({
       }`}
     >
       <div
-        className={`pointer-events-auto relative grid grid-cols-2 overflow-hidden rounded-full border border-slate-200 bg-white/95 p-1 font-black shadow-md backdrop-blur ${
+        className={`pointer-events-auto relative grid grid-cols-3 overflow-hidden rounded-full border border-slate-200 bg-white/95 p-1 font-black shadow-md backdrop-blur ${
           isBottom ? "h-12 text-base" : "h-10 text-sm"
         }`}
       >
         <span
-          className="absolute bottom-1 top-1 w-[calc(50%-4px)] rounded-full bg-[#2563eb] shadow-sm transition-transform duration-200"
+          className="absolute bottom-1 top-1 w-[calc(33.333333%-4px)] rounded-full bg-[#2563eb] shadow-sm transition-transform duration-200"
           style={{
             left: "4px",
             borderRadius: "9999px",
@@ -2285,7 +2583,7 @@ function GraphViewModeToggle({
               type="button"
               onClick={() => onModeChange(option.mode)}
               className={`relative z-10 flex items-center justify-center rounded-full transition-colors duration-200 ${
-                isBottom ? "h-10 min-w-[118px] px-7" : "h-8 min-w-[82px] px-4"
+                isBottom ? "h-10 min-w-[108px] px-6" : "h-8 min-w-[72px] px-4"
               } ${
                 active
                   ? "text-white"
@@ -2293,9 +2591,11 @@ function GraphViewModeToggle({
               }`}
               style={{ borderRadius: "9999px" }}
               title={
-                option.mode === "service"
-                  ? "서비스 간 호출 관계만 표시합니다."
-                  : "서비스 관계를 기준으로 인프라 노드 간 연결만 표시합니다."
+                option.mode === "all"
+                  ? "서비스와 인프라 관계를 함께 표시합니다."
+                  : option.mode === "service"
+                    ? "서비스 간 호출 관계만 표시합니다."
+                    : "서비스 관계를 기준으로 인프라 노드 간 연결만 표시합니다."
               }
             >
               {option.label}
