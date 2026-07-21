@@ -158,6 +158,8 @@ function ServiceDetailPage({ service }) {
   const [detail, setDetail] = useState(() => cloneServiceDetailSample(service.serviceCode));
   const [changeRows, setChangeRows] = useState([]);
   const [changeSourceLabel, setChangeSourceLabel] = useState("샘플 기준");
+  const [impactRows, setImpactRows] = useState([]);
+  const [impactSourceLabel, setImpactSourceLabel] = useState("샘플 기준");
   const deploymentServer = useMemo(
     () => servers.find((server) => Number(server.serverId) === Number(service.serverId)),
     [servers, service.serverId]
@@ -230,6 +232,29 @@ function ServiceDetailPage({ service }) {
       cancelled = true;
     };
   }, [service.serviceId]);
+
+  useEffect(() => {
+    setImpactRows([]);
+    setImpactSourceLabel("샘플 기준");
+    if (import.meta.env.DEV || !service.serviceId) {
+      return undefined;
+    }
+    let cancelled = false;
+    chainViewApi.services
+      .impactPreview(Number(service.serviceId), 2)
+      .then((payload) => {
+        if (cancelled) return;
+        setImpactRows(normalizeServiceImpactRows(payload, services));
+        setImpactSourceLabel("운영 API 기준");
+      })
+      .catch((error) => {
+        console.warn("서비스 영향도 API 조회 실패, 샘플 데이터를 사용합니다.", error);
+        if (!cancelled) setImpactSourceLabel("샘플 기준");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [service.serviceId, services]);
 
   const setTab = (tabKey) => {
     navigate(`/admin-services/${service.serviceCode}?tab=${tabKey}`);
@@ -308,7 +333,7 @@ function ServiceDetailPage({ service }) {
       {activeTab === "overview" ? <ServiceOverviewTab detail={detail} incidents={serviceIncidents} onOpenDeployments={() => setTab("deployments")} onOpenInfraMap={handleInfraMapOpen} onOpenIncidents={() => setTab("incidents")} server={deploymentServer} service={service} /> : null}
       {activeTab === "techstack" ? <ServiceTechStackTab detail={detail} onDelete={handleTechDelete} onEdit={handleTechEdit} techStacks={serviceTechStacks} service={service} /> : null}
       {activeTab === "deployments" ? <ServiceDeploymentTab detail={detail} onOpenDetail={handleServerDetail} onOpenInfraMap={handleInfraMapOpen} server={deploymentServer} service={service} /> : null}
-      {activeTab === "impact" ? <ServiceImpactTab detail={detail} /> : null}
+      {activeTab === "impact" ? <ServiceImpactTab detail={detail} rows={impactRows} service={service} sourceLabel={impactSourceLabel} /> : null}
       {activeTab === "owners" ? <ServiceOwnersTab detail={detail} owners={serviceOwners} /> : null}
       {activeTab === "relations" ? <ServiceRelationTab detail={detail} relations={serviceRelations} /> : null}
       {activeTab === "changes" ? <ServiceChangeTab detail={detail} rows={changeRows} sourceLabel={changeSourceLabel} /> : null}
@@ -365,6 +390,83 @@ function normalizeServiceChangeRow(row) {
     before: row.beforeValue ?? row.oldValue ?? row.previousValue ?? row.before ?? "-",
     after: row.afterValue ?? row.newValue ?? row.currentValue ?? row.after ?? "-",
   };
+}
+
+function readServiceImpactCandidates(payload) {
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+  if (!payload || typeof payload !== "object") {
+    return [];
+  }
+  return (
+    payload.impacts ||
+    payload.impactServices ||
+    payload.impactedServices ||
+    payload.nodes ||
+    payload.services ||
+    payload.items ||
+    payload.data ||
+    []
+  );
+}
+
+function normalizeServiceImpactRows(payload, services) {
+  const candidates = readServiceImpactCandidates(payload);
+  if (!Array.isArray(candidates)) {
+    return [];
+  }
+  return candidates
+    .map((row, index) => {
+      if (!row || typeof row !== "object") {
+        return null;
+      }
+      const serviceId =
+        Number(row.serviceId ?? row.impactedServiceId ?? row.targetServiceId ?? row.nodeId) || 0;
+      const relatedService = services.find((item) => Number(item.serviceId) === serviceId);
+      const serviceName =
+        row.serviceName ||
+        row.impactedServiceName ||
+        row.targetServiceName ||
+        row.label ||
+        row.name ||
+        relatedService?.serviceName ||
+        row.serviceCode ||
+        relatedService?.serviceCode ||
+        "영향 서비스";
+      const depth = Number(row.depth ?? row.level ?? row.hop ?? row.distance);
+      const level =
+        row.impactLevelName ||
+        row.impactLevel ||
+        row.levelName ||
+        (depth <= 1 ? "직접" : depth ? `${depth}-hop` : "간접");
+      return {
+        key: row.impactId || row.id || row.relationId || `${serviceName}-${index}`,
+        level,
+        service: serviceName,
+        scenario:
+          row.scenario ||
+          row.impactReason ||
+          row.reason ||
+          row.relationDescription ||
+          row.description ||
+          "서비스 관계 기반 영향 가능",
+        radius:
+          row.radius ||
+          row.impactScope ||
+          row.scope ||
+          row.categoryPath ||
+          relatedService?.categoryPath?.join(" > ") ||
+          "-",
+        action:
+          row.action ||
+          row.checkAction ||
+          row.recommendation ||
+          row.ownerName ||
+          "담당자 및 연결 서비스 상태 확인",
+      };
+    })
+    .filter(Boolean);
 }
 
 function serviceIncidentStatusLabel(code) {
@@ -483,7 +585,13 @@ function ServiceOverviewTab({ detail, incidents, onOpenDeployments, onOpenInfraM
   );
 }
 
-function ServiceImpactTab({ detail }) {
+function ServiceImpactTab({ detail, rows, service, sourceLabel }) {
+  const impactRows = rows.length
+    ? rows
+    : detail.impactRows.map((row, index) => ({
+        ...row,
+        key: `${row.service}-${index}`,
+      }));
   return (
     <section className="service-detail__panel">
       <div className="service-detail__section-head">
@@ -491,10 +599,14 @@ function ServiceImpactTab({ detail }) {
           <h2>영향도</h2>
           <p>관계 등록 시 함께 관리할 직접/간접 영향 정보</p>
         </div>
+        <div className="service-detail__section-actions">
+          <span className="service-detail__source-label">{sourceLabel}</span>
+          <Link className="btn btn--ghost btn--sm" to={`/topology?serviceId=${service.serviceId}`}>관계도 보기</Link>
+        </div>
       </div>
       <div className="service-detail__impact-grid">
-        {detail.impactRows.map((row) => (
-          <article className="service-detail__impact-card" key={row.service + row.scenario}>
+        {impactRows.map((row) => (
+          <article className="service-detail__impact-card" key={row.key}>
             <span className={`service-detail__impact-level ${row.level === "직접" ? "is-direct" : ""}`}>{row.level}</span>
             <h3>{row.service}</h3>
             <dl>
@@ -504,6 +616,7 @@ function ServiceImpactTab({ detail }) {
             </dl>
           </article>
         ))}
+        {!impactRows.length ? <div className="empty">등록된 영향도 정보가 없습니다.</div> : null}
       </div>
     </section>
   );

@@ -1134,6 +1134,14 @@
   font-weight: 800;
 }
 
+.service-detail__section-actions {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .statistics-page {
   gap: 18px;
 }
