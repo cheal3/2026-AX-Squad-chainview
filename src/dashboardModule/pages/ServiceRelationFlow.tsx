@@ -455,6 +455,9 @@ export function ServiceRelationFlow({
 
   const toggleSelectedServiceNode = useCallback(
     (serviceId: number) => {
+      if (incidentMode) {
+        return;
+      }
       setSelectedServiceNodeId((current) => {
         const next = current === serviceId ? null : serviceId;
         setDetailOpen(false);
@@ -465,7 +468,7 @@ export function ServiceRelationFlow({
         return next;
       });
     },
-    [onSelectInfraNode, onSelectService]
+    [incidentMode, onSelectInfraNode, onSelectService]
   );
 
   const handleGraphViewModeChange = useCallback(
@@ -482,6 +485,9 @@ export function ServiceRelationFlow({
   );
 
   const handlePaneClick = useCallback(() => {
+    if (incidentMode) {
+      return;
+    }
     if (graphViewMode === "infra") {
       setSelectedInfraNodeId(null);
       setDetailOpen(false);
@@ -491,7 +497,7 @@ export function ServiceRelationFlow({
 
     setSelectedServiceNodeId(null);
     setDetailOpen(false);
-  }, [graphViewMode, onSelectInfraNode]);
+  }, [graphViewMode, incidentMode, onSelectInfraNode]);
 
   const serviceById = useMemo(
     () => new Map(services.map((service) => [service.serviceId, service])),
@@ -1027,9 +1033,11 @@ export function ServiceRelationFlow({
     const visibleServices = filteredServices.filter((service) => {
       return visibleServiceIds.has(service.serviceId);
     });
-    const highlightedServiceId = showAllServices
-      ? selectedServiceNodeId
-      : selectedServiceNodeId ?? focusedServiceId;
+    const highlightedServiceId = incidentMode
+      ? null
+      : showAllServices
+        ? selectedServiceNodeId
+        : selectedServiceNodeId ?? focusedServiceId;
     const highlightedConnectedServiceIds = new Set<number>();
 
     activeRelations.forEach((relation) => {
@@ -1095,6 +1103,7 @@ export function ServiceRelationFlow({
     activeRelations,
     detailOpen,
     detailServiceId,
+    incidentMode,
     laneByServiceId,
     highlightServiceId,
     hideNodeActions,
