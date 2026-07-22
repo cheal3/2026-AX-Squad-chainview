@@ -374,12 +374,12 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
   };
   const config = configs[menu];
   const filteredRows = useMemo(() => {
-    const cleanedKeyword = keyword.trim().toLowerCase();
+    const cleanedKeyword = normalizeAdminSearchText(keyword);
     if (!cleanedKeyword) {
       return config.rows;
     }
     return config.rows.filter((row) =>
-      buildRowSearchText(row).includes(cleanedKeyword)
+      matchesAdminSearch(buildRowSearchText(row), cleanedKeyword)
     );
   }, [config.rows, keyword]);
   const filteredRowKeys = filteredRows.map((row) => String(row.key));
@@ -658,11 +658,45 @@ function ApiQueryDetailModal({ detail, onClose }) {
 }
 
 function buildRowSearchText(row) {
-  return adminSearchText(
+  return normalizeAdminSearchText(adminSearchText(
     row.searchText,
     JSON.stringify(row.record ?? row.owner ?? {}),
     ...(row.cells ?? []).map(extractNodeText)
-  ).toLowerCase();
+  ));
+}
+
+function matchesAdminSearch(haystack, keyword) {
+  if (!keyword) return true;
+  if (haystack.includes(keyword)) return true;
+
+  const haystackInitials = hangulInitials(haystack);
+  const keywordInitials = hangulInitials(keyword);
+  return Boolean(
+    haystackInitials &&
+      keywordInitials &&
+      haystackInitials.includes(keywordInitials)
+  );
+}
+
+function normalizeAdminSearchText(value) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+function hangulInitials(value) {
+  const initials = [
+    "ㄱ", "ㄲ", "ㄴ", "ㄷ", "ㄸ", "ㄹ", "ㅁ", "ㅂ", "ㅃ", "ㅅ",
+    "ㅆ", "ㅇ", "ㅈ", "ㅉ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ",
+  ];
+  return Array.from(String(value ?? "")).map((char) => {
+    const code = char.charCodeAt(0);
+    if (code >= 0xac00 && code <= 0xd7a3) {
+      return initials[Math.floor((code - 0xac00) / 588)];
+    }
+    return char;
+  }).join("");
 }
 
 function adminSearchText(...values) {
