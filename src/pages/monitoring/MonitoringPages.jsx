@@ -6,6 +6,7 @@ import { usePortalData } from "../../dashboardModule/PortalDataStore";
 import { IncidentDemoDashboard } from "../../dashboardModule/pages/IncidentDemoDashboard";
 import { ServiceRelationFlow } from "../../dashboardModule/pages/ServiceRelationFlow";
 import { codeLabels } from "../../dashboardModule/mockData";
+import { matchesSearchText, searchableText } from "../../utils/search";
 
 const staticIncidentRows = [
   {
@@ -78,6 +79,7 @@ const staticIncidentRows = [
 export function IncidentAdminPage() {
   const navigate = useNavigate();
   const portalData = usePortalData();
+  const [keyword, setKeyword] = useState("");
   const serviceById = useMemo(
     () => new Map(portalData.services.map((service) => [service.serviceId, service])),
     [portalData.services]
@@ -110,6 +112,20 @@ export function IncidentAdminPage() {
       .filter((row) => !dynamicCodes.has(row.code))
       .map((row) => ({ ...row, source: "static" })),
   ];
+  const filteredRows = rows.filter((row) =>
+    matchesSearchText(
+      searchableText(
+        row.code,
+        row.incidentTypeLabel,
+        row.severityLabel,
+        row.statusCode,
+        row.targetCode,
+        row.targetLabel,
+        row.title
+      ),
+      keyword
+    )
+  );
   const openIncident = (row) => {
     if (row.endedAt) {
       return;
@@ -192,7 +208,7 @@ export function IncidentAdminPage() {
         <select><option>대상유형 · 전체</option><option>SERVICE</option><option>SERVER</option><option>DEPLOYMENT</option></select>
         <input type="date" />
         <input type="date" />
-        <div className="search">🔍<input type="text" placeholder="ID, 제목, 대상 검색..." /></div>
+        <div className="search">🔍<input type="text" value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="ID, 제목, 대상 검색..." /></div>
         <div className="right"><button className="btn btn--ghost btn--sm">초기화</button></div>
       </div>
 
@@ -208,7 +224,7 @@ export function IncidentAdminPage() {
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => {
+            {filteredRows.map((row) => {
               const isOpen = !row.endedAt;
               return (
                 <tr
@@ -238,7 +254,7 @@ export function IncidentAdminPage() {
           </tbody>
         </table>
         <div className="pager">
-          <div className="pager__info">전체 {rows.length}건 · 1-{rows.length} / 1 페이지</div>
+            <div className="pager__info">전체 {filteredRows.length}건 · 1-{filteredRows.length} / 1 페이지</div>
           <div className="pager__nav"><button disabled>‹</button><button className="is-on">1</button><button disabled>›</button></div>
         </div>
       </div>

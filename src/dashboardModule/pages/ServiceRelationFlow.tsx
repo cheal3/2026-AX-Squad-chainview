@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { usePortalData } from "../PortalDataStore";
 import { PageHeader } from "../components/PageHeader";
+import { matchesSearchText, searchableText } from "../../utils/search";
 import {
   codeLabels,
   type ImportanceCode,
@@ -729,21 +730,20 @@ export function ServiceRelationFlow({
   }, [activeRelations]);
 
   const filteredSearchServices = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
-    if (!normalized) {
+    if (!query.trim()) {
       return [];
     }
 
     return filteredServices
       .filter((service) => {
-        return [
-          service.serviceName,
-          service.serviceCode,
-          service.categoryPath.join(" "),
-        ]
-          .join(" ")
-          .toLowerCase()
-          .includes(normalized);
+        return matchesSearchText(
+          searchableText(
+            service.serviceName,
+            service.serviceCode,
+            service.categoryPath
+          ),
+          query
+        );
       })
       .slice(0, 12);
   }, [filteredServices, query]);

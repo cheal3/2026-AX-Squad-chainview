@@ -4,6 +4,7 @@ import { AppShell } from "../../components/AppShell.jsx";
 import { ModalBackdrop } from "../../components/ModalBackdrop.jsx";
 import { chainViewApi } from "../../dashboardModule/chainViewApi";
 import { infraNodesSnapshot, infraRelationsSnapshot } from "../../dashboardModule/infraSnapshot";
+import { matchesSearchText, searchableText } from "../../utils/search";
 
 const infraNodeTypeLabels = {
   RACK: "랙/위치",
@@ -209,8 +210,15 @@ export function InfraRelationsPage() {
   const filteredRelations = relations.filter((relation) => {
     const sourceNode = nodeById.get(Number(relation.sourceInfraNodeId));
     const targetNode = nodeById.get(Number(relation.targetInfraNodeId));
-    const haystack = `${relation.infraRelationId} ${sourceNode?.nodeCode} ${sourceNode?.nodeName} ${targetNode?.nodeCode} ${targetNode?.nodeName} ${relation.description}`.toLowerCase();
-    if (keyword.trim() && !haystack.includes(keyword.trim().toLowerCase())) return false;
+    const haystack = searchableText(
+      relation.infraRelationId,
+      sourceNode?.nodeCode,
+      sourceNode?.nodeName,
+      targetNode?.nodeCode,
+      targetNode?.nodeName,
+      relation.description
+    );
+    if (!matchesSearchText(haystack, keyword)) return false;
     if (typeFilter && relation.relationTypeCode !== typeFilter) return false;
     if (statusFilter && relation.relationStatusCode !== statusFilter) return false;
     return true;
@@ -650,8 +658,13 @@ export function InfraTopologyPage() {
     };
   }, []);
   const filteredNodes = nodes.filter((node) => {
-    const haystack = `${node.nodeCode} ${node.nodeName} ${node.locationLabel} ${node.vendorModel}`.toLowerCase();
-    if (keyword.trim() && !haystack.includes(keyword.trim().toLowerCase())) return false;
+    const haystack = searchableText(
+      node.nodeCode,
+      node.nodeName,
+      node.locationLabel,
+      node.vendorModel
+    );
+    if (!matchesSearchText(haystack, keyword)) return false;
     if (typeFilter && node.nodeTypeCode !== typeFilter) return false;
     if (statusFilter && node.statusCode !== statusFilter) return false;
     return true;

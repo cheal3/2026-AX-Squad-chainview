@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { AppShell } from "../../components/AppShell.jsx";
 import { usePortalData } from "../../dashboardModule/PortalDataStore";
 import { codeLabels } from "../../dashboardModule/mockData";
+import { matchesSearchText, searchableText } from "../../utils/search";
 
 function formatServer(server) {
   if (!server) {
@@ -46,7 +47,7 @@ export function ServiceInfraMappingPage() {
     [draftServerIds, serverById, services]
   );
   const filteredRows = rows.filter(({ service, currentServer, selectedServer, hasInfra }) => {
-    const haystack = [
+    const haystack = searchableText(
       service.serviceCode,
       service.serviceName,
       service.categoryPath?.join(" "),
@@ -55,8 +56,8 @@ export function ServiceInfraMappingPage() {
       selectedServer?.serverName,
       selectedServer?.infraNodeCode,
       selectedServer?.infraNodeName,
-    ].join(" ").toLowerCase();
-    if (keyword.trim() && !haystack.includes(keyword.trim().toLowerCase())) return false;
+    );
+    if (!matchesSearchText(haystack, keyword)) return false;
     if (serverFilter && Number(service.serverId) !== Number(serverFilter)) return false;
     if (mappingFilter === "mapped" && !hasInfra) return false;
     if (mappingFilter === "unmapped" && hasInfra) return false;

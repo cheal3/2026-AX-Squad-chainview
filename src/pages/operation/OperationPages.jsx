@@ -5,6 +5,7 @@ import { Filter, Play, Plus, Search, X } from "lucide-react";
 import { AppShell } from "../../components/AppShell.jsx";
 import { ModalBackdrop } from "../../components/ModalBackdrop.jsx";
 import { usePortalData } from "../../dashboardModule/PortalDataStore";
+import { matchesSearchText, searchableText } from "../../utils/search";
 
 const operationMenuMeta = {
   "service-checks": { section: "운영", label: "서비스 점검" },
@@ -97,7 +98,7 @@ export function ServiceCheckPage() {
   const [modal, setModal] = useState(null);
   const pageSize = OPERATION_PAGE_SIZE;
   const rows = serviceCheckRowsSeed.filter((row) =>
-    [row.code, row.name, row.target].join(" ").toLowerCase().includes(search.toLowerCase())
+    matchesSearchText(searchableText(row.code, row.name, row.target), search)
   );
   const pagedRows = rows.slice((page - 1) * pageSize, page * pageSize);
 
@@ -204,6 +205,7 @@ function ServiceCheckHistoryModal({ onClose, row }) {
 export function NotificationHistoryPage() {
   const navigate = useNavigate();
   const portalData = usePortalData();
+  const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [detail, setDetail] = useState(null);
   const pageSize = OPERATION_PAGE_SIZE;
@@ -213,7 +215,23 @@ export function NotificationHistoryPage() {
     incidentId: portalData.incidents[index % Math.max(1, portalData.incidents.length)]?.incidentId ?? portalData.incidents[0]?.incidentId,
     recipient: index >= notificationHistorySeed.length ? `${row.recipient.split(" ")[0]} (CV${String(1010 + index)})` : row.recipient,
   }));
-  const pagedRows = baseRows.slice((page - 1) * pageSize, page * pageSize);
+  const rows = baseRows.filter((row) =>
+    matchesSearchText(
+      searchableText(
+        row.incidentCode,
+        row.incidentTitle,
+        row.channel,
+        row.targetType,
+        row.recipient,
+        row.contact,
+        row.title,
+        row.template,
+        row.sentAt
+      ),
+      search
+    )
+  );
+  const pagedRows = rows.slice((page - 1) * pageSize, page * pageSize);
 
   return (
     <OperationPageShell
@@ -224,7 +242,7 @@ export function NotificationHistoryPage() {
       action={<button className="btn" onClick={() => navigate("/admin-incidents")} type="button">인시던트 목록</button>}
     >
       <div className="toolbar operation-toolbar operation-toolbar--wide">
-        <label className="search"><Search size={15} /><input placeholder="장애 제목, 알림 제목, 수신자명, 사번, 그룹명 코드 검색" type="text" /></label>
+        <label className="search"><Search size={15} /><input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="장애 제목, 알림 제목, 수신자명, 사번, 그룹명 코드 검색" type="text" /></label>
         <select defaultValue="all"><option value="all">알림 유형 전체</option><option>이메일</option><option>SMS</option><option>알림톡</option></select>
         <select defaultValue="all"><option value="all">대상 유형 전체</option><option>사용자</option><option>그룹</option></select>
         <select defaultValue="all"><option value="all">발송 대상 전체</option></select>
@@ -255,7 +273,7 @@ export function NotificationHistoryPage() {
             ))}
           </tbody>
         </table>
-        <OperationPager page={page} pageSize={pageSize} setPage={setPage} total={baseRows.length} />
+        <OperationPager page={page} pageSize={pageSize} setPage={setPage} total={rows.length} />
       </div>
       {detail ? <NotificationDetailModal detail={detail} onClose={() => setDetail(null)} /> : null}
     </OperationPageShell>
@@ -278,10 +296,26 @@ function NotificationDetailModal({ detail, onClose }) {
 }
 
 export function NotificationTemplatePage() {
+  const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [modal, setModal] = useState(null);
   const pageSize = OPERATION_PAGE_SIZE;
-  const pagedRows = notificationTemplateRows.slice((page - 1) * pageSize, page * pageSize);
+  const rows = notificationTemplateRows.filter((row) =>
+    matchesSearchText(
+      searchableText(
+        row.code,
+        row.name,
+        row.channel,
+        row.purpose,
+        row.provider,
+        row.variables,
+        row.active,
+        row.title
+      ),
+      search
+    )
+  );
+  const pagedRows = rows.slice((page - 1) * pageSize, page * pageSize);
   return (
     <OperationPageShell
       activeMenu="notification-templates"
@@ -291,10 +325,10 @@ export function NotificationTemplatePage() {
       action={<button className="btn btn--primary op-btn-dark" onClick={() => setModal({})} type="button"><Plus size={14} /> 템플릿 등록</button>}
     >
       <div className="toolbar operation-toolbar">
-        <label className="search"><Search size={15} /><input placeholder="템플릿 코드, 이름, 설명 검색..." type="text" /></label>
+        <label className="search"><Search size={15} /><input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="템플릿 코드, 이름, 설명 검색..." type="text" /></label>
         <button className="btn" type="button"><Filter size={14} /> 고급 필터</button>
       </div>
-      <div className="operation-summary"><b>총 3개 템플릿</b></div>
+      <div className="operation-summary"><b>총 {rows.length}개 템플릿</b></div>
       <div className="card operation-card">
         <table className="tbl operation-table operation-table--templates">
           <thead><tr><th>템플릿 코드</th><th>템플릿명</th><th>채널</th><th>용도</th><th>Provider</th><th>변수</th><th>활성</th><th className="col-actions">액션</th></tr></thead>
@@ -313,7 +347,7 @@ export function NotificationTemplatePage() {
             ))}
           </tbody>
         </table>
-        <OperationPager page={page} pageSize={pageSize} setPage={setPage} total={notificationTemplateRows.length} />
+        <OperationPager page={page} pageSize={pageSize} setPage={setPage} total={rows.length} />
       </div>
       {modal ? <TemplateModal row={modal.code ? modal : null} onClose={() => setModal(null)} /> : null}
     </OperationPageShell>

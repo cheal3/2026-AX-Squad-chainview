@@ -6,6 +6,7 @@ import { ModalBackdrop } from "../../components/ModalBackdrop.jsx";
 import { chainViewApi } from "../../dashboardModule/chainViewApi";
 import { usePortalData } from "../../dashboardModule/PortalDataStore";
 import { codeLabels } from "../../dashboardModule/mockData";
+import { matchesSearchText, normalizeSearchText, searchableText } from "../../utils/search";
 
 const adminMenuMetaByKey = {
   services: { section: "서비스", label: "서비스 조회", icon: "📦" },
@@ -374,12 +375,12 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
   };
   const config = configs[menu];
   const filteredRows = useMemo(() => {
-    const cleanedKeyword = normalizeAdminSearchText(keyword);
+    const cleanedKeyword = normalizeSearchText(keyword);
     if (!cleanedKeyword) {
       return config.rows;
     }
     return config.rows.filter((row) =>
-      matchesAdminSearch(buildRowSearchText(row), cleanedKeyword)
+      matchesSearchText(buildRowSearchText(row), cleanedKeyword)
     );
   }, [config.rows, keyword]);
   const filteredRowKeys = filteredRows.map((row) => String(row.key));
@@ -658,45 +659,11 @@ function ApiQueryDetailModal({ detail, onClose }) {
 }
 
 function buildRowSearchText(row) {
-  return normalizeAdminSearchText(adminSearchText(
+  return searchableText(
     row.searchText,
     JSON.stringify(row.record ?? row.owner ?? {}),
     ...(row.cells ?? []).map(extractNodeText)
-  ));
-}
-
-function matchesAdminSearch(haystack, keyword) {
-  if (!keyword) return true;
-  if (haystack.includes(keyword)) return true;
-
-  const haystackInitials = hangulInitials(haystack);
-  const keywordInitials = hangulInitials(keyword);
-  return Boolean(
-    haystackInitials &&
-      keywordInitials &&
-      haystackInitials.includes(keywordInitials)
   );
-}
-
-function normalizeAdminSearchText(value) {
-  return String(value ?? "")
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, " ");
-}
-
-function hangulInitials(value) {
-  const initials = [
-    "ㄱ", "ㄲ", "ㄴ", "ㄷ", "ㄸ", "ㄹ", "ㅁ", "ㅂ", "ㅃ", "ㅅ",
-    "ㅆ", "ㅇ", "ㅈ", "ㅉ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ",
-  ];
-  return Array.from(String(value ?? "")).map((char) => {
-    const code = char.charCodeAt(0);
-    if (code >= 0xac00 && code <= 0xd7a3) {
-      return initials[Math.floor((code - 0xac00) / 588)];
-    }
-    return char;
-  }).join("");
 }
 
 function adminSearchText(...values) {
@@ -1481,8 +1448,10 @@ function SearchableCategorySelect({ disabled = false, onChange, options, placeho
   const rootRef = useRef(null);
   const selectedOption = options.find((option) => option.name === value);
   const filteredOptions = options.filter((option) => {
-    const keyword = `${option.name} ${option.prefix ?? ""}`.toLowerCase();
-    return keyword.includes(query.trim().toLowerCase());
+    return matchesSearchText(
+      searchableText(option.name, option.prefix),
+      query
+    );
   });
 
   useEffect(() => {
@@ -1546,8 +1515,10 @@ function SearchableServiceSelect({ disabled = false, onChange, placeholder = "�
   const rootRef = useRef(null);
   const selectedService = services.find((service) => String(service.serviceId) === String(value));
   const filteredServices = services.filter((service) => {
-    const keyword = `${service.serviceCode} ${service.serviceName} ${service.categoryPath?.join(" ") ?? ""}`.toLowerCase();
-    return keyword.includes(query.trim().toLowerCase());
+    return matchesSearchText(
+      searchableText(service.serviceCode, service.serviceName, service.categoryPath),
+      query
+    );
   });
 
   useEffect(() => {

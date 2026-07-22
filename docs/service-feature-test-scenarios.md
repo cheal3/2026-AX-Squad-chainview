@@ -503,4 +503,5 @@
 | `5997a4d feat: expose api test buttons across admin pages` | API 실행/결과 테스트 버튼을 관리 API 호출 화면 전반에 표시하고, 서비스 분류 API 테스트를 `/api/service-categories/tree` 기준으로 현행화 |
 | `7b74525 fix: support initial consonant admin search` | 관리 목록 검색에서 한글 초성 1글자 검색도 매칭되도록 공통 검색 로직 보완 |
 | `6f4d9b8 fix: normalize notification operation lists` | 알림 전송 이력/알림 템플릿 관리의 제목 링크 굵기를 낮추고 운영 페이지네이션을 10개씩으로 통일 |
-| `이번 변경` | 초기 API 스냅샷에 배포 현황 목록을 포함하고, 배포 등록/수정/삭제 실패 시 화면 임시 반영을 되돌리거나 실패 알림을 표시하도록 보완 |
+| `acd920a fix: load and persist deployment list` | 초기 API 스냅샷에 배포 현황 목록을 포함하고, 배포 등록/수정/삭제 실패 시 화면 임시 반영을 되돌리거나 실패 알림을 표시하도록 보완 |
+| `이번 변경` | 검색 로직을 공통 유틸로 분리하고 관리자/인프라/운영/모니터링/서비스 선택 검색에 한글 초성 1글자 검색을 동일 적용 |
