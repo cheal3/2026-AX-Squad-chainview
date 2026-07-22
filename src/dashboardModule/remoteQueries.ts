@@ -61,7 +61,7 @@ export const remoteQueryPaths: Record<RemoteQueryKey, string> = {
   incidents: "/api/incidents",
   users: "/api/ownership/users",
   groups: "/api/ownership/groups",
-  categories: "/api/service-categories",
+  categories: "/api/service-categories/tree",
   codes: "/api/common-codes",
   deployments: "/api/services + /api/services/{serviceId}",
 };
@@ -142,26 +142,16 @@ async function loadServiceDeployments() {
 }
 
 async function loadServiceCategories() {
-  const listRows = asRemoteRecordArray(
-    await chainViewApi.serviceCategories.list().catch(() => [])
-  );
-  if (hasCategoryHierarchy(listRows)) {
-    return listRows;
-  }
-
   const treeRows = flattenCategoryTree(
     asRemoteRecordArray(await chainViewApi.serviceCategories.tree().catch(() => []))
   );
-  return treeRows.length ? treeRows : listRows;
-}
+  if (treeRows.length) {
+    return treeRows;
+  }
 
-function hasCategoryHierarchy(rows: RemoteListRecord[]) {
-  return rows.some((row) => {
-    const level = asRemoteNumber(row.categoryLevel ?? row.level ?? row.depth);
-    const parentId = asRemoteNumber(row.parentCategoryId ?? row.parentId);
-    const parentCode = asRemoteString(row.parentCategoryCode ?? row.parentCode);
-    return level > 1 || parentId > 0 || Boolean(parentCode);
-  });
+  return asRemoteRecordArray(
+    await chainViewApi.serviceCategories.list().catch(() => [])
+  );
 }
 
 function flattenCategoryTree(

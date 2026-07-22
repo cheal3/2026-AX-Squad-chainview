@@ -70,8 +70,7 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
     remoteStatus.state === "loading" && remoteStatus.source === remoteQueryKey;
   const showRemoteStatus =
     remoteStatus.source === remoteQueryKey || remoteStatus.source === "snapshot";
-  const showRemoteApiButton =
-    remoteQueryKey && (portalData.remoteApi.debugEnabled || menu === "services");
+  const showRemoteApiButton = Boolean(remoteQueryKey);
   const handleRemoteApiTest = async () => {
     if (!remoteQueryKey) {
       return;
@@ -1367,10 +1366,10 @@ function ServiceAdminForm({ form, onChange, onOpenApiDetail, portalData, servers
     () => buildCategoryCatalog(apiCategories.length ? apiCategories : portalData.categories, portalData.services),
     [apiCategories, portalData.categories, portalData.services]
   );
-  const serviceApiStatus = portalData.remoteApi.status;
+  const categoryApiStatus = portalData.remoteApi.status;
   const isServiceApiLoading =
-    serviceApiStatus.state === "loading" && serviceApiStatus.source === "services";
-  const showServiceApiStatus = serviceApiStatus.source === "services";
+    categoryApiStatus.state === "loading" && categoryApiStatus.source === "categories";
+  const showServiceApiStatus = categoryApiStatus.source === "categories";
   const selectedL1 = findCategoryOptionById(categoryCatalog.level1, form.categoryL1Id) ||
     findCategoryOptionByName(categoryCatalog.level1, form.categoryL1);
   const selectedL2 = findCategoryOptionById(categoryCatalog.level2, form.categoryL2Id) ||
@@ -1440,7 +1439,7 @@ function ServiceAdminForm({ form, onChange, onOpenApiDetail, portalData, servers
     onChange("serviceCodeSuffix", normalizeServiceCodeSuffix(value));
   };
   const handleServiceApiLookup = async () => {
-    const status = await portalData.remoteApi.testQuery("services");
+    const status = await portalData.remoteApi.testQuery("categories");
     if (status.detail) {
       onOpenApiDetail?.(status.detail);
     }
@@ -1464,8 +1463,8 @@ function ServiceAdminForm({ form, onChange, onOpenApiDetail, portalData, servers
             {categorySourceLabel}
           </span>
           {showServiceApiStatus ? (
-            <span className={`pill ${serviceApiStatus.state === "success" ? "pill--ok" : serviceApiStatus.state === "error" || serviceApiStatus.state === "blocked" ? "pill--warn" : "pill--gray"}`}>
-              {serviceApiStatus.message}
+            <span className={`pill ${categoryApiStatus.state === "success" ? "pill--ok" : categoryApiStatus.state === "error" || categoryApiStatus.state === "blocked" ? "pill--warn" : "pill--gray"}`}>
+              {categoryApiStatus.message}
             </span>
           ) : null}
           <button
