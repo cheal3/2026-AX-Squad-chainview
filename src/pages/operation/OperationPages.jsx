@@ -12,6 +12,8 @@ const operationMenuMeta = {
   "notification-templates": { section: "운영", label: "알림 템플릿 관리" },
 };
 
+const OPERATION_PAGE_SIZE = 10;
+
 function getOperationMenuMeta(activeMenu) {
   return operationMenuMeta[activeMenu] ?? { section: "운영", label: "운영" };
 }
@@ -93,7 +95,7 @@ export function ServiceCheckPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [modal, setModal] = useState(null);
-  const pageSize = 5;
+  const pageSize = OPERATION_PAGE_SIZE;
   const rows = serviceCheckRowsSeed.filter((row) =>
     [row.code, row.name, row.target].join(" ").toLowerCase().includes(search.toLowerCase())
   );
@@ -204,7 +206,7 @@ export function NotificationHistoryPage() {
   const portalData = usePortalData();
   const [page, setPage] = useState(1);
   const [detail, setDetail] = useState(null);
-  const pageSize = 5;
+  const pageSize = OPERATION_PAGE_SIZE;
   const baseRows = Array.from({ length: 20 }, (_, index) => notificationHistorySeed[index % notificationHistorySeed.length]).map((row, index) => ({
     ...row,
     incidentCode: `INC-2506-${String(142 - index).padStart(4, "0")}`,
@@ -278,7 +280,7 @@ function NotificationDetailModal({ detail, onClose }) {
 export function NotificationTemplatePage() {
   const [page, setPage] = useState(1);
   const [modal, setModal] = useState(null);
-  const pageSize = 5;
+  const pageSize = OPERATION_PAGE_SIZE;
   const pagedRows = notificationTemplateRows.slice((page - 1) * pageSize, page * pageSize);
   return (
     <OperationPageShell

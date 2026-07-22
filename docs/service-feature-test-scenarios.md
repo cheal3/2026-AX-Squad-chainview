@@ -501,3 +501,5 @@
 | `45ecdf7 fix: restore service category selection` | 서비스 수정 화면 진입 시 `categoryId` 기준으로 대/중/소분류 부모 체인을 복원 |
 | `2cd3c0d fix: keep category options api sourced` | API 카테고리가 있으면 서비스 `categoryPath` fallback을 선택지에 섞지 않도록 수정 |
 | `5997a4d feat: expose api test buttons across admin pages` | API 실행/결과 테스트 버튼을 관리 API 호출 화면 전반에 표시하고, 서비스 분류 API 테스트를 `/api/service-categories/tree` 기준으로 현행화 |
+| `7b74525 fix: support initial consonant admin search` | 관리 목록 검색에서 한글 초성 1글자 검색도 매칭되도록 공통 검색 로직 보완 |
+| `이번 변경` | 알림 전송 이력/알림 템플릿 관리의 제목 링크 굵기를 낮추고 운영 페이지네이션을 10개씩으로 통일 |

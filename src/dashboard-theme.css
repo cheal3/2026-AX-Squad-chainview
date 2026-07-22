@@ -3734,9 +3734,13 @@
   color: var(--muted);
 }
 
+.operation-summary b {
+  font-weight: 500;
+}
+
 .operation-summary .is-danger {
   color: #dc2626;
-  font-weight: 800;
+  font-weight: 500;
 }
 
 .op-text-link {
@@ -3748,7 +3752,7 @@
   color: #0f172a;
   padding: 0;
   text-align: left;
-  font-weight: 800;
+  font-weight: 500;
   text-decoration: none;
   white-space: normal;
   word-break: keep-all;
@@ -3763,7 +3767,7 @@
 .op-text-link small {
   margin: 0 0 3px;
   color: var(--muted);
-  font-weight: 700;
+  font-weight: 400;
   text-decoration: none;
 }
 
