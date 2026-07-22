@@ -27,6 +27,7 @@ type RemoteRecord = Record<string, unknown>;
 export type RemotePortalSnapshot = {
   servers: ServerRecord[];
   services: ServiceRecord[];
+  deployments: RemoteRecord[];
   relations: ServiceRelationRecord[];
   techStacks: TechStackRecord[];
   owners: ServiceOwnerRecord[];
@@ -76,6 +77,12 @@ export async function loadRemotePortalSnapshot(): Promise<RemotePortalSnapshot> 
     servers: serverRows.map(mapServer),
     services: serviceRows.map((service) =>
       mapService(service, detailsByServiceId.get(asNumber(service.serviceId)))
+    ),
+    deployments: serviceRows.flatMap((service) =>
+      mapServiceDeployments(
+        service,
+        detailsByServiceId.get(asNumber(service.serviceId))
+      )
     ),
     relations: relationRows.map(mapRelation),
     techStacks: serviceTechStackRows.map(mapTechStack),
@@ -155,6 +162,44 @@ async function safeList(load: () => Promise<unknown>) {
     console.warn("[ChainView API] optional list load failed", error);
     return [];
   }
+}
+
+function mapServiceDeployments(row: RemoteRecord, detail?: RemoteRecord) {
+  const serviceId = asNumber(detail?.serviceId ?? row.serviceId);
+  const deployments = asRecordArray(detail?.deployments);
+  const fallbackDeployment =
+    deployments.length || !serviceId
+      ? []
+      : [{
+          serverId: asNumber(detail?.serverId ?? row.serverId),
+          serverName: asString(detail?.serverName ?? row.serverName),
+          hostName: asString(detail?.hostName ?? row.hostName),
+          deployPath:
+            asString(detail?.deployPath ?? row.deployPath) ||
+            asString(row.deploymentHostsSummary),
+          portInfo: asString(detail?.portInfo ?? row.portInfo),
+          deploymentStatusCode: asString(
+            detail?.deploymentStatusCode ?? row.deploymentStatusCode
+          ),
+          deploymentStatusName: asString(
+            detail?.deploymentStatusName ?? row.deploymentStatusName
+          ),
+          instanceCount: asNumber(
+            detail?.instanceCount ?? row.instanceCount ?? row.deploymentCount,
+            1
+          ),
+        }];
+
+  return [...deployments, ...fallbackDeployment].map((deployment, index) => ({
+    ...deployment,
+    deploymentKey:
+      asString(deployment.deploymentKey) ||
+      `${serviceId}-${asNumber(deployment.serviceServerId) || asNumber(deployment.deploymentId) || index + 1}`,
+    serviceId,
+    serviceCode: asString(detail?.serviceCode ?? row.serviceCode),
+    serviceName:
+      asString(detail?.serviceName ?? row.serviceName) || "이름 없는 서비스",
+  }));
 }
 
 function mapServer(row: RemoteRecord): ServerRecord {

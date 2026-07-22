@@ -288,6 +288,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
   const applyRemoteSnapshot = (snapshot: RemotePortalSnapshot) => {
     setServers(snapshot.servers);
     setServices(snapshot.services);
+    setDeployments(snapshot.deployments);
     setRelations(snapshot.relations);
     setTechStacks(snapshot.techStacks);
     setOwners(snapshot.owners);
@@ -350,7 +351,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       applyRemoteSnapshot(snapshot);
       const status = {
         state: "success" as const,
-        message: `조회 성공: 서비스 ${snapshot.services.length}건, 서버 ${snapshot.servers.length}건`,
+        message: `조회 성공: 서비스 ${snapshot.services.length}건, 서버 ${snapshot.servers.length}건, 배포 ${snapshot.deployments.length}건`,
         lastLoadedAt: nowLabel(),
         source: "snapshot" as const,
       };
@@ -1324,7 +1325,13 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           void appendRemoteDeployment(serviceId, input)
             .then(() => testRemoteQuery("deployments"))
             .catch((error) => {
-              console.warn("[ChainView API] deployment create failed", error);
+              setDeployments((current) =>
+                current.filter((deployment) => deploymentKey(deployment) !== deploymentKey(nextDeployment))
+              );
+              notifyRemoteMutationFailure(
+                error,
+                "배포 정보 등록 API 호출에 실패했습니다."
+              );
             });
         }
       },
@@ -1340,7 +1347,10 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           void replaceRemoteDeployment(serviceId, input)
             .then(() => testRemoteQuery("deployments"))
             .catch((error) => {
-              console.warn("[ChainView API] deployment update failed", error);
+              notifyRemoteMutationFailure(
+                error,
+                "배포 정보 수정 API 호출에 실패했습니다."
+              );
             });
         }
       },
@@ -1354,7 +1364,11 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           void removeRemoteDeployment(serviceId, input)
             .then(() => testRemoteQuery("deployments"))
             .catch((error) => {
-              console.warn("[ChainView API] deployment delete failed", error);
+              setDeployments((current) => [input, ...current]);
+              notifyRemoteMutationFailure(
+                error,
+                "배포 정보 삭제 API 호출에 실패했습니다."
+              );
             });
         }
       },
@@ -1630,9 +1644,19 @@ async function appendRemoteDeployment(serviceId: number, input: RemoteListRecord
 async function replaceRemoteDeployment(serviceId: number, input: RemoteListRecord) {
   const detail = await chainViewApi.services.detail(serviceId);
   const key = deploymentKey(input);
+  let replaced = false;
   const deployments = asRemoteRecordArray((detail as Record<string, unknown>)?.deployments).map(
-    (deployment) => deploymentKey({ ...deployment, serviceId }) === key ? input : deployment
+    (deployment) => {
+      if (deploymentKey({ ...deployment, serviceId }) !== key) {
+        return deployment;
+      }
+      replaced = true;
+      return input;
+    }
   );
+  if (!replaced) {
+    deployments.push(input);
+  }
   await saveRemoteServiceDeployments(serviceId, detail, deployments);
 }
 
