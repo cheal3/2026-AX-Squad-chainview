@@ -102,6 +102,21 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
           record: service,
           owner: serviceOwners[0] ?? null,
           hasOwner: serviceOwners.length > 0,
+          searchText: adminSearchText(
+            service.serviceId,
+            service.serviceCode,
+            service.serviceName,
+            service.categoryPath,
+            codeLabels.serviceType[service.serviceTypeCode],
+            service.serviceTypeCode,
+            codeLabels.importance[service.importanceCode],
+            service.importanceCode,
+            codeLabels.serviceStatus[service.statusCode],
+            service.statusCode,
+            service.endpointUrl,
+            serverById.get(service.serverId)?.serverName,
+            service.description
+          ),
           onClick: () => navigate(`/admin-services/${service.serviceCode}`),
           cells: [
             <code>{service.serviceId}</code>,
@@ -122,6 +137,20 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
       rows: portalData.servers.map((server) => ({
         key: server.serverId,
         record: server,
+        searchText: adminSearchText(
+          server.serverId,
+          server.serverName,
+          server.hostName,
+          server.ipAddress,
+          codeLabels.envType[server.envCode],
+          server.envCode,
+          codeLabels.osType[server.osTypeCode],
+          server.osTypeCode,
+          server.osVersion,
+          codeLabels.serverStatus[server.statusCode],
+          server.statusCode,
+          server.description
+        ),
         cells: [
           <code>{server.serverId}</code>,
           <b>{server.serverName}</b>,
@@ -140,6 +169,17 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
       rows: portalData.relations.map((relation) => ({
         key: relation.relationId,
         record: relation,
+        searchText: adminSearchText(
+          relation.relationId,
+          serviceLabel(serviceById.get(relation.sourceServiceId)),
+          serviceLabel(serviceById.get(relation.targetServiceId)),
+          codeLabels.relationType[relation.relationTypeCode],
+          relation.relationTypeCode,
+          relation.mandatoryYn,
+          codeLabels.relationStatus[relation.relationStatusCode],
+          relation.relationStatusCode,
+          relation.description
+        ),
         cells: [
           <code>{relation.relationId}</code>,
           formatServiceCell(serviceById.get(relation.sourceServiceId)),
@@ -157,6 +197,14 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
       rows: portalData.techStacks.map((stack) => ({
         key: stack.techStackId,
         record: stack,
+        searchText: adminSearchText(
+          stack.techStackId,
+          serviceLabel(serviceById.get(stack.serviceId)),
+          stack.techTypeName,
+          stack.techName,
+          stack.versionText,
+          stack.vendorName
+        ),
         cells: [
           <code>{stack.techStackId}</code>,
           formatServiceCell(serviceById.get(stack.serviceId)),
@@ -173,6 +221,15 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
       rows: portalData.owners.map((owner) => ({
         key: owner.serviceOwnerId,
         owner,
+        searchText: adminSearchText(
+          owner.serviceOwnerId,
+          serviceLabel(serviceById.get(owner.serviceId)),
+          owner.ownerTypeCode,
+          codeLabels.ownerType[owner.ownerTypeCode],
+          owner.ownerName,
+          owner.responsibilityCode,
+          codeLabels.responsibilityType[owner.responsibilityCode]
+        ),
         cells: [
           <code>{owner.serviceOwnerId}</code>,
           formatServiceCell(serviceById.get(owner.serviceId)),
@@ -188,6 +245,17 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
       rows: portalData.users.map((user) => ({
         key: recordKey(user, "userId", "employeeNo"),
         record: user,
+        searchText: adminSearchText(
+          field(user, "userId", ""),
+          field(user, "employeeNo", ""),
+          field(user, "userName", ""),
+          field(user, "orgName", ""),
+          field(user, "departmentName", ""),
+          field(user, "roleName", ""),
+          field(user, "phoneNumber", ""),
+          field(user, "email", ""),
+          field(user, "activeYn", "")
+        ),
         cells: [
           <code>{field(user, "userId")}</code>,
           <code>{field(user, "employeeNo")}</code>,
@@ -207,6 +275,12 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
       rows: portalData.groups.map((group) => ({
         key: recordKey(group, "groupId", "groupCode"),
         record: group,
+        searchText: adminSearchText(
+          field(group, "groupId", ""),
+          field(group, "groupCode", ""),
+          field(group, "groupName", ""),
+          field(group, "description", "")
+        ),
         cells: [
           <code>{field(group, "groupId")}</code>,
           <code>{field(group, "groupCode")}</code>,
@@ -221,6 +295,16 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
       rows: portalData.categories.map((category) => ({
         key: recordKey(category, "categoryId", "categoryCode"),
         record: category,
+        searchText: adminSearchText(
+          field(category, "categoryId", ""),
+          field(category, "categoryCode", ""),
+          field(category, "categoryName", ""),
+          field(category, "categoryLevel", ""),
+          field(category, "parentCategoryId", ""),
+          field(category, "sortOrder", ""),
+          field(category, "updatedAt", ""),
+          field(category, "createdAt", "")
+        ),
         cells: [
           <code>{field(category, "categoryId")}</code>,
           <code>{field(category, "categoryCode")}</code>,
@@ -238,6 +322,14 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
       rows: portalData.codes.map((code) => ({
         key: `${field(code, "codeGroup")}-${field(code, "code")}`,
         record: code,
+        searchText: adminSearchText(
+          field(code, "codeGroup", ""),
+          field(code, "code", ""),
+          field(code, "codeName", ""),
+          field(code, "sortOrder", ""),
+          field(code, "useYn", ""),
+          field(code, "remarks", "")
+        ),
         cells: [
           <code>{field(code, "codeGroup")}</code>,
           <code>{field(code, "code")}</code>,
@@ -254,6 +346,21 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
       rows: portalData.deployments.map((deployment) => ({
         key: field(deployment, "deploymentKey") || recordKey(deployment, "deploymentId", "serverId"),
         record: deployment,
+        searchText: adminSearchText(
+          field(deployment, "deploymentKey", ""),
+          field(deployment, "deploymentId", ""),
+          field(deployment, "serviceCode", ""),
+          field(deployment, "serviceName", ""),
+          field(deployment, "serverName", ""),
+          field(deployment, "hostName", ""),
+          field(deployment, "serverId", ""),
+          field(deployment, "deployPath", ""),
+          field(deployment, "portInfo", ""),
+          field(deployment, "port", ""),
+          field(deployment, "deploymentStatusName", ""),
+          field(deployment, "deploymentStatusCode", ""),
+          field(deployment, "instanceCount", "")
+        ),
         cells: [
           <><code>{field(deployment, "serviceCode")}</code> {field(deployment, "serviceName")}</>,
           field(deployment, "serverName") || field(deployment, "hostName") || field(deployment, "serverId"),
@@ -272,7 +379,7 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
       return config.rows;
     }
     return config.rows.filter((row) =>
-      buildRowSearchText(row).toLowerCase().includes(cleanedKeyword)
+      buildRowSearchText(row).includes(cleanedKeyword)
     );
   }, [config.rows, keyword]);
   const filteredRowKeys = filteredRows.map((row) => String(row.key));
@@ -551,10 +658,28 @@ function ApiQueryDetailModal({ detail, onClose }) {
 }
 
 function buildRowSearchText(row) {
-  return [
+  return adminSearchText(
+    row.searchText,
     JSON.stringify(row.record ?? row.owner ?? {}),
-    ...(row.cells ?? []).map(extractNodeText),
-  ].join(" ");
+    ...(row.cells ?? []).map(extractNodeText)
+  ).toLowerCase();
+}
+
+function adminSearchText(...values) {
+  return values.flatMap(flattenSearchValue).join(" ");
+}
+
+function flattenSearchValue(value) {
+  if (value === null || value === undefined || typeof value === "boolean") {
+    return [];
+  }
+  if (Array.isArray(value)) {
+    return value.flatMap(flattenSearchValue);
+  }
+  if (typeof value === "object") {
+    return Object.values(value).flatMap(flattenSearchValue);
+  }
+  return [String(value)];
 }
 
 function extractNodeText(value) {
