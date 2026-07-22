@@ -1024,9 +1024,9 @@ function buildCategoryCatalog(categories = [], services = []) {
       }))
     );
     return {
-      level1: uniqueByName([...optionsByLevel[0], ...servicePathCatalog.level1]),
-      level2: uniqueByName([...optionsByLevel[1], ...servicePathCatalog.level2]),
-      level3: uniqueByName([...optionsByLevel[2], ...servicePathCatalog.level3]),
+      level1: optionsByLevel[0],
+      level2: optionsByLevel[1],
+      level3: optionsByLevel[2],
     };
   }
 
