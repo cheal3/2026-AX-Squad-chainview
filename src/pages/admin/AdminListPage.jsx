@@ -1006,14 +1006,7 @@ function buildCategoryCatalog(categories = [], services = []) {
       prefix: fallbackCategoryPrefix(path[2]),
     }))),
   };
-  const remoteCategories = inferCategoryLevels(categories.map((category) => ({
-    id: getCategoryId(category),
-    parentId: getCategoryParentId(category),
-    parentCode: getCategoryParentCode(category),
-    level: getCategoryLevel(category),
-    name: getCategoryName(category),
-    code: getCategoryCode(category),
-  })).filter((category) => category.name));
+  const remoteCategories = buildNormalizedCategories(categories);
 
   if (remoteCategories.length) {
     const byId = new Map(remoteCategories.map((category) => [category.id, category]));
@@ -1038,6 +1031,17 @@ function buildCategoryCatalog(categories = [], services = []) {
   }
 
   return servicePathCatalog;
+}
+
+function buildNormalizedCategories(categories = []) {
+  return inferCategoryLevels(categories.map((category) => ({
+    id: getCategoryId(category),
+    parentId: getCategoryParentId(category),
+    parentCode: getCategoryParentCode(category),
+    level: getCategoryLevel(category),
+    name: getCategoryName(category),
+    code: getCategoryCode(category),
+  })).filter((category) => category.name));
 }
 
 function findServiceCategoryChildren(category) {
@@ -1115,14 +1119,62 @@ function buildSelectedCategoryPath(form, categories = []) {
   ].map((item) => compactText(item)).filter(Boolean);
 }
 
-function resolveCategorySelection(categoryPath = [], categories = []) {
+function resolveCategoryPathFromEntry(entry, categories = []) {
+  if (!entry) return [];
+  const byId = new Map(categories.filter((category) => category.id).map((category) => [category.id, category]));
+  const byCode = new Map(categories.filter((category) => category.code).map((category) => [category.code, category]));
+  const chain = [];
+  const seen = new Set();
+  let current = entry;
+
+  while (current) {
+    const key = current.id || current.code || current.name;
+    if (seen.has(key)) break;
+    seen.add(key);
+    chain.unshift(current);
+    current = byId.get(current.parentId) || byCode.get(current.parentCode);
+  }
+
+  const leveledPath = [];
+  chain.forEach((category, index) => {
+    const level = Math.min(Math.max(Number(category.level) || index + 1, 1), 3);
+    leveledPath[level - 1] = category.name;
+  });
+
+  return leveledPath.length ? leveledPath.map((item) => compactText(item)).filter(Boolean) : chain.map((category) => category.name);
+}
+
+function resolveCategoryPath(categoryPath = [], categories = [], categoryId = "") {
+  const cleanedPath = categoryPath.map((item) => compactText(item)).filter(Boolean);
+  const remoteCategories = buildNormalizedCategories(categories);
+  const byId = new Map(remoteCategories.filter((category) => category.id).map((category) => [category.id, category]));
+  const numericCategoryId = Number(categoryId);
+  const categoryFromId = numericCategoryId ? byId.get(numericCategoryId) : null;
+  const pathFromId = resolveCategoryPathFromEntry(categoryFromId, remoteCategories);
+  if (pathFromId.length) return pathFromId;
+
+  const leafName = cleanedPath.at(-1);
+  const leafFromName = leafName
+    ? remoteCategories
+        .filter((category) => category.name === leafName)
+        .sort((left, right) => right.level - left.level)[0]
+    : null;
+  const pathFromName = resolveCategoryPathFromEntry(leafFromName, remoteCategories);
+  if (pathFromName.length > cleanedPath.length) return pathFromName;
+
+  return cleanedPath;
+}
+
+function resolveCategorySelection(categoryPath = [], categories = [], categoryId = "") {
+  const resolvedPath = resolveCategoryPath(categoryPath, categories, categoryId);
   const catalog = buildCategoryCatalog(categories);
-  const selectedL1 = findCategoryOptionByName(catalog.level1, categoryPath[0]);
-  const selectedL2 = findCategoryOptionByName(catalog.level2, categoryPath[1], selectedL1?.name);
-  const selectedL3 = findCategoryOptionByName(catalog.level3, categoryPath[2], selectedL2?.name, selectedL1?.name);
+  const selectedL1 = findCategoryOptionByName(catalog.level1, resolvedPath[0]);
+  const selectedL2 = findCategoryOptionByName(catalog.level2, resolvedPath[1], selectedL1?.name);
+  const selectedL3 = findCategoryOptionByName(catalog.level3, resolvedPath[2], selectedL2?.name, selectedL1?.name);
   const leaf = selectedL3 || selectedL2 || selectedL1;
 
   return {
+    categoryPath: resolvedPath,
     categoryL1Id: selectedL1?.id ? String(selectedL1.id) : "",
     categoryL2Id: selectedL2?.id ? String(selectedL2.id) : "",
     categoryL3Id: selectedL3?.id ? String(selectedL3.id) : "",
@@ -1693,15 +1745,16 @@ function CodeSelect({ labels, value, onChange }) {
 function buildAdminFormState(menu, record, portalData) {
   if (menu === "services") {
     const categoryPath = record?.categoryPath ?? [];
-    const categorySelection = resolveCategorySelection(categoryPath, portalData.categories);
+    const categorySelection = resolveCategorySelection(categoryPath, portalData.categories, record?.categoryId);
+    const resolvedCategoryPath = categorySelection.categoryPath;
     const categoryId = record?.categoryId ? String(record.categoryId) : categorySelection.categoryId;
     return {
       serviceCode: record?.serviceCode ?? "",
       serviceCodeSuffix: record?.serviceCode?.split("-").at(-1) ?? "001",
       serviceName: record?.serviceName ?? "",
-      categoryL1: categoryPath[0] ?? "",
-      categoryL2: categoryPath[1] ?? "",
-      categoryL3: categoryPath[2] ?? "",
+      categoryL1: resolvedCategoryPath[0] ?? "",
+      categoryL2: resolvedCategoryPath[1] ?? "",
+      categoryL3: resolvedCategoryPath[2] ?? "",
       categoryL1Id: categorySelection.categoryL1Id,
       categoryL2Id: categorySelection.categoryL2Id,
       categoryL3Id: categorySelection.categoryL3Id,
