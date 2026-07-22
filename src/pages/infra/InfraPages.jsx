@@ -70,6 +70,20 @@ const normalizeInfraRelation = (edge) => ({
   description: edge.remarks ?? edge.description ?? "",
 });
 
+function mergeInfraRelation(base, remote) {
+  return {
+    ...base,
+    ...remote,
+    infraRelationId: remote.infraRelationId || base.infraRelationId,
+    sourceInfraNodeId: remote.sourceInfraNodeId || base.sourceInfraNodeId,
+    targetInfraNodeId: remote.targetInfraNodeId || base.targetInfraNodeId,
+    relationTypeCode: remote.relationTypeCode || base.relationTypeCode,
+    mandatoryYn: remote.mandatoryYn || base.mandatoryYn,
+    relationStatusCode: remote.relationStatusCode || base.relationStatusCode,
+    description: remote.description || base.description,
+  };
+}
+
 async function fetchInfraNodesFromApi() {
   const nodes = await chainViewApi.infraNodes.list();
   return nodes.map(normalizeInfraNode).filter((node) => node.infraNodeId);
@@ -265,7 +279,7 @@ export function InfraRelationsPage() {
         try {
           await chainViewApi.infraNodes.deleteEdge(Number(form.infraRelationId));
           const createdRelation = normalizeInfraRelation(await chainViewApi.infraNodes.createEdge(buildInfraRelationPayload(nextRelation)));
-          setRelations((current) => current.map((relation) => relation.infraRelationId === form.infraRelationId ? { ...nextRelation, ...createdRelation } : relation));
+          setRelations((current) => current.map((relation) => relation.infraRelationId === form.infraRelationId ? mergeInfraRelation(nextRelation, createdRelation) : relation));
         } catch (error) {
           setRelations(relations);
           notifyInfraMutationFailure(error, "인프라 관계 수정 API 호출에 실패했습니다.");
@@ -279,7 +293,7 @@ export function InfraRelationsPage() {
       if (shouldUseRemoteInfraApi()) {
         try {
           const createdRelation = normalizeInfraRelation(await chainViewApi.infraNodes.createEdge(buildInfraRelationPayload(nextRelation)));
-          setRelations((current) => current.map((relation) => relation.infraRelationId === nextId ? { ...optimisticRelation, ...createdRelation } : relation));
+          setRelations((current) => current.map((relation) => relation.infraRelationId === nextId ? mergeInfraRelation(optimisticRelation, createdRelation) : relation));
         } catch (error) {
           setRelations(relations);
           notifyInfraMutationFailure(error, "인프라 관계 등록 API 호출에 실패했습니다.");

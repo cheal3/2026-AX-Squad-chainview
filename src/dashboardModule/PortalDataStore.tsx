@@ -1069,26 +1069,30 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        setTechStacks((current) => [
-          {
-            techStackId: nextId(current, "techStackId"),
-            serviceId: input.serviceId,
-            techTypeName: input.techTypeName || "서비스 기술",
-            techName: cleaned,
-            versionText: input.versionText || "-",
-            vendorName: input.vendorName || "-",
-          },
-          ...current,
-        ]);
+        const nextTechStack = {
+          techStackId: nextId(techStacks, "techStackId"),
+          serviceId: input.serviceId,
+          techTypeName: input.techTypeName || "서비스 기술",
+          techName: cleaned,
+          versionText: input.versionText || "-",
+          vendorName: input.vendorName || "-",
+        };
+        setTechStacks((current) => [nextTechStack, ...current]);
         if (REMOTE_API_ENABLED) {
-          void addRemoteTechStack(input.serviceId, cleaned)
-            .then(() => refreshRemoteData(400))
+          void addRemoteTechStack(input)
+            .then(() => testRemoteQuery("techstacks"))
             .catch((error) => {
-              console.warn("[ChainView API] tech stack create failed", error);
+              setTechStacks((current) =>
+                current.filter((techStack) => techStack.techStackId !== nextTechStack.techStackId)
+              );
+              notifyRemoteMutationFailure(error, "기술스택 등록 API 호출에 실패했습니다.");
             });
         }
       },
       updateTechStack: (techStackId, input) => {
+        const previousTechStack = techStacks.find(
+          (techStack) => techStack.techStackId === techStackId
+        );
         setTechStacks((current) =>
           current.map((techStack) =>
             techStack.techStackId === techStackId
@@ -1096,28 +1100,36 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
               : techStack
           )
         );
-        const currentTechStack = techStacks.find(
-          (techStack) => techStack.techStackId === techStackId
-        );
-        if (REMOTE_API_ENABLED && currentTechStack) {
-          void chainViewApi.techStacks
-            .update(techStackId, { ...currentTechStack, ...input })
-            .then(() => refreshRemoteData(400))
+        if (REMOTE_API_ENABLED && previousTechStack) {
+          void chainViewApi.serviceTechStacks
+            .update(techStackId, toServiceTechStackUpdatePayload({ ...previousTechStack, ...input }))
+            .then(() => testRemoteQuery("techstacks"))
             .catch((error) => {
-              console.warn("[ChainView API] tech stack update failed", error);
+              setTechStacks((current) =>
+                current.map((techStack) =>
+                  techStack.techStackId === techStackId ? previousTechStack : techStack
+                )
+              );
+              notifyRemoteMutationFailure(error, "기술스택 수정 API 호출에 실패했습니다.");
             });
         }
       },
       deleteTechStack: (techStackId) => {
+        const previousTechStack = techStacks.find(
+          (techStack) => techStack.techStackId === techStackId
+        );
         setTechStacks((current) =>
           current.filter((techStack) => techStack.techStackId !== techStackId)
         );
         if (REMOTE_API_ENABLED) {
-          void chainViewApi.techStacks
+          void chainViewApi.serviceTechStacks
             .delete(techStackId)
-            .then(() => refreshRemoteData(400))
+            .then(() => testRemoteQuery("techstacks"))
             .catch((error) => {
-              console.warn("[ChainView API] tech stack delete failed", error);
+              if (previousTechStack) {
+                setTechStacks((current) => [previousTechStack, ...current]);
+              }
+              notifyRemoteMutationFailure(error, "기술스택 삭제 API 호출에 실패했습니다.");
             });
         }
       },
@@ -1753,12 +1765,19 @@ async function addRemoteOwnerGroup(serviceId: number, groupName: string) {
   });
 }
 
-async function addRemoteTechStack(serviceId: number, techName: string) {
+async function addRemoteTechStack(input: {
+  serviceId: number;
+  techTypeName: string;
+  techName: string;
+  versionText: string;
+  vendorName: string;
+}) {
   const created = await chainViewApi.techStacks.create({
     techTypeCode: "ETC",
-    techName,
-    versionText: "-",
-    vendorName: "-",
+    techTypeName: input.techTypeName || "서비스 기술",
+    techName: input.techName,
+    versionText: input.versionText || "-",
+    vendorName: input.vendorName || "-",
   });
   const techStackId = extractRemoteId(created);
 
@@ -1767,11 +1786,23 @@ async function addRemoteTechStack(serviceId: number, techName: string) {
   }
 
   return chainViewApi.serviceTechStacks.create({
-    serviceId,
+    serviceId: input.serviceId,
     techStackId,
-    versionOverride: "-",
-    remarks: "ChainView 화면에서 추가",
+    versionOverride: input.versionText || "-",
+    remarks: input.vendorName || "ChainView 화면에서 추가",
   });
+}
+
+function toServiceTechStackUpdatePayload(input: {
+  serviceId: number;
+  versionText?: string;
+  vendorName?: string;
+}) {
+  return {
+    serviceId: input.serviceId,
+    versionOverride: asRemoteString(input.versionText) || "-",
+    remarks: asRemoteString(input.vendorName),
+  };
 }
 
 function extractRemoteId(value: unknown) {

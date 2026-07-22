@@ -131,7 +131,21 @@ async function loadServiceDeployments() {
     }
     const detail = isRemoteRecord(result.value) ? result.value : {};
     const service = serviceRows[index];
-    return asRemoteRecordArray(detail.deployments).map((deployment, deploymentIndex) => ({
+    const deployments = asRemoteRecordArray(detail.deployments);
+    const fallbackDeployment =
+      deployments.length || !asRemoteNumber(service.serviceId)
+        ? []
+        : [{
+            deploymentKey: `${asRemoteNumber(service.serviceId)}-primary`,
+            serverId: asRemoteNumber(detail.serverId ?? service.serverId),
+            serverName: asRemoteString(detail.serverName ?? service.serverName),
+            hostName: asRemoteString(detail.hostName ?? service.hostName),
+            deployPath: asRemoteString(detail.deployPath ?? service.deployPath),
+            portInfo: asRemoteString(detail.portInfo ?? service.portInfo),
+            deploymentStatusCode: asRemoteString(detail.deploymentStatusCode ?? service.deploymentStatusCode),
+            instanceCount: asRemoteNumber(detail.instanceCount ?? service.instanceCount, 1),
+          }];
+    return [...deployments, ...fallbackDeployment].map((deployment, deploymentIndex) => ({
       ...deployment,
       deploymentKey: `${asRemoteNumber(service.serviceId)}-${asRemoteNumber(deployment.deploymentId, deploymentIndex + 1)}`,
       serviceCode: asRemoteString(detail.serviceCode ?? service.serviceCode),

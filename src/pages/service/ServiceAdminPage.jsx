@@ -77,6 +77,58 @@ function cloneServiceDetailSample(serviceCode) {
   );
 }
 
+function buildServiceDetail(service, server, owners) {
+  const statusLabel = codeLabels.serviceStatus?.[service.statusCode] || service.statusCode || "-";
+  const importanceLabel = codeLabels.importance?.[service.importanceCode] || service.importanceCode || "-";
+  const ownerRows = owners.map((owner) => ({
+    name: owner.ownerName || "-",
+    role:
+      owner.responsibilityCode === "MAIN"
+        ? "주담당자"
+        : owner.responsibilityCode === "SUB"
+          ? "부담당자"
+          : "알림 담당",
+    meta: `${owner.ownerTypeCode === "GROUP" ? "담당그룹" : "사용자"} · ${owner.serviceCode || service.serviceCode}`,
+  }));
+  const deploymentRows = service.serverId
+    ? [{
+        name: server?.serverName || `서버 ${service.serverId}`,
+        meta: `${server?.ipAddress || "-"}:${service.portInfo || "-"} · ${server?.envCode || "-"} · ${server?.osTypeCode || "-"}`,
+        path: `deploy: ${service.deployPath || "-"}`,
+        status: codeLabels.deploymentStatus?.[service.deploymentStatusCode] || service.deploymentStatusCode || "-",
+      }]
+    : [];
+  const serverRows = server
+    ? [{
+        server: server.serverName,
+        host: server.hostName,
+        ip: server.ipAddress,
+        env: codeLabels.envType?.[server.envCode] || server.envCode || "-",
+        os: `${codeLabels.osType?.[server.osTypeCode] || server.osTypeCode || "-"} ${server.osVersion || ""}`.trim(),
+        path: service.deployPath || "-",
+        port: service.portInfo || "-",
+        instances: service.instanceCount ?? "-",
+        status: codeLabels.deploymentStatus?.[service.deploymentStatusCode] || service.deploymentStatusCode || "-",
+      }]
+    : [];
+
+  return {
+    title: service.serviceName,
+    importanceLabel,
+    statusLabel,
+    ownerSummary: ownerRows[0] ? `${ownerRows[0].name} (${ownerRows[0].role})` : "담당자 미지정",
+    overviewIncidents: [],
+    owners: ownerRows,
+    deploymentRows,
+    techRows: [],
+    serverRows,
+    changeRows: [],
+    relationRows: [],
+    impactRows: [],
+    incidentRows: [],
+  };
+}
+
 export function ServiceAdminPage() {
   const { serviceCode } = useParams();
   const portalData = usePortalData();
@@ -155,7 +207,6 @@ function ServiceDetailPage({ service }) {
     updateTechStack,
   } = usePortalData();
   const activeTab = new URLSearchParams(location.search).get("tab") || "overview";
-  const [detail, setDetail] = useState(() => cloneServiceDetailSample(service.serviceCode));
   const [changeRows, setChangeRows] = useState([]);
   const [changeSourceLabel, setChangeSourceLabel] = useState("샘플 기준");
   const [impactRows, setImpactRows] = useState([]);
@@ -165,8 +216,17 @@ function ServiceDetailPage({ service }) {
     [servers, service.serverId]
   );
   const serviceOwners = useMemo(
-    () => owners.filter((owner) => Number(owner.serviceId) === Number(service.serviceId)),
-    [owners, service.serviceId]
+    () =>
+      owners.filter(
+        (owner) =>
+          Number(owner.serviceId) === Number(service.serviceId) ||
+          String(owner.serviceCode || "") === String(service.serviceCode)
+      ),
+    [owners, service.serviceCode, service.serviceId]
+  );
+  const detail = useMemo(
+    () => buildServiceDetail(service, deploymentServer, serviceOwners),
+    [deploymentServer, service, serviceOwners]
   );
   const serviceTechStacks = useMemo(
     () => techStacks.filter((techStack) => Number(techStack.serviceId) === Number(service.serviceId)),
@@ -205,10 +265,6 @@ function ServiceDetailPage({ service }) {
   );
   const tabClassName = (tabKey) =>
     `service-detail__tab${activeTab === tabKey ? " is-active" : ""}`;
-
-  useEffect(() => {
-    setDetail(cloneServiceDetailSample(service.serviceCode));
-  }, [service.serviceCode]);
 
   useEffect(() => {
     setChangeRows([]);
@@ -496,9 +552,9 @@ function ServiceOverviewTab({ detail, incidents, onOpenDeployments, onOpenInfraM
           <dt>importance</dt><dd><span className="pill pill--crit">{detail.importanceLabel}</span></dd>
           <dt>status</dt><dd><span className="pill pill--ok">{detail.statusLabel}</span></dd>
           <dt>endpointUrl</dt><dd><code>{service.endpointUrl}</code></dd>
-          <dt>description</dt><dd>{service.description || "외부 카드사 승인 요청 중계 API"}</dd>
-          <dt>createdAt</dt><dd>2023-04-12 / createdBy: 20180023 홍OO</dd>
-          <dt>updatedAt</dt><dd>2026-05-30 / updatedBy: 20210034 김OO</dd>
+          <dt>description</dt><dd>{service.description || "-"}</dd>
+          <dt>createdAt</dt><dd>{formatServiceDetailDate(service.createdAt)} / createdBy: {service.createdBy || "-"}</dd>
+          <dt>updatedAt</dt><dd>{formatServiceDetailDate(service.updatedAt)} / updatedBy: {service.updatedBy || "-"}</dd>
         </dl>
       </article>
 
@@ -541,6 +597,7 @@ function ServiceOverviewTab({ detail, incidents, onOpenDeployments, onOpenInfraM
               </div>
             </div>
           ))}
+          {!detail.deploymentRows.length ? <div className="empty">등록된 배포 정보가 없습니다.</div> : null}
         </div>
       </article>
 
@@ -579,6 +636,7 @@ function ServiceOverviewTab({ detail, incidents, onOpenDeployments, onOpenInfraM
               </div>
             </div>
           ))}
+          {!detail.owners.length ? <div className="empty">등록된 담당자 정보가 없습니다.</div> : null}
         </div>
       </article>
     </div>

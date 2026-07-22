@@ -31,6 +31,8 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
   const [selectedOwner, setSelectedOwner] = useState(null);
   const [adminModal, setAdminModal] = useState(null);
   const [apiDetailModal, setApiDetailModal] = useState(null);
+  const [keyword, setKeyword] = useState("");
+  const [selectedKeys, setSelectedKeys] = useState([]);
   const serviceById = useMemo(
     () => new Map(portalData.services.map((service) => [service.serviceId, service])),
     [portalData.services]
@@ -80,6 +82,11 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
       setApiDetailModal(status.detail);
     }
   };
+
+  useEffect(() => {
+    setKeyword("");
+    setSelectedKeys([]);
+  }, [menu]);
 
   const configs = {
     services: {
@@ -259,6 +266,43 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
     },
   };
   const config = configs[menu];
+  const filteredRows = useMemo(() => {
+    const cleanedKeyword = keyword.trim().toLowerCase();
+    if (!cleanedKeyword) {
+      return config.rows;
+    }
+    return config.rows.filter((row) =>
+      buildRowSearchText(row).toLowerCase().includes(cleanedKeyword)
+    );
+  }, [config.rows, keyword]);
+  const filteredRowKeys = filteredRows.map((row) => String(row.key));
+  const isAllChecked =
+    filteredRowKeys.length > 0 &&
+    filteredRowKeys.every((key) => selectedKeys.includes(key));
+  const toggleAllRows = (checked) => {
+    if (!checked) {
+      setSelectedKeys((current) =>
+        current.filter((key) => !filteredRowKeys.includes(key))
+      );
+      return;
+    }
+    setSelectedKeys((current) => Array.from(new Set([...current, ...filteredRowKeys])));
+  };
+  const toggleRow = (key, checked) => {
+    const normalizedKey = String(key);
+    setSelectedKeys((current) =>
+      checked
+        ? Array.from(new Set([...current, normalizedKey]))
+        : current.filter((item) => item !== normalizedKey)
+    );
+  };
+  const resetList = () => {
+    setKeyword("");
+    setSelectedKeys([]);
+  };
+  const exportCsv = () => {
+    downloadAdminCsv(`${menu}.csv`, config.columns, filteredRows);
+  };
   const closeOwnerModal = () => {
     setOwnerModal(null);
     setSelectedOwner(null);
@@ -331,7 +375,7 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
                 ) : null}
               </>
             ) : null}
-            <button className="btn">📥 CSV 내보내기</button>
+            <button className="btn" onClick={exportCsv} type="button">📥 CSV 내보내기</button>
             {config.actionLabel ? (
               <button
                 className="btn btn--primary"
@@ -346,23 +390,23 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
       </div>
 
       <div className="toolbar">
-        <div className="search">🔍<input type="text" placeholder={`${meta.label} 검색...`} /></div>
-        <div className="right"><button className="btn btn--ghost btn--sm">초기화</button></div>
+        <div className="search">🔍<input type="text" value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder={`${meta.label} 검색...`} /></div>
+        <div className="right"><button className="btn btn--ghost btn--sm" onClick={resetList} type="button">초기화</button></div>
       </div>
 
       <div className="card">
         <table className="tbl">
           <thead>
             <tr>
-              <th className="col-check"><input type="checkbox" className="chk" /></th>
+              <th className="col-check"><input type="checkbox" className="chk" checked={isAllChecked} onChange={(event) => toggleAllRows(event.target.checked)} /></th>
               {config.columns.map((column) => <th key={column}>{column}</th>)}
               <th className="col-actions">관리</th>
             </tr>
           </thead>
           <tbody>
-            {config.rows.map((row) => (
+            {filteredRows.map((row) => (
               <tr className={row.onClick ? "is-clickable-incident" : undefined} key={row.key} onClick={row.onClick}>
-                <td className="col-check"><input className="chk" onClick={(event) => event.stopPropagation()} type="checkbox" /></td>
+                <td className="col-check"><input className="chk" checked={selectedKeys.includes(String(row.key))} onChange={(event) => toggleRow(row.key, event.target.checked)} onClick={(event) => event.stopPropagation()} type="checkbox" /></td>
                 {row.cells.map((cell, index) => <td key={index}>{cell}</td>)}
                 <td className="col-actions">
                   {config.readOnly ? (
@@ -418,7 +462,7 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
           </tbody>
         </table>
         <div className="pager">
-          <div className="pager__info">전체 {config.rows.length}건 · 1-{config.rows.length} / 1 페이지</div>
+          <div className="pager__info">전체 {filteredRows.length}건 · 1-{filteredRows.length} / 1 페이지 · 선택 {selectedKeys.filter((key) => filteredRowKeys.includes(key)).length}건</div>
           <div className="pager__nav"><button disabled>‹</button><button className="is-on">1</button><button disabled>›</button></div>
         </div>
       </div>
@@ -506,6 +550,50 @@ function ApiQueryDetailModal({ detail, onClose }) {
   );
 }
 
+function buildRowSearchText(row) {
+  return [
+    JSON.stringify(row.record ?? row.owner ?? {}),
+    ...(row.cells ?? []).map(extractNodeText),
+  ].join(" ");
+}
+
+function extractNodeText(value) {
+  if (value === null || value === undefined || typeof value === "boolean") {
+    return "";
+  }
+  if (typeof value === "string" || typeof value === "number") {
+    return String(value);
+  }
+  if (Array.isArray(value)) {
+    return value.map(extractNodeText).join(" ");
+  }
+  if (typeof value === "object" && "props" in value) {
+    return extractNodeText(value.props?.children);
+  }
+  return "";
+}
+
+function csvEscape(value) {
+  const text = String(value ?? "");
+  return /[",\n\r]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+}
+
+function downloadAdminCsv(filename, columns, rows) {
+  const lines = [
+    columns.map(csvEscape).join(","),
+    ...rows.map((row) => (row.cells ?? []).map((cell) => csvEscape(extractNodeText(cell))).join(",")),
+  ];
+  const blob = new Blob([`\uFEFF${lines.join("\n")}`], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 function formatApiDate(value) {
   if (!value) {
     return "-";
@@ -568,7 +656,7 @@ function AdminRecordModal({ modal, onClose, onOpenApiDetail, portalData, serverB
     }
 
     if (menu === "services") {
-      const serviceCode = requireValue(form.serviceCode, "serviceCode")?.toUpperCase();
+      const serviceCode = requireValue((form.serviceCode || "").toUpperCase(), "serviceCode")?.toUpperCase();
       const serviceName = requireValue(form.serviceName, "서비스명");
       const categoryPath = buildSelectedCategoryPath(form, portalData.categories);
       const categoryL1 = requireValue(categoryPath[0], "대분류");
