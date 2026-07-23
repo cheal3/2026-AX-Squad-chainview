@@ -108,7 +108,7 @@ function TopBar({ isDark = false }) {
 
   const openIncidentDetail = (incidentId) => {
     setIsNotificationOpen(false);
-    navigate(`/dashboard-proto-detail?incidentId=${incidentId}`);
+    navigate(`/dashboard?incidentId=${incidentId}`);
   };
   const handleAccountEdit = () => {
     window.alert("계정정보 수정 기능은 다음 단계에서 연결 예정입니다.");

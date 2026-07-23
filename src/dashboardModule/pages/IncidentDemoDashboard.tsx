@@ -556,7 +556,7 @@ function DashboardServiceFilter({
     <section className="mt-1 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-[0_1px_3px_rgba(15,23,42,0.05)]">
       <h2 className="mb-2.5 text-sm font-black text-slate-900">조회조건</h2>
 
-      <div className="grid min-w-0 grid-cols-[minmax(150px,1.35fr)_repeat(3,minmax(80px,0.8fr))_minmax(120px,1fr)_40px] items-end gap-2 xl:grid-cols-[200px_repeat(3,minmax(110px,140px))_minmax(150px,180px)_auto] xl:gap-4">
+      <div className="grid min-w-0 grid-cols-[minmax(150px,1.35fr)_repeat(3,minmax(80px,0.8fr))_minmax(120px,1fr)_40px] items-end gap-2 xl:grid-cols-[minmax(240px,1.2fr)_repeat(3,minmax(150px,1fr))_minmax(220px,1.35fr)_auto] xl:gap-x-6">
           <div
             className="relative grid h-10 min-w-0 grid-cols-2 overflow-hidden rounded-full border border-slate-200 bg-white p-1 shadow-md"
             style={{ borderRadius: 9999 }}
@@ -631,7 +631,7 @@ function DashboardServiceFilter({
           }}
         />
 
-        <div className="flex shrink-0 items-end gap-2">
+        <div className="flex shrink-0 items-end gap-2 xl:ml-1">
           <button
             className="hidden h-9 shrink-0 border border-slate-200 bg-white px-3 text-[11px] font-black text-slate-700 hover:bg-slate-50 xl:block"
             type="button"
