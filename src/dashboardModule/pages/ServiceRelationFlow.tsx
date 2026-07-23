@@ -88,6 +88,12 @@ type RelationImpactSummary = {
   text: string;
 };
 
+type IncidentServiceScope = {
+  lane: number;
+  rank: number;
+  label: string;
+};
+
 function normalizeGraphLookupValue(value?: string | null) {
   return (value ?? "").toLowerCase().replace(/[^a-z0-9가-힣]/g, "");
 }
@@ -788,6 +794,97 @@ export function ServiceRelationFlow({
         : baseFilteredServices,
     [baseFilteredServices, incidentServiceIds]
   );
+  const incidentDirectServiceIds = useMemo(() => {
+    const directIds = new Set<number>();
+    if (!incidentMode || !infraIncident || !activeIncident) {
+      return directIds;
+    }
+
+    filteredServices.forEach((service) => {
+      const infraNodeId = serviceInfraTargetByServiceId.get(service.serviceId);
+      if (
+        infraNodeId === incidentInfraNodeId ||
+        (activeIncident.serverId && service.serverId === activeIncident.serverId)
+      ) {
+        directIds.add(service.serviceId);
+      }
+    });
+
+    if (directIds.size === 0 && filteredServices[0]) {
+      directIds.add(filteredServices[0].serviceId);
+    }
+
+    return directIds;
+  }, [
+    activeIncident,
+    filteredServices,
+    incidentInfraNodeId,
+    incidentMode,
+    infraIncident,
+    serviceInfraTargetByServiceId,
+  ]);
+  const incidentServiceScopeById = useMemo(() => {
+    const scopeById = new Map<number, IncidentServiceScope>();
+    if (!incidentMode || !infraIncident || !incidentServiceIds) {
+      return scopeById;
+    }
+
+    incidentDirectServiceIds.forEach((serviceId) => {
+      if (incidentServiceIds.has(serviceId)) {
+        scopeById.set(serviceId, {
+          lane: 0,
+          rank: 0,
+          label: "인프라 직접 영향",
+        });
+      }
+    });
+
+    activeRelations.forEach((relation) => {
+      if (
+        !incidentServiceIds.has(relation.sourceServiceId) ||
+        !incidentServiceIds.has(relation.targetServiceId)
+      ) {
+        return;
+      }
+
+      const sourceDirect = incidentDirectServiceIds.has(relation.sourceServiceId);
+      const targetDirect = incidentDirectServiceIds.has(relation.targetServiceId);
+      if (sourceDirect && !targetDirect) {
+        scopeById.set(relation.targetServiceId, {
+          lane: 2,
+          rank: 2,
+          label: "송신 1뎁스 영향",
+        });
+      }
+      if (!sourceDirect && targetDirect) {
+        scopeById.set(relation.sourceServiceId, {
+          lane: 1,
+          rank: 1,
+          label: "수신 1뎁스 영향",
+        });
+      }
+    });
+
+    incidentServiceIds.forEach((serviceId) => {
+      if (!scopeById.has(serviceId)) {
+        scopeById.set(serviceId, {
+          lane: incidentDirectServiceIds.has(serviceId) ? 0 : 2,
+          rank: incidentDirectServiceIds.has(serviceId) ? 0 : 3,
+          label: incidentDirectServiceIds.has(serviceId)
+            ? "인프라 직접 영향"
+            : "연계 1뎁스 영향",
+        });
+      }
+    });
+
+    return scopeById;
+  }, [
+    activeRelations,
+    incidentDirectServiceIds,
+    incidentMode,
+    incidentServiceIds,
+    infraIncident,
+  ]);
   useEffect(() => {
     if (!incidentMode || !incidentServiceIds || incidentServiceIds.size === 0) {
       return;
@@ -1153,34 +1250,19 @@ export function ServiceRelationFlow({
       const laneMap = new Map<number, number>();
       const laneGroups = new Map<number, number[]>();
       const yMap = new Map<number, number>();
-      const directServiceIds = new Set<number>();
       const nodeYSpacing = 318;
       const compareIncidentServiceIds = (firstId: number, secondId: number) => {
+        const firstScope = incidentServiceScopeById.get(firstId);
+        const secondScope = incidentServiceScopeById.get(secondId);
         const firstName = serviceById.get(firstId)?.serviceName ?? "";
         const secondName = serviceById.get(secondId)?.serviceName ?? "";
 
-        return firstName.localeCompare(secondName, "ko") || firstId - secondId;
+        return (
+          (firstScope?.rank ?? 9) - (secondScope?.rank ?? 9) ||
+          firstName.localeCompare(secondName, "ko") ||
+          firstId - secondId
+        );
       };
-
-      filteredServices.forEach((service) => {
-        const infraNodeId = serviceInfraTargetByServiceId.get(service.serviceId);
-        if (
-          infraNodeId === incidentInfraNodeId ||
-          (activeIncident?.serverId && service.serverId === activeIncident.serverId)
-        ) {
-          directServiceIds.add(service.serviceId);
-        }
-      });
-
-      if (directServiceIds.size === 0 && filteredServices[0]) {
-        directServiceIds.add(filteredServices[0].serviceId);
-      }
-
-      directServiceIds.forEach((serviceId) => {
-        if (visible.has(serviceId)) {
-          laneMap.set(serviceId, 0);
-        }
-      });
 
       activeRelations.forEach((relation) => {
         if (
@@ -1190,25 +1272,17 @@ export function ServiceRelationFlow({
           return;
         }
 
-        const sourceDirect = directServiceIds.has(relation.sourceServiceId);
-        const targetDirect = directServiceIds.has(relation.targetServiceId);
+        const sourceDirect = incidentDirectServiceIds.has(relation.sourceServiceId);
+        const targetDirect = incidentDirectServiceIds.has(relation.targetServiceId);
         if (!sourceDirect && !targetDirect) {
           return;
         }
 
         relationIds.add(relation.relationId);
-        if (!sourceDirect && targetDirect) {
-          laneMap.set(relation.sourceServiceId, -1);
-        }
-        if (sourceDirect && !targetDirect) {
-          laneMap.set(relation.targetServiceId, 1);
-        }
       });
 
       visible.forEach((serviceId) => {
-        if (!laneMap.has(serviceId)) {
-          laneMap.set(serviceId, directServiceIds.has(serviceId) ? 0 : 1);
-        }
+        laneMap.set(serviceId, incidentServiceScopeById.get(serviceId)?.lane ?? 2);
         const lane = laneMap.get(serviceId) ?? 0;
         laneGroups.set(lane, [...(laneGroups.get(lane) ?? []), serviceId]);
       });
@@ -1424,6 +1498,10 @@ export function ServiceRelationFlow({
     activeRelations,
     filteredServices,
     focusedServiceId,
+    incidentDirectServiceIds,
+    incidentServiceIds,
+    incidentServiceScopeById,
+    infraIncident,
     relationDepth,
     serviceById,
     showAllServices,
@@ -1521,8 +1599,45 @@ export function ServiceRelationFlow({
       }
     });
 
+    if (incidentMode && infraIncident) {
+      const incidentInfraNodeName =
+        infraGraphNodes.find((node) => node.infraNodeId === incidentInfraNodeId)
+          ?.nodeName ?? activeIncident?.targetLabel ?? "장애 인프라";
+
+      incidentServiceScopeById.forEach((scope, serviceId) => {
+        if (!visibleServiceIds.has(serviceId) || impactMap.has(serviceId)) {
+          return;
+        }
+
+        const text =
+          scope.rank === 0
+            ? `${incidentInfraNodeName} 장애로 직접 업무 영향이 예상됩니다.`
+            : `${scope.label}으로 업무 영향 확인이 필요합니다.`;
+
+        impactMap.set(serviceId, [
+          {
+            path: scope.label,
+            text,
+          },
+        ]);
+      });
+    }
+
     return impactMap;
-  }, [activeRelations, focusedServiceId, laneByServiceId, serviceById, visibleRelationIds]);
+  }, [
+    activeIncident,
+    activeRelations,
+    focusedServiceId,
+    incidentInfraNodeId,
+    incidentMode,
+    incidentServiceScopeById,
+    infraGraphNodes,
+    infraIncident,
+    laneByServiceId,
+    serviceById,
+    visibleRelationIds,
+    visibleServiceIds,
+  ]);
 
   const serviceNodes = useMemo<Node<ServiceNodeData>[]>(() => {
     const visibleServices = filteredServices.filter((service) => {
