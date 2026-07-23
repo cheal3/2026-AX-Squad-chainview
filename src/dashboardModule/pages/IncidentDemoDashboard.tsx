@@ -3,7 +3,6 @@ import {
   AlertTriangle,
   Bell,
   BriefcaseBusiness,
-  Building2,
   CheckCircle2,
   CircleHelp,
   Clock3,
@@ -12,8 +11,6 @@ import {
   Globe2,
   Mail,
   Maximize2,
-  Monitor,
-  Network,
   Phone,
   RefreshCw,
   Search,
@@ -29,15 +26,30 @@ import {
 } from "./ServiceRelationFlow";
 import { usePortalData } from "../PortalDataStore";
 import type { IncidentRecord, ServiceRecord, ServiceRelationRecord } from "../mockData";
+import { chainViewEmployeeNo } from "../chainViewApi";
 import { useNavigate } from "react-router-dom";
 
-const categories = [
-  { key: "all", label: "전체 서비스", value: 48, icon: <Server size={26} />, tone: "slate" },
-  { key: "platform", label: "공통 플랫폼", value: 12, icon: <Network size={28} />, tone: "blue" },
-  { key: "core", label: "기간계/업무계", value: 18, icon: <Building2 size={28} />, tone: "navy" },
-  { key: "channel", label: "채널계", value: 10, icon: <Monitor size={27} />, tone: "blue" },
-  { key: "external", label: "대외채널", value: 8, icon: <Globe2 size={27} />, tone: "blue" },
-];
+const DASHBOARD_FILTER_STORAGE_KEY = "chainview.dashboard.service-filter.v1";
+const DEFAULT_CATEGORY_L1 = "공통플랫폼";
+const DEFAULT_CATEGORY_L2 = "SWA 플랫폼";
+
+type DashboardFilterScope = "all" | "mine";
+
+type DashboardFilterState = {
+  scope: DashboardFilterScope;
+  categoryL1: string;
+  categoryL2: string;
+  categoryL3: string;
+  serviceId: number | null;
+};
+
+const DEFAULT_DASHBOARD_FILTER: DashboardFilterState = {
+  scope: "all",
+  categoryL1: DEFAULT_CATEGORY_L1,
+  categoryL2: DEFAULT_CATEGORY_L2,
+  categoryL3: "",
+  serviceId: null,
+};
 
 const managementRows = [
   ["담당조직 미등록", "3건", "owner"],
@@ -71,36 +83,62 @@ const incidentRows = [
   ["Auth-Service", "INC-2026-0017", "완료", "2개", "5일 전", "green"],
 ];
 
-function isCoreService(service: ServiceRecord) {
-  const rootCategory = service.categoryPath[0] ?? "";
-  return rootCategory.includes("기간계");
+function readDashboardFilter(): DashboardFilterState {
+  if (typeof window === "undefined") return DEFAULT_DASHBOARD_FILTER;
+
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(DASHBOARD_FILTER_STORAGE_KEY) ?? "null");
+    if (!saved || (saved.scope !== "all" && saved.scope !== "mine")) {
+      return DEFAULT_DASHBOARD_FILTER;
+    }
+    return {
+      scope: saved.scope,
+      categoryL1: String(saved.categoryL1 ?? ""),
+      categoryL2: String(saved.categoryL2 ?? ""),
+      categoryL3: String(saved.categoryL3 ?? ""),
+      serviceId: Number(saved.serviceId) || null,
+    };
+  } catch {
+    return DEFAULT_DASHBOARD_FILTER;
+  }
 }
 
-function matchesDashboardCategory(service: ServiceRecord, categoryKey: string) {
-  const rootCategory = service.categoryPath[0] ?? "";
-  const categoryLabel = service.categoryPath.join(" ");
+function categoryName(record: Record<string, unknown>) {
+  return String(record.categoryName ?? record.name ?? record.label ?? "").trim();
+}
 
-  if (categoryKey === "all") {
-    return true;
+function categoryId(record: Record<string, unknown>) {
+  return Number(record.categoryId ?? record.id) || 0;
+}
+
+function serviceCategoryPath(
+  service: ServiceRecord,
+  categoryRecords: Array<Record<string, unknown>>
+) {
+  if (service.categoryPath.length > 1 || !service.categoryId) {
+    return service.categoryPath.filter(Boolean);
   }
 
-  if (categoryKey === "platform") {
-    return /공통|플랫폼|인프라/.test(categoryLabel);
+  const byId = new Map(categoryRecords.map((record) => [categoryId(record), record]));
+  const path: string[] = [];
+  let current = byId.get(service.categoryId);
+  const visited = new Set<number>();
+
+  while (current) {
+    const currentId = categoryId(current);
+    if (!currentId || visited.has(currentId)) break;
+    visited.add(currentId);
+    const name = categoryName(current);
+    if (name) path.unshift(name);
+    const parentId = Number(current.parentCategoryId ?? current.parentId) || 0;
+    current = parentId ? byId.get(parentId) : undefined;
   }
 
-  if (categoryKey === "core") {
-    return /기간계|업무계/.test(categoryLabel);
-  }
+  return path.length ? path : service.categoryPath.filter(Boolean);
+}
 
-  if (categoryKey === "channel") {
-    return /채널/.test(categoryLabel);
-  }
-
-  if (categoryKey === "external") {
-    return /대외|외부/.test(rootCategory) || /대외|외부/.test(categoryLabel);
-  }
-
-  return true;
+function uniqueLabels(values: string[]) {
+  return [...new Set(values.filter(Boolean))].sort((a, b) => a.localeCompare(b, "ko"));
 }
 
 export function IncidentDemoDashboard({
@@ -126,13 +164,14 @@ function DashboardCase({
   const navigate = useNavigate();
   const [createdIncidentId, setCreatedIncidentId] = useState<number | undefined>();
   const stableDataRef = useRef(portalData);
+  const filterLookupRequestedRef = useRef(false);
   useEffect(() => {
     if (portalData.services.length > 0) {
       stableDataRef.current = portalData;
     }
   }, [portalData]);
   const dashboardData =
-    stableDataRef.current.services.length > 0 ? stableDataRef.current : portalData;
+    portalData.services.length > 0 ? portalData : stableDataRef.current;
   const effectiveActiveIncidentId = activeIncidentId ?? createdIncidentId;
   const activeIncident = effectiveActiveIncidentId
     ? portalData.incidents.find(
@@ -141,7 +180,19 @@ function DashboardCase({
           incident.incidentStatusCode !== "RESOLVED"
       )
     : undefined;
-  const { relations, services } = dashboardData;
+  const { categories: categoryRecords, owners, relations, services, users } = dashboardData;
+
+  useEffect(() => {
+    if (activeIncident || !portalData.remoteApi.enabled || filterLookupRequestedRef.current) return;
+    filterLookupRequestedRef.current = true;
+    if (portalData.categories.length === 0) {
+      void portalData.remoteApi.testQuery("categories");
+    }
+    if (portalData.users.length === 0) {
+      void portalData.remoteApi.testQuery("users");
+    }
+  }, [activeIncident, portalData]);
+
   const relationCountByServiceId = useMemo(() => {
     const counts = new Map<number, number>();
 
@@ -158,22 +209,95 @@ function DashboardCase({
 
     return counts;
   }, [relations]);
-  const [selectedCategoryKey, setSelectedCategoryKey] = useState("core");
-  const categoryServices = useMemo(() => {
-    const matched = services.filter((service) =>
-      matchesDashboardCategory(service, selectedCategoryKey)
+  const [draftFilter, setDraftFilter] = useState<DashboardFilterState>(readDashboardFilter);
+  const [appliedFilter, setAppliedFilter] = useState<DashboardFilterState>(readDashboardFilter);
+  const categoryPathByServiceId = useMemo(
+    () =>
+      new Map(
+        services.map((service) => [
+          service.serviceId,
+          serviceCategoryPath(service, categoryRecords),
+        ])
+      ),
+    [categoryRecords, services]
+  );
+  const currentUser = useMemo(
+    () => users.find((user) => String(user.employeeNo ?? "") === chainViewEmployeeNo),
+    [users]
+  );
+  const currentUserId = Number(currentUser?.userId) || 0;
+  const myServiceIds = useMemo(() => {
+    const userOwners = owners.filter((owner) => owner.ownerTypeCode === "USER");
+    const matched = userOwners.filter((owner) =>
+      currentUserId ? Number(owner.userId) === currentUserId : true
     );
-    return matched.length > 0 ? matched : services;
-  }, [selectedCategoryKey, services]);
-  const coreServices = useMemo(() => {
-    const matched = categoryServices.filter(isCoreService);
-    return selectedCategoryKey === "core" && matched.length > 0
-      ? matched
-      : categoryServices;
-  }, [categoryServices, selectedCategoryKey]);
+    return new Set(matched.map((owner) => owner.serviceId));
+  }, [currentUserId, owners]);
+  const scopedServices = useMemo(
+    () =>
+      draftFilter.scope === "mine"
+        ? services.filter((service) => myServiceIds.has(service.serviceId))
+        : services,
+    [draftFilter.scope, myServiceIds, services]
+  );
+  const categoryL1Options = useMemo(
+    () =>
+      uniqueLabels(
+        scopedServices.map((service) => categoryPathByServiceId.get(service.serviceId)?.[0] ?? "")
+      ),
+    [categoryPathByServiceId, scopedServices]
+  );
+  const categoryL2Options = useMemo(
+    () =>
+      uniqueLabels(
+        scopedServices
+          .filter(
+            (service) =>
+              !draftFilter.categoryL1 ||
+              categoryPathByServiceId.get(service.serviceId)?.[0] === draftFilter.categoryL1
+          )
+          .map((service) => categoryPathByServiceId.get(service.serviceId)?.[1] ?? "")
+      ),
+    [categoryPathByServiceId, draftFilter.categoryL1, scopedServices]
+  );
+  const categoryL3Options = useMemo(
+    () =>
+      uniqueLabels(
+        scopedServices
+          .filter((service) => {
+            const path = categoryPathByServiceId.get(service.serviceId) ?? [];
+            return (
+              (!draftFilter.categoryL1 || path[0] === draftFilter.categoryL1) &&
+              (!draftFilter.categoryL2 || path[1] === draftFilter.categoryL2)
+            );
+          })
+          .map((service) => categoryPathByServiceId.get(service.serviceId)?.[2] ?? "")
+      ),
+    [categoryPathByServiceId, draftFilter.categoryL1, draftFilter.categoryL2, scopedServices]
+  );
+  const filteredServices = useMemo(() => {
+    const candidates =
+      appliedFilter.scope === "mine"
+        ? services.filter((service) => myServiceIds.has(service.serviceId))
+        : services;
+
+    return candidates.filter((service) => {
+      const path = categoryPathByServiceId.get(service.serviceId) ?? [];
+      return (
+        (!appliedFilter.serviceId || service.serviceId === appliedFilter.serviceId) &&
+        (!appliedFilter.categoryL1 || path[0] === appliedFilter.categoryL1) &&
+        (!appliedFilter.categoryL2 || path[1] === appliedFilter.categoryL2) &&
+        (!appliedFilter.categoryL3 || path[2] === appliedFilter.categoryL3)
+      );
+    });
+  }, [appliedFilter, categoryPathByServiceId, myServiceIds, services]);
+  const filteredServiceIds = useMemo(
+    () => filteredServices.map((service) => service.serviceId),
+    [filteredServices]
+  );
   const defaultSelectedServiceId = useMemo(
     () =>
-      [...coreServices]
+      [...filteredServices]
         .sort((first, second) => {
           const relationCountDiff =
             (relationCountByServiceId.get(second.serviceId) ?? 0) -
@@ -185,7 +309,7 @@ function DashboardCase({
             first.serviceId - second.serviceId
           );
         })[0]?.serviceId,
-    [coreServices, relationCountByServiceId]
+    [filteredServices, relationCountByServiceId]
   );
   const [selectedServiceId, setSelectedServiceId] = useState<number | undefined>(
     defaultSelectedServiceId
@@ -195,13 +319,24 @@ function DashboardCase({
 
   useEffect(() => {
     setSelectedServiceId((current) => {
-      if (current && coreServices.some((service) => service.serviceId === current)) {
+      if (current && filteredServices.some((service) => service.serviceId === current)) {
         return current;
       }
 
       return defaultSelectedServiceId;
     });
-  }, [coreServices, defaultSelectedServiceId]);
+  }, [filteredServices, defaultSelectedServiceId]);
+
+  const applyFilter = () => {
+    setAppliedFilter(draftFilter);
+    window.localStorage.setItem(DASHBOARD_FILTER_STORAGE_KEY, JSON.stringify(draftFilter));
+    setSelectedInfraNode(undefined);
+  };
+
+  const resetFilter = () => {
+    const reset = { ...draftFilter, categoryL1: "", categoryL2: "", categoryL3: "", serviceId: null };
+    setDraftFilter(reset);
+  };
 
   const handleSelectService = (serviceId: number) => {
     setSelectedInfraNode(undefined);
@@ -219,8 +354,8 @@ function DashboardCase({
   };
   const selectedService =
     services.find((service) => service.serviceId === selectedServiceId) ??
-    coreServices.find((service) => service.serviceId === defaultSelectedServiceId) ??
-    services[0];
+    filteredServices.find((service) => service.serviceId === defaultSelectedServiceId) ??
+    filteredServices[0];
 
   if (activeIncident) {
     return (
@@ -234,13 +369,21 @@ function DashboardCase({
 
   return (
     <section className="flex min-h-[calc(100vh-116px)] min-w-0 flex-1 flex-col">
-      <MetricStrip
-        selectedCategoryKey={selectedCategoryKey}
-        onSelectCategory={setSelectedCategoryKey}
+      <DashboardServiceFilter
+        categoryL1Options={categoryL1Options}
+        categoryL2Options={categoryL2Options}
+        categoryL3Options={categoryL3Options}
+        categoryPathByServiceId={categoryPathByServiceId}
+        filter={draftFilter}
+        services={scopedServices}
+        onApply={applyFilter}
+        onChange={setDraftFilter}
+        onReset={resetFilter}
       />
       <div className="mt-3 grid min-h-[460px] min-w-0 flex-[1.55] grid-cols-[minmax(0,1fr)_minmax(300px,400px)] gap-3">
         <RelationMap
-          coreServiceIds={coreServices.map((service) => service.serviceId)}
+          key={JSON.stringify(appliedFilter)}
+          coreServiceIds={filteredServiceIds}
           selectedServiceId={selectedServiceId}
           onSelectInfraNode={setSelectedInfraNode}
           onSelectService={handleSelectService}
@@ -337,39 +480,247 @@ function DashboardHeader() {
   );
 }
 
-function MetricStrip({
-  onSelectCategory,
-  selectedCategoryKey,
+function DashboardServiceFilter({
+  categoryL1Options,
+  categoryL2Options,
+  categoryL3Options,
+  categoryPathByServiceId,
+  filter,
+  onApply,
+  onChange,
+  onReset,
+  services,
 }: {
-  onSelectCategory: (categoryKey: string) => void;
-  selectedCategoryKey: string;
+  categoryL1Options: string[];
+  categoryL2Options: string[];
+  categoryL3Options: string[];
+  categoryPathByServiceId: Map<number, string[]>;
+  filter: DashboardFilterState;
+  onApply: () => void;
+  onChange: (filter: DashboardFilterState) => void;
+  onReset: () => void;
+  services: ServiceRecord[];
 }) {
+  const updateScope = (scope: DashboardFilterScope) => {
+    onChange({ scope, categoryL1: "", categoryL2: "", categoryL3: "", serviceId: null });
+  };
+
   return (
-    <div className="mt-1 grid min-w-0 grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-3">
-      {categories.map((item) => (
+    <section className="mt-1 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-[0_1px_3px_rgba(15,23,42,0.05)]">
+      <h2 className="mb-2.5 text-sm font-black text-slate-900">조회조건</h2>
+
+      <div className="flex min-w-0 flex-wrap items-end gap-3 xl:flex-nowrap">
+        <div className="grid h-9 shrink-0 grid-cols-2 rounded-full border border-slate-200 bg-white p-0.5" style={{ borderRadius: 9999 }}>
+          {([
+            ["all", "전체 서비스"],
+            ["mine", "내 담당 서비스"],
+          ] as const).map(([scope, label]) => (
+            <button
+              key={scope}
+              className={`min-w-[108px] px-3 text-xs font-black transition-colors ${
+                filter.scope === scope
+                  ? "bg-[#1f2a44] text-white shadow-sm"
+                  : "text-slate-600 hover:text-slate-950"
+              }`}
+              style={{ borderRadius: 9999 }}
+              type="button"
+              onClick={() => updateScope(scope)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex h-9 min-w-[215px] flex-1 items-center border-l border-slate-200 pl-3 text-xs font-bold text-slate-500 xl:max-w-[270px]">
+          <span className="line-clamp-2 leading-4">
+            {filter.scope === "mine"
+              ? "내가 담당자로 등록된 서비스만 조회됩니다."
+              : "전체 서비스를 대상으로 조회됩니다."}
+          </span>
+        </div>
+
+        <FilterSelect
+          label="대분류"
+          options={categoryL1Options}
+          value={filter.categoryL1}
+          onChange={(categoryL1) =>
+            onChange({ ...filter, categoryL1, categoryL2: "", categoryL3: "", serviceId: null })
+          }
+        />
+        <FilterSelect
+          disabled={!filter.categoryL1}
+          label="중분류"
+          options={categoryL2Options}
+          value={filter.categoryL2}
+          onChange={(categoryL2) =>
+            onChange({ ...filter, categoryL2, categoryL3: "", serviceId: null })
+          }
+        />
+        <FilterSelect
+          disabled={!filter.categoryL2}
+          label="소분류"
+          options={categoryL3Options}
+          value={filter.categoryL3}
+          onChange={(categoryL3) => onChange({ ...filter, categoryL3, serviceId: null })}
+        />
+
+        <ServiceSearchSelect
+          services={services}
+          value={filter.serviceId}
+          onChange={(service) => {
+            const path = service
+              ? categoryPathByServiceId.get(service.serviceId) ?? service.categoryPath
+              : [];
+            onChange({
+              ...filter,
+              serviceId: service?.serviceId ?? null,
+              categoryL1: path[0] ?? "",
+              categoryL2: path[1] ?? "",
+              categoryL3: path[2] ?? "",
+            });
+          }}
+        />
+
         <button
-          key={item.label}
-          className={`h-[74px] min-w-0 rounded-lg border bg-white px-5 py-3 text-left shadow-[0_1px_3px_rgba(15,23,42,0.08)] ${
-            selectedCategoryKey === item.key
-              ? "border-[#126cf0] ring-2 ring-[#126cf0]/15"
-              : "border-slate-200"
-          }`}
+          className="h-9 shrink-0 border border-slate-200 bg-white px-4 text-xs font-black text-slate-700 hover:bg-slate-50"
           type="button"
-          onClick={() => onSelectCategory(item.key)}
+          onClick={onReset}
         >
-          <div className="flex min-w-0 items-center justify-between gap-3">
-            <div className="min-w-0">
-              <div className="truncate text-xs font-black text-slate-500">{item.label}</div>
-              <div className={`mt-2 text-3xl font-black ${item.tone === "navy" ? "text-[#1f2a44]" : "text-slate-950"}`}>
-                {item.value}
-              </div>
-            </div>
-            <div className={`shrink-0 ${item.tone === "slate" ? "text-slate-500" : item.tone === "navy" ? "text-[#1f2a44]" : "text-[#2563eb]"}`}>
-              {item.icon}
-            </div>
-          </div>
+          초기화
         </button>
-      ))}
+        <button
+          className="h-9 shrink-0 bg-[#1f2a44] px-5 text-xs font-black text-white shadow-sm hover:bg-[#263552]"
+          type="button"
+          onClick={onApply}
+        >
+          조회
+        </button>
+      </div>
+
+    </section>
+  );
+}
+
+function FilterSelect({
+  disabled = false,
+  label,
+  onChange,
+  options,
+  value,
+}: {
+  disabled?: boolean;
+  label: string;
+  onChange: (value: string) => void;
+  options: string[];
+  value: string;
+}) {
+  const normalizedOptions = value && !options.includes(value) ? [value, ...options] : options;
+  return (
+    <label className="min-w-[128px] flex-1 xl:max-w-[170px]">
+      <span className="mb-1 block text-[11px] font-black text-slate-600">{label}</span>
+      <select
+        className="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-xs font-bold text-slate-800 outline-none focus:border-blue-500 disabled:bg-slate-50 disabled:text-slate-400"
+        disabled={disabled}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      >
+        <option value="">전체</option>
+        {normalizedOptions.map((option) => (
+          <option key={option} value={option}>{option}</option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function ServiceSearchSelect({
+  onChange,
+  services,
+  value,
+}: {
+  onChange: (service?: ServiceRecord) => void;
+  services: ServiceRecord[];
+  value: number | null;
+}) {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const selected = services.find((service) => service.serviceId === value);
+  const [query, setQuery] = useState(selected ? `${selected.serviceName} · ${selected.serviceCode}` : "");
+  const [open, setOpen] = useState(false);
+  const results = useMemo(() => {
+    const keyword = query.trim().toLowerCase();
+    return services
+      .filter((service) =>
+        !keyword || `${service.serviceName} ${service.serviceCode}`.toLowerCase().includes(keyword)
+      )
+      .slice(0, 20);
+  }, [query, services]);
+
+  useEffect(() => {
+    setQuery(selected ? `${selected.serviceName} · ${selected.serviceCode}` : "");
+  }, [selected?.serviceId]);
+
+  useEffect(() => {
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, []);
+
+  return (
+    <div className="relative min-w-[190px] flex-[1.35] xl:max-w-[250px]" ref={rootRef}>
+      <label className="block">
+        <span className="mb-1 block text-[11px] font-black text-slate-600">서비스 검색</span>
+        <span className="relative block">
+          <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            className="h-9 w-full rounded-md border border-slate-200 bg-white pl-9 pr-8 text-xs font-bold text-slate-800 outline-none focus:border-blue-500"
+            placeholder="서비스명 또는 코드 검색"
+            value={query}
+            onFocus={() => setOpen(true)}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setOpen(true);
+              if (value) onChange(undefined);
+            }}
+          />
+          {query ? (
+            <button
+              aria-label="서비스 검색 초기화"
+              className="absolute right-1 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center text-slate-400 hover:text-slate-700"
+              type="button"
+              onClick={() => {
+                setQuery("");
+                setOpen(true);
+                onChange(undefined);
+              }}
+            >
+              <X size={14} />
+            </button>
+          ) : null}
+        </span>
+      </label>
+      {open ? (
+        <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-50 max-h-64 overflow-y-auto rounded-md border border-slate-200 bg-white p-1 shadow-xl">
+          {results.length ? results.map((service) => (
+            <button
+              key={service.serviceId}
+              className="flex w-full min-w-0 flex-col px-3 py-2 text-left hover:bg-slate-50"
+              type="button"
+              onClick={() => {
+                setQuery(`${service.serviceName} · ${service.serviceCode}`);
+                setOpen(false);
+                onChange(service);
+              }}
+            >
+              <span className="truncate text-xs font-black text-slate-900">{service.serviceName}</span>
+              <span className="truncate text-[11px] font-bold text-slate-500">{service.serviceCode}</span>
+            </button>
+          )) : (
+            <div className="px-3 py-4 text-center text-xs font-bold text-slate-500">검색 결과가 없습니다.</div>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -387,9 +738,8 @@ function RelationMap({
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const coreServiceIdSet = useMemo(() => new Set(coreServiceIds), [coreServiceIds]);
-  const serviceFilter = coreServiceIdSet.size
-    ? (service: ServiceRecord) => coreServiceIdSet.has(service.serviceId)
-    : undefined;
+  const serviceFilter = (service: ServiceRecord) =>
+    coreServiceIdSet.has(service.serviceId);
 
   return (
     <>

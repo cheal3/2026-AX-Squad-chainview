@@ -619,6 +619,46 @@ export function ServiceRelationFlow({
 
     return next;
   }, [infraGraphNodes, serverById, services]);
+  const filteredInfraNodeIds = useMemo(() => {
+    if (!serviceFilter) {
+      return null;
+    }
+
+    const directNodeIds = new Set<number>();
+    filteredServices.forEach((service) => {
+      const infraNodeId = serviceInfraTargetByServiceId.get(service.serviceId);
+      if (infraNodeId) directNodeIds.add(infraNodeId);
+    });
+
+    const visibleNodeIds = new Set(directNodeIds);
+    infraGraphRelations.forEach((relation) => {
+      if (directNodeIds.has(relation.sourceInfraNodeId)) {
+        visibleNodeIds.add(relation.targetInfraNodeId);
+      }
+      if (directNodeIds.has(relation.targetInfraNodeId)) {
+        visibleNodeIds.add(relation.sourceInfraNodeId);
+      }
+    });
+    return visibleNodeIds;
+  }, [filteredServices, infraGraphRelations, serviceFilter, serviceInfraTargetByServiceId]);
+  const scopedInfraGraphNodes = useMemo(
+    () =>
+      filteredInfraNodeIds
+        ? infraGraphNodes.filter((node) => filteredInfraNodeIds.has(node.infraNodeId))
+        : infraGraphNodes,
+    [filteredInfraNodeIds, infraGraphNodes]
+  );
+  const scopedInfraGraphRelations = useMemo(
+    () =>
+      filteredInfraNodeIds
+        ? infraGraphRelations.filter(
+            (relation) =>
+              filteredInfraNodeIds.has(relation.sourceInfraNodeId) &&
+              filteredInfraNodeIds.has(relation.targetInfraNodeId)
+          )
+        : infraGraphRelations,
+    [filteredInfraNodeIds, infraGraphRelations]
+  );
   const selectedServiceInfraNodeIds = useMemo(() => {
     const next = new Set<number>();
     if (!selectedServiceNodeId) {
@@ -1281,17 +1321,17 @@ export function ServiceRelationFlow({
     const allMode = graphViewMode === "all";
 
     const nodeById = new Map(
-      infraGraphNodes.map((node) => [node.infraNodeId, node])
+      scopedInfraGraphNodes.map((node) => [node.infraNodeId, node])
     );
     const outgoing = new Map<number, number[]>();
     const indegree = new Map<number, number>();
 
-    infraGraphNodes.forEach((node) => {
+    scopedInfraGraphNodes.forEach((node) => {
       outgoing.set(node.infraNodeId, []);
       indegree.set(node.infraNodeId, 0);
     });
 
-    infraGraphRelations.forEach((relation) => {
+    scopedInfraGraphRelations.forEach((relation) => {
       if (
         !nodeById.has(relation.sourceInfraNodeId) ||
         !nodeById.has(relation.targetInfraNodeId)
@@ -1310,7 +1350,7 @@ export function ServiceRelationFlow({
     });
 
     const laneByNodeId = new Map<number, number>();
-    const queue = infraGraphNodes
+    const queue = scopedInfraGraphNodes
       .filter((node) => (indegree.get(node.infraNodeId) ?? 0) === 0)
       .sort((first, second) =>
         first.nodeName.localeCompare(second.nodeName, "ko") ||
@@ -1318,8 +1358,8 @@ export function ServiceRelationFlow({
       )
       .map((node) => node.infraNodeId);
 
-    if (!queue.length && infraGraphNodes[0]) {
-      queue.push(infraGraphNodes[0].infraNodeId);
+    if (!queue.length && scopedInfraGraphNodes[0]) {
+      queue.push(scopedInfraGraphNodes[0].infraNodeId);
     }
 
     queue.forEach((nodeId) => laneByNodeId.set(nodeId, 0));
@@ -1338,14 +1378,14 @@ export function ServiceRelationFlow({
       });
     }
 
-    infraGraphNodes.forEach((node) => {
+    scopedInfraGraphNodes.forEach((node) => {
       if (!laneByNodeId.has(node.infraNodeId)) {
         laneByNodeId.set(node.infraNodeId, 0);
       }
     });
 
     const groups = new Map<number, InfraGraphNodeRecord[]>();
-    infraGraphNodes.forEach((node) => {
+    scopedInfraGraphNodes.forEach((node) => {
       const lane = laneByNodeId.get(node.infraNodeId) ?? 0;
       groups.set(lane, [...(groups.get(lane) ?? []), node]);
     });
@@ -1416,8 +1456,8 @@ export function ServiceRelationFlow({
     return nodes;
   }, [
     graphViewMode,
-    infraGraphNodes,
-    infraGraphRelations,
+    scopedInfraGraphNodes,
+    scopedInfraGraphRelations,
     selectedInfraConnectedNodeIds,
     selectedInfraNodeId,
     selectedServiceInfraNodeIds,
@@ -1508,7 +1548,7 @@ export function ServiceRelationFlow({
     const addedTopologyRelationEdges = new Set<string>();
     const visibleNodeIds = new Set(topologyNodes.map((node) => node.id));
 
-    infraGraphRelations.forEach((relation) => {
+    scopedInfraGraphRelations.forEach((relation) => {
       const sourceNodeId = `infra-${relation.sourceInfraNodeId}`;
       const targetNodeId = `infra-${relation.targetInfraNodeId}`;
 
@@ -1639,7 +1679,7 @@ export function ServiceRelationFlow({
     focusedServiceId,
     highlightServiceId,
     incidentMode,
-    infraGraphRelations,
+    scopedInfraGraphRelations,
     laneByServiceId,
     serviceById,
     serverById,

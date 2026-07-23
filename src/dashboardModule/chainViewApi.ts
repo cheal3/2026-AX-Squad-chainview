@@ -9,7 +9,7 @@ export const chainViewApiBaseUrl =
   import.meta.env.VITE_CHAINVIEW_API_BASE_URL ||
   (import.meta.env.DEV ? "/chainview-api" : chainViewRemoteOrigin);
 
-const chainViewEmployeeNo =
+export const chainViewEmployeeNo =
   import.meta.env.VITE_CHAINVIEW_EMPLOYEE_NO ?? DEFAULT_EMPLOYEE_NO;
 const chainViewPassword =
   import.meta.env.VITE_CHAINVIEW_PASSWORD ?? "";
