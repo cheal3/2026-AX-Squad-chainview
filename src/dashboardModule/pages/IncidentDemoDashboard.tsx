@@ -212,6 +212,21 @@ function DashboardCase({
 
     return counts;
   }, [relations]);
+  const relationDirectionCountsByServiceId = useMemo(() => {
+    const counts = new Map<number, { incoming: number; outgoing: number }>();
+    const ensure = (serviceId: number) => {
+      const current = counts.get(serviceId) ?? { incoming: 0, outgoing: 0 };
+      counts.set(serviceId, current);
+      return current;
+    };
+
+    relations.forEach((relation) => {
+      ensure(relation.sourceServiceId).outgoing += 1;
+      ensure(relation.targetServiceId).incoming += 1;
+    });
+
+    return counts;
+  }, [relations]);
   const [draftFilter, setDraftFilter] = useState<DashboardFilterState>(readDashboardFilter);
   const [appliedFilter, setAppliedFilter] = useState<DashboardFilterState>(readDashboardFilter);
   const categoryPathByServiceId = useMemo(
@@ -481,6 +496,11 @@ function DashboardCase({
             selectedService
               ? relationCountByServiceId.get(selectedService.serviceId) ?? 0
               : 0
+          }
+          relationDirectionCounts={
+            selectedService
+              ? relationDirectionCountsByServiceId.get(selectedService.serviceId) ?? { incoming: 0, outgoing: 0 }
+              : { incoming: 0, outgoing: 0 }
           }
           service={selectedService}
           onBeforeCreateInfraIncident={() =>
@@ -960,6 +980,7 @@ function ServiceInfoPanel({
   onCreateInfraIncident,
   onCreateIncident,
   relationCount,
+  relationDirectionCounts,
   service,
 }: {
   infraNode?: InfraGraphNodeRecord;
@@ -968,6 +989,7 @@ function ServiceInfoPanel({
   onCreateInfraIncident: () => void;
   onCreateIncident: () => void;
   relationCount: number;
+  relationDirectionCounts: { incoming: number; outgoing: number };
   service?: ServiceRecord;
 }) {
   const serviceName = service?.serviceName ?? "-";
@@ -994,7 +1016,7 @@ function ServiceInfoPanel({
           <CheckCircle2 size={17} className="text-[#008f72]" />
           <span className="truncate">{serviceName}</span>
         </div>
-        <NormalInfo relationCount={relationCount} service={service} />
+        <NormalInfo relationDirectionCounts={relationDirectionCounts} service={service} />
         <div className="mt-4 grid min-w-0 grid-cols-2 gap-3">
           <button
             className="h-[28px] min-w-0 rounded border border-[#126cf0] px-2 text-sm font-black text-[#126cf0]"
@@ -1020,6 +1042,7 @@ function ServiceInfoPanel({
       {isDetailOpen ? (
         <ServiceDetailModal
           relationCount={relationCount}
+          relationDirectionCounts={relationDirectionCounts}
           service={service}
           onClose={() => setIsDetailOpen(false)}
         />
@@ -1193,16 +1216,17 @@ function StatusBadge() {
 }
 
 function NormalInfo({
-  relationCount,
+  relationDirectionCounts,
   service,
 }: {
-  relationCount: number;
+  relationDirectionCounts: { incoming: number; outgoing: number };
   service?: ServiceRecord;
 }) {
   const category = service?.categoryPath.join(" > ") ?? "-";
-  const ownerGroup = service?.createdBy ?? "-";
   const serviceCode = service?.serviceCode ?? "-";
-  const serviceType = service?.serviceTypeCode ?? "-";
+  const incomingCount = relationDirectionCounts.incoming;
+  const outgoingCount = relationDirectionCounts.outgoing;
+  const relationCount = incomingCount + outgoingCount;
   const createdAt = service?.createdAt ?? "-";
   const description = service?.description || "-";
 
@@ -1210,14 +1234,12 @@ function NormalInfo({
     <dl className="mt-4 grid min-w-0 grid-cols-[110px_minmax(0,1fr)] gap-y-2 text-sm leading-5">
       <dt className="font-bold text-slate-700">서비스 분류</dt>
       <dd className="truncate">{category}</dd>
-      <dt className="font-bold text-slate-700">소유 조직</dt>
-      <dd className="truncate">{ownerGroup}</dd>
-      <dt className="font-bold text-slate-700">담당 그룹</dt>
+      <dt className="font-bold text-slate-700">서비스 코드</dt>
       <dd className="truncate">{serviceCode}</dd>
       <dt className="font-bold text-slate-700">상위 서비스</dt>
-      <dd className="truncate">{serviceType}</dd>
+      <dd className="truncate">{incomingCount}개</dd>
       <dt className="font-bold text-slate-700">하위 서비스</dt>
-      <dd className="truncate">-</dd>
+      <dd className="truncate">{outgoingCount}개</dd>
       <dt className="font-bold text-slate-700">연관 서비스 수</dt>
       <dd className="truncate">{relationCount}개</dd>
       <dt className="font-bold text-slate-700">인시던트 이력</dt>
@@ -1234,14 +1256,19 @@ function ServiceDetailModal({
   dark = false,
   onClose,
   relationCount,
+  relationDirectionCounts,
   service,
 }: {
   dark?: boolean;
   onClose: () => void;
   relationCount: number;
+  relationDirectionCounts: { incoming: number; outgoing: number };
   service?: ServiceRecord;
 }) {
   const backdropHandlers = useSafeBackdropClose(onClose);
+  const incomingCount = relationDirectionCounts.incoming;
+  const outgoingCount = relationDirectionCounts.outgoing;
+  const totalRelationCount = incomingCount + outgoingCount;
   const sections = [
     {
       title: "서비스 정보",
@@ -1267,7 +1294,9 @@ function ServiceDetailModal({
     {
       title: "영향도 정보",
       rows: [
-        ["연관 서비스 수", `${relationCount}개`],
+        ["상위 서비스", `${incomingCount}개`],
+        ["하위 서비스", `${outgoingCount}개`],
+        ["연관 서비스 수", `${totalRelationCount || relationCount}개`],
         ["직접 영향", "EAM 통합 인증, SSO 통합 인증"],
         ["간접 영향", "결제/주문/알림 연계 서비스"],
       ],

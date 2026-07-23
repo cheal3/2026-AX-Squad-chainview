@@ -2137,7 +2137,7 @@ function RemoteAdminForm({ form, isEdit, menu, onChange, portalData }) {
         <h4 className="form-section__title">배포 정보</h4>
         <div className="form-grid">
           <div className="form-row"><label>서비스<span className="req">*</span></label><select value={form.serviceId} onChange={(event) => onChange("serviceId", event.target.value)} disabled={isEdit}>{portalData.services.map((service) => <option key={service.serviceId} value={service.serviceId}>{service.serviceCode} {service.serviceName}</option>)}</select></div>
-          <div className="form-row"><label>서버<span className="req">*</span></label><select value={form.serverId} onChange={(event) => onChange("serverId", event.target.value)}>{portalData.servers.map((server) => <option key={server.serverId} value={server.serverId}>{server.serverName}</option>)}</select></div>
+          <div className="form-row"><label>서버<span className="req">*</span></label><select value={form.serverId} onChange={(event) => onChange("serverId", event.target.value)} disabled={isEdit}>{portalData.servers.map((server) => <option key={server.serverId} value={server.serverId}>{server.serverName}</option>)}</select></div>
           <div className="form-row"><label>배포 상태</label><CodeSelect labels={codeLabels.deploymentStatus} value={form.deploymentStatusCode} onChange={(value) => onChange("deploymentStatusCode", value)} /></div>
           <div className="form-row"><label>인스턴스 수</label><input type="number" min="1" value={form.instanceCount} onChange={(event) => onChange("instanceCount", event.target.value)} /></div>
           <div className="form-row"><label>배포 경로<span className="req">*</span></label><input type="text" value={form.deployPath} onChange={(event) => onChange("deployPath", event.target.value)} /></div>
@@ -2435,7 +2435,7 @@ function OwnerManagementModals({ modal, onClose, owner, portalData, services }) 
   }
 
   const isEdit = modal === "edit";
-  const serviceLocked = Boolean(owner?.lockedService);
+  const serviceLocked = isEdit || Boolean(owner?.lockedService);
 
   return (
     <ModalBackdrop onClose={onClose}>

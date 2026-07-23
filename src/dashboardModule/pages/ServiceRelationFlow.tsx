@@ -2385,9 +2385,6 @@ export function ServiceRelationFlow({
   const detailServer = detailService
     ? serverById.get(detailService.serverId)
     : undefined;
-  const detailOwners = detailService
-    ? ownersByServiceId.get(detailService.serviceId) ?? []
-    : [];
   const detailTechStacks = detailService
     ? techStacksByServiceId.get(detailService.serviceId) ?? []
     : [];
@@ -2648,7 +2645,6 @@ export function ServiceRelationFlow({
               incidentTitle={activeIncident?.title}
               impactCount={activeIncidentConnectedServiceIds.size}
               outgoingCount={directOutgoingCount}
-              owners={detailOwners}
               relationImpacts={detailRelationImpacts}
               server={detailServer}
               service={detailService}
@@ -3637,7 +3633,6 @@ function RelationServiceDetailPanel({
   incidentTitle,
   impactCount,
   outgoingCount,
-  owners,
   relationImpacts,
   server,
   service,
@@ -3651,7 +3646,6 @@ function RelationServiceDetailPanel({
   incidentTitle?: string;
   impactCount: number;
   outgoingCount: number;
-  owners: string[];
   relationImpacts: RelationImpactSummary[];
   server?: ServerRecord;
   service: ServiceRecord;
@@ -3780,25 +3774,31 @@ function RelationServiceDetailPanel({
           value={server?.serverName ?? "서버 미지정"}
         />
         <RelationDetailItem
-          label="담당"
-          value={owners.length > 0 ? owners.join(", ") : "미지정"}
+          label="서비스 코드"
+          value={service.serviceCode}
         />
         <RelationDetailItem
           label="엔드포인트"
           value={service.endpointUrl || "미입력"}
         />
 
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
-            <div className="text-xs font-semibold text-slate-400">수신</div>
+            <div className="text-xs font-semibold text-slate-400">상위 서비스</div>
             <div className="mt-1 text-lg font-black text-slate-900">
               {incomingCount}
             </div>
           </div>
           <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
-            <div className="text-xs font-semibold text-slate-400">송신</div>
+            <div className="text-xs font-semibold text-slate-400">하위 서비스</div>
             <div className="mt-1 text-lg font-black text-slate-900">
               {outgoingCount}
+            </div>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+            <div className="text-xs font-semibold text-slate-400">연관 서비스 수</div>
+            <div className="mt-1 text-lg font-black text-slate-900">
+              {incomingCount + outgoingCount}
             </div>
           </div>
         </div>
