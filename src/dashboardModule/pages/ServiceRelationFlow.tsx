@@ -823,68 +823,6 @@ export function ServiceRelationFlow({
     infraIncident,
     serviceInfraTargetByServiceId,
   ]);
-  const incidentServiceScopeById = useMemo(() => {
-    const scopeById = new Map<number, IncidentServiceScope>();
-    if (!incidentMode || !infraIncident || !incidentServiceIds) {
-      return scopeById;
-    }
-
-    incidentDirectServiceIds.forEach((serviceId) => {
-      if (incidentServiceIds.has(serviceId)) {
-        scopeById.set(serviceId, {
-          lane: 0,
-          rank: 0,
-          label: "인프라 직접 영향",
-        });
-      }
-    });
-
-    activeRelations.forEach((relation) => {
-      if (
-        !incidentServiceIds.has(relation.sourceServiceId) ||
-        !incidentServiceIds.has(relation.targetServiceId)
-      ) {
-        return;
-      }
-
-      const sourceDirect = incidentDirectServiceIds.has(relation.sourceServiceId);
-      const targetDirect = incidentDirectServiceIds.has(relation.targetServiceId);
-      if (sourceDirect && !targetDirect) {
-        scopeById.set(relation.targetServiceId, {
-          lane: 2,
-          rank: 2,
-          label: "송신 1뎁스 영향",
-        });
-      }
-      if (!sourceDirect && targetDirect) {
-        scopeById.set(relation.sourceServiceId, {
-          lane: 1,
-          rank: 1,
-          label: "수신 1뎁스 영향",
-        });
-      }
-    });
-
-    incidentServiceIds.forEach((serviceId) => {
-      if (!scopeById.has(serviceId)) {
-        scopeById.set(serviceId, {
-          lane: incidentDirectServiceIds.has(serviceId) ? 0 : 2,
-          rank: incidentDirectServiceIds.has(serviceId) ? 0 : 3,
-          label: incidentDirectServiceIds.has(serviceId)
-            ? "인프라 직접 영향"
-            : "연계 1뎁스 영향",
-        });
-      }
-    });
-
-    return scopeById;
-  }, [
-    activeRelations,
-    incidentDirectServiceIds,
-    incidentMode,
-    incidentServiceIds,
-    infraIncident,
-  ]);
   useEffect(() => {
     if (!incidentMode || !incidentServiceIds || incidentServiceIds.size === 0) {
       return;
@@ -1022,9 +960,71 @@ export function ServiceRelationFlow({
           relation.sourceServiceId !== relation.targetServiceId &&
           allowedServiceIds.has(relation.sourceServiceId) &&
           allowedServiceIds.has(relation.targetServiceId)
-      ),
+    ),
     [allowedServiceIds, relations]
   );
+  const incidentServiceScopeById = useMemo(() => {
+    const scopeById = new Map<number, IncidentServiceScope>();
+    if (!incidentMode || !infraIncident || !incidentServiceIds) {
+      return scopeById;
+    }
+
+    incidentDirectServiceIds.forEach((serviceId) => {
+      if (incidentServiceIds.has(serviceId)) {
+        scopeById.set(serviceId, {
+          lane: 0,
+          rank: 0,
+          label: "인프라 직접 영향",
+        });
+      }
+    });
+
+    activeRelations.forEach((relation) => {
+      if (
+        !incidentServiceIds.has(relation.sourceServiceId) ||
+        !incidentServiceIds.has(relation.targetServiceId)
+      ) {
+        return;
+      }
+
+      const sourceDirect = incidentDirectServiceIds.has(relation.sourceServiceId);
+      const targetDirect = incidentDirectServiceIds.has(relation.targetServiceId);
+      if (sourceDirect && !targetDirect) {
+        scopeById.set(relation.targetServiceId, {
+          lane: 2,
+          rank: 2,
+          label: "송신 1뎁스 영향",
+        });
+      }
+      if (!sourceDirect && targetDirect) {
+        scopeById.set(relation.sourceServiceId, {
+          lane: 1,
+          rank: 1,
+          label: "수신 1뎁스 영향",
+        });
+      }
+    });
+
+    incidentServiceIds.forEach((serviceId) => {
+      if (!scopeById.has(serviceId)) {
+        scopeById.set(serviceId, {
+          lane: incidentDirectServiceIds.has(serviceId) ? 0 : 2,
+          rank: incidentDirectServiceIds.has(serviceId) ? 0 : 3,
+          label: incidentDirectServiceIds.has(serviceId)
+            ? "인프라 직접 영향"
+            : "연계 1뎁스 영향",
+        });
+      }
+    });
+
+    return scopeById;
+  }, [
+    activeRelations,
+    incidentDirectServiceIds,
+    incidentMode,
+    incidentServiceIds,
+    infraIncident,
+  ]);
   const selectedInfraRelatedServiceIds = useMemo(() => {
     const related = new Set(selectedInfraServiceIds);
     if (selectedInfraServiceIds.size === 0) {
