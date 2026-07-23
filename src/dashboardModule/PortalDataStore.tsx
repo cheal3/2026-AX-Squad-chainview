@@ -981,7 +981,11 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           updatedAt: now,
           ...input,
         };
+        const nextDeployments = localDeploymentRecords(nextService, input);
         setServices((current) => [nextService, ...current]);
+        if (nextDeployments.length) {
+          setDeployments((current) => [...nextDeployments, ...current]);
+        }
         if (REMOTE_API_ENABLED) {
           void toServicePayload(nextService)
             .then((payload) => chainViewApi.services.create(payload))
@@ -989,6 +993,9 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             .catch((error) => {
               setServices((current) =>
                 current.filter((service) => service.serviceId !== nextService.serviceId)
+              );
+              setDeployments((current) =>
+                current.filter((deployment) => Number(deployment.serviceId) !== nextService.serviceId)
               );
               notifyRemoteMutationFailure(error, "서비스 등록 API 호출에 실패했습니다.");
             });
@@ -999,6 +1006,10 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         const previousService = services.find(
           (service) => service.serviceId === serviceId
         );
+        const previousDeployments = deployments;
+        const nextDeployments = previousService
+          ? localDeploymentRecords({ ...previousService, ...input }, input)
+          : [];
         setServices((current) =>
           current.map((service) =>
             service.serviceId === serviceId
@@ -1006,6 +1017,12 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
               : service
           )
         );
+        if (nextDeployments.length) {
+          setDeployments((current) => [
+            ...nextDeployments,
+            ...current.filter((deployment) => Number(deployment.serviceId) !== serviceId),
+          ]);
+        }
         if (REMOTE_API_ENABLED && previousService) {
           void toServiceUpdatePayload(serviceId, { ...previousService, ...input })
             .then((payload) => chainViewApi.services.update(serviceId, payload))
@@ -1016,6 +1033,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
                   service.serviceId === serviceId ? previousService : service
                 )
               );
+              setDeployments(previousDeployments);
               notifyRemoteMutationFailure(error, "서비스 수정 API 호출에 실패했습니다.");
             });
         }
@@ -1724,6 +1742,22 @@ function explicitServiceDeploymentPayloads(input: NewServiceInput | ServiceRecor
     (input as NewServiceInput & { deployments?: unknown })?.deployments
   ).map(toRemoteDeploymentPayload);
   return inputDeployments;
+}
+
+function localDeploymentRecords(
+  service: ServiceRecord,
+  input: Partial<NewServiceInput | ServiceRecord>
+) {
+  return explicitServiceDeploymentPayloads({
+    ...service,
+    ...input,
+  } as NewServiceInput | ServiceRecord).map((deployment, index) => ({
+    ...deployment,
+    serviceId: service.serviceId,
+    serviceCode: service.serviceCode,
+    serviceName: service.serviceName,
+    deploymentKey: `${service.serviceId}-local-${deployment.serverId}-${index}`,
+  }));
 }
 
 function toDeploymentPayload(input: NewServiceInput | ServiceRecord) {

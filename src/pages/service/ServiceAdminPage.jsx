@@ -77,7 +77,7 @@ function cloneServiceDetailSample(serviceCode) {
   );
 }
 
-function buildServiceDetail(service, server, owners) {
+function buildServiceDetail(service, deploymentInfos, owners) {
   const statusLabel = codeLabels.serviceStatus?.[service.statusCode] || service.statusCode || "-";
   const importanceLabel = codeLabels.importance?.[service.importanceCode] || service.importanceCode || "-";
   const ownerRows = owners.map((owner) => ({
@@ -90,27 +90,24 @@ function buildServiceDetail(service, server, owners) {
           : "알림 담당",
     meta: `${owner.ownerTypeCode === "GROUP" ? "담당그룹" : "사용자"} · ${owner.serviceCode || service.serviceCode}`,
   }));
-  const deploymentRows = service.serverId
-    ? [{
-        name: server?.serverName || `서버 ${service.serverId}`,
-        meta: `${server?.ipAddress || "-"}:${service.portInfo || "-"} · ${server?.envCode || "-"} · ${server?.osTypeCode || "-"}`,
-        path: `deploy: ${service.deployPath || "-"}`,
-        status: codeLabels.deploymentStatus?.[service.deploymentStatusCode] || service.deploymentStatusCode || "-",
-      }]
-    : [];
-  const serverRows = server
-    ? [{
-        server: server.serverName,
-        host: server.hostName,
-        ip: server.ipAddress,
-        env: codeLabels.envType?.[server.envCode] || server.envCode || "-",
-        os: `${codeLabels.osType?.[server.osTypeCode] || server.osTypeCode || "-"} ${server.osVersion || ""}`.trim(),
-        path: service.deployPath || "-",
-        port: service.portInfo || "-",
-        instances: service.instanceCount ?? "-",
-        status: codeLabels.deploymentStatus?.[service.deploymentStatusCode] || service.deploymentStatusCode || "-",
-      }]
-    : [];
+  const deploymentRows = deploymentInfos.map(({ deployment, server }) => ({
+    name: server?.serverName || `서버 ${deployment.serverId ?? service.serverId}`,
+    meta: `${server?.ipAddress || "-"}:${deployment.portInfo || service.portInfo || "-"} · ${server?.envCode || "-"} · ${server?.osTypeCode || "-"}`,
+    path: `deploy: ${deployment.deployPath || service.deployPath || "-"}`,
+    status: codeLabels.deploymentStatus?.[deployment.deploymentStatusCode] || deployment.deploymentStatusCode || service.deploymentStatusCode || "-",
+  }));
+  const serverRows = deploymentInfos.map(({ deployment, server }) => ({
+    server: server?.serverName || `서버 ${deployment.serverId ?? service.serverId}`,
+    host: server?.hostName || "-",
+    ip: server?.ipAddress || "-",
+    env: codeLabels.envType?.[server?.envCode] || server?.envCode || "-",
+    os: `${codeLabels.osType?.[server?.osTypeCode] || server?.osTypeCode || "-"} ${server?.osVersion || ""}`.trim(),
+    path: deployment.deployPath || service.deployPath || "-",
+    port: deployment.portInfo || service.portInfo || "-",
+    instances: deployment.instanceCount ?? service.instanceCount ?? "-",
+    status: codeLabels.deploymentStatus?.[deployment.deploymentStatusCode] || deployment.deploymentStatusCode || service.deploymentStatusCode || "-",
+    infraNodeName: server?.infraNodeName || "인프라 미매핑",
+  }));
 
   return {
     title: service.serviceName,
@@ -127,6 +124,28 @@ function buildServiceDetail(service, server, owners) {
     impactRows: [],
     incidentRows: [],
   };
+}
+
+function buildServiceDeploymentInfos(service, deployments, servers) {
+  const serviceDeployments = deployments.filter(
+    (deployment) => Number(deployment.serviceId) === Number(service.serviceId)
+  );
+  const fallbackDeployments =
+    serviceDeployments.length || !service.serverId
+      ? serviceDeployments
+      : [{
+          serviceId: service.serviceId,
+          serverId: service.serverId,
+          deployPath: service.deployPath,
+          portInfo: service.portInfo,
+          deploymentStatusCode: service.deploymentStatusCode,
+          instanceCount: service.instanceCount,
+        }];
+
+  return fallbackDeployments.map((deployment) => ({
+    deployment,
+    server: servers.find((server) => Number(server.serverId) === Number(deployment.serverId)),
+  }));
 }
 
 export function ServiceAdminPage() {
@@ -158,6 +177,7 @@ function ServiceDetailPage({ service }) {
   const location = useLocation();
   const {
     deleteTechStack,
+    deployments,
     incidents,
     owners,
     relations,
@@ -171,9 +191,13 @@ function ServiceDetailPage({ service }) {
   const [changeSourceLabel, setChangeSourceLabel] = useState("샘플 기준");
   const [impactRows, setImpactRows] = useState([]);
   const [impactSourceLabel, setImpactSourceLabel] = useState("샘플 기준");
+  const deploymentInfos = useMemo(
+    () => buildServiceDeploymentInfos(service, deployments, servers),
+    [deployments, servers, service]
+  );
   const deploymentServer = useMemo(
-    () => servers.find((server) => Number(server.serverId) === Number(service.serverId)),
-    [servers, service.serverId]
+    () => deploymentInfos[0]?.server,
+    [deploymentInfos]
   );
   const serviceOwners = useMemo(
     () =>
@@ -185,8 +209,8 @@ function ServiceDetailPage({ service }) {
     [owners, service.serviceCode, service.serviceId]
   );
   const detail = useMemo(
-    () => buildServiceDetail(service, deploymentServer, serviceOwners),
-    [deploymentServer, service, serviceOwners]
+    () => buildServiceDetail(service, deploymentInfos, serviceOwners),
+    [deploymentInfos, service, serviceOwners]
   );
   const serviceTechStacks = useMemo(
     () => techStacks.filter((techStack) => Number(techStack.serviceId) === Number(service.serviceId)),

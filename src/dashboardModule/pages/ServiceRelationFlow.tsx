@@ -362,6 +362,7 @@ export function ServiceRelationFlow({
     relations,
     owners,
     servers,
+    deployments,
     techStacks,
     incidents,
     incidentImpacts,
@@ -548,6 +549,7 @@ export function ServiceRelationFlow({
   );
 
   const toggleSelectedInfraNode = useCallback((infraNodeId: number) => {
+    userMovedViewportRef.current = false;
     setSelectedInfraNodeId((current) => {
       const next = current === infraNodeId ? null : infraNodeId;
       setDetailOpen(Boolean(next));
@@ -565,6 +567,7 @@ export function ServiceRelationFlow({
 
   const toggleSelectedServiceNode = useCallback(
     (serviceId: number) => {
+      userMovedViewportRef.current = false;
       setSelectedServiceNodeId((current) => {
         const next = current === serviceId ? null : serviceId;
         setDetailOpen(false);
@@ -624,7 +627,26 @@ export function ServiceRelationFlow({
     () => new Map(servers.map((server) => [server.serverId, server])),
     [servers]
   );
-  const serviceInfraTargetByServiceId = useMemo(() => {
+  const serviceServerIdsByServiceId = useMemo(() => {
+    const next = new Map<number, number[]>();
+    deployments.forEach((deployment) => {
+      const serviceId = Number(deployment.serviceId);
+      const serverId = Number(deployment.serverId);
+      if (!serviceId || !serverId) {
+        return;
+      }
+      next.set(serviceId, Array.from(new Set([...(next.get(serviceId) ?? []), serverId])));
+    });
+    services.forEach((service) => {
+      const serverId = Number(service.serverId);
+      if (!serverId) {
+        return;
+      }
+      next.set(service.serviceId, Array.from(new Set([...(next.get(service.serviceId) ?? []), serverId])));
+    });
+    return next;
+  }, [deployments, services]);
+  const serviceInfraTargetsByServiceId = useMemo(() => {
     const infraById = new Map(
       infraGraphNodes.map((node) => [node.infraNodeId, node])
     );
@@ -640,37 +662,47 @@ export function ServiceRelationFlow({
         node.infraNodeId,
       ])
     );
-    const next = new Map<number, number>();
+    const multiNext = new Map<number, number[]>();
 
     services.forEach((service) => {
-      const server = serverById.get(service.serverId);
-      if (!server) {
-        return;
-      }
+      const infraNodeIds = (serviceServerIdsByServiceId.get(service.serviceId) ?? [])
+        .map((serverId) => serverById.get(serverId))
+        .map((server) => {
+          if (!server) return undefined;
+          if (server.infraNodeId && infraById.has(server.infraNodeId)) {
+            return server.infraNodeId;
+          }
 
-      if (server.infraNodeId && infraById.has(server.infraNodeId)) {
-        next.set(service.serviceId, server.infraNodeId);
-        return;
-      }
+          const directCode = normalizeGraphLookupValue(server.infraNodeCode);
+          const directName = normalizeGraphLookupValue(server.infraNodeName);
+          const inferredCode = normalizeGraphLookupValue(
+            inferInfraNodeCodeForServer(server)
+          );
 
-      const directCode = normalizeGraphLookupValue(server.infraNodeCode);
-      const directName = normalizeGraphLookupValue(server.infraNodeName);
-      const inferredCode = normalizeGraphLookupValue(
-        inferInfraNodeCodeForServer(server)
-      );
+          return (
+            infraByCode.get(directCode) ??
+            infraByName.get(directName) ??
+            infraByCode.get(inferredCode)
+          );
+        })
+        .filter((infraNodeId): infraNodeId is number => Boolean(infraNodeId));
 
-      const infraNodeId =
-        infraByCode.get(directCode) ??
-        infraByName.get(directName) ??
-        infraByCode.get(inferredCode);
-
-      if (infraNodeId) {
-        next.set(service.serviceId, infraNodeId);
+      if (infraNodeIds.length) {
+        multiNext.set(service.serviceId, Array.from(new Set(infraNodeIds)));
       }
     });
 
+    return multiNext;
+  }, [infraGraphNodes, serverById, serviceServerIdsByServiceId, services]);
+  const serviceInfraTargetByServiceId = useMemo(() => {
+    const next = new Map<number, number>();
+    serviceInfraTargetsByServiceId.forEach((infraNodeIds, serviceId) => {
+      if (infraNodeIds[0]) {
+        next.set(serviceId, infraNodeIds[0]);
+      }
+    });
     return next;
-  }, [infraGraphNodes, serverById, services]);
+  }, [serviceInfraTargetsByServiceId]);
   const incidentInfraNodeId = useMemo(() => {
     if (!infraIncident || !activeIncident) {
       return undefined;
@@ -751,8 +783,8 @@ export function ServiceRelationFlow({
       if (!incidentInfraNodeId) {
         return directIds;
       }
-      serviceInfraTargetByServiceId.forEach((infraNodeId, serviceId) => {
-        if (infraNodeId === incidentInfraNodeId) {
+      serviceInfraTargetsByServiceId.forEach((infraNodeIds, serviceId) => {
+        if (infraNodeIds.includes(incidentInfraNodeId)) {
           directIds.add(serviceId);
         }
       });
@@ -784,7 +816,7 @@ export function ServiceRelationFlow({
     incidentServiceId,
     infraIncident,
     relations,
-    serviceInfraTargetByServiceId,
+    serviceInfraTargetsByServiceId,
     services,
   ]);
   const filteredServices = useMemo(
@@ -801,9 +833,9 @@ export function ServiceRelationFlow({
     }
 
     filteredServices.forEach((service) => {
-      const infraNodeId = serviceInfraTargetByServiceId.get(service.serviceId);
+      const infraNodeIds = serviceInfraTargetsByServiceId.get(service.serviceId) ?? [];
       if (
-        infraNodeId === incidentInfraNodeId ||
+        infraNodeIds.includes(Number(incidentInfraNodeId)) ||
         (activeIncident.serverId && service.serverId === activeIncident.serverId)
       ) {
         directIds.add(service.serviceId);
@@ -821,7 +853,7 @@ export function ServiceRelationFlow({
     incidentInfraNodeId,
     incidentMode,
     infraIncident,
-    serviceInfraTargetByServiceId,
+    serviceInfraTargetsByServiceId,
   ]);
   useEffect(() => {
     if (!incidentMode || !incidentServiceIds || incidentServiceIds.size === 0) {
@@ -856,8 +888,8 @@ export function ServiceRelationFlow({
 
     const directNodeIds = new Set<number>();
     filteredServices.forEach((service) => {
-      const infraNodeId = serviceInfraTargetByServiceId.get(service.serviceId);
-      if (infraNodeId) directNodeIds.add(infraNodeId);
+      const infraNodeIds = serviceInfraTargetsByServiceId.get(service.serviceId) ?? [];
+      infraNodeIds.forEach((infraNodeId) => directNodeIds.add(infraNodeId));
     });
 
     const visibleNodeIds = new Set(directNodeIds);
@@ -876,7 +908,7 @@ export function ServiceRelationFlow({
     infraGraphRelations,
     infraIncident,
     serviceFilter,
-    serviceInfraTargetByServiceId,
+    serviceInfraTargetsByServiceId,
   ]);
   const scopedInfraGraphNodes = useMemo(
     () =>
@@ -902,27 +934,25 @@ export function ServiceRelationFlow({
       return next;
     }
 
-    const infraNodeId = serviceInfraTargetByServiceId.get(selectedServiceNodeId);
-    if (infraNodeId) {
-      next.add(infraNodeId);
-    }
+    const infraNodeIds = serviceInfraTargetsByServiceId.get(selectedServiceNodeId) ?? [];
+    infraNodeIds.forEach((infraNodeId) => next.add(infraNodeId));
 
     return next;
-  }, [selectedServiceNodeId, serviceInfraTargetByServiceId]);
+  }, [selectedServiceNodeId, serviceInfraTargetsByServiceId]);
   const selectedInfraServiceIds = useMemo(() => {
     const next = new Set<number>();
     if (!selectedInfraNodeId) {
       return next;
     }
 
-    serviceInfraTargetByServiceId.forEach((infraNodeId, serviceId) => {
-      if (infraNodeId === selectedInfraNodeId) {
+    serviceInfraTargetsByServiceId.forEach((infraNodeIds, serviceId) => {
+      if (infraNodeIds.includes(selectedInfraNodeId)) {
         next.add(serviceId);
       }
     });
 
     return next;
-  }, [selectedInfraNodeId, serviceInfraTargetByServiceId]);
+  }, [selectedInfraNodeId, serviceInfraTargetsByServiceId]);
   const ownersByServiceId = useMemo(() => {
     const next = new Map<number, string[]>();
     owners.forEach((owner) => {
@@ -1721,7 +1751,7 @@ export function ServiceRelationFlow({
               : service.statusCode,
           importanceCode: service.importanceCode ?? "NORMAL",
           ownerGroup: ownerByServiceId.get(service.serviceId) ?? "미지정",
-          serverCount: service.serverId ? 1 : 0,
+          serverCount: serviceServerIdsByServiceId.get(service.serviceId)?.length ?? (service.serverId ? 1 : 0),
           focused,
           connected,
           dimmed,
@@ -1763,6 +1793,7 @@ export function ServiceRelationFlow({
     selectedInfraNodeId,
     selectedInfraRelatedServiceIds,
     selectedInfraServiceIds,
+    serviceServerIdsByServiceId,
     showAllServices,
     toggleSelectedServiceNode,
     visibleServiceIds,
@@ -2112,29 +2143,29 @@ export function ServiceRelationFlow({
         ? filteredServices
             .filter((service) => visibleServiceIds.has(service.serviceId))
             .flatMap((service) => {
-              const infraNodeId = serviceInfraTargetByServiceId.get(
+              const infraNodeIds = serviceInfraTargetsByServiceId.get(
                 service.serviceId
-              );
-              if (!infraNodeId) {
+              ) ?? [];
+              if (!infraNodeIds.length) {
                 return [];
               }
 
               const sourceNodeId = String(service.serviceId);
-              const targetNodeId = `infra-${infraNodeId}`;
-              if (
-                !visibleServiceIds.has(service.serviceId) ||
-                !visibleNodeIds.has(targetNodeId)
-              ) {
-                return [];
-              }
-              const hasSelection =
-                Boolean(selectedServiceNodeId) || Boolean(selectedInfraNodeId);
-              const active =
-                selectedServiceNodeId === service.serviceId ||
-                selectedInfraNodeId === infraNodeId;
+              return infraNodeIds.flatMap((infraNodeId) => {
+                const targetNodeId = `infra-${infraNodeId}`;
+                if (
+                  !visibleServiceIds.has(service.serviceId) ||
+                  !visibleNodeIds.has(targetNodeId)
+                ) {
+                  return [];
+                }
+                const hasSelection =
+                  Boolean(selectedServiceNodeId) || Boolean(selectedInfraNodeId);
+                const active =
+                  selectedServiceNodeId === service.serviceId ||
+                  selectedInfraNodeId === infraNodeId;
 
-              return [
-                {
+                return [{
                   id: `service-infra-${service.serviceId}-${infraNodeId}`,
                   source: sourceNodeId,
                   target: targetNodeId,
@@ -2155,8 +2186,8 @@ export function ServiceRelationFlow({
                     strokeWidth: active ? 2.8 : 2,
                     opacity: active ? 0.95 : hasSelection ? 0.14 : 0.72,
                   },
-                },
-              ];
+                }];
+              });
             })
         : [];
 
@@ -2180,7 +2211,7 @@ export function ServiceRelationFlow({
     laneByServiceId,
     serviceById,
     serverById,
-    serviceInfraTargetByServiceId,
+    serviceInfraTargetsByServiceId,
     selectedInfraNodeId,
     selectedInfraServiceIds,
     selectedServiceInfraNodeIds,
@@ -2271,7 +2302,7 @@ export function ServiceRelationFlow({
 
     const frame = window.requestAnimationFrame(() => {
       const fitZoom =
-        initialFitZoom ?? (showAllServices ? 0.18 : 0.46);
+        initialFitZoom ?? (showAllServices ? 0.34 : 0.46);
 
       flowInstance.fitView({
         duration: 0,
@@ -2302,8 +2333,14 @@ export function ServiceRelationFlow({
         return;
       }
 
+      const anchorServiceId =
+        selectedServiceNodeId ??
+        (serviceById.has(focusedServiceId) ? focusedServiceId : filteredServices[0]?.serviceId);
+      const anchorNode = selectedInfraNodeId
+        ? nodes.find((node) => node.id === `infra-${selectedInfraNodeId}`)
+        : nodes.find((node) => node.id === String(anchorServiceId));
       const expanded = relationDepth > 1;
-      const autoCenterKey = `${focusedServiceId}:${relationDepth}`;
+      const autoCenterKey = `${graphViewMode}:${anchorServiceId ?? "none"}:${selectedInfraNodeId ?? "none"}:${relationDepth}:${query}`;
 
       if (
         userMovedViewportRef.current &&
@@ -2312,15 +2349,32 @@ export function ServiceRelationFlow({
         return;
       }
 
-      flowInstance.setCenter(NODE_WIDTH / 2, 0, {
-        zoom: expanded ? 0.52 : 0.86,
+      if (!anchorNode) {
+        return;
+      }
+
+      flowInstance.setCenter(anchorNode.position.x + NODE_WIDTH / 2, anchorNode.position.y, {
+        zoom: showAllServices ? 0.62 : expanded ? 0.58 : 0.9,
         duration: 800,
       });
       autoCenteredKeyRef.current = autoCenterKey;
     });
 
     return () => window.cancelAnimationFrame(frame);
-  }, [autoCenter, flowInstance, focusedServiceId, relationDepth]);
+  }, [
+    autoCenter,
+    filteredServices,
+    flowInstance,
+    focusedServiceId,
+    graphViewMode,
+    nodes,
+    query,
+    relationDepth,
+    selectedInfraNodeId,
+    selectedServiceNodeId,
+    serviceById,
+    showAllServices,
+  ]);
 
   const shellClassName = embedded
     ? embeddedHeightClassName
