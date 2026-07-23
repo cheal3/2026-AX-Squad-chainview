@@ -2257,6 +2257,46 @@ export function ServiceRelationFlow({
           box-shadow: inset 0 0 0 1px rgba(255, 51, 68, 0.08);
         }
 
+        .chainview-flow-dark .chainview-detail-panel {
+          border-color: #35506b !important;
+          background: rgba(8, 27, 45, 0.98) !important;
+          color: #e5edf7 !important;
+          box-shadow: 0 18px 48px rgba(0, 0, 0, 0.38) !important;
+        }
+
+        .chainview-flow-dark .chainview-detail-panel .border-slate-200,
+        .chainview-flow-dark .chainview-detail-panel .border-slate-300 {
+          border-color: #35506b !important;
+        }
+
+        .chainview-flow-dark .chainview-detail-panel .bg-white,
+        .chainview-flow-dark .chainview-detail-panel .bg-slate-50,
+        .chainview-flow-dark .chainview-detail-panel .bg-slate-100,
+        .chainview-flow-dark .chainview-detail-panel .bg-slate-200 {
+          background: #0b2135 !important;
+        }
+
+        .chainview-flow-dark .chainview-detail-panel .text-slate-950,
+        .chainview-flow-dark .chainview-detail-panel .text-slate-900,
+        .chainview-flow-dark .chainview-detail-panel .text-slate-800,
+        .chainview-flow-dark .chainview-detail-panel .text-slate-700 {
+          color: #e5edf7 !important;
+        }
+
+        .chainview-flow-dark .chainview-detail-panel .text-slate-600,
+        .chainview-flow-dark .chainview-detail-panel .text-slate-500 {
+          color: #b5c5d6 !important;
+        }
+
+        .chainview-flow-dark .chainview-detail-panel .text-slate-400 {
+          color: #91a7bd !important;
+        }
+
+        .chainview-flow-dark .chainview-detail-panel [class*="overflow-y-auto"] {
+          scrollbar-color: #486179 #061625;
+          scrollbar-width: thin;
+        }
+
         .chainview-flow-dark .chainview-lane-node {
           border-left-color: rgba(100, 116, 139, 0.28);
           border-right-color: rgba(100, 116, 139, 0.28);
@@ -2934,7 +2974,7 @@ function RelationServiceDetailPanel({
 
   return (
     <aside
-      className={`absolute right-4 top-4 z-30 flex origin-top-right transform-gpu flex-col overflow-hidden border border-slate-200 bg-white/96 text-slate-900 transition-[width,max-height,box-shadow,border-radius,transform] ease-out ${
+      className={`chainview-detail-panel absolute right-4 top-4 z-30 flex origin-top-right transform-gpu flex-col overflow-hidden border border-slate-200 bg-white/96 text-slate-900 transition-[width,max-height,box-shadow,border-radius,transform] ease-out ${
         panelTall
           ? "rounded-2xl shadow-xl"
           : "rounded-[22px] shadow-sm hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"

@@ -132,63 +132,23 @@ function buildServiceDetail(service, server, owners) {
 export function ServiceAdminPage() {
   const { serviceCode } = useParams();
   const portalData = usePortalData();
-  const sampleServices = [
-    {
-      serviceCode: "EXT-001",
-      serviceName: "카드승인연계",
-      categoryPath: ["대외계", "결제", "승인"],
-      serviceType: "API",
-      importance: "높음",
-      status: "운영중",
-      endpoint: "https://ext.bank.com/v2/card/auth",
-      createdAt: "2023-04-12",
-    },
-    {
-      serviceCode: "EXT-004",
-      serviceName: "카드취소연계",
-      categoryPath: ["대외계", "결제", "취소"],
-      serviceType: "API",
-      importance: "높음",
-      status: "운영중",
-      endpoint: "https://ext.bank.com/v2/card/cancel",
-      createdAt: "2023-04-12",
-    },
-    {
-      serviceCode: "DEP-001",
-      serviceName: "예금이체서비스",
-      categoryPath: ["기간계", "계좌", "이체"],
-      serviceType: "API",
-      importance: "높음",
-      status: "운영중",
-      endpoint: "https://core.bank.com/dep/transfer",
-      createdAt: "2022-11-03",
-    },
-  ];
-  const sampleService =
-    sampleServices.find((service) => service.serviceCode === serviceCode) ??
-    sampleServices[0];
   const selectedService =
-    portalData.services.find((service) => service.serviceCode === serviceCode) ??
-    {
-      serviceId: 1001,
-      categoryPath: sampleService.categoryPath,
-      serviceCode: sampleService.serviceCode,
-      serviceName: sampleService.serviceName,
-      serviceTypeCode: sampleService.serviceType,
-      importanceCode: "HIGH",
-      statusCode: "NORMAL",
-      description: "외부 카드사 승인 요청 중계 API",
-      endpointUrl: sampleService.endpoint,
-      serverId: 1,
-      deployPath: "/app/services/ext-card",
-      portInfo: "8443",
-      deploymentStatusCode: "RUNNING",
-      instanceCount: 3,
-      createdBy: "20180023",
-      updatedBy: "20210034",
-      createdAt: "2023-04-12",
-      updatedAt: "2026-05-30",
-    };
+    portalData.services.find((service) => service.serviceCode === serviceCode);
+
+  if (portalData.remoteApi.initialLoading) {
+    return (
+      <div className="service-detail-page">
+        <div className="service-detail-data-loader inline-data-loader" role="status" aria-live="polite">
+          <span className="portal-initial-loader__ring" aria-hidden="true" />
+          <strong>서비스 상세 정보를 불러오는 중입니다.</strong>
+        </div>
+      </div>
+    );
+  }
+
+  if (!selectedService) {
+    return <div className="service-detail-page"><div className="empty">조회된 서비스가 없습니다.</div></div>;
+  }
 
   return <ServiceDetailPage service={selectedService} />;
 }
@@ -659,7 +619,6 @@ function ServiceImpactTab({ detail, rows, service, sourceLabel }) {
         </div>
         <div className="service-detail__section-actions">
           <span className="service-detail__source-label">{sourceLabel}</span>
-          <Link className="btn btn--ghost btn--sm" to={`/topology?serviceId=${service.serviceId}`}>관계도 보기</Link>
         </div>
       </div>
       <div className="service-detail__impact-grid">

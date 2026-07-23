@@ -19,7 +19,10 @@ function formatInfra(server) {
 }
 
 export function ServiceInfraMappingPage() {
-  const { services, servers, updateService } = usePortalData();
+  const { services, servers, updateService, remoteApi } = usePortalData();
+  const isDataLoading =
+    remoteApi.initialLoading ||
+    (remoteApi.status.state === "loading" && remoteApi.status.source === "snapshot");
   const [keyword, setKeyword] = useState("");
   const [serverFilter, setServerFilter] = useState("");
   const [mappingFilter, setMappingFilter] = useState("");
@@ -115,10 +118,19 @@ export function ServiceInfraMappingPage() {
         </div>
 
         <div className="service-infra-page__summary">
-          <div><b>{services.length}</b><span>전체 서비스</span></div>
-          <div><b>{servers.length}</b><span>전체 서버</span></div>
-          <div><b>{rows.length - unmappedCount}</b><span>인프라 매핑 완료</span></div>
-          <div><b>{unmappedCount}</b><span>인프라 미매핑</span></div>
+          {isDataLoading ? (
+            <div className="inline-data-loader" role="status" aria-live="polite">
+              <span className="portal-initial-loader__ring" aria-hidden="true" />
+              <strong>배치 현황을 불러오는 중입니다.</strong>
+            </div>
+          ) : (
+            <>
+              <div><b>{services.length}</b><span>전체 서비스</span></div>
+              <div><b>{servers.length}</b><span>전체 서버</span></div>
+              <div><b>{rows.length - unmappedCount}</b><span>인프라 매핑 완료</span></div>
+              <div><b>{unmappedCount}</b><span>인프라 미매핑</span></div>
+            </>
+          )}
         </div>
 
         <div className="card">
@@ -129,7 +141,17 @@ export function ServiceInfraMappingPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredRows.map((row) => (
+              {isDataLoading ? (
+                <tr>
+                  <td colSpan={6}>
+                    <div className="inline-data-loader" role="status" aria-live="polite">
+                      <span className="portal-initial-loader__ring" aria-hidden="true" />
+                      <strong>서비스 배치 매핑을 불러오는 중입니다.</strong>
+                    </div>
+                  </td>
+                </tr>
+              ) : null}
+              {!isDataLoading && filteredRows.map((row) => (
                 <tr className={row.isDirty ? "is-dirty" : ""} key={row.service.serviceId}>
                   <td>
                     <code>{row.service.serviceCode}</code>
@@ -158,11 +180,11 @@ export function ServiceInfraMappingPage() {
                   </td>
                 </tr>
               ))}
-              {!filteredRows.length ? <tr><td colSpan={6}><div className="empty">조회된 서비스 배치 매핑이 없습니다.</div></td></tr> : null}
+              {!isDataLoading && !filteredRows.length ? <tr><td colSpan={6}><div className="empty">조회된 서비스 배치 매핑이 없습니다.</div></td></tr> : null}
             </tbody>
           </table>
           <div className="pager">
-            <div className="pager__info">전체 {filteredRows.length}건 · 서비스의 배포 서버를 기준으로 인프라 노드를 표시합니다.</div>
+            <div className="pager__info">{isDataLoading ? "데이터 조회 중" : `전체 ${filteredRows.length}건 · 서비스의 배포 서버를 기준으로 인프라 노드를 표시합니다.`}</div>
           </div>
         </div>
       </main>

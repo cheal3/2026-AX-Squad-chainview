@@ -83,6 +83,10 @@ export function IncidentAdminPage() {
   const [keyword, setKeyword] = useState("");
   const [editingIncident, setEditingIncident] = useState(null);
   const [deletingIncident, setDeletingIncident] = useState(null);
+  const isTableLoading =
+    portalData.remoteApi.initialLoading ||
+    (portalData.remoteApi.status.state === "loading" &&
+      portalData.remoteApi.status.source === "snapshot");
   const serviceById = useMemo(
     () => new Map(portalData.services.map((service) => [service.serviceId, service])),
     [portalData.services]
@@ -225,7 +229,17 @@ export function IncidentAdminPage() {
             </tr>
           </thead>
           <tbody>
-            {filteredRows.map((row) => {
+            {isTableLoading ? (
+              <tr>
+                <td colSpan={11}>
+                  <div className="inline-data-loader" role="status" aria-live="polite">
+                    <span className="portal-initial-loader__ring" aria-hidden="true" />
+                    <strong>인시던트 현황을 불러오는 중입니다.</strong>
+                  </div>
+                </td>
+              </tr>
+            ) : null}
+            {!isTableLoading && filteredRows.map((row) => {
               const isOpen = !row.endedAt;
               return (
                 <tr
@@ -277,7 +291,7 @@ export function IncidentAdminPage() {
           </tbody>
         </table>
         <div className="pager">
-          <div className="pager__info">전체 {filteredRows.length}건 · 1-{filteredRows.length} / 1 페이지</div>
+          <div className="pager__info">{isTableLoading ? "데이터 조회 중" : `전체 ${filteredRows.length}건 · 1-${filteredRows.length} / 1 페이지`}</div>
           <div className="pager__nav"><button disabled>‹</button><button className="is-on">1</button><button disabled>›</button></div>
         </div>
       </div>
@@ -634,15 +648,15 @@ function TopologyInfo({ children, title }) {
 
 function DashboardFrame() {
   const location = useLocation();
-  const { incidents } = usePortalData();
+  const { incidents, remoteApi } = usePortalData();
   const activeIncidentId = Number(new URLSearchParams(location.search).get("incidentId")) || undefined;
   const isIncidentMode = Boolean(
     activeIncidentId &&
-      incidents.some(
+      (remoteApi.initialLoading || incidents.some(
         (incident) =>
           incident.incidentId === activeIncidentId &&
           incident.incidentStatusCode !== "RESOLVED"
-      )
+      ))
   );
 
   return (
@@ -662,7 +676,14 @@ function DashboardFrame() {
           </>
         ) : null}
         <div className="chain-dashboard-scope">
-          <IncidentDemoDashboard activeIncidentId={activeIncidentId} />
+          {remoteApi.initialLoading ? (
+            <div className="dashboard-data-loader inline-data-loader" role="status" aria-live="polite">
+              <span className="portal-initial-loader__ring" aria-hidden="true" />
+              <strong>대시보드 데이터를 불러오는 중입니다.</strong>
+            </div>
+          ) : (
+            <IncidentDemoDashboard activeIncidentId={activeIncidentId} />
+          )}
         </div>
       </main>
     </AppShell>
@@ -865,7 +886,6 @@ export function IncidentDetailPage() {
             <article className="incident-detail__card incident-detail__card--graph">
               <div className="incident-detail__card-head">
                 <h2>영향 범위 (BLAST RADIUS)</h2>
-                <Link to={`/topology?incidentId=${incident.incidentId}&serviceId=${service?.serviceId ?? ""}`}>전체 토폴로지 보기 →</Link>
               </div>
               <div className="incident-detail__blast">
                 <ServiceRelationFlow
@@ -937,7 +957,6 @@ export function IncidentDetailPage() {
           <article className="incident-detail__card incident-detail__card--graph incident-detail__tab-card" role="tabpanel">
             <div className="incident-detail__card-head">
               <h2>영향 범위 (BLAST RADIUS)</h2>
-              <Link to={`/topology?incidentId=${incident.incidentId}&serviceId=${service?.serviceId ?? ""}`}>전체 토폴로지 보기 →</Link>
             </div>
             <div className="incident-detail__blast">
               <ServiceRelationFlow

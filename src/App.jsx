@@ -12,7 +12,6 @@ const ServiceInfraMappingPage = lazy(() => import("./pages/infra/ServiceInfraMap
 const DashboardPage = lazy(() => import("./pages/monitoring/MonitoringPages.jsx").then((module) => ({ default: module.DashboardPage })));
 const IncidentAdminPage = lazy(() => import("./pages/monitoring/MonitoringPages.jsx").then((module) => ({ default: module.IncidentAdminPage })));
 const IncidentDetailPage = lazy(() => import("./pages/monitoring/MonitoringPages.jsx").then((module) => ({ default: module.IncidentDetailPage })));
-const TopologyPage = lazy(() => import("./pages/monitoring/MonitoringPages.jsx").then((module) => ({ default: module.TopologyPage })));
 const NotificationHistoryPage = lazy(() => import("./pages/operation/OperationPages.jsx").then((module) => ({ default: module.NotificationHistoryPage })));
 const NotificationTemplatePage = lazy(() => import("./pages/operation/OperationPages.jsx").then((module) => ({ default: module.NotificationTemplatePage })));
 const ServiceCheckPage = lazy(() => import("./pages/operation/OperationPages.jsx").then((module) => ({ default: module.ServiceCheckPage })));
@@ -310,13 +309,11 @@ function AppRoutes() {
         <Route path="/operation/notification-templates" element={<NotificationTemplatePage />} />
         <Route path="/analysis/statistics" element={<StatisticsPage />} />
         <Route path="/analysis/incidents" element={<RoutePage activeMenuOverride="analysis-incidents" slug="admin-incidents" />} />
-        <Route path="/topology" element={<TopologyPage />} />
         <Route path="/admin-infra-topology" element={<InfraTopologyPage />} />
         <Route path="/admin-infra-relations" element={<InfraRelationsPage />} />
         <Route path="/admin-service-infra-mapping" element={<ServiceInfraMappingPage />} />
         <Route path="/dashboard-proto" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard-proto-detail" element={<IncidentDetailPage />} />
-        <Route path="/dashboard-proto-topology" element={<Navigate to="/topology" replace />} />
         <Route path="/admin-services/:serviceCode" element={<AppShell activeMenu="services"><main className="main"><ServiceAdminPage /></main></AppShell>} />
         <Route path="/admin-permissions" element={<RoutePage activeMenuOverride="permissions" slug="admin-users" />} />
         <Route path="/admin-owner-management" element={<RoutePage activeMenuOverride="owner-management" slug="admin-owners" />} />

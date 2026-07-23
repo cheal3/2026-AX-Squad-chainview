@@ -1841,6 +1841,11 @@
   box-shadow: var(--shadow-sm);
 }
 
+.service-infra-page__summary > .inline-data-loader {
+  grid-column: 1 / -1;
+  min-height: 94px;
+}
+
 .service-infra-page__summary b {
   display: block;
   color: var(--text);
@@ -4030,6 +4035,20 @@
 
 .inline-data-loader {
   min-height: 180px;
+}
+
+.dashboard-data-loader,
+.service-detail-data-loader {
+  min-height: min(520px, calc(100vh - 180px));
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.app.is-dark .dashboard-data-loader {
+  border-color: #1f3549;
+  background: #081b2d;
+  color: #b9c8d8;
 }
 
 .incident-detail__loading {
