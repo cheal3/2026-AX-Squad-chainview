@@ -2004,7 +2004,9 @@ export function ServiceRelationFlow({
           targetHandle: sourceIsLeft ? "left-target" : "right-target",
           type: "default",
           className: incidentMode
-            ? "chainview-flow-edge chainview-flow-edge-active"
+            ? directlyConnected
+              ? "chainview-flow-edge chainview-flow-edge-active"
+              : "chainview-flow-edge chainview-flow-edge-normal-dashed"
             : directlyConnected
             ? "chainview-flow-edge chainview-flow-edge-active"
             : hasHighlight
@@ -2016,9 +2018,13 @@ export function ServiceRelationFlow({
                 : "chainview-flow-edge chainview-flow-edge-normal-dashed",
           style: {
             stroke,
-            strokeWidth: incidentMode || directlyConnected ? 2.8 : 1.75,
+            strokeWidth: directlyConnected ? 2.8 : incidentMode ? 1.8 : 1.75,
             opacity: incidentMode
-              ? 0.98
+              ? directlyConnected
+                ? 0.98
+                : hasHighlight
+                  ? 0.18
+                  : 0.68
               : directlyConnected
               ? 0.98
               : hasHighlight
