@@ -1257,7 +1257,7 @@ export function ServiceRelationFlow({
         id: String(service.serviceId),
         type: "serviceNode",
         position: {
-          x: lane * X_SPACING + (allMode ? -260 : 0),
+          x: lane * X_SPACING + (allMode ? 980 : 0),
           y: yByServiceId.get(service.serviceId) ?? 0,
         },
         data: {
@@ -1392,7 +1392,7 @@ export function ServiceRelationFlow({
 
     const INFRA_X_SPACING = 430;
     const INFRA_Y_SPACING = 148;
-    const INFRA_ALL_MODE_X_OFFSET = 980;
+    const INFRA_ALL_MODE_X_OFFSET = -260;
     const nodes: Node<ServerInfraNodeData>[] = [];
 
     Array.from(groups.entries())
@@ -1521,11 +1521,18 @@ export function ServiceRelationFlow({
           : sourceLane >= 0 && targetLane > sourceLane
             ? IMPACT_COLOR
             : DEPENDS_ON_COLOR;
+        const sourceIsLeft = sourceLane <= targetLane;
 
         return {
           id: String(relation.relationId),
           source: String(relation.sourceServiceId),
           target: String(relation.targetServiceId),
+          ...(showAllServices
+            ? {
+                sourceHandle: sourceIsLeft ? "right-source" : "left-source",
+                targetHandle: sourceIsLeft ? "left-target" : "right-target",
+              }
+            : {}),
           type: "default",
           className: directlyConnected
             ? "chainview-flow-edge chainview-flow-edge-active"
@@ -1642,7 +1649,8 @@ export function ServiceRelationFlow({
                   id: `service-infra-${service.serviceId}-${infraNodeId}`,
                   source: sourceNodeId,
                   target: targetNodeId,
-                  targetHandle: "left-target",
+                  sourceHandle: "left-source",
+                  targetHandle: "right-target",
                   type: "default",
                   animated: true,
                   className:
@@ -3104,7 +3112,8 @@ function ServiceNode({ data }: { data: ServiceNodeData }) {
           data.onSelectServiceNode(data.serviceId);
         }}
       >
-        <Handle type="target" position={Position.Left} />
+        <Handle id="left-target" type="target" position={Position.Left} />
+        <Handle id="left-source" type="source" position={Position.Left} />
         <div className="flex min-w-0 items-center gap-2">
           <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-slate-500">
             <Server size={14} />
@@ -3118,7 +3127,8 @@ function ServiceNode({ data }: { data: ServiceNodeData }) {
             </div>
           </div>
         </div>
-        <Handle type="source" position={Position.Right} />
+        <Handle id="right-target" type="target" position={Position.Right} />
+        <Handle id="right-source" type="source" position={Position.Right} />
       </button>
     );
   }

@@ -509,34 +509,47 @@ function DashboardServiceFilter({
     <section className="mt-1 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-[0_1px_3px_rgba(15,23,42,0.05)]">
       <h2 className="mb-2.5 text-sm font-black text-slate-900">조회조건</h2>
 
-      <div className="flex min-w-0 flex-wrap items-end gap-3 xl:flex-nowrap">
-        <div className="grid h-9 shrink-0 grid-cols-2 rounded-full border border-slate-200 bg-white p-0.5" style={{ borderRadius: 9999 }}>
-          {([
-            ["all", "전체 서비스"],
-            ["mine", "내 담당 서비스"],
-          ] as const).map(([scope, label]) => (
-            <button
-              key={scope}
-              className={`min-w-[108px] px-3 text-xs font-black transition-colors ${
-                filter.scope === scope
-                  ? "bg-[#1f2a44] text-white shadow-sm"
-                  : "text-slate-600 hover:text-slate-950"
-              }`}
-              style={{ borderRadius: 9999 }}
-              type="button"
-              onClick={() => updateScope(scope)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+      <div className="flex min-w-0 flex-wrap items-end gap-3">
+        <div className="flex min-w-[340px] flex-[1.5_1_420px] items-end gap-3">
+          <div
+            className="relative grid h-10 w-[240px] shrink-0 grid-cols-2 overflow-hidden rounded-full border border-slate-200 bg-white p-1 shadow-md"
+            style={{ borderRadius: 9999 }}
+          >
+            <span
+              className="absolute bottom-1 top-1 w-[calc(50%-4px)] rounded-full bg-[#2563eb] shadow-sm transition-transform duration-200"
+              style={{
+                left: 4,
+                borderRadius: 9999,
+                transform: `translate3d(${filter.scope === "mine" ? 100 : 0}%, 0, 0)`,
+              }}
+            />
+            {([
+              ["all", "전체 서비스"],
+              ["mine", "내 담당 서비스"],
+            ] as const).map(([scope, label]) => (
+              <button
+                key={scope}
+                className={`relative z-10 h-8 px-3 text-xs font-black transition-colors ${
+                  filter.scope === scope
+                    ? "text-white"
+                    : "text-slate-600 hover:text-slate-950"
+                }`}
+                style={{ borderRadius: 9999 }}
+                type="button"
+                onClick={() => updateScope(scope)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
 
-        <div className="flex h-9 min-w-[215px] flex-1 items-center border-l border-slate-200 pl-3 text-xs font-bold text-slate-500 xl:max-w-[270px]">
-          <span className="line-clamp-2 leading-4">
-            {filter.scope === "mine"
-              ? "내가 담당자로 등록된 서비스만 조회됩니다."
-              : "전체 서비스를 대상으로 조회됩니다."}
-          </span>
+          <div className="flex h-10 min-w-[150px] flex-1 items-center border-l border-slate-200 pl-3 text-xs font-bold text-slate-500">
+            <span className="line-clamp-2 leading-4">
+              {filter.scope === "mine"
+                ? "내가 담당자로 등록된 서비스만 조회됩니다."
+                : "전체 서비스를 대상으로 조회됩니다."}
+            </span>
+          </div>
         </div>
 
         <FilterSelect
@@ -581,20 +594,22 @@ function DashboardServiceFilter({
           }}
         />
 
-        <button
-          className="h-9 shrink-0 border border-slate-200 bg-white px-4 text-xs font-black text-slate-700 hover:bg-slate-50"
-          type="button"
-          onClick={onReset}
-        >
-          초기화
-        </button>
-        <button
-          className="h-9 shrink-0 bg-[#1f2a44] px-5 text-xs font-black text-white shadow-sm hover:bg-[#263552]"
-          type="button"
-          onClick={onApply}
-        >
-          조회
-        </button>
+        <div className="flex shrink-0 items-end gap-2">
+          <button
+            className="h-9 shrink-0 border border-slate-200 bg-white px-4 text-xs font-black text-slate-700 hover:bg-slate-50"
+            type="button"
+            onClick={onReset}
+          >
+            초기화
+          </button>
+          <button
+            className="h-9 shrink-0 bg-[#1f2a44] px-5 text-xs font-black text-white shadow-sm hover:bg-[#263552]"
+            type="button"
+            onClick={onApply}
+          >
+            조회
+          </button>
+        </div>
       </div>
 
     </section>
@@ -616,7 +631,7 @@ function FilterSelect({
 }) {
   const normalizedOptions = value && !options.includes(value) ? [value, ...options] : options;
   return (
-    <label className="min-w-[128px] flex-1 xl:max-w-[170px]">
+    <label className="w-[150px] min-w-[130px] flex-[1_1_140px] max-w-[190px]">
       <span className="mb-1 block text-[11px] font-black text-slate-600">{label}</span>
       <select
         className="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-xs font-bold text-slate-800 outline-none focus:border-blue-500 disabled:bg-slate-50 disabled:text-slate-400"
@@ -668,7 +683,7 @@ function ServiceSearchSelect({
   }, []);
 
   return (
-    <div className="relative min-w-[190px] flex-[1.35] xl:max-w-[250px]" ref={rootRef}>
+    <div className="relative min-w-[220px] flex-[1.2_1_240px] max-w-[320px]" ref={rootRef}>
       <label className="block">
         <span className="mb-1 block text-[11px] font-black text-slate-600">서비스 검색</span>
         <span className="relative block">
