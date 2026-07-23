@@ -111,7 +111,7 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
   const configs = {
     services: {
       actionLabel: "＋ 서비스 등록",
-      columns: ["serviceId", "서비스", "분류", "유형", "중요도", "상태", "엔드포인트", "서버"],
+      columns: ["서비스 코드", "서비스명", "분류", "유형", "중요도", "상태", "엔드포인트", "서버"],
       rows: portalData.services.map((service) => {
         const serviceOwners =
           ownersByServiceId.get(String(service.serviceId)) ??
@@ -139,8 +139,8 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
           ),
           onClick: () => navigate(`/admin-services/${service.serviceCode}`),
           cells: [
-            <code>{service.serviceId}</code>,
-            <><code>{service.serviceCode}</code> {service.serviceName}</>,
+            <code>{service.serviceCode}</code>,
+            service.serviceName,
             service.categoryPath?.join(" > ") || "미분류",
             codeLabels.serviceType[service.serviceTypeCode] || service.serviceTypeCode,
             codeLabels.importance[service.importanceCode] || service.importanceCode || "-",
@@ -395,12 +395,12 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
   const config = configs[menu];
   const filteredRows = useMemo(() => {
     const cleanedKeyword = normalizeSearchText(keyword);
-    if (!cleanedKeyword) {
-      return config.rows;
-    }
-    return config.rows.filter((row) =>
-      matchesSearchText(buildRowSearchText(row), cleanedKeyword)
-    );
+    const rows = cleanedKeyword
+      ? config.rows.filter((row) =>
+          matchesSearchText(buildRowSearchText(row), cleanedKeyword)
+        )
+      : config.rows;
+    return sortRowsByCreatedAtDesc(rows);
   }, [config.rows, keyword]);
   const filteredRowKeys = filteredRows.map((row) => String(row.key));
   const isAllChecked =
@@ -700,6 +700,25 @@ function buildRowSearchText(row) {
 
 function adminSearchText(...values) {
   return values.flatMap(flattenSearchValue).join(" ");
+}
+
+function createdAtTime(record) {
+  const value =
+    record?.createdAt ??
+    record?.createdDate ??
+    record?.registeredAt ??
+    record?.created_at ??
+    record?.regDt ??
+    record?.created;
+  const time = value ? new Date(value).getTime() : 0;
+  return Number.isFinite(time) ? time : 0;
+}
+
+function sortRowsByCreatedAtDesc(rows) {
+  return [...rows].sort((left, right) => {
+    const diff = createdAtTime(right.record) - createdAtTime(left.record);
+    return diff || String(right.key).localeCompare(String(left.key), "ko", { numeric: true });
+  });
 }
 
 function serviceDeploymentRows(service, deployments) {
@@ -1944,10 +1963,10 @@ function ServerAdminForm({ form, onChange, isEdit }) {
         <div className="form-grid">
           <div className="form-row">
             <label>serverName<span className="req">*</span></label>
-            <input type="text" value={form.serverName} onChange={(event) => onChange("serverName", event.target.value)} disabled={isEdit} placeholder="예: WAS-PRD-14" />
+            <input type="text" value={form.serverName} onChange={(event) => onChange("serverName", event.target.value)} disabled={isEdit} placeholder="예: 기간계 WAS #1" />
             {isEdit ? <span className="help">PK · 수정 불가</span> : <span className="help">고유 · 명명규칙 준수</span>}
           </div>
-          <div className="form-row"><label>hostname<span className="req">*</span></label><input type="text" value={form.hostName} onChange={(event) => onChange("hostName", event.target.value)} placeholder="예: was-prd-14.bank.local" /></div>
+          <div className="form-row"><label>hostname<span className="req">*</span></label><input type="text" value={form.hostName} onChange={(event) => onChange("hostName", event.target.value)} placeholder="gateone에 등록된 서버 hostname" /></div>
           <div className="form-row"><label>IP 주소<span className="req">*</span></label><input type="text" value={form.ipAddress} onChange={(event) => onChange("ipAddress", event.target.value)} placeholder="예: 10.20.30.14" /></div>
         </div>
       </div>
