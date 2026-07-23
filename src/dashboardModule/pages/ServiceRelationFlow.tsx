@@ -804,9 +804,9 @@ export function ServiceRelationFlow({
 
     setFocusedServiceId(nextFocusedServiceId);
     setDetailServiceId(nextFocusedServiceId);
-    setSelectedServiceNodeId(nextFocusedServiceId);
+    setSelectedServiceNodeId(infraIncident ? null : nextFocusedServiceId);
     userMovedViewportRef.current = false;
-  }, [filteredServices, focusedServiceId, incidentMode, incidentServiceIds]);
+  }, [filteredServices, focusedServiceId, incidentMode, incidentServiceIds, infraIncident]);
   const allowedServiceIds = useMemo(
     () => new Set(filteredServices.map((service) => service.serviceId)),
     [filteredServices]
@@ -1136,6 +1136,93 @@ export function ServiceRelationFlow({
               categoryOffset * ALL_SERVICES_CATEGORY_GAP +
               laneStagger
           );
+        });
+      });
+
+      return {
+        visibleRelationIds: relationIds,
+        visibleServiceIds: visible,
+        laneByServiceId: laneMap,
+        yByServiceId: yMap,
+      };
+    }
+
+    if (incidentMode && infraIncident && incidentServiceIds) {
+      const visible = new Set<number>(incidentServiceIds);
+      const relationIds = new Set<number>();
+      const laneMap = new Map<number, number>();
+      const laneGroups = new Map<number, number[]>();
+      const yMap = new Map<number, number>();
+      const directServiceIds = new Set<number>();
+      const nodeYSpacing = 318;
+      const compareIncidentServiceIds = (firstId: number, secondId: number) => {
+        const firstName = serviceById.get(firstId)?.serviceName ?? "";
+        const secondName = serviceById.get(secondId)?.serviceName ?? "";
+
+        return firstName.localeCompare(secondName, "ko") || firstId - secondId;
+      };
+
+      filteredServices.forEach((service) => {
+        const infraNodeId = serviceInfraTargetByServiceId.get(service.serviceId);
+        if (
+          infraNodeId === incidentInfraNodeId ||
+          (activeIncident?.serverId && service.serverId === activeIncident.serverId)
+        ) {
+          directServiceIds.add(service.serviceId);
+        }
+      });
+
+      if (directServiceIds.size === 0 && filteredServices[0]) {
+        directServiceIds.add(filteredServices[0].serviceId);
+      }
+
+      directServiceIds.forEach((serviceId) => {
+        if (visible.has(serviceId)) {
+          laneMap.set(serviceId, 0);
+        }
+      });
+
+      activeRelations.forEach((relation) => {
+        if (
+          !visible.has(relation.sourceServiceId) ||
+          !visible.has(relation.targetServiceId)
+        ) {
+          return;
+        }
+
+        const sourceDirect = directServiceIds.has(relation.sourceServiceId);
+        const targetDirect = directServiceIds.has(relation.targetServiceId);
+        if (!sourceDirect && !targetDirect) {
+          return;
+        }
+
+        relationIds.add(relation.relationId);
+        if (!sourceDirect && targetDirect) {
+          laneMap.set(relation.sourceServiceId, -1);
+        }
+        if (sourceDirect && !targetDirect) {
+          laneMap.set(relation.targetServiceId, 1);
+        }
+      });
+
+      visible.forEach((serviceId) => {
+        if (!laneMap.has(serviceId)) {
+          laneMap.set(serviceId, directServiceIds.has(serviceId) ? 0 : 1);
+        }
+        const lane = laneMap.get(serviceId) ?? 0;
+        laneGroups.set(lane, [...(laneGroups.get(lane) ?? []), serviceId]);
+      });
+
+      laneGroups.forEach((serviceIds, lane) => {
+        const sorted = [...serviceIds].sort(compareIncidentServiceIds);
+        enforceVerticalGap(
+          sorted.map((serviceId, index) => ({
+            serviceId,
+            targetY: centeredOffset(index, sorted.length, nodeYSpacing),
+          })),
+          nodeYSpacing
+        ).forEach((y, serviceId) => {
+          yMap.set(serviceId, y);
         });
       });
 
