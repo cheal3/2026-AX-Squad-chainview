@@ -78,6 +78,15 @@ export const codeLabels = {
     SUB: "부 담당",
     ALERT: "알림 대상",
   },
+  techType: {
+    LANGUAGE: "언어",
+    FRAMEWORK: "프레임워크",
+    DATABASE: "데이터베이스",
+    MESSAGE_QUEUE: "메시지큐",
+    CACHE: "캐시",
+    WAS: "WAS",
+    WEB_SERVER: "웹 서버",
+  },
 };
 
 export type ServerStatusCode = keyof typeof codeLabels.serverStatus;
@@ -150,6 +159,7 @@ export interface ServiceRelationRecord {
 export interface TechStackRecord {
   techStackId: number;
   serviceId: number;
+  techTypeCode?: keyof typeof codeLabels.techType;
   techTypeName: string;
   techName: string;
   versionText: string;
@@ -458,6 +468,7 @@ export const techStacks: TechStackRecord[] = [
   {
     techStackId: 1,
     serviceId: 2,
+    techTypeCode: "FRAMEWORK",
     techTypeName: "프론트엔드 프레임워크",
     techName: "React",
     versionText: "18.3.1",
@@ -466,6 +477,7 @@ export const techStacks: TechStackRecord[] = [
   {
     techStackId: 2,
     serviceId: 2,
+    techTypeCode: "FRAMEWORK",
     techTypeName: "백엔드 프레임워크",
     techName: "Spring Boot",
     versionText: "3.3.7",
@@ -474,6 +486,7 @@ export const techStacks: TechStackRecord[] = [
   {
     techStackId: 3,
     serviceId: 1,
+    techTypeCode: "DATABASE",
     techTypeName: "데이터베이스",
     techName: "MySQL",
     versionText: "8.x",
@@ -482,6 +495,7 @@ export const techStacks: TechStackRecord[] = [
   {
     techStackId: 4,
     serviceId: 1,
+    techTypeCode: "LANGUAGE",
     techTypeName: "런타임",
     techName: "Java",
     versionText: "17",

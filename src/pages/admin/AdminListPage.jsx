@@ -885,7 +885,11 @@ function AdminRecordModal({ modal, onClose, onOpenApiDetail, portalData, serverB
       }
       const payload = {
         serviceId,
-        techTypeName: form.techTypeName.trim() || "서비스 기술",
+        techTypeCode: form.techTypeCode,
+        techTypeName:
+          codeLabels.techType[form.techTypeCode] ||
+          form.techTypeName.trim() ||
+          "서비스 기술",
         techName,
         versionText: form.versionText.trim() || "-",
         vendorName: form.vendorName.trim() || "-",
@@ -1870,7 +1874,7 @@ function TechStackAdminForm({ form, onChange, services, isEdit }) {
       <div className="form-section">
         <h4 className="form-section__title">기술 정보</h4>
         <div className="form-grid">
-          <div className="form-row"><label>유형 (TECH_TYPE)<span className="req">*</span></label><input type="text" value={form.techTypeName} onChange={(event) => onChange("techTypeName", event.target.value)} placeholder="예: FRAMEWORK" /></div>
+          <div className="form-row"><label>유형 (TECH_TYPE)<span className="req">*</span></label><CodeSelect labels={codeLabels.techType} value={form.techTypeCode} onChange={(value) => onChange("techTypeCode", value)} /></div>
           <div className="form-row"><label>기술명<span className="req">*</span></label><input type="text" value={form.techName} onChange={(event) => onChange("techName", event.target.value)} placeholder="예: Spring Boot" /></div>
           <div className="form-row"><label>기본버전</label><input type="text" value={form.versionText} onChange={(event) => onChange("versionText", event.target.value)} placeholder="예: 3.2.5" /></div>
           <div className="form-row"><label>벤더</label><input type="text" value={form.vendorName} onChange={(event) => onChange("vendorName", event.target.value)} placeholder="예: VMware" /></div>
@@ -1974,6 +1978,19 @@ function CodeSelect({ labels, value, onChange }) {
   );
 }
 
+function resolveTechTypeCode(record) {
+  if (record?.techTypeCode && codeLabels.techType[record.techTypeCode]) {
+    return record.techTypeCode;
+  }
+
+  const normalizedName = String(record?.techTypeName ?? "").trim();
+  const matched = Object.entries(codeLabels.techType).find(
+    ([code, label]) => code === normalizedName || label === normalizedName
+  );
+
+  return matched?.[0] ?? "FRAMEWORK";
+}
+
 function buildAdminFormState(menu, record, portalData) {
   if (menu === "services") {
     const categoryPath = record?.categoryPath ?? [];
@@ -2029,9 +2046,11 @@ function buildAdminFormState(menu, record, portalData) {
   }
 
   if (menu === "techstacks") {
+    const techTypeCode = resolveTechTypeCode(record);
     return {
       serviceId: String(record?.serviceId ?? portalData.services[0]?.serviceId ?? ""),
-      techTypeName: record?.techTypeName ?? "FRAMEWORK",
+      techTypeCode,
+      techTypeName: record?.techTypeName ?? codeLabels.techType[techTypeCode],
       techName: record?.techName ?? "",
       versionText: record?.versionText ?? "",
       vendorName: record?.vendorName ?? "",

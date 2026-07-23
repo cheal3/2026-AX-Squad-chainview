@@ -316,10 +316,20 @@ function mapRelation(row: RemoteRecord): ServiceRelationRecord {
 }
 
 function mapTechStack(row: RemoteRecord): TechStackRecord {
+  const techTypeCode = knownCode(
+    row.techTypeCode,
+    codeLabels.techType,
+    "FRAMEWORK"
+  );
+
   return {
     techStackId: asNumber(row.serviceTechStackId ?? row.techStackId),
     serviceId: asNumber(row.serviceId),
-    techTypeName: asString(row.techTypeName) || "기술스택",
+    techTypeCode,
+    techTypeName:
+      asString(row.techTypeName) ||
+      codeLabels.techType[techTypeCode] ||
+      "기술스택",
     techName: asString(row.techName) || "기술명 미등록",
     versionText: asString(row.versionOverride ?? row.versionText) || "-",
     vendorName: asString(row.vendorName) || "-",

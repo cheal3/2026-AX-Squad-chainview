@@ -1543,8 +1543,7 @@ function IncidentCommandDashboard({
               incidentMode
               incident={incident}
               initialRelationDepth={1}
-              initialServiceId={rootService?.serviceId}
-              showAllServices={incident.incidentTypeCode === "SERVER"}
+              initialServiceId={rootService?.serviceId ?? incidentServices[0]?.serviceId}
             />
           </div>
         </section>
@@ -1559,8 +1558,7 @@ function IncidentCommandDashboard({
             incidentMode
             incident={incident}
             initialRelationDepth={1}
-            initialServiceId={rootService?.serviceId}
-            showAllServices={incident.incidentTypeCode === "SERVER"}
+            initialServiceId={rootService?.serviceId ?? incidentServices[0]?.serviceId}
             />
           </RelationFlowModal>
         ) : null}

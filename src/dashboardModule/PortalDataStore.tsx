@@ -91,7 +91,7 @@ type NewRelationInput = {
 
 type NewTechStackInput = Pick<
   TechStackRecord,
-  "serviceId" | "techTypeName" | "techName" | "versionText" | "vendorName"
+  "serviceId" | "techTypeCode" | "techTypeName" | "techName" | "versionText" | "vendorName"
 >;
 
 type HealthCheckResult = {
@@ -1190,6 +1190,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           typeof inputOrServiceId === "number"
             ? {
                 serviceId: inputOrServiceId,
+                techTypeCode: "FRAMEWORK",
                 techTypeName: "서비스 기술",
                 techName: techName ?? "",
                 versionText: "-",
@@ -1204,7 +1205,11 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         const nextTechStack = {
           techStackId: nextId(techStacks, "techStackId"),
           serviceId: input.serviceId,
-          techTypeName: input.techTypeName || "서비스 기술",
+          techTypeCode: input.techTypeCode || "FRAMEWORK",
+          techTypeName:
+            input.techTypeName ||
+            codeLabels.techType[input.techTypeCode || "FRAMEWORK"] ||
+            "서비스 기술",
           techName: cleaned,
           versionText: input.versionText || "-",
           vendorName: input.vendorName || "-",
@@ -1924,14 +1929,18 @@ async function addRemoteOwnerGroup(serviceId: number, groupName: string) {
 
 async function addRemoteTechStack(input: {
   serviceId: number;
+  techTypeCode?: keyof typeof codeLabels.techType;
   techTypeName: string;
   techName: string;
   versionText: string;
   vendorName: string;
 }) {
+  const techTypeCode = input.techTypeCode || "FRAMEWORK";
+
   const created = await chainViewApi.techStacks.create({
-    techTypeCode: "ETC",
-    techTypeName: input.techTypeName || "서비스 기술",
+    techTypeCode,
+    techTypeName:
+      input.techTypeName || codeLabels.techType[techTypeCode] || "서비스 기술",
     techName: input.techName,
     versionText: input.versionText || "-",
     vendorName: input.vendorName || "-",

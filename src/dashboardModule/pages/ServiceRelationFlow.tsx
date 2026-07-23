@@ -1079,6 +1079,8 @@ export function ServiceRelationFlow({
     }
 
     const visible = new Set<number>([focusedServiceId]);
+    const nodeYSpacing = incidentMode ? 318 : Y_SPACING;
+    const childNodeYSpacing = incidentMode ? 286 : CHILD_Y_SPACING;
     const laneMap = new Map<number, number>([[focusedServiceId, 0]]);
     const parentByServiceId = new Map<number, number>();
     const relationIds = new Set<number>();
@@ -1214,7 +1216,7 @@ export function ServiceRelationFlow({
           laneServiceIds.forEach((serviceId, index) => {
             candidates.push({
               serviceId,
-              targetY: centeredOffset(index, laneServiceIds.length, Y_SPACING),
+              targetY: centeredOffset(index, laneServiceIds.length, nodeYSpacing),
             });
           });
         } else {
@@ -1244,13 +1246,13 @@ export function ServiceRelationFlow({
                   serviceId,
                   targetY:
                     parentY +
-                    centeredOffset(index, sortedChildIds.length, CHILD_Y_SPACING),
+                    centeredOffset(index, sortedChildIds.length, childNodeYSpacing),
                 });
               });
             });
         }
 
-        enforceVerticalGap(candidates, Y_SPACING).forEach((y, serviceId) => {
+        enforceVerticalGap(candidates, nodeYSpacing).forEach((y, serviceId) => {
           yMap.set(serviceId, y);
         });
       });
@@ -1269,6 +1271,7 @@ export function ServiceRelationFlow({
     relationDepth,
     serviceById,
     showAllServices,
+    incidentMode,
   ]);
 
   const laneNodes = useMemo<Node<LaneNodeData>[]>(() => {
