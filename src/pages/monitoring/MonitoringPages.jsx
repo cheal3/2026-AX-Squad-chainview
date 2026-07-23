@@ -83,6 +83,7 @@ export function IncidentAdminPage() {
   const [keyword, setKeyword] = useState("");
   const [editingIncident, setEditingIncident] = useState(null);
   const [deletingIncident, setDeletingIncident] = useState(null);
+  const [selectedIncidentRowKeys, setSelectedIncidentRowKeys] = useState([]);
   const isTableLoading =
     portalData.remoteApi.initialLoading ||
     (portalData.remoteApi.status.state === "loading" &&
@@ -131,6 +132,40 @@ export function IncidentAdminPage() {
       keyword
     )
   );
+  const filteredRowKeys = useMemo(
+    () => filteredRows.map((row) => incidentRowKey(row)),
+    [filteredRows]
+  );
+  const isAllChecked =
+    filteredRowKeys.length > 0 &&
+    filteredRowKeys.every((key) => selectedIncidentRowKeys.includes(key));
+  const toggleAllRows = (checked) => {
+    if (!checked) {
+      setSelectedIncidentRowKeys((current) =>
+        current.filter((key) => !filteredRowKeys.includes(key))
+      );
+      return;
+    }
+
+    setSelectedIncidentRowKeys((current) =>
+      Array.from(new Set([...current, ...filteredRowKeys]))
+    );
+  };
+  const toggleRow = (key, checked) => {
+    setSelectedIncidentRowKeys((current) =>
+      checked
+        ? Array.from(new Set([...current, key]))
+        : current.filter((selectedKey) => selectedKey !== key)
+    );
+  };
+
+  useEffect(() => {
+    setSelectedIncidentRowKeys((current) => {
+      const next = current.filter((key) => filteredRowKeys.includes(key));
+      return next.length === current.length ? current : next;
+    });
+  }, [filteredRowKeys]);
+
   const openIncident = (row) => {
     if (row.endedAt) {
       return;
@@ -221,7 +256,15 @@ export function IncidentAdminPage() {
         <table className="tbl">
           <thead>
             <tr>
-              <th className="col-check"><input type="checkbox" className="chk" /></th>
+              <th className="col-check">
+                <input
+                  type="checkbox"
+                  className="chk"
+                  checked={isAllChecked}
+                  disabled={filteredRowKeys.length === 0}
+                  onChange={(event) => toggleAllRows(event.target.checked)}
+                />
+              </th>
               <th>ID</th><th>유형</th><th>심각도</th><th>상태</th>
               <th>대상</th><th>제목</th><th>영향 서비스</th>
               <th>발생시각</th><th>종료시각</th>
@@ -241,13 +284,22 @@ export function IncidentAdminPage() {
             ) : null}
             {!isTableLoading && filteredRows.map((row) => {
               const isOpen = !row.endedAt;
+              const rowKey = incidentRowKey(row);
               return (
                 <tr
                   className={isOpen ? "is-clickable-incident" : undefined}
-                  key={`${row.source}-${row.code}-${row.startedAt}`}
+                  key={rowKey}
                   onClick={() => openIncident(row)}
                 >
-                  <td className="col-check"><input type="checkbox" className="chk" onClick={(event) => event.stopPropagation()} /></td>
+                  <td className="col-check">
+                    <input
+                      type="checkbox"
+                      className="chk"
+                      checked={selectedIncidentRowKeys.includes(rowKey)}
+                      onChange={(event) => toggleRow(rowKey, event.target.checked)}
+                      onClick={(event) => event.stopPropagation()}
+                    />
+                  </td>
                   <td><code>{row.code}</code></td>
                   <td><span className={`pill ${severityPillClass(row.severityCode)}`}>{row.incidentTypeLabel}</span></td>
                   <td><span className={`pill ${severityPillClass(row.severityCode)}`}>{row.severityLabel}</span></td>
@@ -291,7 +343,7 @@ export function IncidentAdminPage() {
           </tbody>
         </table>
         <div className="pager">
-          <div className="pager__info">{isTableLoading ? "데이터 조회 중" : `전체 ${filteredRows.length}건 · 1-${filteredRows.length} / 1 페이지`}</div>
+          <div className="pager__info">{isTableLoading ? "데이터 조회 중" : `전체 ${filteredRows.length}건 · 1-${filteredRows.length} / 1 페이지 · 선택 ${selectedIncidentRowKeys.length}건`}</div>
           <div className="pager__nav"><button disabled>‹</button><button className="is-on">1</button><button disabled>›</button></div>
         </div>
       </div>
@@ -465,6 +517,10 @@ function formatTargetLabel(targetLabel, targetCode) {
       {prefix.trim()} · <code>{targetCode}</code>
     </>
   );
+}
+
+function incidentRowKey(row) {
+  return `${row.source ?? "incident"}-${row.code}-${row.startedAt}`;
 }
 
 export function DashboardPage() {
