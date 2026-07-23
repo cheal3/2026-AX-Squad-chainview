@@ -360,14 +360,13 @@ export function InfraRelationsPage() {
           <table className="tbl infra-table">
             <thead>
               <tr>
-                <th>relationId</th><th>source 인프라</th><th>target 인프라</th><th>관계 유형</th><th>필수</th><th>상태</th><th>설명</th><th className="col-actions">관리</th>
+                <th>source 인프라</th><th>target 인프라</th><th>관계 유형</th><th>필수</th><th>상태</th><th>설명</th><th className="col-actions">관리</th>
               </tr>
             </thead>
             <tbody>
-              {isLoading ? <tr><td colSpan={8}><InlineDataLoader /></td></tr> : null}
+              {isLoading ? <tr><td colSpan={7}><InlineDataLoader /></td></tr> : null}
               {!isLoading && filteredRelations.map((relation) => (
                 <tr key={relation.infraRelationId}>
-                  <td><code>{relation.infraRelationId}</code></td>
                   <td>{formatInfraNodeCell(nodeById.get(Number(relation.sourceInfraNodeId)))}</td>
                   <td>{formatInfraNodeCell(nodeById.get(Number(relation.targetInfraNodeId)))}</td>
                   <td>{infraRelationTypeLabels[relation.relationTypeCode] || relation.relationTypeCode}</td>
@@ -382,7 +381,7 @@ export function InfraRelationsPage() {
                   </td>
                 </tr>
               ))}
-              {!isLoading && !filteredRelations.length ? <tr><td colSpan={8}><div className="empty">조회된 인프라 관계가 없습니다.</div></td></tr> : null}
+              {!isLoading && !filteredRelations.length ? <tr><td colSpan={7}><div className="empty">조회된 인프라 관계가 없습니다.</div></td></tr> : null}
             </tbody>
           </table>
           <div className="pager">

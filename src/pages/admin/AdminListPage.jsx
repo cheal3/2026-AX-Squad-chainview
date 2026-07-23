@@ -153,7 +153,7 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
     },
     servers: {
       actionLabel: "＋ 서버 등록",
-      columns: ["serverId", "서버명", "호스트", "IP", "환경", "OS", "상태", "설명"],
+      columns: ["서버명", "호스트", "IP", "환경", "OS", "상태", "설명"],
       rows: portalData.servers.map((server) => ({
         key: server.serverId,
         record: server,
@@ -172,7 +172,6 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
           server.description
         ),
         cells: [
-          <code>{server.serverId}</code>,
           <b>{server.serverName}</b>,
           server.hostName,
           server.ipAddress,
@@ -185,7 +184,7 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
     },
     relations: {
       actionLabel: "＋ 관계 등록",
-      columns: ["relationId", "송신 서비스", "수신 서비스", "유형", "필수", "상태", "설명"],
+      columns: ["송신 서비스", "수신 서비스", "유형", "필수", "상태", "설명"],
       rows: portalData.relations.map((relation) => ({
         key: relation.relationId,
         record: relation,
@@ -201,7 +200,6 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
           relation.description
         ),
         cells: [
-          <code>{relation.relationId}</code>,
           formatServiceCell(serviceById.get(relation.sourceServiceId)),
           formatServiceCell(serviceById.get(relation.targetServiceId)),
           codeLabels.relationType[relation.relationTypeCode] || relation.relationTypeCode,
@@ -213,7 +211,7 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
     },
     techstacks: {
       actionLabel: "＋ 기술스택 등록",
-      columns: ["techStackId", "서비스", "유형", "기술명", "버전", "벤더"],
+      columns: ["서비스", "유형", "기술명", "버전", "벤더"],
       rows: portalData.techStacks.map((stack) => ({
         key: stack.techStackId,
         record: stack,
@@ -226,7 +224,6 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
           stack.vendorName
         ),
         cells: [
-          <code>{stack.techStackId}</code>,
           formatServiceCell(serviceById.get(stack.serviceId)),
           stack.techTypeName,
           <b>{stack.techName}</b>,
