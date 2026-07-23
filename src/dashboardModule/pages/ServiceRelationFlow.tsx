@@ -1961,7 +1961,11 @@ export function ServiceRelationFlow({
             return false;
           }
 
-          return showAllServices || Math.abs(targetLane - sourceLane) === 1;
+          return (
+            incidentMode ||
+            showAllServices ||
+            Math.abs(targetLane - sourceLane) === 1
+          );
         }
       )
       .map((relation) => {
@@ -1999,7 +2003,9 @@ export function ServiceRelationFlow({
           sourceHandle: sourceIsLeft ? "right-source" : "left-source",
           targetHandle: sourceIsLeft ? "left-target" : "right-target",
           type: "default",
-          className: directlyConnected
+          className: incidentMode
+            ? "chainview-flow-edge chainview-flow-edge-active"
+            : directlyConnected
             ? "chainview-flow-edge chainview-flow-edge-active"
             : hasHighlight
               ? showAllServices
@@ -2011,7 +2017,9 @@ export function ServiceRelationFlow({
           style: {
             stroke,
             strokeWidth: incidentMode || directlyConnected ? 2.8 : 1.75,
-            opacity: directlyConnected
+            opacity: incidentMode
+              ? 0.98
+              : directlyConnected
               ? 0.98
               : hasHighlight
                 ? 0.1
