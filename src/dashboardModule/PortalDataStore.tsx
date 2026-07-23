@@ -174,7 +174,7 @@ type PortalDataContextValue = {
   addServer: (input: NewServerInput) => ServerRecord;
   updateServer: (serverId: number, input: Partial<NewServerInput>) => void;
   deleteServer: (serverId: number) => { ok: boolean; message: string };
-  addService: (input: NewServiceInput) => ServiceRecord;
+  addService: (input: NewServiceInput) => Promise<{ ok: boolean; message: string; service?: ServiceRecord }>;
   updateService: (serviceId: number, input: Partial<ServiceRecord>) => void;
   deleteService: (serviceId: number) => void;
   addRelation: (input: NewRelationInput) => { ok: boolean; message: string };
@@ -250,8 +250,45 @@ function remoteErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error && error.message ? error.message : fallback;
 }
 
+function remoteErrorDetailMessage(error: unknown, fallback: string) {
+  const baseMessage = remoteErrorMessage(error, fallback);
+  const body = (error as { body?: unknown })?.body;
+  if (!body || typeof body !== "string") {
+    return baseMessage;
+  }
+
+  try {
+    const parsed = JSON.parse(body) as Record<string, unknown>;
+    const details = [
+      parsed.message,
+      parsed.error,
+      parsed.detail,
+      ...(Array.isArray(parsed.errors)
+        ? parsed.errors.map((item) =>
+            typeof item === "string"
+              ? item
+              : `${(item as Record<string, unknown>).field ?? (item as Record<string, unknown>).name ?? "필드"}: ${(item as Record<string, unknown>).message ?? (item as Record<string, unknown>).defaultMessage ?? (item as Record<string, unknown>).reason ?? JSON.stringify(item)}`
+          )
+        : []),
+      ...(Array.isArray(parsed.fieldErrors)
+        ? parsed.fieldErrors.map((item) =>
+            `${(item as Record<string, unknown>).field ?? (item as Record<string, unknown>).name ?? "필드"}: ${(item as Record<string, unknown>).message ?? (item as Record<string, unknown>).defaultMessage ?? (item as Record<string, unknown>).reason ?? JSON.stringify(item)}`
+          )
+        : []),
+      ...(Array.isArray(parsed.violations)
+        ? parsed.violations.map((item) =>
+            `${(item as Record<string, unknown>).field ?? (item as Record<string, unknown>).propertyPath ?? "필드"}: ${(item as Record<string, unknown>).message ?? JSON.stringify(item)}`
+          )
+        : []),
+    ].filter(Boolean);
+    return details.length ? `${baseMessage}\n\n상세:\n${Array.from(new Set(details)).join("\n")}` : baseMessage;
+  } catch {
+    return `${baseMessage}\n\n서버 응답:\n${body.slice(0, 700)}`;
+  }
+}
+
 function notifyRemoteMutationFailure(error: unknown, fallback: string) {
-  const message = remoteErrorMessage(error, fallback);
+  const message = remoteErrorDetailMessage(error, fallback);
   console.warn(`[ChainView API] ${fallback}`, error);
   window.alert(message);
 }
@@ -970,7 +1007,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         }
         return { ok: true, message: "서버가 삭제되었습니다." };
       },
-      addService: (input) => {
+      addService: async (input) => {
         const now = timestamp();
         const nextService: ServiceRecord = {
           serviceId: nextId(services, "serviceId"),
@@ -987,20 +1024,27 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           setDeployments((current) => [...nextDeployments, ...current]);
         }
         if (REMOTE_API_ENABLED) {
-          void toServicePayload(nextService)
-            .then((payload) => chainViewApi.services.create(payload))
-            .then(() => refreshRemoteData(400))
-            .catch((error) => {
-              setServices((current) =>
-                current.filter((service) => service.serviceId !== nextService.serviceId)
-              );
-              setDeployments((current) =>
-                current.filter((deployment) => Number(deployment.serviceId) !== nextService.serviceId)
-              );
-              notifyRemoteMutationFailure(error, "서비스 등록 API 호출에 실패했습니다.");
+          try {
+            const payload = await toServicePayload(nextService);
+            await chainViewApi.services.create(payload);
+            await refreshRemoteData(400).catch((error) => {
+              console.warn("[ChainView API] 서비스 등록 후 목록 새로고침에 실패했습니다.", error);
             });
+          } catch (error) {
+            setServices((current) =>
+              current.filter((service) => service.serviceId !== nextService.serviceId)
+            );
+            setDeployments((current) =>
+              current.filter((deployment) => Number(deployment.serviceId) !== nextService.serviceId)
+            );
+            console.warn("[ChainView API] 서비스 등록 API 호출에 실패했습니다.", error);
+            return {
+              ok: false,
+              message: remoteErrorDetailMessage(error, "서비스 등록 API 호출에 실패했습니다."),
+            };
+          }
         }
-        return nextService;
+        return { ok: true, message: "서비스가 등록되었습니다.", service: nextService };
       },
       updateService: (serviceId, input) => {
         const previousService = services.find(

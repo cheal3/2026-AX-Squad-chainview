@@ -834,6 +834,7 @@ function AdminRecordModal({ modal, onClose, onOpenApiDetail, portalData, serverB
   const isCreate = mode === "create";
   const isDelete = mode === "delete";
   const [form, setForm] = useState(() => buildAdminFormState(menu, record, portalData));
+  const [saving, setSaving] = useState(false);
   const title = getAdminModalTitle(menu, mode, record);
 
   useEffect(() => {
@@ -851,7 +852,8 @@ function AdminRecordModal({ modal, onClose, onOpenApiDetail, portalData, serverB
     }
     return cleaned;
   };
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    if (saving) return;
     if (isDelete) {
       if (menu === "services") {
         portalData.deleteService(record.serviceId);
@@ -879,13 +881,18 @@ function AdminRecordModal({ modal, onClose, onOpenApiDetail, portalData, serverB
     }
 
     if (menu === "services") {
+      setSaving(true);
       const serviceCode = requireValue((form.serviceCode || "").toUpperCase(), "serviceCode")?.toUpperCase();
       const serviceName = requireValue(form.serviceName, "서비스명");
       const categoryPath = buildSelectedCategoryPath(form, portalData.categories);
       const categoryL1 = requireValue(categoryPath[0], "대분류");
-      if (!serviceCode || !serviceName || !categoryL1) return;
+      if (!serviceCode || !serviceName || !categoryL1) {
+        setSaving(false);
+        return;
+      }
       if (!isValidServiceCode(serviceCode)) {
         window.alert("서비스 코드는 대문자, 숫자, _, - 만 사용할 수 있습니다.");
+        setSaving(false);
         return;
       }
       const selectedServerIds = normalizeSelectedServerIds(
@@ -895,6 +902,7 @@ function AdminRecordModal({ modal, onClose, onOpenApiDetail, portalData, serverB
       );
       if (!selectedServerIds.length) {
         window.alert("배포 서버를 1개 이상 선택해주세요.");
+        setSaving(false);
         return;
       }
       const deploymentInputs = selectedServerIds.map((serverId) => {
@@ -927,10 +935,17 @@ function AdminRecordModal({ modal, onClose, onOpenApiDetail, portalData, serverB
         description: form.description.trim(),
       };
       if (isCreate) {
-        portalData.addService(payload);
+        const result = await portalData.addService(payload);
+        setSaving(false);
+        window.alert(result.ok ? "서비스가 등록되었습니다." : `서비스 등록에 실패했습니다.\n\n${result.message}`);
+        if (!result.ok) return;
       } else {
         portalData.updateService(record.serviceId, payload);
+        setSaving(false);
+        window.alert("서비스가 수정되었습니다.");
       }
+      onClose();
+      return;
     } else if (menu === "servers") {
       const serverName = requireValue(form.serverName, "serverName");
       const hostName = requireValue(form.hostName, "hostname");
@@ -1154,8 +1169,8 @@ function AdminRecordModal({ modal, onClose, onOpenApiDetail, portalData, serverB
           ) : null}
         </div>
         <div className="modal__foot">
-          <button className="btn" onClick={onClose} type="button">취소</button>
-          <button className="btn btn--primary" onClick={handleSubmit} type="button">{isCreate ? "등록" : "저장"}</button>
+          <button className="btn" disabled={saving} onClick={onClose} type="button">취소</button>
+          <button className="btn btn--primary" disabled={saving} onClick={handleSubmit} type="button">{saving ? "저장 중" : isCreate ? "등록" : "저장"}</button>
         </div>
       </div>
     </ModalBackdrop>
