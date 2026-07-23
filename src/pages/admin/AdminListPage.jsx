@@ -100,7 +100,7 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
     }
 
     lastRealtimeQueryRef.current = queryKey;
-    void portalData.remoteApi.testQuery(remoteQueryKey);
+    void portalData.remoteApi.refreshQueries([remoteQueryKey]);
   }, [menu, portalData.remoteApi, remoteQueryKey]);
 
   useEffect(() => {
@@ -439,11 +439,7 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
   };
   const openOwnerModal = async (modal, owner) => {
     if (portalData.remoteApi.enabled && modal !== "delete") {
-      await Promise.allSettled([
-        portalData.remoteApi.testQuery("users"),
-        portalData.remoteApi.testQuery("groups"),
-        portalData.remoteApi.testQuery("owners"),
-      ]);
+      await portalData.remoteApi.refreshQueries(["users", "groups", "owners"]);
     }
     setSelectedOwner(owner);
     setOwnerModal(modal);

@@ -20,6 +20,20 @@ export type RemoteQueryKey =
   | "codes"
   | "deployments";
 
+export const remoteQueryKeys: RemoteQueryKey[] = [
+  "services",
+  "servers",
+  "relations",
+  "techstacks",
+  "owners",
+  "incidents",
+  "users",
+  "groups",
+  "categories",
+  "codes",
+  "deployments",
+];
+
 export type RemoteListRecord = RemoteRecord;
 
 export type RemoteApiCallDetail = {

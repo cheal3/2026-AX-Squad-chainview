@@ -38,6 +38,7 @@ import {
   countRemoteRows,
   previewRemoteResponse,
   remoteQueryLabels,
+  remoteQueryKeys,
   remoteQueryLoaders,
   type RemoteApiCallDetail,
   type RemoteListRecord,
@@ -217,6 +218,7 @@ type PortalDataContextValue = {
     status: RemoteApiStatus;
     debugEnabled: boolean;
     refresh: () => Promise<RemoteApiStatus>;
+    refreshQueries: (queryKeys?: RemoteQueryKey[]) => Promise<RemoteApiStatus>;
     testQuery: (queryKey: RemoteQueryKey) => Promise<RemoteApiStatus>;
   };
 };
@@ -511,6 +513,76 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
     },
     [loadRemoteSnapshot]
   );
+  const refreshRemoteQueries = useCallback(
+    async (queryKeys: RemoteQueryKey[] = remoteQueryKeys): Promise<RemoteApiStatus> => {
+      const uniqueQueryKeys = Array.from(new Set(queryKeys));
+      if (!uniqueQueryKeys.length) {
+        return remoteApiStatus;
+      }
+
+      if (uniqueQueryKeys.length === remoteQueryKeys.length) {
+        return loadRemoteSnapshot();
+      }
+
+      if (!REMOTE_API_ENABLED) {
+        const status = {
+          state: "blocked" as const,
+          message: "원격 조회가 비활성화되어 있습니다.",
+          source: uniqueQueryKeys[0],
+        };
+        setRemoteApiStatus(status);
+        return status;
+      }
+
+      if (isMixedContentRuntime) {
+        const status = {
+          state: "blocked" as const,
+          message: "HTTPS 화면에서는 HTTP API를 브라우저가 차단합니다.",
+          source: uniqueQueryKeys[0],
+        };
+        setRemoteApiStatus(status);
+        return status;
+      }
+
+      setRemoteApiStatus({
+        state: "loading",
+        message: `${uniqueQueryKeys.map((queryKey) => remoteQueryLabels[queryKey]).join(", ")} 실시간 조회 중`,
+        source: uniqueQueryKeys[0],
+      });
+
+      const results = await Promise.allSettled(
+        uniqueQueryKeys.map(async (queryKey) => {
+          const result = await remoteQueryLoaders[queryKey]();
+          applyRemoteQueryResult(queryKey, result);
+        })
+      );
+      const failed = results.find((result) => result.status === "rejected");
+      if (failed) {
+        const reason = failed.reason;
+        const status = {
+          state: "error" as const,
+          message:
+            reason instanceof Error
+              ? reason.message
+              : "실시간 조회 API 호출에 실패했습니다.",
+          source: uniqueQueryKeys[0],
+        };
+        setRemoteApiStatus(status);
+        return status;
+      }
+
+      await loadRemoteSnapshot();
+      const status = {
+        state: "success" as const,
+        message: `${uniqueQueryKeys.map((queryKey) => remoteQueryLabels[queryKey]).join(", ")} 최신 조회 완료`,
+        lastLoadedAt: nowLabel(),
+        source: uniqueQueryKeys[uniqueQueryKeys.length - 1],
+      };
+      setRemoteApiStatus(status);
+      return status;
+    },
+    [loadRemoteSnapshot, remoteApiStatus]
+  );
 
   useEffect(() => {
     if (!REMOTE_API_ENABLED || MANUAL_API_LOAD_MODE) {
@@ -622,6 +694,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         status: remoteApiStatus,
         debugEnabled: API_DEBUG_ENABLED,
         refresh: loadRemoteSnapshot,
+        refreshQueries: refreshRemoteQueries,
         testQuery: testRemoteQuery,
       },
       createIncident: createIncidentRecord,
@@ -1564,6 +1637,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       owners,
       relations,
       remoteApiStatus,
+      refreshRemoteQueries,
       services,
       servers,
       testRemoteQuery,

@@ -1,9 +1,10 @@
-import { lazy, Suspense, useEffect, useMemo } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef } from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { initAdminInteractions } from "./adminInteractions.js";
 import { AppShell } from "./components/AppShell.jsx";
 import { pages } from "./pagesData.js";
 import { PortalDataProvider, usePortalData } from "./dashboardModule/PortalDataStore";
+import { remoteQueryKeys } from "./dashboardModule/remoteQueries";
 
 const DynamicAdminListPage = lazy(() => import("./pages/admin/AdminListPage.jsx").then((module) => ({ default: module.DynamicAdminListPage })));
 const InfraRelationsPage = lazy(() => import("./pages/infra/InfraPages.jsx").then((module) => ({ default: module.InfraRelationsPage })));
@@ -326,9 +327,32 @@ function AppRoutes() {
   );
 }
 
+function RealtimeRemoteGetRefresh() {
+  const location = useLocation();
+  const { remoteApi } = usePortalData();
+  const lastRefreshKeyRef = useRef("");
+
+  useEffect(() => {
+    if (!remoteApi.enabled || remoteApi.initialLoading) {
+      return;
+    }
+
+    const refreshKey = `${location.pathname}${location.search}`;
+    if (lastRefreshKeyRef.current === refreshKey) {
+      return;
+    }
+
+    lastRefreshKeyRef.current = refreshKey;
+    void remoteApi.refreshQueries(remoteQueryKeys);
+  }, [location.pathname, location.search, remoteApi]);
+
+  return null;
+}
+
 export default function App() {
   return (
     <PortalDataProvider>
+      <RealtimeRemoteGetRefresh />
       <AppRoutes />
     </PortalDataProvider>
   );
