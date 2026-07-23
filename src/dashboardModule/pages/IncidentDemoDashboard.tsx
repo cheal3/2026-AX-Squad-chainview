@@ -26,7 +26,7 @@ import {
 } from "./ServiceRelationFlow";
 import { usePortalData } from "../PortalDataStore";
 import type { IncidentRecord, ServiceRecord, ServiceRelationRecord } from "../mockData";
-import { chainViewEmployeeNo } from "../chainViewApi";
+import { chainViewApi, chainViewEmployeeNo } from "../chainViewApi";
 import { useNavigate } from "react-router-dom";
 
 const DASHBOARD_FILTER_STORAGE_KEY = "chainview.dashboard.service-filter.v1";
@@ -50,38 +50,6 @@ const DEFAULT_DASHBOARD_FILTER: DashboardFilterState = {
   categoryL3: "",
   serviceId: null,
 };
-
-const managementRows = [
-  ["담당조직 미등록", "3건", "owner"],
-  ["담당그룹 미등록", "2건", "group"],
-  ["영향도 미연결", "5건", "relation"],
-  ["서비스 설명 미등록", "4건", "document"],
-  ["미완료 인시던트", "6건", "incident"],
-];
-
-const deployRows = [
-  ["Payment-Service", "5분 전", "up"],
-  ["Order-Service", "12분 전", "up"],
-  ["Customer-Service", "35분 전", "up"],
-  ["Loan-Service", "1시간 전", "sync"],
-  ["Auth-Service", "2시간 전", "sync"],
-];
-
-const changeRows = [
-  ["Payment-Service", "담당조직 변경", "20분 전"],
-  ["Order-Service", "서비스 설명 수정", "1시간 전"],
-  ["Customer-Service", "영향관계 수정", "2시간 전"],
-  ["Loan-Service", "담당그룹 변경", "3시간 전"],
-  ["Auth-Service", "서비스 분류 변경", "4시간 전"],
-];
-
-const incidentRows = [
-  ["Payment-Service", "INC-2026-0021", "회고 대기", "7개", "2시간 전", "purple"],
-  ["Order-Service", "INC-2026-0020", "완료", "3개", "어제", "green"],
-  ["Customer-Service", "INC-2026-0019", "분석 중", "6개", "어제", "sky"],
-  ["Loan-Service", "INC-2026-0018", "조치 중", "5개", "3일 전", "orange"],
-  ["Auth-Service", "INC-2026-0017", "완료", "2개", "5일 전", "green"],
-];
 
 function readDashboardFilter(): DashboardFilterState {
   if (typeof window === "undefined") return DEFAULT_DASHBOARD_FILTER;
@@ -141,6 +109,185 @@ function uniqueLabels(values: string[]) {
   return [...new Set(values.filter(Boolean))].sort((a, b) => a.localeCompare(b, "ko"));
 }
 
+type DashboardManagementRow = [string, string, string];
+type DashboardChangeRow = {
+  change: string;
+  key: string;
+  service: string;
+  sortAt: string;
+  time: string;
+};
+type DashboardDeployRow = [string, string, string];
+type DashboardIncidentRow = [string, string, string, string, string, string];
+
+function parseDashboardCardDate(value: unknown) {
+  if (!value) return null;
+  const date = new Date(String(value).replace(" ", "T"));
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function relativeDashboardTime(value: unknown) {
+  const date = parseDashboardCardDate(value);
+  if (!date) return "-";
+  const diffMs = Date.now() - date.getTime();
+  if (diffMs < 60_000) return "방금 전";
+  const minutes = Math.floor(diffMs / 60_000);
+  if (minutes < 60) return `${minutes}분 전`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}시간 전`;
+  return `${Math.floor(hours / 24)}일 전`;
+}
+
+function serviceDisplayName(
+  serviceById: Map<number, ServiceRecord>,
+  serviceByCode: Map<string, ServiceRecord>,
+  row: Record<string, unknown>
+) {
+  const service =
+    serviceById.get(Number(row.serviceId)) ||
+    serviceById.get(Number(row.impactedServiceId)) ||
+    serviceByCode.get(String(row.serviceCode ?? row.targetCode ?? ""));
+  return String(row.serviceName ?? row.targetServiceName ?? service?.serviceName ?? row.targetLabel ?? row.serviceCode ?? row.targetCode ?? "-");
+}
+
+function buildManagementRows({
+  incidents,
+  owners,
+  relations,
+  services,
+}: {
+  incidents: IncidentRecord[];
+  owners: { serviceId: number }[];
+  relations: ServiceRelationRecord[];
+  services: ServiceRecord[];
+}): DashboardManagementRow[] {
+  const ownerServiceIds = new Set(owners.map((owner) => Number(owner.serviceId)));
+  const relationServiceIds = new Set<number>();
+  relations.forEach((relation) => {
+    relationServiceIds.add(Number(relation.sourceServiceId));
+    relationServiceIds.add(Number(relation.targetServiceId));
+  });
+
+  return [
+    [
+      "담당자/담당그룹 미등록",
+      `${services.filter((service) => !ownerServiceIds.has(Number(service.serviceId))).length}건`,
+      "group",
+    ],
+    [
+      "영향도 미연결",
+      `${services.filter((service) => !relationServiceIds.has(Number(service.serviceId))).length}건`,
+      "relation",
+    ],
+    [
+      "서비스 설명 미등록",
+      `${relations.filter((relation) => !String(relation.description ?? "").trim()).length}건`,
+      "document",
+    ],
+    [
+      "미완료 인시던트",
+      `${incidents.filter((incident) => incident.incidentStatusCode !== "RESOLVED").length}건`,
+      "incident",
+    ],
+  ];
+}
+
+function normalizeDashboardChangeRow(row: unknown, service: ServiceRecord): DashboardChangeRow | null {
+  if (!row || typeof row !== "object") return null;
+  const record = row as Record<string, unknown>;
+  const at =
+    record.changedAt ||
+    record.createdAt ||
+    record.updatedAt ||
+    record.occurredAt ||
+    record.at ||
+    "";
+  const change =
+    record.changeTypeName ||
+    record.changeTypeCode ||
+    record.actionType ||
+    record.action ||
+    record.type ||
+    record.fieldName ||
+    record.changedField ||
+    "변경";
+  return {
+    change: String(change),
+    key: String(record.changeHistoryId || record.historyId || record.id || `${service.serviceId}-${at}-${change}`),
+    service: service.serviceName,
+    sortAt: String(at),
+    time: relativeDashboardTime(at),
+  };
+}
+
+function buildRecentIncidentRows({
+  incidentImpacts,
+  incidents,
+  serviceByCode,
+  serviceById,
+}: {
+  incidentImpacts: { incidentId: number }[];
+  incidents: IncidentRecord[];
+  serviceByCode: Map<string, ServiceRecord>;
+  serviceById: Map<number, ServiceRecord>;
+}): DashboardIncidentRow[] {
+  return [...incidents]
+    .sort((left, right) => String(right.startedAt || "").localeCompare(String(left.startedAt || "")))
+    .slice(0, 5)
+    .map((incident) => {
+      const serviceName = serviceDisplayName(serviceById, serviceByCode, incident as unknown as Record<string, unknown>);
+      const impactCount = incidentImpacts.filter((impact) => Number(impact.incidentId) === Number(incident.incidentId)).length;
+      const resolved = incident.incidentStatusCode === "RESOLVED";
+      const tone = resolved ? "green" : incident.incidentStatusCode === "IN_PROGRESS" ? "orange" : "sky";
+      return [
+        serviceName,
+        incident.externalIncidentCode ?? `INC-${incident.incidentId}`,
+        incident.incidentStatusCode,
+        `${impactCount}개`,
+        resolved ? relativeDashboardTime(incident.endedAt) : "미종료",
+        tone,
+      ];
+    });
+}
+
+function buildRecentDeployRows({
+  deployments,
+  serviceByCode,
+  serviceById,
+  services,
+}: {
+  deployments: Record<string, unknown>[];
+  serviceByCode: Map<string, ServiceRecord>;
+  serviceById: Map<number, ServiceRecord>;
+  services: ServiceRecord[];
+}): DashboardDeployRow[] {
+  const rows = deployments.length
+    ? deployments
+    : services.map((service) => ({
+        deploymentStatusCode: service.deploymentStatusCode,
+        serviceId: service.serviceId,
+        serviceName: service.serviceName,
+        updatedAt: service.updatedAt,
+      }));
+
+  return [...rows]
+    .sort((left, right) =>
+      String((right as Record<string, unknown>).updatedAt || (right as Record<string, unknown>).createdAt || "")
+        .localeCompare(String((left as Record<string, unknown>).updatedAt || (left as Record<string, unknown>).createdAt || ""))
+    )
+    .slice(0, 5)
+    .map((row) => {
+      const record = row as Record<string, unknown>;
+      const status = String(record.deploymentStatusCode ?? record.statusCode ?? "");
+      const at = record.updatedAt ?? record.createdAt;
+      return [
+        serviceDisplayName(serviceById, serviceByCode, record),
+        relativeDashboardTime(at),
+        status === "RUNNING" || status === "SUCCESS" ? "up" : "sync",
+      ];
+    });
+}
+
 export function IncidentDemoDashboard({
   activeIncidentId,
 }: {
@@ -178,12 +325,17 @@ function DashboardCase({
     : undefined;
   const {
     categories: categoryRecords,
+    deployments,
+    incidentImpacts,
+    incidents,
     owners,
     relations,
     servers,
     services,
     users,
   } = dashboardData;
+  const [recentChangeRows, setRecentChangeRows] = useState<DashboardChangeRow[]>([]);
+  const [recentChangeLoading, setRecentChangeLoading] = useState(false);
 
   useEffect(() => {
     if (activeIncident || !portalData.remoteApi.enabled || filterLookupRequestedRef.current) return;
@@ -195,6 +347,49 @@ function DashboardCase({
       void portalData.remoteApi.testQuery("users");
     }
   }, [activeIncident, portalData]);
+
+  useEffect(() => {
+    if (!services.length) {
+      setRecentChangeRows([]);
+      return undefined;
+    }
+
+    let cancelled = false;
+    setRecentChangeLoading(true);
+    Promise.all(
+      services.map((service) =>
+        chainViewApi.services
+          .changeHistory(Number(service.serviceId))
+          .then((rows) =>
+            Array.isArray(rows)
+              ? rows.map((row) => normalizeDashboardChangeRow(row, service))
+              : []
+          )
+          .catch(() => [])
+      )
+    )
+      .then((rowsByService) => {
+        if (cancelled) return;
+        setRecentChangeRows(
+          rowsByService
+            .flat()
+            .filter(Boolean)
+            .sort((left, right) =>
+              String(right.sortAt || "").localeCompare(String(left.sortAt || ""))
+            )
+            .slice(0, 5)
+        );
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setRecentChangeLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [services]);
 
   const relationCountByServiceId = useMemo(() => {
     const counts = new Map<number, number>();
@@ -227,6 +422,26 @@ function DashboardCase({
 
     return counts;
   }, [relations]);
+  const serviceById = useMemo(
+    () => new Map(services.map((service) => [Number(service.serviceId), service])),
+    [services]
+  );
+  const serviceByCode = useMemo(
+    () => new Map(services.map((service) => [service.serviceCode, service])),
+    [services]
+  );
+  const managementRows = useMemo(
+    () => buildManagementRows({ incidents, owners, relations, services }),
+    [incidents, owners, relations, services]
+  );
+  const recentIncidentRows = useMemo(
+    () => buildRecentIncidentRows({ incidentImpacts, incidents, serviceByCode, serviceById }),
+    [incidentImpacts, incidents, serviceByCode, serviceById]
+  );
+  const recentDeployRows = useMemo(
+    () => buildRecentDeployRows({ deployments, serviceByCode, serviceById, services }),
+    [deployments, serviceByCode, serviceById, services]
+  );
   const [draftFilter, setDraftFilter] = useState<DashboardFilterState>(readDashboardFilter);
   const [appliedFilter, setAppliedFilter] = useState<DashboardFilterState>(readDashboardFilter);
   const categoryPathByServiceId = useMemo(
@@ -511,7 +726,13 @@ function DashboardCase({
           }
         />
       </div>
-      <BottomPanels />
+      <BottomPanels
+        changeRows={recentChangeRows}
+        deployRows={recentDeployRows}
+        incidentRows={recentIncidentRows}
+        managementRows={managementRows}
+        recentChangeLoading={recentChangeLoading}
+      />
     </section>
   );
 }
@@ -1823,7 +2044,19 @@ function DarkPanel({ children, title }: { children: ReactNode; title: string }) 
   );
 }
 
-function BottomPanels() {
+function BottomPanels({
+  changeRows,
+  deployRows,
+  incidentRows,
+  managementRows,
+  recentChangeLoading,
+}: {
+  changeRows: DashboardChangeRow[];
+  deployRows: DashboardDeployRow[];
+  incidentRows: DashboardIncidentRow[];
+  managementRows: DashboardManagementRow[];
+  recentChangeLoading: boolean;
+}) {
   const navigate = useNavigate();
 
   return (
@@ -1839,23 +2072,20 @@ function BottomPanels() {
           />
         ))}
       </Panel>
-      <Panel
-        actionLabel="더보기 〉"
-        onAction={() => navigate("/admin-deployments")}
-        title="최근 배포"
-      >
-        {deployRows.map(([service, time, status]) => (
-          <TinyRow key={service} icon={status === "up" ? "↑" : "●"} label={service} value={time} tone={status === "up" ? "success" : "muted"} />
-        ))}
-      </Panel>
       <Panel title="최근 서비스 변경">
-        {changeRows.map(([service, change, time]) => (
-          <div key={service} className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,0.86fr)_minmax(44px,0.52fr)] items-center gap-2 py-1 text-[13px] leading-5 text-slate-900">
-            <span className="min-w-0 break-words">{service}</span>
-            <span className="min-w-0 break-words text-slate-700">{change}</span>
-            <span className="min-w-0 break-words text-right text-slate-500">{time}</span>
-          </div>
-        ))}
+        {recentChangeLoading && !changeRows.length ? (
+          <TinyEmpty>변경 이력을 불러오는 중입니다.</TinyEmpty>
+        ) : changeRows.length ? (
+          changeRows.map((row) => (
+            <div key={row.key} className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,0.86fr)_minmax(44px,0.52fr)] items-center gap-2 py-1 text-[13px] leading-5 text-slate-900">
+              <span className="min-w-0 break-words">{row.service}</span>
+              <span className="min-w-0 break-words text-slate-700">{row.change}</span>
+              <span className="min-w-0 break-words text-right text-slate-500">{row.time}</span>
+            </div>
+          ))
+        ) : (
+          <TinyEmpty>변경 이력이 없습니다.</TinyEmpty>
+        )}
       </Panel>
       <Panel
         actionLabel="더보기 〉"
@@ -1869,7 +2099,7 @@ function BottomPanels() {
           <span className="break-words">영향 서비스</span>
           <span className="text-right">종료</span>
         </div>
-        {incidentRows.map(([service, incident, status, impact, end, tone]) => (
+        {incidentRows.length ? incidentRows.map(([service, incident, status, impact, end, tone]) => (
           <div key={incident} className="grid min-w-0 grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(58px,0.72fr)_minmax(50px,0.7fr)_minmax(42px,0.55fr)] items-center gap-2 py-1 text-[13px] leading-5 text-slate-900">
             <span className="min-w-0 break-words">{service}</span>
             <span className="min-w-0 break-words text-slate-700">{incident}</span>
@@ -1877,7 +2107,16 @@ function BottomPanels() {
             <span className="min-w-0 break-words text-slate-700">{impact}</span>
             <span className="min-w-0 break-words text-right text-slate-500">{end}</span>
           </div>
-        ))}
+        )) : <TinyEmpty>등록된 인시던트가 없습니다.</TinyEmpty>}
+      </Panel>
+      <Panel
+        actionLabel="더보기 〉"
+        onAction={() => navigate("/admin-deployments")}
+        title="최근 배포"
+      >
+        {deployRows.length ? deployRows.map(([service, time, status]) => (
+          <TinyRow key={`${service}-${time}`} icon={status === "up" ? "↑" : "●"} label={service} value={time} tone={status === "up" ? "success" : "muted"} />
+        )) : <TinyEmpty>최근 배포가 없습니다.</TinyEmpty>}
       </Panel>
     </div>
   );
@@ -1954,6 +2193,14 @@ function TinyRow({
         <span className="truncate font-normal">{label}</span>
       </div>
       <span className="shrink-0 font-normal text-slate-950">{value}</span>
+    </div>
+  );
+}
+
+function TinyEmpty({ children }: { children: ReactNode }) {
+  return (
+    <div className="py-6 text-center text-[13px] font-semibold text-slate-400">
+      {children}
     </div>
   );
 }
