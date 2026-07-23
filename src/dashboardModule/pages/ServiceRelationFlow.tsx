@@ -351,8 +351,15 @@ export function ServiceRelationFlow({
       ? stableDashboardDataRef.current
       : portalData
     : portalData;
-  const { services, relations, owners, servers, techStacks, incidents } =
-    dataSource;
+  const {
+    services,
+    relations,
+    owners,
+    servers,
+    techStacks,
+    incidents,
+    incidentImpacts,
+  } = dataSource;
   const baseFilteredServices = useMemo(
     () => (serviceFilter ? services.filter((service) => serviceFilter(service)) : services),
     [serviceFilter, services]
@@ -708,13 +715,36 @@ export function ServiceRelationFlow({
     });
     return nodeIds;
   }, [incidentInfraNodeId, infraGraphRelations]);
+  const activeIncidentImpactServiceIds = useMemo(() => {
+    if (!activeIncident) {
+      return new Set<number>();
+    }
+
+    return new Set(
+      incidentImpacts
+        .filter((impact) => impact.incidentId === activeIncident.incidentId)
+        .map((impact) => impact.impactedServiceId)
+        .filter(Boolean)
+    );
+  }, [activeIncident, incidentImpacts]);
   const incidentServiceIds = useMemo(() => {
     if (!incidentMode || !activeIncident) {
       return null;
     }
 
     const directIds = new Set<number>();
+    activeIncidentImpactServiceIds.forEach((serviceId) => {
+      directIds.add(serviceId);
+    });
+
     if (infraIncident) {
+      if (activeIncident.serverId) {
+        services.forEach((service) => {
+          if (service.serverId === activeIncident.serverId) {
+            directIds.add(service.serviceId);
+          }
+        });
+      }
       if (!incidentInfraNodeId) {
         return directIds;
       }
@@ -740,7 +770,17 @@ export function ServiceRelationFlow({
       }
     });
     return scopedIds;
-  }, [activeIncident, incidentInfraNodeId, incidentMode, incidentServiceId, infraIncident, relations, serviceInfraTargetByServiceId]);
+  }, [
+    activeIncident,
+    activeIncidentImpactServiceIds,
+    incidentInfraNodeId,
+    incidentMode,
+    incidentServiceId,
+    infraIncident,
+    relations,
+    serviceInfraTargetByServiceId,
+    services,
+  ]);
   const filteredServices = useMemo(
     () =>
       incidentServiceIds
@@ -748,13 +788,50 @@ export function ServiceRelationFlow({
         : baseFilteredServices,
     [baseFilteredServices, incidentServiceIds]
   );
+  useEffect(() => {
+    if (!incidentMode || !incidentServiceIds || incidentServiceIds.size === 0) {
+      return;
+    }
+
+    if (incidentServiceIds.has(focusedServiceId)) {
+      return;
+    }
+
+    const nextFocusedServiceId = filteredServices[0]?.serviceId;
+    if (!nextFocusedServiceId) {
+      return;
+    }
+
+    setFocusedServiceId(nextFocusedServiceId);
+    setDetailServiceId(nextFocusedServiceId);
+    setSelectedServiceNodeId(nextFocusedServiceId);
+    userMovedViewportRef.current = false;
+  }, [filteredServices, focusedServiceId, incidentMode, incidentServiceIds]);
   const allowedServiceIds = useMemo(
     () => new Set(filteredServices.map((service) => service.serviceId)),
     [filteredServices]
   );
   const filteredInfraNodeIds = useMemo(() => {
     if (infraIncident) {
-      return incidentInfraNodeIds ?? new Set<number>();
+      const visibleNodeIds = new Set<number>(incidentInfraNodeIds ?? []);
+
+      filteredServices.forEach((service) => {
+        const infraNodeId = serviceInfraTargetByServiceId.get(service.serviceId);
+        if (infraNodeId) {
+          visibleNodeIds.add(infraNodeId);
+        }
+      });
+
+      infraGraphRelations.forEach((relation) => {
+        if (visibleNodeIds.has(relation.sourceInfraNodeId)) {
+          visibleNodeIds.add(relation.targetInfraNodeId);
+        }
+        if (visibleNodeIds.has(relation.targetInfraNodeId)) {
+          visibleNodeIds.add(relation.sourceInfraNodeId);
+        }
+      });
+
+      return visibleNodeIds;
     }
     if (!serviceFilter) {
       return null;
@@ -776,7 +853,14 @@ export function ServiceRelationFlow({
       }
     });
     return visibleNodeIds;
-  }, [filteredServices, incidentInfraNodeIds, infraGraphRelations, infraIncident, serviceFilter, serviceInfraTargetByServiceId]);
+  }, [
+    filteredServices,
+    incidentInfraNodeIds,
+    infraGraphRelations,
+    infraIncident,
+    serviceFilter,
+    serviceInfraTargetByServiceId,
+  ]);
   const scopedInfraGraphNodes = useMemo(
     () =>
       filteredInfraNodeIds
@@ -879,7 +963,10 @@ export function ServiceRelationFlow({
     return related;
   }, [activeRelations, selectedInfraServiceIds]);
   const activeIncidentServiceId =
-    incidentServiceId ?? initialFocusedServiceId;
+    incidentServiceId ??
+    (incidentMode && incidentServiceIds?.has(focusedServiceId)
+      ? focusedServiceId
+      : filteredServices[0]?.serviceId ?? initialFocusedServiceId);
   const activeIncidentConnectedServiceIds = useMemo(() => {
     const connected = new Set<number>();
     activeRelations.forEach((relation) => {
@@ -1953,12 +2040,27 @@ export function ServiceRelationFlow({
       return;
     }
 
-    setFocusedServiceId(initialFocusedServiceId);
-    setDetailServiceId(initialFocusedServiceId);
+    const nextInitialFocusedServiceId =
+      incidentMode &&
+      incidentServiceIds &&
+      incidentServiceIds.size > 0 &&
+      !incidentServiceIds.has(initialFocusedServiceId)
+        ? filteredServices[0]?.serviceId ?? initialFocusedServiceId
+        : initialFocusedServiceId;
+
+    setFocusedServiceId(nextInitialFocusedServiceId);
+    setDetailServiceId(nextInitialFocusedServiceId);
     setDetailOpen(true);
     setRelationDepth(incidentMode ? 1 : initialRelationDepth ?? 2);
     userMovedViewportRef.current = false;
-  }, [incidentMode, initialFocusedServiceId, initialRelationDepth, initialServiceId]);
+  }, [
+    filteredServices,
+    incidentMode,
+    incidentServiceIds,
+    initialFocusedServiceId,
+    initialRelationDepth,
+    initialServiceId,
+  ]);
 
   useEffect(() => {
     if (!initialFitView || !flowInstance || initialFitViewDoneRef.current) {
