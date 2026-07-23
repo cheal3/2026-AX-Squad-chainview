@@ -896,9 +896,11 @@ export function IncidentDetailPage() {
                   hideDetailPanel
                   hideNodeActions
                   hideTopControl
+                  incident={incident}
                   incidentMode
-                  initialRelationDepth={2}
+                  initialRelationDepth={1}
                   initialServiceId={service?.serviceId}
+                  showAllServices={incident.incidentTypeCode === "SERVER"}
                 />
               </div>
             </article>
@@ -967,9 +969,11 @@ export function IncidentDetailPage() {
                 hideDetailPanel
                 hideNodeActions
                 hideTopControl
+                incident={incident}
                 incidentMode
-                initialRelationDepth={2}
+                initialRelationDepth={1}
                 initialServiceId={service?.serviceId}
+                showAllServices={incident.incidentTypeCode === "SERVER"}
               />
             </div>
           </article>

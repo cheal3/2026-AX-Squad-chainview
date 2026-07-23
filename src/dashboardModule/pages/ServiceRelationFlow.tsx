@@ -552,9 +552,6 @@ export function ServiceRelationFlow({
 
   const toggleSelectedServiceNode = useCallback(
     (serviceId: number) => {
-      if (incidentMode) {
-        return;
-      }
       setSelectedServiceNodeId((current) => {
         const next = current === serviceId ? null : serviceId;
         setDetailOpen(false);
@@ -566,7 +563,7 @@ export function ServiceRelationFlow({
         return next;
       });
     },
-    [incidentMode, onSelectInfraNode, onSelectService]
+    [onSelectInfraNode, onSelectService]
   );
 
   const handleGraphViewModeChange = useCallback(
@@ -587,9 +584,6 @@ export function ServiceRelationFlow({
   );
 
   const handlePaneClick = useCallback(() => {
-    if (incidentMode) {
-      return;
-    }
     if (graphViewMode === "infra") {
       setSelectedInfraNodeId(null);
       setDetailOpen(false);
@@ -607,7 +601,7 @@ export function ServiceRelationFlow({
 
     setSelectedServiceNodeId(null);
     setDetailOpen(false);
-  }, [graphViewMode, incidentMode, onSelectInfraNode]);
+  }, [graphViewMode, onSelectInfraNode]);
 
   const serviceById = useMemo(
     () => new Map(services.map((service) => [service.serviceId, service])),
@@ -868,6 +862,22 @@ export function ServiceRelationFlow({
       ),
     [allowedServiceIds, relations]
   );
+  const selectedInfraRelatedServiceIds = useMemo(() => {
+    const related = new Set(selectedInfraServiceIds);
+    if (selectedInfraServiceIds.size === 0) {
+      return related;
+    }
+
+    activeRelations.forEach((relation) => {
+      if (selectedInfraServiceIds.has(relation.sourceServiceId)) {
+        related.add(relation.targetServiceId);
+      }
+      if (selectedInfraServiceIds.has(relation.targetServiceId)) {
+        related.add(relation.sourceServiceId);
+      }
+    });
+    return related;
+  }, [activeRelations, selectedInfraServiceIds]);
   const activeIncidentServiceId =
     incidentServiceId ?? initialFocusedServiceId;
   const activeIncidentConnectedServiceIds = useMemo(() => {
@@ -1369,8 +1379,10 @@ export function ServiceRelationFlow({
       : 0;
     const hasSelectedInfraInAllMode =
       allMode && Boolean(selectedInfraNodeId);
-    const highlightedServiceId = incidentMode || hasSelectedInfraInAllMode
+    const highlightedServiceId = hasSelectedInfraInAllMode
       ? null
+      : incidentMode
+        ? selectedServiceNodeId
       : showAllServices
         ? selectedServiceNodeId
         : selectedServiceNodeId ?? focusedServiceId;
@@ -1402,7 +1414,7 @@ export function ServiceRelationFlow({
           highlightedConnectedServiceIds.has(service.serviceId));
       const connectedByInfra =
         hasSelectedInfraInAllMode &&
-        selectedInfraServiceIds.has(service.serviceId);
+        selectedInfraRelatedServiceIds.has(service.serviceId);
       const connected = connectedByService || connectedByInfra;
       const focused =
         (Boolean(highlightedServiceId) &&
@@ -1424,7 +1436,7 @@ export function ServiceRelationFlow({
         },
         data: {
           serviceId: service.serviceId,
-          compact: showAllServices,
+          compact: showAllServices && !incidentMode,
           label: service.serviceName,
           code: service.serviceCode,
           category: service.categoryPath.join(" / "),
@@ -1475,6 +1487,7 @@ export function ServiceRelationFlow({
     filteredServices,
     selectedServiceNodeId,
     selectedInfraNodeId,
+    selectedInfraRelatedServiceIds,
     selectedInfraServiceIds,
     showAllServices,
     toggleSelectedServiceNode,
@@ -1600,29 +1613,27 @@ export function ServiceRelationFlow({
             },
             data: {
               connected:
-                incidentMode
-                  ? true
-                  : allMode
+                allMode
                   ? (!hasSelectedServiceInAllMode &&
                       !hasSelectedInfraInAllMode) ||
                     connectedToSelectedService ||
                     connectedToSelectedInfra
                   : selectedInfraConnectedNodeIds.has(node.infraNodeId),
               dimmed:
-                incidentMode
-                  ? false
-                  : allMode
+                allMode
                   ? (hasSelectedServiceInAllMode ||
                       hasSelectedInfraInAllMode) &&
                     !connectedToSelectedService &&
                     !connectedToSelectedInfra
                   : Boolean(selectedInfraNodeId) &&
                     !selectedInfraConnectedNodeIds.has(node.infraNodeId),
-              focused: incidentMode
-                ? node.infraNodeId === incidentInfraNodeId
-                : allMode
+              focused: allMode
                 ? connectedToSelectedService ||
-                  selectedInfraNodeId === node.infraNodeId
+                  selectedInfraNodeId === node.infraNodeId ||
+                  (!selectedServiceNodeId &&
+                    !selectedInfraNodeId &&
+                    incidentMode &&
+                    node.infraNodeId === incidentInfraNodeId)
                 : selectedInfraNodeId === node.infraNodeId,
               infraNodeId: node.infraNodeId,
               kind: "infra",
@@ -1694,13 +1705,12 @@ export function ServiceRelationFlow({
           relation.targetServiceId
         );
         const hasHighlight =
-          !incidentMode && (Boolean(highlightedServiceId) || hasInfraHighlight);
+          Boolean(highlightedServiceId) || hasInfraHighlight;
         const directlyConnected =
-          !incidentMode &&
-          ((Boolean(highlightedServiceId) &&
+          (Boolean(highlightedServiceId) &&
             (relation.sourceServiceId === highlightedServiceId ||
               relation.targetServiceId === highlightedServiceId)) ||
-            (hasInfraHighlight && sourceInInfraScope && targetInInfraScope));
+            (hasInfraHighlight && (sourceInInfraScope || targetInInfraScope));
         const stroke = incidentMode
           ? "#ff3344"
           : sourceLane >= 0 && targetLane > sourceLane
@@ -1730,8 +1740,14 @@ export function ServiceRelationFlow({
                 : "chainview-flow-edge chainview-flow-edge-normal-dashed",
           style: {
             stroke,
-            strokeWidth: incidentMode ? 2.8 : directlyConnected ? 2.8 : 1.75,
-            opacity: incidentMode ? 0.95 : directlyConnected ? 0.98 : hasHighlight ? 0.12 : 0.42,
+            strokeWidth: incidentMode || directlyConnected ? 2.8 : 1.75,
+            opacity: directlyConnected
+              ? 0.98
+              : hasHighlight
+                ? 0.1
+                : incidentMode
+                  ? 0.95
+                  : 0.42,
           },
         };
       });
@@ -2399,6 +2415,42 @@ export function ServiceRelationFlow({
 
         .chainview-flow-dark .chainview-flow-node-connected {
           border-color: rgba(245, 158, 11, 0.62);
+        }
+
+        .chainview-flow-dark .chainview-infra-node,
+        .chainview-flow-dark .chainview-infra-node-infra {
+          border-color: #35506b;
+          background: #0b2135;
+          color: #e2e8f0;
+          box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
+        }
+
+        .chainview-flow-dark .chainview-infra-node .text-slate-950,
+        .chainview-flow-dark .chainview-infra-node .text-slate-900 {
+          color: #ffffff !important;
+        }
+
+        .chainview-flow-dark .chainview-infra-node .text-slate-500 {
+          color: #cbd5e1 !important;
+        }
+
+        .chainview-flow-dark .chainview-infra-node .text-slate-400 {
+          color: #94a3b8 !important;
+        }
+
+        .chainview-flow-dark .chainview-infra-node .bg-blue-50 {
+          background: #112b43 !important;
+          color: #58a6ff !important;
+        }
+
+        .chainview-flow-dark .chainview-infra-node-connected {
+          border-color: rgba(245, 158, 11, 0.62);
+        }
+
+        .chainview-flow-dark .chainview-infra-node-focused {
+          border-color: #ff3344;
+          box-shadow: 0 0 0 4px rgba(255, 51, 68, 0.18),
+            0 14px 30px rgba(255, 51, 68, 0.18);
         }
 
         .chainview-flow-dark .chainview-flow-impact-note {

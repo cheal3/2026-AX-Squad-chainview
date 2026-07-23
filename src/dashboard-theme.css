@@ -4931,6 +4931,23 @@
   background: rgba(248, 250, 252, 0.94);
 }
 
+.app.is-dark .chainview-flow-loader,
+.chainview-flow-dark .chainview-flow-loader {
+  background: rgba(8, 27, 45, 0.96);
+  color: #b9c8d8;
+}
+
+.app.is-dark .chainview-flow-loader .portal-initial-loader__ring,
+.chainview-flow-dark .chainview-flow-loader .portal-initial-loader__ring {
+  border-color: #29435c;
+  border-top-color: #58a6ff;
+}
+
+.app.is-dark .portal-initial-loader__ring {
+  border-color: #29435c;
+  border-top-color: #58a6ff;
+}
+
 @keyframes portal-initial-loader-spin {
   to {
     transform: rotate(360deg);

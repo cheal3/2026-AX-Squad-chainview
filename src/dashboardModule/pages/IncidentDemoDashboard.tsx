@@ -162,7 +162,6 @@ function DashboardCase({
 }) {
   const portalData = usePortalData();
   const navigate = useNavigate();
-  const [createdIncidentId, setCreatedIncidentId] = useState<number | undefined>();
   const stableDataRef = useRef(portalData);
   const filterLookupRequestedRef = useRef(false);
   useEffect(() => {
@@ -172,10 +171,9 @@ function DashboardCase({
   }, [portalData]);
   const dashboardData =
     portalData.services.length > 0 ? portalData : stableDataRef.current;
-  const effectiveActiveIncidentId = activeIncidentId ?? createdIncidentId;
-  const activeIncident = effectiveActiveIncidentId
+  const activeIncident = activeIncidentId
     ? portalData.incidents.find(
-        (incident) => incident.incidentId === effectiveActiveIncidentId
+        (incident) => incident.incidentId === activeIncidentId
       )
     : undefined;
   const {
@@ -391,7 +389,6 @@ function DashboardCase({
             "RESOLVED",
             "운영자가 인시던트를 종료 처리했습니다."
           );
-          setCreatedIncidentId(undefined);
           navigate("/dashboard", { replace: true });
         }}
         relations={portalData.relations}
@@ -460,7 +457,6 @@ function DashboardCase({
               manualRegisteredYn: "Y",
               registeredBy: "admin",
             });
-            setCreatedIncidentId(incident.incidentId);
             navigate(`/dashboard?incidentId=${incident.incidentId}`);
           }}
           onCreateIncident={() => {
@@ -479,7 +475,6 @@ function DashboardCase({
               manualRegisteredYn: "Y",
               registeredBy: "admin",
             });
-            setCreatedIncidentId(incident.incidentId);
             navigate(`/dashboard?incidentId=${incident.incidentId}`);
           }}
           relationCount={
@@ -1448,9 +1443,19 @@ function IncidentCommandDashboard({
             service.serviceName === incident.targetLabel
         )
       : undefined);
-  const impact = buildIncidentImpactColumns(rootService, services, relations);
-  const impactedCount = impact.level1.length + impact.level2.length;
+  const incidentServices = rootService
+    ? [rootService]
+    : incident.incidentTypeCode === "SERVER" && incident.serverId
+      ? services.filter((service) => service.serverId === incident.serverId)
+      : [];
+  const impact = buildIncidentImpactColumns(incidentServices, services, relations);
+  const impactedCount =
+    incident.incidentTypeCode === "SERVER"
+      ? impact.affectedServices.length
+      : impact.level1.length;
   const incidentTitle = incident.title || `${rootService?.serviceName ?? "서비스"} 장애 발생`;
+  const incidentTargetTypeLabel =
+    incident.incidentTypeCode === "SERVER" ? "인프라" : "서비스";
   const incidentTargetName =
     incident.targetLabel || rootService?.serviceName || incident.targetCode || "대상 미지정";
   const startedAt = useMemo(
@@ -1463,7 +1468,7 @@ function IncidentCommandDashboard({
   const timelineEvents = [
     [formatTimelineClock(startedAtDate), `${incidentTargetName} 오류 증가 감지`],
     [formatTimelineClock(clampTimelineTime(addSeconds(startedAtDate, 14), now)), `${impact.level1[0]?.serviceName ?? "Order-Service"} 영향 감지`],
-    [formatTimelineClock(clampTimelineTime(addSeconds(startedAtDate, 24), now)), `${impact.level2[0]?.serviceName ?? "Contract-Service"} 영향 감지`],
+    [formatTimelineClock(clampTimelineTime(addSeconds(startedAtDate, 24), now)), `${impact.level1[1]?.serviceName ?? impact.level1[0]?.serviceName ?? "Contract-Service"} 영향 감지`],
     [formatTimelineClock(now), "현재 모니터링 중"],
   ];
 
@@ -1484,7 +1489,7 @@ function IncidentCommandDashboard({
               <AlertTriangle size={25} />
             </div>
             <div className="min-w-0">
-              <div className="text-xs font-black text-[#ff4d5a]">서비스 장애 발생</div>
+              <div className="text-xs font-black text-[#ff4d5a]">{incidentTargetTypeLabel} 장애 발생</div>
               <div className="mt-1 flex min-w-0 items-center gap-2">
                 <h1 className="truncate text-xl font-black text-white">
                   {incidentTitle}
@@ -1504,18 +1509,18 @@ function IncidentCommandDashboard({
       </header>
 
       <div className="mt-3 grid min-w-0 grid-cols-[repeat(auto-fit,minmax(190px,1fr))] gap-3">
-        <DarkMetric icon={<AlertTriangle size={23} />} label="장애 서비스" value="1" delta="1" tone="red" />
+        <DarkMetric icon={<AlertTriangle size={23} />} label={`장애 ${incidentTargetTypeLabel}`} value="1" delta="1" tone="red" />
         <DarkMetric icon={<Users size={23} />} label="영향 서비스" value={String(Math.max(impactedCount, 1))} delta="3" tone="amber" />
-        <DarkMetric icon={<BriefcaseBusiness size={23} />} label="영향 업무" value="14" delta="5" tone="amber" />
+        <DarkMetric icon={<BriefcaseBusiness size={23} />} label="영향 업무" value={String(impact.businessImpactCount)} delta={String(impact.businessImpactCount)} tone="amber" />
         <DarkMetric icon={<Globe2 size={23} />} label="영향 채널" value="3" delta="1" tone="purple" />
       </div>
 
       <div className="mt-3 grid min-h-[500px] min-w-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(280px,320px)] gap-3">
         <section className="min-h-0 overflow-hidden rounded-lg border border-[#1f3549] bg-[#081b2d]">
           <div className="flex h-10 items-center justify-between border-b border-[#1f3549] px-4">
-            <div className="text-base font-black text-white">서비스 영향도 맵</div>
+            <div className="text-base font-black text-white">{incidentTargetTypeLabel} 영향도 맵</div>
             <div className="flex items-center gap-2">
-              <div className="text-xs font-black text-slate-400">기준 노드 2뎁스 영향</div>
+              <div className="text-xs font-black text-slate-400">직접 연결 영향</div>
               <button
                 aria-label="서비스 영향도 맵 전체 화면 보기"
                 className="flex h-7 w-7 shrink-0 items-center justify-center rounded border border-[#35506b] bg-[#0b2135] text-slate-200 hover:border-[#4b6682] hover:bg-[#102a43]"
@@ -1544,7 +1549,7 @@ function IncidentCommandDashboard({
           </div>
         </section>
         {isMapExpanded ? (
-          <RelationFlowModal dark title="서비스 영향도 맵" onClose={() => setIsMapExpanded(false)}>
+          <RelationFlowModal dark title={`${incidentTargetTypeLabel} 영향도 맵`} onClose={() => setIsMapExpanded(false)}>
             <ServiceRelationFlow
             embedded
             embeddedHeightClassName="h-full"
@@ -1620,30 +1625,48 @@ function IncidentCommandDashboard({
 }
 
 function buildIncidentImpactColumns(
-  rootService: ServiceRecord | undefined,
+  incidentServices: ServiceRecord[],
   services: ServiceRecord[],
   relations: ServiceRelationRecord[]
 ) {
   const serviceById = new Map(services.map((service) => [service.serviceId, service]));
+  const incidentServiceIds = new Set(
+    incidentServices.map((service) => service.serviceId)
+  );
   const activeRelations = relations.filter(
     (relation) => relation.relationStatusCode === "ACTIVE"
   );
-  const level1 = rootService
-    ? activeRelations
-        .filter((relation) => relation.sourceServiceId === rootService.serviceId)
-        .map((relation) => serviceById.get(relation.targetServiceId))
-        .filter((service): service is ServiceRecord => Boolean(service))
-        .slice(0, 3)
-    : [];
-  const level1Ids = new Set(level1.map((service) => service.serviceId));
-  const level2 = activeRelations
-    .filter((relation) => level1Ids.has(relation.sourceServiceId))
-    .map((relation) => serviceById.get(relation.targetServiceId))
+  const level1 = activeRelations
+    .flatMap((relation) => {
+      if (incidentServiceIds.has(relation.sourceServiceId)) {
+        return [serviceById.get(relation.targetServiceId)];
+      }
+      if (incidentServiceIds.has(relation.targetServiceId)) {
+        return [serviceById.get(relation.sourceServiceId)];
+      }
+      return [];
+    })
     .filter((service): service is ServiceRecord => Boolean(service))
-    .filter((service, index, list) => list.findIndex((item) => item.serviceId === service.serviceId) === index)
-    .slice(0, 3);
+    .filter(
+      (service, index, list) =>
+        !incidentServiceIds.has(service.serviceId) &&
+        list.findIndex((item) => item.serviceId === service.serviceId) === index
+    );
+  const affectedServices = [...incidentServices, ...level1].filter(
+    (service, index, list) =>
+      list.findIndex((item) => item.serviceId === service.serviceId) === index
+  );
+  const businessImpactCount = new Set(
+    affectedServices
+      .map(
+        (service) =>
+          service.categoryPath[service.categoryPath.length - 1] ??
+          service.categoryPath[0]
+      )
+      .filter(Boolean)
+  ).size;
 
-  return { level1, level2 };
+  return { affectedServices, businessImpactCount, level1 };
 }
 
 function IncidentSelectedPanel({
