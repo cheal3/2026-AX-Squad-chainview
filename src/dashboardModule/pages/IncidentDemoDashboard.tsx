@@ -340,15 +340,18 @@ function DashboardCase({
     });
   }, [filteredServices, defaultSelectedServiceId]);
 
-  const applyFilter = () => {
-    setAppliedFilter(draftFilter);
-    window.localStorage.setItem(DASHBOARD_FILTER_STORAGE_KEY, JSON.stringify(draftFilter));
+  const applyFilter = (nextFilter = draftFilter) => {
+    setAppliedFilter(nextFilter);
+    window.localStorage.setItem(DASHBOARD_FILTER_STORAGE_KEY, JSON.stringify(nextFilter));
     setSelectedInfraNode(undefined);
   };
 
-  const resetFilter = () => {
+  const resetFilter = (applyImmediately = false) => {
     const reset = { ...draftFilter, categoryL1: "", categoryL2: "", categoryL3: "", serviceId: null };
     setDraftFilter(reset);
+    if (applyImmediately) {
+      applyFilter(reset);
+    }
   };
 
   const handleSelectService = (serviceId: number) => {
@@ -509,20 +512,39 @@ function DashboardServiceFilter({
   categoryL3Options: string[];
   categoryPathByServiceId: Map<number, string[]>;
   filter: DashboardFilterState;
-  onApply: () => void;
+  onApply: (filter?: DashboardFilterState) => void;
   onChange: (filter: DashboardFilterState) => void;
-  onReset: () => void;
+  onReset: (applyImmediately?: boolean) => void;
   services: ServiceRecord[];
 }) {
+  const [compact, setCompact] = useState(() =>
+    window.matchMedia("(max-width: 1279px)").matches
+  );
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 1279px)");
+    const updateCompact = () => setCompact(mediaQuery.matches);
+    updateCompact();
+    mediaQuery.addEventListener("change", updateCompact);
+    return () => mediaQuery.removeEventListener("change", updateCompact);
+  }, []);
+
+  const updateFilter = (nextFilter: DashboardFilterState) => {
+    onChange(nextFilter);
+    if (compact) {
+      onApply(nextFilter);
+    }
+  };
+
   const updateScope = (scope: DashboardFilterScope) => {
-    onChange({ scope, categoryL1: "", categoryL2: "", categoryL3: "", serviceId: null });
+    updateFilter({ scope, categoryL1: "", categoryL2: "", categoryL3: "", serviceId: null });
   };
 
   return (
     <section className="mt-1 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-[0_1px_3px_rgba(15,23,42,0.05)]">
       <h2 className="mb-2.5 text-sm font-black text-slate-900">조회조건</h2>
 
-      <div className="grid min-w-0 grid-cols-[200px_repeat(3,minmax(100px,130px))_minmax(180px,1fr)_auto] items-end gap-2">
+      <div className="grid min-w-0 grid-cols-[minmax(150px,1.35fr)_repeat(3,minmax(80px,0.8fr))_minmax(120px,1fr)_40px] items-end gap-2 xl:grid-cols-[200px_repeat(3,minmax(110px,140px))_minmax(150px,180px)_auto] xl:gap-4">
           <div
             className="relative grid h-10 min-w-0 grid-cols-2 overflow-hidden rounded-full border border-slate-200 bg-white p-1 shadow-md"
             style={{ borderRadius: 9999 }}
@@ -560,7 +582,7 @@ function DashboardServiceFilter({
           options={categoryL1Options}
           value={filter.categoryL1}
           onChange={(categoryL1) =>
-            onChange({ ...filter, categoryL1, categoryL2: "", categoryL3: "", serviceId: null })
+            updateFilter({ ...filter, categoryL1, categoryL2: "", categoryL3: "", serviceId: null })
           }
         />
         <FilterSelect
@@ -569,7 +591,7 @@ function DashboardServiceFilter({
           options={categoryL2Options}
           value={filter.categoryL2}
           onChange={(categoryL2) =>
-            onChange({ ...filter, categoryL2, categoryL3: "", serviceId: null })
+            updateFilter({ ...filter, categoryL2, categoryL3: "", serviceId: null })
           }
         />
         <FilterSelect
@@ -577,7 +599,7 @@ function DashboardServiceFilter({
           label="소분류"
           options={categoryL3Options}
           value={filter.categoryL3}
-          onChange={(categoryL3) => onChange({ ...filter, categoryL3, serviceId: null })}
+          onChange={(categoryL3) => updateFilter({ ...filter, categoryL3, serviceId: null })}
         />
 
         <ServiceSearchSelect
@@ -587,7 +609,7 @@ function DashboardServiceFilter({
             const path = service
               ? categoryPathByServiceId.get(service.serviceId) ?? service.categoryPath
               : [];
-            onChange({
+            updateFilter({
               ...filter,
               serviceId: service?.serviceId ?? null,
               categoryL1: path[0] ?? "",
@@ -597,18 +619,27 @@ function DashboardServiceFilter({
           }}
         />
 
-        <div className="flex shrink-0 items-end gap-1.5">
+        <div className="flex shrink-0 items-end gap-2">
           <button
-            className="h-9 shrink-0 border border-slate-200 bg-white px-3 text-[11px] font-black text-slate-700 hover:bg-slate-50"
+            className="hidden h-9 shrink-0 border border-slate-200 bg-white px-3 text-[11px] font-black text-slate-700 hover:bg-slate-50 xl:block"
             type="button"
-            onClick={onReset}
+            onClick={() => onReset()}
           >
             초기화
           </button>
           <button
-            className="h-9 shrink-0 bg-[#1f2a44] px-4 text-[11px] font-black text-white shadow-sm hover:bg-[#263552]"
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 xl:hidden"
             type="button"
-            onClick={onApply}
+            title="필터 초기화"
+            aria-label="필터 초기화"
+            onClick={() => onReset(true)}
+          >
+            <RefreshCw size={16} />
+          </button>
+          <button
+            className="hidden h-9 shrink-0 bg-[#1f2a44] px-4 text-[11px] font-black text-white shadow-sm hover:bg-[#263552] xl:block"
+            type="button"
+            onClick={() => onApply()}
           >
             조회
           </button>
