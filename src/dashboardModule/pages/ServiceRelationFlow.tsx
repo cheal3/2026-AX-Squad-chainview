@@ -967,6 +967,10 @@ export function ServiceRelationFlow({
       infraNodeIds.forEach((infraNodeId) => directNodeIds.add(infraNodeId));
     });
 
+    if (incidentMode) {
+      return directNodeIds;
+    }
+
     const visibleNodeIds = new Set(directNodeIds);
     infraGraphRelations.forEach((relation) => {
       if (directNodeIds.has(relation.sourceInfraNodeId)) {
@@ -981,6 +985,7 @@ export function ServiceRelationFlow({
     filteredServices,
     incidentInfraNodeIds,
     infraGraphRelations,
+    incidentMode,
     infraIncident,
     serviceFilter,
     serviceInfraTargetsByServiceId,
