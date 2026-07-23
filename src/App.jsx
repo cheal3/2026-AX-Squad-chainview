@@ -18,6 +18,8 @@ const NotificationTemplatePage = lazy(() => import("./pages/operation/OperationP
 const ServiceCheckPage = lazy(() => import("./pages/operation/OperationPages.jsx").then((module) => ({ default: module.ServiceCheckPage })));
 const ServiceAdminPage = lazy(() => import("./pages/service/ServiceAdminPage.jsx").then((module) => ({ default: module.ServiceAdminPage })));
 const StatisticsPage = lazy(() => import("./pages/statistics/StatisticsPage.jsx").then((module) => ({ default: module.StatisticsPage })));
+const AiAssistantPage = lazy(() => import("./pages/ai/AiPages.jsx").then((module) => ({ default: module.AiAssistantPage })));
+const AiRunbookPage = lazy(() => import("./pages/ai/AiPages.jsx").then((module) => ({ default: module.AiRunbookPage })));
 
 const htmlPageToRoute = (href) => {
   if (!href || /^(https?:|mailto:|tel:|#)/i.test(href)) {
@@ -310,6 +312,8 @@ function AppRoutes() {
         <Route path="/operation/notification-templates" element={<NotificationTemplatePage />} />
         <Route path="/analysis/statistics" element={<StatisticsPage />} />
         <Route path="/analysis/incidents" element={<RoutePage activeMenuOverride="analysis-incidents" slug="admin-incidents" />} />
+        <Route path="/ai/assistant" element={<AiAssistantPage />} />
+        <Route path="/ai/runbook" element={<AiRunbookPage />} />
         <Route path="/admin-infra-topology" element={<InfraTopologyPage />} />
         <Route path="/admin-infra-relations" element={<InfraRelationsPage />} />
         <Route path="/admin-service-infra-mapping" element={<ServiceInfraMappingPage />} />
