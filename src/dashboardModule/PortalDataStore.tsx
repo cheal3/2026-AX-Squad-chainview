@@ -263,6 +263,9 @@ function normalizeInitialServices(services: ServiceRecord[]) {
 }
 
 export function PortalDataProvider({ children }: { children: ReactNode }) {
+  const [initialDataReady, setInitialDataReady] = useState(
+    MANUAL_API_LOAD_MODE
+  );
   const [servers, setServers] = useState<ServerRecord[]>([]);
   const [services, setServices] = useState<ServiceRecord[]>([]);
   const [relations, setRelations] = useState<ServiceRelationRecord[]>([]);
@@ -297,6 +300,10 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
     setRelations(snapshot.relations);
     setTechStacks(snapshot.techStacks);
     setOwners(snapshot.owners);
+    setUsers(snapshot.users);
+    setGroups(snapshot.groups);
+    setCategories(snapshot.categories);
+    setCodes(snapshot.codes);
     setIncidents(snapshot.incidents);
     setIncidentImpacts(snapshot.incidentImpacts);
     setIncidentEvents(snapshot.incidentEvents);
@@ -308,16 +315,22 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
     }
 
     let cancelled = false;
-    void import("./mockData.generated").then((mockData) => {
-      if (cancelled) {
-        return;
-      }
-      setServers(mockData.servers);
-      setServices(normalizeInitialServices(mockData.services));
-      setRelations(mockData.serviceRelations);
-      setTechStacks(mockData.techStacks);
-      setOwners(mockData.serviceOwners);
-    });
+    void import("./mockData.generated")
+      .then((mockData) => {
+        if (cancelled) {
+          return;
+        }
+        setServers(mockData.servers);
+        setServices(normalizeInitialServices(mockData.services));
+        setRelations(mockData.serviceRelations);
+        setTechStacks(mockData.techStacks);
+        setOwners(mockData.serviceOwners);
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setInitialDataReady(true);
+        }
+      });
 
     return () => {
       cancelled = true;
@@ -332,6 +345,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         source: "snapshot" as const,
       };
       setRemoteApiStatus(status);
+      setInitialDataReady(true);
       return status;
     }
 
@@ -342,6 +356,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         source: "snapshot" as const,
       };
       setRemoteApiStatus(status);
+      setInitialDataReady(true);
       return status;
     }
 
@@ -361,6 +376,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         source: "snapshot" as const,
       };
       setRemoteApiStatus(status);
+      setInitialDataReady(true);
       return status;
     } catch (error) {
       console.warn("[ChainView API] remote snapshot load failed", error);
@@ -373,6 +389,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         source: "snapshot" as const,
       };
       setRemoteApiStatus(status);
+      setInitialDataReady(true);
       return status;
     }
   }, []);
@@ -1546,10 +1563,23 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
     ]
   );
 
+  if (!initialDataReady) {
+    return <PortalInitialLoader />;
+  }
+
   return (
     <PortalDataContext.Provider value={value}>
       {children}
     </PortalDataContext.Provider>
+  );
+}
+
+function PortalInitialLoader() {
+  return (
+    <div className="portal-initial-loader" role="status" aria-live="polite">
+      <span className="portal-initial-loader__ring" aria-hidden="true" />
+      <strong>ChainView 데이터를 불러오는 중입니다.</strong>
+    </div>
   );
 }
 

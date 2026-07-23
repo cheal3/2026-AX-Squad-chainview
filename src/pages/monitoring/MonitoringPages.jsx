@@ -108,9 +108,11 @@ export function IncidentAdminPage() {
       title: incident.title,
     };
   });
-  const rows = dynamicRows.length
+  const rows = portalData.remoteApi.enabled
     ? dynamicRows
-    : staticIncidentRows.map((row) => ({ ...row, source: "static" }));
+    : dynamicRows.length
+      ? dynamicRows
+      : staticIncidentRows.map((row) => ({ ...row, source: "static" }));
   const filteredRows = rows.filter((row) =>
     matchesSearchText(
       searchableText(
@@ -674,34 +676,27 @@ export function IncidentDetailPage() {
     incidentEvents,
     incidentImpacts,
     incidents,
+    owners,
+    users,
+    groups,
+    deployments,
     relations,
     services,
     updateIncidentStatus,
   } = usePortalData();
   const [now, setNow] = useState(() => new Date());
+  const [activeTab, setActiveTab] = useState("overview");
   const incidentId = Number(new URLSearchParams(location.search).get("incidentId")) || undefined;
   const incident =
     incidents.find((item) => item.incidentId === incidentId) ??
-    incidents.find((item) => item.incidentStatusCode !== "RESOLVED") ??
-    {
-      incidentId: 0,
-      incidentStatusCode: "OPEN",
-      severityCode: "CRITICAL",
-      externalIncidentCode: "INC-2026-0312",
-      targetCode: "EXT-001",
-      targetLabel: "SERVICE · EXT-001",
-      title: "외부 카드사 응답 timeout 다발",
-      startedAt: "2026-06-01 14:08",
-      description: "외부 카드사 승인 요청 지연으로 영향 서비스가 감지되었습니다.",
-      manualRegisteredYn: "Y",
-      registeredBy: "SYSTEM",
-    };
+    (!incidentId
+      ? incidents.find((item) => item.incidentStatusCode !== "RESOLVED")
+      : undefined);
   const service =
-    services.find((item) => item.serviceId === incident.serviceId) ??
-    services.find((item) => item.serviceCode === incident.targetCode) ??
-    services[0];
+    services.find((item) => item.serviceId === incident?.serviceId) ??
+    services.find((item) => item.serviceCode === incident?.targetCode);
   const impactedServices = incidentImpacts
-    .filter((impact) => impact.incidentId === incident.incidentId)
+    .filter((impact) => impact.incidentId === incident?.incidentId)
     .map((impact) => services.find((item) => item.serviceId === impact.impactedServiceId))
     .filter(Boolean);
   const relatedRelations = relations
@@ -713,27 +708,56 @@ export function IncidentDetailPage() {
     .slice(0, 6);
   const relationServiceName = (serviceId) =>
     services.find((item) => item.serviceId === serviceId)?.serviceName ?? `SERVICE-${serviceId}`;
-  const elapsedLabel = incident.startedAt ? formatIncidentElapsed(incident.startedAt, now) : "00:00:00";
-  const eventRows = incidentEvents.filter((event) => event.incidentId === incident.incidentId);
-  const timelineRows = eventRows.length
-    ? eventRows.map((event) => [event.createdAt?.slice(11, 16) || "-", event.message, event.actor])
-    : [
-        ["14:08", "자동 감지: 에러율 임계치 초과 · 외부 통신 5xx", "System"],
-        ["14:08", "자동 감지: 인스턴스 1대 헬스체크 실패", "System"],
-        ["14:09", "담당 그룹 알림 발송 · Slack · SMS 3명", "System"],
-        ["14:11", "연쇄 영향 감지: 카드취소연계, 카드정산연계 상태 변화", "System"],
-        ["14:12", "담당자 ACK 수신", "System"],
-      ];
-  const recentDeploymentRows = [
-    { date: "2026-06-23", title: "결제 API 지연 반영", owner: "김OO", status: "운영 반영" },
-    { date: "2026-06-22", title: "장애 대비 캐시 정책 긴급 반영", owner: "박OO", status: "운영 반영" },
-    { date: "2026-06-20", title: "Gateway timeout 설정 변경", owner: "이OO", status: "검토 필요" },
-  ];
+  const elapsedLabel = incident?.startedAt ? formatIncidentElapsed(incident.startedAt, now) : "00:00:00";
+  const timelineRows = incidentEvents
+    .filter((event) => event.incidentId === incident?.incidentId)
+    .map((event) => [event.createdAt?.slice(11, 16) || "-", event.message, event.actor]);
+  const recentDeploymentRows = deployments
+    .filter((deployment) => Number(deployment.serviceId) === service?.serviceId)
+    .slice(0, 5)
+    .map((deployment) => ({
+      date: String(deployment.deployedAt ?? deployment.updatedAt ?? deployment.createdAt ?? "-").slice(0, 10),
+      title: String(deployment.versionText ?? deployment.releaseVersion ?? deployment.deployPath ?? "배포 정보"),
+      owner: String(deployment.deployedBy ?? deployment.updatedBy ?? "-"),
+      status: String(deployment.deploymentStatusName ?? deployment.deploymentStatusCode ?? "-"),
+    }));
+  const incidentOwners = owners
+    .filter(
+      (owner) =>
+        owner.serviceId === service?.serviceId ||
+        (owner.serviceCode && owner.serviceCode === service?.serviceCode)
+    )
+    .map((owner) => {
+      const user = users.find((item) => Number(item.userId) === Number(owner.userId));
+      const group = groups.find((item) => Number(item.groupId) === Number(owner.groupId));
+      const name = owner.ownerName || String(user?.userName ?? group?.groupName ?? "담당자 미등록");
+      const organization = String(
+        user?.departmentName ?? user?.orgName ?? group?.groupName ??
+        (owner.ownerTypeCode === "GROUP" ? "담당 그룹" : "담당자")
+      );
+      return {
+        id: owner.serviceOwnerId,
+        name,
+        role: codeLabels.responsibilityType[owner.responsibilityCode] || owner.responsibilityCode,
+        organization,
+        email: String(user?.email ?? ""),
+      };
+    });
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 1000);
     return () => window.clearInterval(timer);
   }, []);
+
+  if (!incident) {
+    return (
+      <AppShell activeMenu="incidents" isDark>
+        <main className="main chain-dashboard-main incident-detail-page">
+          <div className="incident-detail__empty">조회된 인시던트가 없습니다.</div>
+        </main>
+      </AppShell>
+    );
+  }
 
   const resolveIncident = () => {
     if (
@@ -756,7 +780,7 @@ export function IncidentDetailPage() {
         <div className="incident-detail__crumb">
           <Link to="/dashboard">📊 실시간 대시보드</Link>
           <span>/</span>
-          <span>{service?.categoryPath?.[0] ?? "대외계"}</span>
+          <span>{service?.categoryPath?.[0] ?? "-"}</span>
           <span>/</span>
           <span>{service?.serviceName ?? incident.targetCode}</span>
         </div>
@@ -770,10 +794,10 @@ export function IncidentDetailPage() {
             </div>
             <div className="incident-detail__meta">
               <span>serviceCode <b>{service?.serviceCode ?? incident.targetCode}</b></span>
-              <span>분류 <b>{service?.categoryPath?.join(" > ") ?? "대외계 > 결제 > 승인"}</b></span>
-              <span>SERVICE_TYPE <b>{service?.serviceTypeCode ?? "API"}</b></span>
-              <span>IMPORTANCE <b>{service?.importanceCode ?? "높음"}</b></span>
-              <span>STATUS <b>{codeLabels.serviceStatus?.[service?.statusCode] ?? "운영중"}</b></span>
+              <span>분류 <b>{service?.categoryPath?.join(" > ") || "-"}</b></span>
+              <span>SERVICE_TYPE <b>{service?.serviceTypeCode ?? "-"}</b></span>
+              <span>IMPORTANCE <b>{service?.importanceCode ?? "-"}</b></span>
+              <span>STATUS <b>{service ? codeLabels.serviceStatus?.[service.statusCode] ?? service.statusCode : "-"}</b></span>
             </div>
           </div>
           <div className="incident-detail__actions">
@@ -787,14 +811,30 @@ export function IncidentDetailPage() {
           </div>
         </section>
 
-        <nav className="incident-detail__tabs">
-          {["개요", "감지/알림 이력", "영향도", "최근 배포", "담당자"].map((tab, index) => (
-            <span className={index === 0 ? "is-active" : ""} key={tab}>{tab}</span>
+        <nav className="incident-detail__tabs" aria-label="인시던트 상세 메뉴" role="tablist">
+          {[
+            ["overview", "개요"],
+            ["history", "감지/알림 이력"],
+            ["impact", "영향도"],
+            ["deployments", "최근 배포"],
+            ["owners", "담당자"],
+          ].map(([tabKey, label]) => (
+            <button
+              aria-selected={activeTab === tabKey}
+              className={activeTab === tabKey ? "is-active" : ""}
+              key={tabKey}
+              onClick={() => setActiveTab(tabKey)}
+              role="tab"
+              type="button"
+            >
+              {label}
+            </button>
           ))}
         </nav>
 
-        <div className="incident-detail__layout">
-          <section className="incident-detail__left">
+        {activeTab === "overview" ? (
+          <div className="incident-detail__layout" role="tabpanel">
+            <section className="incident-detail__left">
             <article className="incident-detail__card incident-detail__card--danger incident-detail__card--summary">
               <div className="incident-detail__card-head">
                 <h2>🚨 진행 중 인시던트</h2>
@@ -802,70 +842,21 @@ export function IncidentDetailPage() {
               </div>
               <div className="incident-detail__summary">
                 <b>title</b>
-                <p>{incident.title} · incidentType: 서비스 장애 · affectedServices: {Math.max(impactedServices.length, 2)}</p>
+                <p>{incident.title} · incidentType: 서비스 장애 · affectedServices: {impactedServices.length}</p>
               </div>
-              <h3>감지 및 알림 이력</h3>
-              <div className="incident-detail__timeline incident-detail__scroll-area">
-                {timelineRows.map(([time, message, actor], index) => (
-                  <div className="incident-detail__timeline-row" key={`${time}-${message}`}>
-                    <span>{time}</span>
-                    <i className={index < 2 ? "is-danger" : index < 4 ? "is-warn" : ""} />
-                    <p>{message}</p>
-                    <em>{actor}</em>
-                  </div>
-                ))}
-              </div>
+              <p className="incident-detail__description">{incident.description || "등록된 인시던트 설명이 없습니다."}</p>
             </article>
-
-            <article className="incident-detail__card incident-detail__card--graph">
-              <div className="incident-detail__card-head">
-                <h2>영향 범위 (BLAST RADIUS)</h2>
-                <Link to={`/topology?incidentId=${incident.incidentId}&serviceId=${service?.serviceId ?? ""}`}>전체 토폴로지 보기 →</Link>
-              </div>
-              <div className="incident-detail__blast">
-                <ServiceRelationFlow
-                  embedded
-                  embeddedHeightClassName="h-full"
-                  frameless
-                  hideDepthToggle
-                  hideDetailPanel
-                  hideNodeActions
-                  hideTopControl
-                  incidentMode
-                  initialRelationDepth={2}
-                  initialServiceId={service?.serviceId}
-                />
-              </div>
-            </article>
-
-            <article className="incident-detail__card incident-detail__card--compact">
-              <div className="incident-detail__card-head">
-                <h2>최근 배포 이력</h2>
-                <span>장애 발생 전후 변경사항</span>
-              </div>
-              <div className="incident-detail__deploy-list incident-detail__scroll-area">
-                {recentDeploymentRows.map((row) => (
-                  <div className="incident-detail__deploy-row" key={row.date + row.title}>
-                    <time>{row.date}</time>
-                    <strong>{row.title}</strong>
-                    <span>{row.owner}</span>
-                    <em>{row.status}</em>
-                  </div>
-                ))}
-              </div>
-            </article>
-          </section>
-
-          <aside className="incident-detail__right">
+            </section>
+            <aside className="incident-detail__right">
             <article className="incident-detail__card incident-detail__card--summary">
               <h2>📦 기본 정보 (SERVICE)</h2>
               <dl className="incident-detail__dl">
                 <dt>serviceCode</dt><dd><code>{service?.serviceCode ?? incident.targetCode}</code></dd>
                 <dt>serviceName</dt><dd>{service?.serviceName ?? incident.title}</dd>
                 <dt>categoryL1/L2/L3</dt><dd>{service?.categoryPath?.join(" > ") ?? "-"}</dd>
-                <dt>serviceType</dt><dd>{service?.serviceTypeCode ?? "API"}</dd>
-                <dt>importance</dt><dd>{service?.importanceCode ?? "높음"}</dd>
-                <dt>status</dt><dd>{service?.statusCode ?? "INCIDENT"}</dd>
+                <dt>serviceType</dt><dd>{service?.serviceTypeCode ?? "-"}</dd>
+                <dt>importance</dt><dd>{service?.importanceCode ?? "-"}</dd>
+                <dt>status</dt><dd>{service?.statusCode ?? "-"}</dd>
                 <dt>endpointUrl</dt><dd>{service?.endpointUrl ?? "-"}</dd>
                 <dt>description</dt><dd>{service?.description ?? incident.description}</dd>
               </dl>
@@ -880,21 +871,88 @@ export function IncidentDetailPage() {
                     <code>{relation.relationTypeCode}</code>
                   </div>
                 ))}
+                {!relatedRelations.length ? <div className="incident-detail__empty">등록된 서비스 관계가 없습니다.</div> : null}
               </div>
             </article>
+            </aside>
+          </div>
+        ) : null}
 
-            <article className="incident-detail__card incident-detail__card--compact">
-              <h2>👥 담당자 (SERVICE_OWNER)</h2>
-              {["김OO · 주담당자", "박OO · 부담당자", "이OO · 운영자"].map((owner) => (
-                <div className="incident-detail__owner" key={owner}>
-                  <b>{owner.slice(0, 1)}</b>
-                  <span>{owner}<small>대외계팀 · bank.com</small></span>
-                  <em>✉</em>
+        {activeTab === "history" ? (
+          <article className="incident-detail__card incident-detail__tab-card" role="tabpanel">
+            <div className="incident-detail__card-head">
+              <h2>감지 및 알림 이력</h2>
+              <span>인시던트 발생 이후 기록</span>
+            </div>
+            <div className="incident-detail__timeline incident-detail__scroll-area">
+              {timelineRows.length ? timelineRows.map(([time, message, actor], index) => (
+                <div className="incident-detail__timeline-row" key={`${time}-${message}`}>
+                  <span>{time}</span>
+                  <i className={index < 2 ? "is-danger" : index < 4 ? "is-warn" : ""} />
+                  <p>{message}</p>
+                  <em>{actor}</em>
                 </div>
-              ))}
-            </article>
-          </aside>
-        </div>
+              )) : <div className="incident-detail__empty">등록된 감지 및 알림 이력이 없습니다.</div>}
+            </div>
+          </article>
+        ) : null}
+
+        {activeTab === "impact" ? (
+          <article className="incident-detail__card incident-detail__card--graph incident-detail__tab-card" role="tabpanel">
+            <div className="incident-detail__card-head">
+              <h2>영향 범위 (BLAST RADIUS)</h2>
+              <Link to={`/topology?incidentId=${incident.incidentId}&serviceId=${service?.serviceId ?? ""}`}>전체 토폴로지 보기 →</Link>
+            </div>
+            <div className="incident-detail__blast">
+              <ServiceRelationFlow
+                embedded
+                embeddedHeightClassName="h-full"
+                frameless
+                hideDepthToggle
+                hideDetailPanel
+                hideNodeActions
+                hideTopControl
+                incidentMode
+                initialRelationDepth={2}
+                initialServiceId={service?.serviceId}
+              />
+            </div>
+          </article>
+        ) : null}
+
+        {activeTab === "deployments" ? (
+          <article className="incident-detail__card incident-detail__tab-card" role="tabpanel">
+            <div className="incident-detail__card-head">
+              <h2>최근 배포 이력</h2>
+              <span>장애 발생 전후 변경사항</span>
+            </div>
+            <div className="incident-detail__deploy-list incident-detail__scroll-area">
+              {recentDeploymentRows.length ? recentDeploymentRows.map((row) => (
+                <div className="incident-detail__deploy-row" key={row.date + row.title}>
+                  <time>{row.date}</time>
+                  <strong>{row.title}</strong>
+                  <span>{row.owner}</span>
+                  <em>{row.status}</em>
+                </div>
+              )) : <div className="incident-detail__empty">등록된 배포 이력이 없습니다.</div>}
+            </div>
+          </article>
+        ) : null}
+
+        {activeTab === "owners" ? (
+          <article className="incident-detail__card incident-detail__tab-card" role="tabpanel">
+            <h2>👥 담당자 (SERVICE_OWNER)</h2>
+            <div className="incident-detail__owner-grid">
+              {incidentOwners.length ? incidentOwners.map((owner) => (
+                <div className="incident-detail__owner" key={owner.id}>
+                  <b>{owner.name.slice(0, 1)}</b>
+                  <span>{owner.name} · {owner.role}<small>{owner.organization}{owner.email ? ` · ${owner.email}` : ""}</small></span>
+                  <em title={owner.email || "이메일 미등록"}>✉</em>
+                </div>
+              )) : <div className="incident-detail__empty">등록된 서비스 담당자가 없습니다.</div>}
+            </div>
+          </article>
+        ) : null}
       </main>
     </AppShell>
   );

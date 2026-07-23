@@ -393,12 +393,14 @@ export function ServiceRelationFlow({
   const [graphViewMode, setGraphViewMode] = useState<GraphViewMode>(
     initialInfraDepth > 0 ? "infra" : showAllServices && !incidentMode ? "all" : "service"
   );
+  const remoteInfraEnabled = shouldUseRemoteInfraApi();
   const [infraGraphNodes, setInfraGraphNodes] = useState<InfraGraphNodeRecord[]>(
-    () => infraNodesSnapshot.map(normalizeInfraNode)
+    () => remoteInfraEnabled ? [] : infraNodesSnapshot.map(normalizeInfraNode)
   );
   const [infraGraphRelations, setInfraGraphRelations] = useState<
     InfraGraphRelationRecord[]
-  >(() => infraRelationsSnapshot.map(normalizeInfraRelation));
+  >(() => remoteInfraEnabled ? [] : infraRelationsSnapshot.map(normalizeInfraRelation));
+  const [infraGraphLoading, setInfraGraphLoading] = useState(remoteInfraEnabled);
   const [selectedInfraNodeId, setSelectedInfraNodeId] = useState<number | null>(
     null
   );
@@ -433,9 +435,14 @@ export function ServiceRelationFlow({
       })
       .catch((error) => {
         console.warn(
-          "[ChainView API] infra graph load failed, snapshot data will be used",
+          "[ChainView API] infra graph load failed",
           error
         );
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setInfraGraphLoading(false);
+        }
       });
 
     return () => {
@@ -1905,6 +1912,12 @@ export function ServiceRelationFlow({
             />
             <Controls />
           </ReactFlow>
+          {infraGraphLoading && graphViewMode !== "service" ? (
+            <div className="chainview-flow-loader" role="status" aria-live="polite">
+              <span className="portal-initial-loader__ring" aria-hidden="true" />
+              <strong>인프라 관계를 불러오는 중입니다.</strong>
+            </div>
+          ) : null}
           {focusedService && !hideTopControl && (
             <RelationTopControl
               detailOpen={detailPanelWide}

@@ -31,6 +31,10 @@ export type RemotePortalSnapshot = {
   relations: ServiceRelationRecord[];
   techStacks: TechStackRecord[];
   owners: ServiceOwnerRecord[];
+  users: RemoteRecord[];
+  groups: RemoteRecord[];
+  categories: RemoteRecord[];
+  codes: RemoteRecord[];
   incidents: IncidentRecord[];
   incidentImpacts: IncidentImpactRecord[];
   incidentEvents: IncidentEventRecord[];
@@ -61,12 +65,20 @@ export async function loadRemotePortalSnapshot(): Promise<RemotePortalSnapshot> 
     ownerRows,
     serviceTechStackRows,
     incidentRows,
+    userRows,
+    groupRows,
+    categoryRows,
+    codeRows,
   ] = await Promise.all([
     safeList(() => chainViewApi.servers.list()),
     safeList(() => chainViewApi.serviceRelations.list()),
     safeList(() => chainViewApi.ownership.serviceOwners.list()),
     safeList(() => chainViewApi.serviceTechStacks.list()),
     safeList(() => chainViewApi.incidents.list()),
+    safeList(() => chainViewApi.ownership.users.list()),
+    safeList(() => chainViewApi.ownership.groups.list()),
+    safeList(() => chainViewApi.serviceCategories.list()),
+    safeList(() => chainViewApi.commonCodes.list()),
   ]);
 
   const incidents = await loadIncidentDetails(incidentRows);
@@ -87,6 +99,10 @@ export async function loadRemotePortalSnapshot(): Promise<RemotePortalSnapshot> 
     relations: relationRows.map(mapRelation),
     techStacks: serviceTechStackRows.map(mapTechStack),
     owners: ownerRows.map(mapOwner),
+    users: userRows,
+    groups: groupRows,
+    categories: categoryRows,
+    codes: codeRows,
     incidents,
     incidentImpacts,
     incidentEvents: [

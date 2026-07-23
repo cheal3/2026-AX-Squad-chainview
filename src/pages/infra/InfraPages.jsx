@@ -165,15 +165,17 @@ function downloadCsv(filename, headers, rows) {
 
 export function InfraRelationsPage() {
   const location = useLocation();
-  const [nodes, setNodes] = useState(initialInfraNodes);
-  const [relations, setRelations] = useState(initialInfraRelations);
+  const remoteInfraEnabled = shouldUseRemoteInfraApi();
+  const [nodes, setNodes] = useState(() => remoteInfraEnabled ? [] : initialInfraNodes);
+  const [relations, setRelations] = useState(() => remoteInfraEnabled ? [] : initialInfraRelations);
+  const [isLoading, setIsLoading] = useState(remoteInfraEnabled);
   const [keyword, setKeyword] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [modal, setModal] = useState(null);
   const [graphOpen, setGraphOpen] = useState(false);
-  const [graphFocusNodeId, setGraphFocusNodeId] = useState(initialInfraNodes[0]?.infraNodeId ?? "");
-  const [dataSourceLabel, setDataSourceLabel] = useState("스냅샷 기준");
+  const [graphFocusNodeId, setGraphFocusNodeId] = useState(remoteInfraEnabled ? "" : initialInfraNodes[0]?.infraNodeId ?? "");
+  const [dataSourceLabel, setDataSourceLabel] = useState(remoteInfraEnabled ? "운영 API 조회 중" : "스냅샷 기준");
   const nodeById = useMemo(
     () => new Map(nodes.map((node) => [node.infraNodeId, node])),
     [nodes]
@@ -192,8 +194,10 @@ export function InfraRelationsPage() {
         setGraphFocusNodeId((current) => nextNodes.some((node) => Number(node.infraNodeId) === Number(current)) ? current : nextNodes[0]?.infraNodeId ?? "");
         setDataSourceLabel("운영 API 기준");
       } catch (error) {
-        console.warn("인프라 관계 API 조회 실패, 스냅샷 데이터를 사용합니다.", error);
-        if (!cancelled) setDataSourceLabel("스냅샷 기준");
+        console.warn("인프라 관계 API 조회에 실패했습니다.", error);
+        if (!cancelled) setDataSourceLabel("운영 API 조회 실패");
+      } finally {
+        if (!cancelled) setIsLoading(false);
       }
     })();
     return () => {
@@ -360,7 +364,8 @@ export function InfraRelationsPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredRelations.map((relation) => (
+              {isLoading ? <tr><td colSpan={8}><InlineDataLoader /></td></tr> : null}
+              {!isLoading && filteredRelations.map((relation) => (
                 <tr key={relation.infraRelationId}>
                   <td><code>{relation.infraRelationId}</code></td>
                   <td>{formatInfraNodeCell(nodeById.get(Number(relation.sourceInfraNodeId)))}</td>
@@ -377,7 +382,7 @@ export function InfraRelationsPage() {
                   </td>
                 </tr>
               ))}
-              {!filteredRelations.length ? <tr><td colSpan={8}><div className="empty">조회된 인프라 관계가 없습니다.</div></td></tr> : null}
+              {!isLoading && !filteredRelations.length ? <tr><td colSpan={8}><div className="empty">조회된 인프라 관계가 없습니다.</div></td></tr> : null}
             </tbody>
           </table>
           <div className="pager">
@@ -633,12 +638,14 @@ function InfraRelationGraphModal({
 }
 
 export function InfraTopologyPage() {
-  const [nodes, setNodes] = useState(initialInfraNodes);
+  const remoteInfraEnabled = shouldUseRemoteInfraApi();
+  const [nodes, setNodes] = useState(() => remoteInfraEnabled ? [] : initialInfraNodes);
+  const [isLoading, setIsLoading] = useState(remoteInfraEnabled);
   const [keyword, setKeyword] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [modal, setModal] = useState(null);
-  const [dataSourceLabel, setDataSourceLabel] = useState("스냅샷 기준");
+  const [dataSourceLabel, setDataSourceLabel] = useState(remoteInfraEnabled ? "운영 API 조회 중" : "스냅샷 기준");
   useEffect(() => {
     if (!shouldUseRemoteInfraApi()) return;
     let cancelled = false;
@@ -649,8 +656,10 @@ export function InfraTopologyPage() {
         setNodes(nextNodes);
         setDataSourceLabel("운영 API 기준");
       } catch (error) {
-        console.warn("인프라 노드 API 조회 실패, 스냅샷 데이터를 사용합니다.", error);
-        if (!cancelled) setDataSourceLabel("스냅샷 기준");
+        console.warn("인프라 노드 API 조회에 실패했습니다.", error);
+        if (!cancelled) setDataSourceLabel("운영 API 조회 실패");
+      } finally {
+        if (!cancelled) setIsLoading(false);
       }
     })();
     return () => {
@@ -792,7 +801,8 @@ export function InfraTopologyPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredNodes.map((node) => (
+              {isLoading ? <tr><td colSpan={8}><InlineDataLoader /></td></tr> : null}
+              {!isLoading && filteredNodes.map((node) => (
                 <tr key={node.infraNodeId}>
                   <td><code>{node.nodeCode}</code></td>
                   <td><b>{node.nodeName}</b></td>
@@ -809,7 +819,7 @@ export function InfraTopologyPage() {
                   </td>
                 </tr>
               ))}
-              {!filteredNodes.length ? <tr><td colSpan={8}><div className="empty">조회된 인프라 노드가 없습니다.</div></td></tr> : null}
+              {!isLoading && !filteredNodes.length ? <tr><td colSpan={8}><div className="empty">조회된 인프라 노드가 없습니다.</div></td></tr> : null}
             </tbody>
           </table>
           <div className="pager">
@@ -844,6 +854,15 @@ export function InfraTopologyPage() {
         ) : null}
       </main>
     </AppShell>
+  );
+}
+
+function InlineDataLoader() {
+  return (
+    <div className="inline-data-loader" role="status" aria-live="polite">
+      <span className="portal-initial-loader__ring" aria-hidden="true" />
+      <strong>데이터를 불러오는 중입니다.</strong>
+    </div>
   );
 }
 

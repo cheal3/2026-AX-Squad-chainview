@@ -784,14 +784,22 @@
 .incident-detail__tabs {
   display: flex;
   gap: 18px;
+  overflow-x: auto;
   border-bottom: 1px solid #1f3549;
   margin: 18px 0;
   color: #9fb1c5;
   font-weight: 800;
 }
 
-.incident-detail__tabs span {
+.incident-detail__tabs button {
+  flex: 0 0 auto;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: inherit;
   padding: 0 0 12px;
+  font: inherit;
+  cursor: pointer;
 }
 
 .incident-detail__tabs .is-active {
@@ -826,7 +834,7 @@
 }
 
 .incident-detail__card--summary {
-  height: 282px;
+  min-height: 282px;
 }
 
 .incident-detail__card--graph {
@@ -834,7 +842,25 @@
 }
 
 .incident-detail__card--compact {
-  height: 232px;
+  min-height: 232px;
+}
+
+.incident-detail__tab-card {
+  width: 100%;
+  min-height: 420px;
+}
+
+.incident-detail__description {
+  margin: 0;
+  color: #b9c8d8;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.incident-detail__owner-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: 12px;
 }
 
 .incident-detail__card--danger {
@@ -954,6 +980,9 @@
 .incident-detail__dl dd {
   min-width: 0;
   margin: 0;
+  max-width: 100%;
+  white-space: normal;
+  word-break: break-word;
   overflow-wrap: anywhere;
 }
 
@@ -1048,6 +1077,15 @@
   background: #0b2135;
   padding: 10px;
   margin-top: 10px;
+}
+
+.incident-detail__empty {
+  display: grid;
+  min-height: 72px;
+  place-items: center;
+  color: #91a7bd;
+  font-weight: 700;
+  text-align: center;
 }
 
 .incident-detail__card--compact .incident-detail__owner:first-of-type {
@@ -3953,5 +3991,58 @@
 
   .operation-variable-row {
     grid-template-columns: 1fr;
+  }
+}
+.portal-initial-loader {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  background: #f5f7fb;
+  color: #1f2a44;
+  font-size: 14px;
+}
+
+.portal-initial-loader__ring {
+  width: 42px;
+  height: 42px;
+  border: 4px solid #dbe4f0;
+  border-top-color: #2563eb;
+  border-radius: 50%;
+  animation: portal-initial-loader-spin 0.8s linear infinite;
+}
+
+.inline-data-loader,
+.chainview-flow-loader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: #526174;
+  font-weight: 700;
+}
+
+.inline-data-loader {
+  min-height: 180px;
+}
+
+.inline-data-loader .portal-initial-loader__ring,
+.chainview-flow-loader .portal-initial-loader__ring {
+  width: 30px;
+  height: 30px;
+}
+
+.chainview-flow-loader {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  background: rgba(248, 250, 252, 0.94);
+}
+
+@keyframes portal-initial-loader-spin {
+  to {
+    transform: rotate(360deg);
   }
 }
