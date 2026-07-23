@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Filter, History, List, Pencil, Play, Plus, Power, RotateCcw, Search, Trash2, X } from "lucide-react";
 
 import { AppShell } from "../../components/AppShell.jsx";
 import { ModalBackdrop } from "../../components/ModalBackdrop.jsx";
+import { chainViewApi } from "../../dashboardModule/chainViewApi";
 import { usePortalData } from "../../dashboardModule/PortalDataStore";
 import { matchesSearchText, searchableText } from "../../utils/search";
 
@@ -34,6 +35,76 @@ const notificationTemplateRows = [
   { code: "SERVICE_DOWN_V1", name: "서비스 장애 알림톡", channel: "알림톡", purpose: "서비스 장애", provider: "더미(개발)", variables: "2 / 2 (필수/전체)", active: "Y", title: "[오류] {{serviceName}} 장애 알림" },
   { code: "SERVICE_DOWN_SMS_V1", name: "서비스 장애 SMS", channel: "SMS", purpose: "서비스 장애", provider: "더미(개발)", variables: "2 / 2 (필수/전체)", active: "Y", title: "[장애] {{serviceName}}" },
 ];
+
+function normalizeTemplateRow(row, index = 0) {
+  const variableRows = Array.isArray(row?.variables)
+    ? row.variables
+    : Array.isArray(row?.templateVariables)
+      ? row.templateVariables
+      : Array.isArray(row?.variableDefinitions)
+        ? row.variableDefinitions
+        : [];
+  const requiredCount = variableRows.filter((variable) =>
+    Boolean(variable?.required ?? variable?.requiredYn === "Y")
+  ).length;
+  const variableCountText =
+    typeof row?.variables === "string"
+      ? row.variables
+      : `${requiredCount || variableRows.length} / ${variableRows.length} (필수/전체)`;
+
+  return {
+    templateId: Number(row?.templateId ?? row?.notificationTemplateId) || undefined,
+    code: String(row?.templateCode ?? row?.code ?? ""),
+    name: String(row?.templateName ?? row?.name ?? ""),
+    channel: String(row?.channelCode ?? row?.channel ?? ""),
+    purpose: String(row?.purposeCode ?? row?.purpose ?? row?.templatePurposeCode ?? ""),
+    provider: String(row?.providerCode ?? row?.provider ?? row?.providerName ?? "더미(개발)"),
+    variables: variableCountText,
+    variableRows,
+    active: String(row?.activeYn ?? row?.useYn ?? row?.active ?? "Y").toUpperCase() === "N" ? "N" : "Y",
+    title: String(row?.titleTemplate ?? row?.titlePattern ?? row?.messageTitle ?? row?.title ?? ""),
+    body: String(row?.bodyTemplate ?? row?.bodyPattern ?? row?.messageBody ?? row?.body ?? ""),
+    description: String(row?.description ?? row?.remarks ?? ""),
+    createdAt: row?.createdAt ?? row?.createdDate ?? row?.regDt ?? "",
+    rowKey: String(row?.templateId ?? row?.notificationTemplateId ?? row?.templateCode ?? row?.code ?? index),
+  };
+}
+
+function buildTemplatePayload(form, variables, bodyPattern, titlePattern) {
+  const normalizedVariables = variables
+    .filter((variable) => String(variable.key ?? "").trim())
+    .map((variable, index) => ({
+      variableKey: String(variable.key).trim(),
+      key: String(variable.key).trim(),
+      variableName: String(variable.label ?? variable.key).trim(),
+      label: String(variable.label ?? variable.key).trim(),
+      requiredYn: variable.required ? "Y" : "N",
+      required: Boolean(variable.required),
+      exampleValue: String(variable.example ?? "").trim(),
+      example: String(variable.example ?? "").trim(),
+      sortOrder: index + 1,
+    }));
+
+  return {
+    templateCode: form.code.trim().toUpperCase(),
+    templateName: form.name.trim(),
+    channelCode: form.channel,
+    purposeCode: form.purpose,
+    templatePurposeCode: form.purpose,
+    providerCode: form.provider,
+    activeYn: form.active,
+    useYn: form.active,
+    titleTemplate: titlePattern.trim(),
+    titlePattern: titlePattern.trim(),
+    messageTitle: titlePattern.trim(),
+    bodyTemplate: bodyPattern.trim(),
+    bodyPattern: bodyPattern.trim(),
+    messageBody: bodyPattern.trim(),
+    description: form.description.trim(),
+    variables: normalizedVariables,
+    variableDefinitions: normalizedVariables,
+  };
+}
 
 const notificationHistorySeed = [
   { incidentCode: "INC-2506-0142", incidentTitle: "대외계 MCI 2호기 네트워크 간헐 단절", severity: "장애", progress: "진행중", channel: "이메일", sendStatus: "대기", targetType: "사용자", recipient: "오세훈 (CV1007)", contact: "cv1007@chainview.local", title: "[상세] MCI 영향 서비스 점검 요청", template: "INCIDENT_DETAIL_V1", sentAt: "2025-06-20 10:36" },
@@ -329,8 +400,35 @@ export function NotificationTemplatePage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [modal, setModal] = useState(null);
+  const [templates, setTemplates] = useState(() => notificationTemplateRows.map(normalizeTemplateRow));
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState("");
   const pageSize = OPERATION_PAGE_SIZE;
-  const rows = notificationTemplateRows.filter((row) =>
+  const loadTemplates = async () => {
+    setLoading(true);
+    setLoadError("");
+    try {
+      const remoteRows = await chainViewApi.notificationTemplates.list();
+      const list = Array.isArray(remoteRows)
+        ? remoteRows
+        : Array.isArray(remoteRows?.content)
+          ? remoteRows.content
+          : Array.isArray(remoteRows?.items)
+            ? remoteRows.items
+            : [];
+      setTemplates(list.map(normalizeTemplateRow));
+    } catch (error) {
+      console.warn("알림 템플릿 목록 조회 실패", error);
+      setLoadError(error?.message || "알림 템플릿 목록 조회에 실패했습니다.");
+      setTemplates(notificationTemplateRows.map(normalizeTemplateRow));
+    } finally {
+      setLoading(false);
+    }
+  };
+  useEffect(() => {
+    void loadTemplates();
+  }, []);
+  const rows = templates.filter((row) =>
     matchesSearchText(
       searchableText(
         row.code,
@@ -346,6 +444,46 @@ export function NotificationTemplatePage() {
     )
   );
   const pagedRows = rows.slice((page - 1) * pageSize, page * pageSize);
+  const handleSaveTemplate = async ({ form, variables, bodyPattern, titlePattern, row }) => {
+    const payload = buildTemplatePayload(form, variables, bodyPattern, titlePattern);
+    if (!payload.templateCode || !payload.templateName || !payload.channelCode || !payload.purposeCode || !payload.bodyTemplate) {
+      window.alert("필수값을 입력해주세요.");
+      return false;
+    }
+
+    try {
+      if (row?.templateId) {
+        await chainViewApi.notificationTemplates.update(row.templateId, payload);
+      } else {
+        await chainViewApi.notificationTemplates.create(payload);
+      }
+      await loadTemplates();
+      setPage(1);
+      return true;
+    } catch (error) {
+      console.error("알림 템플릿 저장 실패", error);
+      window.alert(error?.message || "알림 템플릿 저장에 실패했습니다.");
+      return false;
+    }
+  };
+  const handleToggleTemplate = async (row) => {
+    if (!row?.templateId) {
+      window.alert("서버에 등록된 템플릿만 상태 변경할 수 있습니다.");
+      return;
+    }
+    try {
+      if (row.active === "Y") {
+        await chainViewApi.notificationTemplates.deactivate(row.templateId);
+      } else {
+        await chainViewApi.notificationTemplates.activate(row.templateId);
+      }
+      await loadTemplates();
+    } catch (error) {
+      console.error("알림 템플릿 상태 변경 실패", error);
+      window.alert(error?.message || "알림 템플릿 상태 변경에 실패했습니다.");
+    }
+  };
+
   return (
     <OperationPageShell
       activeMenu="notification-templates"
@@ -356,9 +494,9 @@ export function NotificationTemplatePage() {
     >
       <div className="toolbar operation-toolbar">
         <label className="search"><Search size={15} /><input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="템플릿 코드, 이름, 설명 검색..." type="text" /></label>
-        <button className="btn" type="button"><Filter size={14} /> 고급 필터</button>
+        <button className="btn" onClick={loadTemplates} type="button"><RotateCcw size={14} /> 새로고침</button>
       </div>
-      <div className="operation-summary"><b>총 {rows.length}개 템플릿</b></div>
+      <div className="operation-summary"><b>총 {rows.length}개 템플릿</b>{loading ? <span>조회 중</span> : null}{loadError ? <span className="text-red-600">{loadError}</span> : null}</div>
       <div className="card operation-card">
         <table className="tbl operation-table operation-table--templates">
           <thead><tr><th>템플릿</th><th>채널</th><th>용도</th><th>변수</th><th>상태</th><th className="col-actions">관리</th></tr></thead>
@@ -370,28 +508,50 @@ export function NotificationTemplatePage() {
                 <td>{row.purpose}</td>
                 <td>{row.variables}</td>
                 <td><span className="pill pill--ok">{row.active === "Y" ? "활성" : "비활성"}</span></td>
-                <td><div className="row-actions op-row-actions"><OperationIconButton label="템플릿 수정" onClick={() => setModal(row)}><Pencil size={16} /></OperationIconButton><OperationIconButton danger label="템플릿 비활성"><Power size={16} /></OperationIconButton></div></td>
+                <td><div className="row-actions op-row-actions"><OperationIconButton label="템플릿 수정" onClick={() => setModal(row)}><Pencil size={16} /></OperationIconButton><OperationIconButton danger label={row.active === "Y" ? "템플릿 비활성" : "템플릿 활성"} onClick={() => handleToggleTemplate(row)}><Power size={16} /></OperationIconButton></div></td>
               </tr>
             ))}
+            {!pagedRows.length ? (
+              <tr><td colSpan={6}>등록된 알림 템플릿이 없습니다.</td></tr>
+            ) : null}
           </tbody>
         </table>
         <OperationPager page={page} pageSize={pageSize} setPage={setPage} total={rows.length} />
       </div>
-      {modal ? <TemplateModal row={modal.code ? modal : null} onClose={() => setModal(null)} /> : null}
+      {modal ? <TemplateModal row={modal.code ? modal : null} onClose={() => setModal(null)} onSave={handleSaveTemplate} /> : null}
     </OperationPageShell>
   );
 }
 
-function TemplateModal({ onClose, row }) {
+function TemplateModal({ onClose, onSave, row }) {
+  const [form, setForm] = useState({
+    active: row?.active ?? "Y",
+    channel: row?.channel ?? "",
+    code: row?.code ?? "",
+    description: row?.description ?? "",
+    name: row?.name ?? "",
+    provider: row?.provider ?? "더미(개발)",
+    purpose: row?.purpose ?? "",
+  });
   const [titlePattern, setTitlePattern] = useState(row?.title ?? "[장애] {{serviceName}}");
   const [bodyPattern, setBodyPattern] = useState(
-    "{{serviceName}}에서 {{severityName}} 등급의 장애가 발생했습니다.\n영향 범위: {{impactSummary}}"
+    row?.body || "{{serviceName}}에서 {{severityName}} 등급의 장애가 발생했습니다.\n영향 범위: {{impactSummary}}"
   );
-  const [variables, setVariables] = useState([
-    { key: "serviceName", label: "서비스명", required: true, example: "결제 서비스" },
-    { key: "severityName", label: "심각도", required: true, example: "치명" },
-    { key: "impactSummary", label: "영향 요약", required: false, example: "로그인 및 결제 지연" },
-  ]);
+  const [variables, setVariables] = useState(() =>
+    row?.variableRows?.length
+      ? row.variableRows.map((variable) => ({
+          key: variable.variableKey ?? variable.key ?? "",
+          label: variable.variableName ?? variable.label ?? variable.name ?? "",
+          required: Boolean(variable.required ?? variable.requiredYn === "Y"),
+          example: variable.exampleValue ?? variable.example ?? "",
+        }))
+      : [
+          { key: "serviceName", label: "서비스명", required: true, example: "결제 서비스" },
+          { key: "severityName", label: "심각도", required: true, example: "치명" },
+          { key: "impactSummary", label: "영향 요약", required: false, example: "로그인 및 결제 지연" },
+        ]
+  );
+  const [saving, setSaving] = useState(false);
   const recommendedVariables = [
     ["hostName", "호스트명"],
     ["incidentTitle", "인시던트 제목"],
@@ -427,6 +587,20 @@ function TemplateModal({ onClose, row }) {
           : result,
       pattern
     );
+  const updateForm = (field, value) => {
+    setForm((current) => ({ ...current, [field]: value }));
+  };
+  const handleSubmit = async () => {
+    setSaving(true);
+    try {
+      const saved = await onSave({ bodyPattern, form, row, titlePattern, variables });
+      if (saved) {
+        onClose();
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <ModalBackdrop onClose={onClose}>
@@ -436,19 +610,19 @@ function TemplateModal({ onClose, row }) {
           <section>
             <h4 className="form-section__title">기본 정보</h4>
             <div className="operation-form-grid">
-              <OperationFormRow label="템플릿 코드" required><input defaultValue={row?.code ?? ""} placeholder="영문, 숫자, _ 입력" type="text" /></OperationFormRow>
-              <OperationFormRow label="템플릿명" required><input defaultValue={row?.name ?? ""} placeholder="템플릿명을 입력하세요" type="text" /></OperationFormRow>
-              <OperationFormRow label="Provider" required><select defaultValue={row?.provider ?? "더미(개발)"}><option>더미(개발)</option><option>운영 Provider</option></select></OperationFormRow>
-              <OperationFormRow label="채널" required><select defaultValue={row?.channel ?? ""}><option value="">선택하세요</option><option>알림톡</option><option>SMS</option><option>이메일</option></select></OperationFormRow>
-              <OperationFormRow label="용도" required><select defaultValue={row?.purpose ?? ""}><option value="">선택하세요</option><option>인시던트</option><option>서비스 장애</option></select></OperationFormRow>
-              <OperationFormRow label="활성" required><select defaultValue={row?.active ?? "Y"}><option>Y</option><option>N</option></select></OperationFormRow>
+              <OperationFormRow label="템플릿 코드" required><input disabled={Boolean(row)} value={form.code} onChange={(event) => updateForm("code", event.target.value.toUpperCase())} placeholder="영문, 숫자, _ 입력" type="text" /></OperationFormRow>
+              <OperationFormRow label="템플릿명" required><input value={form.name} onChange={(event) => updateForm("name", event.target.value)} placeholder="템플릿명을 입력하세요" type="text" /></OperationFormRow>
+              <OperationFormRow label="Provider" required><select value={form.provider} onChange={(event) => updateForm("provider", event.target.value)}><option>더미(개발)</option><option>운영 Provider</option></select></OperationFormRow>
+              <OperationFormRow label="채널" required><select value={form.channel} onChange={(event) => updateForm("channel", event.target.value)}><option value="">선택하세요</option><option>알림톡</option><option>SMS</option><option>이메일</option></select></OperationFormRow>
+              <OperationFormRow label="용도" required><select value={form.purpose} onChange={(event) => updateForm("purpose", event.target.value)}><option value="">선택하세요</option><option>인시던트</option><option>서비스 장애</option></select></OperationFormRow>
+              <OperationFormRow label="활성" required><select value={form.active} onChange={(event) => updateForm("active", event.target.value)}><option>Y</option><option>N</option></select></OperationFormRow>
             </div>
             <div className="operation-pattern-guide">
               제목과 본문에 <code>{"{{변수명}}"}</code>을 입력하면 발송 시 실제 값으로 치환됩니다.
             </div>
             <OperationFormRow label="제목 패턴"><input value={titlePattern} onChange={(event) => setTitlePattern(event.target.value)} type="text" /></OperationFormRow>
             <OperationFormRow label="본문 패턴" required><textarea value={bodyPattern} onChange={(event) => setBodyPattern(event.target.value)} placeholder="예: {{serviceName}} 장애가 발생했습니다." rows={6} /></OperationFormRow>
-            <OperationFormRow label="설명"><textarea placeholder="검색·관리를 위한 설명을 입력하세요. (선택)" rows={4} /></OperationFormRow>
+            <OperationFormRow label="설명"><textarea value={form.description} onChange={(event) => updateForm("description", event.target.value)} placeholder="검색·관리를 위한 설명을 입력하세요. (선택)" rows={4} /></OperationFormRow>
           </section>
           <section className="operation-variable-panel">
             <div className="operation-variable-head"><div><h4>템플릿 변수</h4><p>변수명과 미리보기용 예시값을 등록하세요.</p></div><button className="btn btn--sm" onClick={() => addVariable()} type="button"><Plus size={14} /> 직접 추가</button></div>
@@ -477,7 +651,7 @@ function TemplateModal({ onClose, row }) {
             </div>
           </section>
         </div>
-        <div className="modal__foot"><button className="btn" onClick={onClose} type="button">취소</button><button className="btn btn--primary op-btn-dark" onClick={onClose} type="button">{row ? "저장" : "등록"}</button></div>
+        <div className="modal__foot"><button className="btn" onClick={onClose} type="button">취소</button><button className="btn btn--primary op-btn-dark" disabled={saving} onClick={handleSubmit} type="button">{saving ? "저장 중" : row ? "저장" : "등록"}</button></div>
       </div>
     </ModalBackdrop>
   );
