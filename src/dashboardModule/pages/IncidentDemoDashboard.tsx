@@ -175,9 +175,7 @@ function DashboardCase({
   const effectiveActiveIncidentId = activeIncidentId ?? createdIncidentId;
   const activeIncident = effectiveActiveIncidentId
     ? portalData.incidents.find(
-        (incident) =>
-          incident.incidentId === effectiveActiveIncidentId &&
-          incident.incidentStatusCode !== "RESOLVED"
+        (incident) => incident.incidentId === effectiveActiveIncidentId
       )
     : undefined;
   const { categories: categoryRecords, owners, relations, services, users } = dashboardData;

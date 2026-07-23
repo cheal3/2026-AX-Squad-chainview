@@ -226,12 +226,28 @@ export function NotificationHistoryPage() {
   const [page, setPage] = useState(1);
   const [detail, setDetail] = useState(null);
   const pageSize = OPERATION_PAGE_SIZE;
-  const baseRows = Array.from({ length: 20 }, (_, index) => notificationHistorySeed[index % notificationHistorySeed.length]).map((row, index) => ({
-    ...row,
-    incidentCode: `INC-2506-${String(142 - index).padStart(4, "0")}`,
-    incidentId: portalData.incidents[index % Math.max(1, portalData.incidents.length)]?.incidentId ?? portalData.incidents[0]?.incidentId,
-    recipient: index >= notificationHistorySeed.length ? `${row.recipient.split(" ")[0]} (CV${String(1010 + index)})` : row.recipient,
-  }));
+  const linkedIncidents = [...portalData.incidents].sort((left, right) =>
+    String(right.startedAt || "").localeCompare(String(left.startedAt || ""))
+  );
+  const baseRows = Array.from(
+    { length: 20 },
+    (_, index) => notificationHistorySeed[index % notificationHistorySeed.length]
+  ).map((row, index) => {
+    const incident = linkedIncidents[index % Math.max(1, linkedIncidents.length)];
+    return {
+      ...row,
+      incidentCode:
+        incident?.externalIncidentCode ?? `INC-2506-${String(142 - index).padStart(4, "0")}`,
+      incidentId: incident?.incidentId,
+      incidentTitle: incident?.title ?? row.incidentTitle,
+      progress: incident?.incidentStatusCode === "RESOLVED" ? "종료" : "진행중",
+      severity: incident?.severityCode ?? row.severity,
+      recipient:
+        index >= notificationHistorySeed.length
+          ? `${row.recipient.split(" ")[0]} (CV${String(1010 + index)})`
+          : row.recipient,
+    };
+  });
   const rows = baseRows.filter((row) =>
     matchesSearchText(
       searchableText(
