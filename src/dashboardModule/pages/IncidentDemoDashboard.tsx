@@ -242,12 +242,24 @@ function buildRecentIncidentRows({
       return [
         serviceName,
         incident.externalIncidentCode ?? `INC-${incident.incidentId}`,
-        incident.incidentStatusCode,
+        formatDashboardIncidentStatus(incident.incidentStatusCode),
         `${impactCount}개`,
         resolved ? relativeDashboardTime(incident.endedAt) : "미종료",
         tone,
       ];
     });
+}
+
+function formatDashboardIncidentStatus(statusCode: string) {
+  return (
+    {
+      OPEN: "접수",
+      IN_PROGRESS: "조치중",
+      MONITORING: "모니터링",
+      RESOLVED: "종료",
+      CLOSED: "종료",
+    }[statusCode] ?? statusCode
+  );
 }
 
 function buildRecentDeployRows({
@@ -2060,7 +2072,7 @@ function BottomPanels({
   const navigate = useNavigate();
 
   return (
-    <div className="mt-3 grid min-h-[220px] min-w-0 flex-[0.7] grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)_minmax(0,1.25fr)_minmax(0,2.15fr)] items-stretch gap-2">
+    <div className="mt-3 grid min-h-[220px] min-w-0 flex-[0.7] grid-cols-1 items-stretch gap-3 xl:grid-cols-[minmax(250px,0.9fr)_minmax(320px,1.1fr)_minmax(500px,1.75fr)_minmax(360px,1.25fr)]">
       <Panel title="관리 필요 서비스">
         {managementRows.map(([label, value, type]) => (
           <TinyRow
@@ -2077,10 +2089,12 @@ function BottomPanels({
           <TinyEmpty>변경 이력을 불러오는 중입니다.</TinyEmpty>
         ) : changeRows.length ? (
           changeRows.map((row) => (
-            <div key={row.key} className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,0.86fr)_minmax(44px,0.52fr)] items-center gap-2 py-1 text-[13px] leading-5 text-slate-900">
-              <span className="min-w-0 break-words">{row.service}</span>
-              <span className="min-w-0 break-words text-slate-700">{row.change}</span>
-              <span className="min-w-0 break-words text-right text-slate-500">{row.time}</span>
+            <div key={row.key} className="flex min-w-0 items-center justify-between gap-3 rounded-md px-1 py-1.5 text-[13px] leading-5 text-slate-900">
+              <div className="min-w-0">
+                <div className="truncate font-bold text-slate-950" title={row.service}>{row.service}</div>
+                <div className="truncate text-xs font-semibold text-slate-500" title={row.change}>{row.change}</div>
+              </div>
+              <span className="shrink-0 whitespace-nowrap text-xs font-bold text-slate-500">{row.time}</span>
             </div>
           ))
         ) : (
@@ -2092,20 +2106,19 @@ function BottomPanels({
         onAction={() => navigate("/admin-incidents")}
         title="최근 인시던트"
       >
-        <div className="grid min-w-0 grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(58px,0.72fr)_minmax(50px,0.7fr)_minmax(42px,0.55fr)] gap-2 pb-1 text-[12px] font-black leading-5 text-slate-500">
-          <span className="break-words">서비스</span>
-          <span className="break-words">인시던트</span>
-          <span className="break-words">상태</span>
-          <span className="break-words">영향 서비스</span>
-          <span className="text-right">종료</span>
-        </div>
         {incidentRows.length ? incidentRows.map(([service, incident, status, impact, end, tone]) => (
-          <div key={incident} className="grid min-w-0 grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(58px,0.72fr)_minmax(50px,0.7fr)_minmax(42px,0.55fr)] items-center gap-2 py-1 text-[13px] leading-5 text-slate-900">
-            <span className="min-w-0 break-words">{service}</span>
-            <span className="min-w-0 break-words text-slate-700">{incident}</span>
-            <span className="min-w-0"><IncidentStatus tone={tone}>{status}</IncidentStatus></span>
-            <span className="min-w-0 break-words text-slate-700">{impact}</span>
-            <span className="min-w-0 break-words text-right text-slate-500">{end}</span>
+          <div key={incident} className="min-w-0 rounded-md px-1 py-1.5 text-[13px] leading-5 hover:bg-slate-50">
+            <div className="flex min-w-0 items-center justify-between gap-3">
+              <span className="truncate font-bold text-slate-950" title={service}>{service}</span>
+              <IncidentStatus tone={tone}>{status}</IncidentStatus>
+            </div>
+            <div className="mt-0.5 flex min-w-0 items-center gap-2 text-xs font-semibold text-slate-500">
+              <span className="shrink-0 text-slate-700">{incident}</span>
+              <span className="text-slate-300">·</span>
+              <span className="shrink-0">영향 {impact}</span>
+              <span className="text-slate-300">·</span>
+              <span className="truncate">{end}</span>
+            </div>
           </div>
         )) : <TinyEmpty>등록된 인시던트가 없습니다.</TinyEmpty>}
       </Panel>
@@ -2147,7 +2160,7 @@ function Panel({
           </button>
         ) : null}
       </div>
-      <div className="min-w-0 overflow-hidden">{children}</div>
+      <div className="min-w-0 overflow-y-auto pr-1">{children}</div>
     </section>
   );
 }
@@ -2187,10 +2200,10 @@ function TinyRow({
         : "bg-slate-100 text-slate-500";
 
   return (
-    <div className="flex min-w-0 items-center justify-between gap-3 py-1 text-[13px] leading-5 text-slate-900">
+    <div className="flex min-w-0 items-center justify-between gap-3 py-1.5 text-[13px] leading-5 text-slate-900">
       <div className="flex min-w-0 items-center gap-2">
         <span className={`grid h-[17px] w-[17px] shrink-0 place-items-center rounded-full ${toneClass}`}>{icon}</span>
-        <span className="truncate font-normal">{label}</span>
+        <span className="min-w-0 break-keep font-normal leading-5">{label}</span>
       </div>
       <span className="shrink-0 font-normal text-slate-950">{value}</span>
     </div>
