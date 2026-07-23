@@ -130,6 +130,7 @@ type RemoteApiStatus = {
 type NewIncidentInput = {
   incidentTypeCode?: IncidentRecord["incidentTypeCode"];
   serviceId?: number;
+  serverId?: number;
   severityCode: SeverityCode;
   externalIncidentCode?: string;
   targetCode?: string;
@@ -1834,6 +1835,7 @@ function toIncidentCreatePayload(input: NewIncidentInput, startedAt: string) {
   return {
     incidentTypeCode: input.incidentTypeCode ?? "SERVICE",
     serviceId: input.serviceId,
+    serverId: input.serverId,
     severityCode: input.severityCode,
     targetCode: input.targetCode,
     targetLabel: input.targetLabel,

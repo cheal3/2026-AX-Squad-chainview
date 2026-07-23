@@ -178,7 +178,14 @@ function DashboardCase({
         (incident) => incident.incidentId === effectiveActiveIncidentId
       )
     : undefined;
-  const { categories: categoryRecords, owners, relations, services, users } = dashboardData;
+  const {
+    categories: categoryRecords,
+    owners,
+    relations,
+    servers,
+    services,
+    users,
+  } = dashboardData;
 
   useEffect(() => {
     if (activeIncident || !portalData.remoteApi.enabled || filterLookupRequestedRef.current) return;
@@ -421,8 +428,29 @@ function DashboardCase({
               return;
             }
 
+            const normalizeLookup = (value?: string) =>
+              String(value ?? "").trim().toUpperCase();
+            const infraCode = normalizeLookup(selectedInfraNode.nodeCode);
+            const infraName = normalizeLookup(selectedInfraNode.nodeName);
+            const incidentServer = servers.find(
+              (server) =>
+                server.infraNodeId === selectedInfraNode.infraNodeId ||
+                (Boolean(infraCode) &&
+                  normalizeLookup(server.infraNodeCode) === infraCode) ||
+                (Boolean(infraName) &&
+                  normalizeLookup(server.infraNodeName) === infraName)
+            );
+
+            if (!incidentServer) {
+              window.alert(
+                "선택한 인프라 요소에 매핑된 서버가 없어 서버 인시던트를 생성할 수 없습니다."
+              );
+              return;
+            }
+
             const incident = portalData.createIncident({
               incidentTypeCode: "SERVER",
+              serverId: incidentServer.serverId,
               severityCode: "CRITICAL",
               externalIncidentCode: nextIncidentCode(),
               targetCode: selectedInfraNode.nodeCode,
