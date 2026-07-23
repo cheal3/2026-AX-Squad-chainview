@@ -78,6 +78,7 @@ type NewServiceInput = {
   portInfo: string;
   deploymentStatusCode?: DeploymentStatusCode;
   instanceCount: number;
+  deployments?: RemoteListRecord[];
   description: string;
 };
 
@@ -1677,6 +1678,7 @@ function toServerPayload(input: NewServerInput) {
 }
 
 async function toServicePayload(input: NewServiceInput | ServiceRecord) {
+  const deployments = explicitServiceDeploymentPayloads(input);
   return {
     categoryId: input.categoryId || (await findCategoryId(input.categoryPath)),
     serviceCode: input.serviceCode,
@@ -1686,7 +1688,7 @@ async function toServicePayload(input: NewServiceInput | ServiceRecord) {
     statusCode: input.statusCode,
     description: input.description,
     endpointUrl: input.endpointUrl,
-    deployments: [toDeploymentPayload(input)],
+    deployments: deployments.length ? deployments : [toDeploymentPayload(input)],
   };
 }
 
@@ -1696,9 +1698,10 @@ async function toServiceUpdatePayload(
 ) {
   const detail = await chainViewApi.services.detail(serviceId).catch(() => null);
   const detailRecord = isRemoteRecord(detail) ? detail : null;
-  const deployments = asRemoteRecordArray(detailRecord?.deployments).map(
-    toRemoteDeploymentPayload
-  );
+  const inputDeployments = explicitServiceDeploymentPayloads(input);
+  const deployments = inputDeployments.length
+    ? inputDeployments
+    : asRemoteRecordArray(detailRecord?.deployments).map(toRemoteDeploymentPayload);
 
   return {
     categoryId:
@@ -1714,6 +1717,13 @@ async function toServiceUpdatePayload(
     endpointUrl: input.endpointUrl,
     deployments: deployments.length ? deployments : [toDeploymentPayload(input)],
   };
+}
+
+function explicitServiceDeploymentPayloads(input: NewServiceInput | ServiceRecord) {
+  const inputDeployments = asRemoteRecordArray(
+    (input as NewServiceInput & { deployments?: unknown })?.deployments
+  ).map(toRemoteDeploymentPayload);
+  return inputDeployments;
 }
 
 function toDeploymentPayload(input: NewServiceInput | ServiceRecord) {

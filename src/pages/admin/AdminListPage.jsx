@@ -134,7 +134,7 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
             codeLabels.serviceStatus[service.statusCode],
             service.statusCode,
             service.endpointUrl,
-            serverById.get(service.serverId)?.serverName,
+            deploymentServerSummary(service, portalData.deployments, serverById),
             service.description
           ),
           onClick: () => navigate(`/admin-services/${service.serviceCode}`),
@@ -146,7 +146,7 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
             codeLabels.importance[service.importanceCode] || service.importanceCode || "-",
             codeLabels.serviceStatus[service.statusCode] || service.statusCode,
             service.endpointUrl || "-",
-            serverById.get(service.serverId)?.serverName || "-",
+            deploymentServerSummary(service, portalData.deployments, serverById),
           ],
         };
       }),
@@ -702,6 +702,55 @@ function adminSearchText(...values) {
   return values.flatMap(flattenSearchValue).join(" ");
 }
 
+function serviceDeploymentRows(service, deployments) {
+  if (!service?.serviceId) {
+    return [];
+  }
+  return deployments.filter(
+    (deployment) => Number(deployment.serviceId) === Number(service.serviceId)
+  );
+}
+
+function serviceDeploymentServerIds(service, deployments, servers) {
+  const deploymentServerIds = serviceDeploymentRows(service, deployments)
+    .map((deployment) => Number(deployment.serverId))
+    .filter(Boolean);
+  const fallbackServerId =
+    Number(service?.serverId) || Number(servers[0]?.serverId) || 0;
+  return Array.from(new Set([
+    ...deploymentServerIds,
+    ...(fallbackServerId ? [fallbackServerId] : []),
+  ])).map(String);
+}
+
+function normalizeSelectedServerIds(serverIds, fallbackServerId, servers) {
+  const selectedIds = Array.isArray(serverIds) ? serverIds : [];
+  const normalized = selectedIds
+    .map((serverId) => Number(serverId))
+    .filter(Boolean);
+  const fallback = Number(fallbackServerId) || Number(servers[0]?.serverId) || 0;
+  return Array.from(new Set([
+    ...normalized,
+    ...(fallback && !normalized.length ? [fallback] : []),
+  ]));
+}
+
+function deploymentServerSummary(service, deployments, serverById) {
+  const serverIds = serviceDeploymentRows(service, deployments)
+    .map((deployment) => Number(deployment.serverId))
+    .filter(Boolean);
+  const uniqueServerIds = Array.from(
+    new Set(serverIds.length ? serverIds : [Number(service.serverId)].filter(Boolean))
+  );
+  const names = uniqueServerIds
+    .map((serverId) => serverById.get(serverId)?.serverName || `서버 ${serverId}`)
+    .filter(Boolean);
+  if (!names.length) {
+    return "-";
+  }
+  return names.length > 1 ? `${names[0]} 외 ${names.length - 1}개` : names[0];
+}
+
 function flattenSearchValue(value) {
   if (value === null || value === undefined || typeof value === "boolean") {
     return [];
@@ -823,6 +872,27 @@ function AdminRecordModal({ modal, onClose, onOpenApiDetail, portalData, serverB
         window.alert("서비스 코드는 대문자, 숫자, _, - 만 사용할 수 있습니다.");
         return;
       }
+      const selectedServerIds = normalizeSelectedServerIds(
+        form.serverIds,
+        form.serverId,
+        portalData.servers
+      );
+      if (!selectedServerIds.length) {
+        window.alert("배포 서버를 1개 이상 선택해주세요.");
+        return;
+      }
+      const deploymentInputs = selectedServerIds.map((serverId) => {
+        const server = portalData.servers.find((item) => Number(item.serverId) === serverId);
+        return {
+          serverId,
+          serverName: server?.serverName,
+          hostName: server?.hostName,
+          deployPath: form.deployPath.trim(),
+          portInfo: form.portInfo.trim(),
+          deploymentStatusCode: form.deploymentStatusCode,
+          instanceCount: Number(form.instanceCount) || 1,
+        };
+      });
       const payload = {
         categoryId: Number(form.categoryId || form.categoryL3Id || form.categoryL2Id || form.categoryL1Id) || undefined,
         serviceCode,
@@ -832,11 +902,12 @@ function AdminRecordModal({ modal, onClose, onOpenApiDetail, portalData, serverB
         importanceCode: form.importanceCode,
         statusCode: form.statusCode,
         endpointUrl: form.endpointUrl.trim(),
-        serverId: Number(form.serverId) || portalData.servers[0]?.serverId || 1,
+        serverId: selectedServerIds[0],
         deployPath: form.deployPath.trim(),
         portInfo: form.portInfo.trim(),
         deploymentStatusCode: form.deploymentStatusCode,
         instanceCount: Number(form.instanceCount) || 1,
+        deployments: deploymentInputs,
         description: form.description.trim(),
       };
       if (isCreate) {
@@ -1772,7 +1843,18 @@ function ServiceAdminForm({ form, onChange, onOpenApiDetail, portalData, servers
       <div className="form-section">
         <h4 className="form-section__title">배포 정보</h4>
         <div className="form-grid">
-          <div className="form-row"><label>배포 서버</label><select value={form.serverId} onChange={(event) => onChange("serverId", event.target.value)}>{servers.map((server) => <option key={server.serverId} value={server.serverId}>{server.serverName}</option>)}</select></div>
+          <div className="form-row full">
+            <label>배포 서버</label>
+            <ServerMultiSelect
+              servers={servers}
+              value={form.serverIds}
+              onChange={(serverIds) => {
+                onChange("serverIds", serverIds);
+                onChange("serverId", serverIds[0] ?? "");
+              }}
+            />
+            <span className="help">하나의 서비스가 여러 배포 서버에 올라가는 다중 배포 관계로 저장됩니다.</span>
+          </div>
           <div className="form-row"><label>배포 상태</label><CodeSelect labels={codeLabels.deploymentStatus} value={form.deploymentStatusCode} onChange={(value) => onChange("deploymentStatusCode", value)} /></div>
           <div className="form-row"><label>배포 경로</label><input type="text" value={form.deployPath} onChange={(event) => onChange("deployPath", event.target.value)} placeholder="/opt/app" /></div>
           <div className="form-row"><label>포트</label><input type="text" value={form.portInfo} onChange={(event) => onChange("portInfo", event.target.value)} placeholder="8080,8443" /></div>
@@ -1784,6 +1866,73 @@ function ServiceAdminForm({ form, onChange, onOpenApiDetail, portalData, servers
         <div className="form-row"><label>설명</label><textarea value={form.description} onChange={(event) => onChange("description", event.target.value)} placeholder="서비스 상세 설명" /></div>
       </div>
     </>
+  );
+}
+
+function ServerMultiSelect({ servers, value, onChange }) {
+  const [query, setQuery] = useState("");
+  const selectedIds = Array.isArray(value) ? value.map(String) : [];
+  const selectedServers = servers.filter((server) =>
+    selectedIds.includes(String(server.serverId))
+  );
+  const filteredServers = servers.filter((server) =>
+    matchesSearchText(
+      searchableText(server.serverName, server.hostName, server.ipAddress, server.envCode),
+      query
+    )
+  );
+  const toggleServer = (serverId, checked) => {
+    const next = checked
+      ? Array.from(new Set([...selectedIds, String(serverId)]))
+      : selectedIds.filter((id) => id !== String(serverId));
+    onChange(next);
+  };
+
+  return (
+    <div className="server-multi-select">
+      <div className="server-multi-select__selected">
+        {selectedServers.length ? selectedServers.map((server) => (
+          <button
+            className="server-multi-select__chip"
+            key={server.serverId}
+            onClick={() => toggleServer(server.serverId, false)}
+            type="button"
+          >
+            {server.serverName}
+            <span>×</span>
+          </button>
+        )) : <span className="server-multi-select__placeholder">선택된 배포 서버가 없습니다.</span>}
+      </div>
+      <div className="server-multi-select__toolbar">
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="서버명, 호스트, IP 검색"
+          type="text"
+        />
+        <button type="button" onClick={() => onChange(servers.map((server) => String(server.serverId)))}>전체 선택</button>
+        <button type="button" onClick={() => onChange([])}>해제</button>
+      </div>
+      <div className="server-multi-select__list">
+        {filteredServers.map((server) => {
+          const checked = selectedIds.includes(String(server.serverId));
+          return (
+            <label className="server-multi-select__option" key={server.serverId}>
+              <input
+                checked={checked}
+                onChange={(event) => toggleServer(server.serverId, event.target.checked)}
+                type="checkbox"
+              />
+              <span>
+                <b>{server.serverName}</b>
+                <small>{server.hostName} · {server.ipAddress} · {server.envCode}</small>
+              </span>
+            </label>
+          );
+        })}
+        {!filteredServers.length ? <div className="server-multi-select__empty">검색 결과가 없습니다.</div> : null}
+      </div>
+    </div>
   );
 }
 
@@ -2014,6 +2163,7 @@ function buildAdminFormState(menu, record, portalData) {
     const categorySelection = resolveCategorySelection(categoryPath, portalData.categories, record?.categoryId);
     const resolvedCategoryPath = categorySelection.categoryPath;
     const categoryId = record?.categoryId ? String(record.categoryId) : categorySelection.categoryId;
+    const serverIds = serviceDeploymentServerIds(record, portalData.deployments, portalData.servers);
     return {
       serviceCode: record?.serviceCode ?? "",
       serviceCodeSuffix: record?.serviceCode?.split("-").at(-1) ?? "001",
@@ -2029,7 +2179,8 @@ function buildAdminFormState(menu, record, portalData) {
       importanceCode: record?.importanceCode ?? "NORMAL",
       statusCode: record?.statusCode ?? "NORMAL",
       endpointUrl: record?.endpointUrl ?? "",
-      serverId: String(record?.serverId ?? portalData.servers[0]?.serverId ?? ""),
+      serverId: serverIds[0] ?? "",
+      serverIds,
       deployPath: record?.deployPath ?? "/opt/app",
       portInfo: record?.portInfo ?? "8080",
       deploymentStatusCode: record?.deploymentStatusCode ?? "RUNNING",
