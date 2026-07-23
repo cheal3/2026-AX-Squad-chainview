@@ -733,9 +733,6 @@ export function ServiceRelationFlow({
     }
 
     const directIds = new Set<number>();
-    activeIncidentImpactServiceIds.forEach((serviceId) => {
-      directIds.add(serviceId);
-    });
 
     if (infraIncident) {
       if (activeIncident.serverId) {
@@ -755,6 +752,9 @@ export function ServiceRelationFlow({
       });
     } else if (incidentServiceId) {
       directIds.add(incidentServiceId);
+      activeIncidentImpactServiceIds.forEach((serviceId) => {
+        directIds.add(serviceId);
+      });
     }
 
     const scopedIds = new Set(directIds);
@@ -813,25 +813,7 @@ export function ServiceRelationFlow({
   );
   const filteredInfraNodeIds = useMemo(() => {
     if (infraIncident) {
-      const visibleNodeIds = new Set<number>(incidentInfraNodeIds ?? []);
-
-      filteredServices.forEach((service) => {
-        const infraNodeId = serviceInfraTargetByServiceId.get(service.serviceId);
-        if (infraNodeId) {
-          visibleNodeIds.add(infraNodeId);
-        }
-      });
-
-      infraGraphRelations.forEach((relation) => {
-        if (visibleNodeIds.has(relation.sourceInfraNodeId)) {
-          visibleNodeIds.add(relation.targetInfraNodeId);
-        }
-        if (visibleNodeIds.has(relation.targetInfraNodeId)) {
-          visibleNodeIds.add(relation.sourceInfraNodeId);
-        }
-      });
-
-      return visibleNodeIds;
+      return incidentInfraNodeIds ?? new Set<number>();
     }
     if (!serviceFilter) {
       return null;
