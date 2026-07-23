@@ -888,10 +888,15 @@ export function ServiceRelationFlow({
       });
 
       const yMap = new Map<number, number>();
-      laneGroups.forEach((serviceIds) => {
+      const minLane = Math.min(...laneGroups.keys());
+      laneGroups.forEach((serviceIds, lane) => {
         const sorted = [...serviceIds].sort(compareServiceIds);
         const categoryOffsets = new Map<string, number>();
         let categoryCount = 0;
+        const laneStagger =
+          sorted.length === 1
+            ? (Math.round(lane - minLane) % 2 === 0 ? -88 : 88)
+            : 0;
 
         sorted.forEach((serviceId, index) => {
           const categoryKey =
@@ -907,7 +912,8 @@ export function ServiceRelationFlow({
           yMap.set(
             serviceId,
             centeredOffset(index, sorted.length, ALL_SERVICES_Y_SPACING) +
-              categoryOffset * ALL_SERVICES_CATEGORY_GAP
+              categoryOffset * ALL_SERVICES_CATEGORY_GAP +
+              laneStagger
           );
         });
       });
@@ -1393,6 +1399,7 @@ export function ServiceRelationFlow({
     const INFRA_X_SPACING = 430;
     const INFRA_Y_SPACING = 148;
     const INFRA_ALL_MODE_X_OFFSET = -260;
+    const minInfraLane = Math.min(...groups.keys());
     const nodes: Node<ServerInfraNodeData>[] = [];
 
     Array.from(groups.entries())
@@ -1419,7 +1426,11 @@ export function ServiceRelationFlow({
             type: "serverInfraNode",
             position: {
               x: lane * INFRA_X_SPACING + (allMode ? INFRA_ALL_MODE_X_OFFSET : 0),
-              y: centeredOffset(index, sortedNodes.length, INFRA_Y_SPACING),
+              y:
+                centeredOffset(index, sortedNodes.length, INFRA_Y_SPACING) +
+                (sortedNodes.length === 1
+                  ? (Math.round(lane - minInfraLane) % 2 === 0 ? -72 : 72)
+                  : 0),
             },
             data: {
               connected:

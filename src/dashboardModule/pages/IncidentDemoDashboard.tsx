@@ -292,8 +292,21 @@ function DashboardCase({
     });
   }, [appliedFilter, categoryPathByServiceId, myServiceIds, services]);
   const filteredServiceIds = useMemo(
-    () => filteredServices.map((service) => service.serviceId),
-    [filteredServices]
+    () => {
+      const seedIds = new Set(filteredServices.map((service) => service.serviceId));
+      const expandedIds = new Set(seedIds);
+      relations.forEach((relation) => {
+        if (relation.relationStatusCode !== "ACTIVE") return;
+        if (seedIds.has(relation.sourceServiceId)) {
+          expandedIds.add(relation.targetServiceId);
+        }
+        if (seedIds.has(relation.targetServiceId)) {
+          expandedIds.add(relation.sourceServiceId);
+        }
+      });
+      return [...expandedIds];
+    },
+    [filteredServices, relations]
   );
   const defaultSelectedServiceId = useMemo(
     () =>
@@ -509,14 +522,13 @@ function DashboardServiceFilter({
     <section className="mt-1 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-[0_1px_3px_rgba(15,23,42,0.05)]">
       <h2 className="mb-2.5 text-sm font-black text-slate-900">조회조건</h2>
 
-      <div className="flex min-w-0 flex-wrap items-end gap-3">
-        <div className="flex min-w-[340px] flex-[1.5_1_420px] items-end gap-3">
+      <div className="grid min-w-0 grid-cols-[200px_minmax(120px,1fr)_repeat(3,minmax(90px,110px))_minmax(160px,1.2fr)_auto] items-end gap-2">
           <div
-            className="relative grid h-10 w-[240px] shrink-0 grid-cols-2 overflow-hidden rounded-full border border-slate-200 bg-white p-1 shadow-md"
+            className="relative grid h-10 min-w-0 grid-cols-2 overflow-hidden rounded-full border border-slate-200 bg-white p-1 shadow-md"
             style={{ borderRadius: 9999 }}
           >
             <span
-              className="absolute bottom-1 top-1 w-[calc(50%-4px)] rounded-full bg-[#2563eb] shadow-sm transition-transform duration-200"
+              className="absolute bottom-1 top-1 w-[calc(50%-4px)] rounded-full bg-[#1f2a44] shadow-sm transition-transform duration-200"
               style={{
                 left: 4,
                 borderRadius: 9999,
@@ -529,7 +541,7 @@ function DashboardServiceFilter({
             ] as const).map(([scope, label]) => (
               <button
                 key={scope}
-                className={`relative z-10 h-8 px-3 text-xs font-black transition-colors ${
+                className={`relative z-10 h-8 min-w-0 px-2 text-[11px] font-black transition-colors ${
                   filter.scope === scope
                     ? "text-white"
                     : "text-slate-600 hover:text-slate-950"
@@ -543,14 +555,13 @@ function DashboardServiceFilter({
             ))}
           </div>
 
-          <div className="flex h-10 min-w-[150px] flex-1 items-center border-l border-slate-200 pl-3 text-xs font-bold text-slate-500">
-            <span className="line-clamp-2 leading-4">
+          <div className="flex h-10 min-w-0 items-center border-l border-slate-200 pl-2 text-[11px] font-bold text-slate-500">
+            <span className="truncate">
               {filter.scope === "mine"
                 ? "내가 담당자로 등록된 서비스만 조회됩니다."
                 : "전체 서비스를 대상으로 조회됩니다."}
             </span>
           </div>
-        </div>
 
         <FilterSelect
           label="대분류"
@@ -594,16 +605,16 @@ function DashboardServiceFilter({
           }}
         />
 
-        <div className="flex shrink-0 items-end gap-2">
+        <div className="flex shrink-0 items-end gap-1.5">
           <button
-            className="h-9 shrink-0 border border-slate-200 bg-white px-4 text-xs font-black text-slate-700 hover:bg-slate-50"
+            className="h-9 shrink-0 border border-slate-200 bg-white px-3 text-[11px] font-black text-slate-700 hover:bg-slate-50"
             type="button"
             onClick={onReset}
           >
             초기화
           </button>
           <button
-            className="h-9 shrink-0 bg-[#1f2a44] px-5 text-xs font-black text-white shadow-sm hover:bg-[#263552]"
+            className="h-9 shrink-0 bg-[#1f2a44] px-4 text-[11px] font-black text-white shadow-sm hover:bg-[#263552]"
             type="button"
             onClick={onApply}
           >
@@ -631,10 +642,10 @@ function FilterSelect({
 }) {
   const normalizedOptions = value && !options.includes(value) ? [value, ...options] : options;
   return (
-    <label className="w-[150px] min-w-[130px] flex-[1_1_140px] max-w-[190px]">
+    <label className="min-w-0">
       <span className="mb-1 block text-[11px] font-black text-slate-600">{label}</span>
       <select
-        className="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-xs font-bold text-slate-800 outline-none focus:border-blue-500 disabled:bg-slate-50 disabled:text-slate-400"
+        className="h-9 w-full min-w-0 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-bold text-slate-800 outline-none focus:border-blue-500 disabled:bg-slate-50 disabled:text-slate-400"
         disabled={disabled}
         value={value}
         onChange={(event) => onChange(event.target.value)}
@@ -683,13 +694,13 @@ function ServiceSearchSelect({
   }, []);
 
   return (
-    <div className="relative min-w-[220px] flex-[1.2_1_240px] max-w-[320px]" ref={rootRef}>
+    <div className="relative min-w-0" ref={rootRef}>
       <label className="block">
         <span className="mb-1 block text-[11px] font-black text-slate-600">서비스 검색</span>
         <span className="relative block">
           <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
-            className="h-9 w-full rounded-md border border-slate-200 bg-white pl-9 pr-8 text-xs font-bold text-slate-800 outline-none focus:border-blue-500"
+            className="h-9 w-full min-w-0 rounded-md border border-slate-200 bg-white pl-8 pr-7 text-[11px] font-bold text-slate-800 outline-none focus:border-blue-500"
             placeholder="서비스명 또는 코드 검색"
             value={query}
             onFocus={() => setOpen(true)}
