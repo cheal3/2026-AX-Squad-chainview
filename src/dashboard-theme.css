@@ -3975,8 +3975,8 @@
 }
 
 .operation-page .pager__nav button.is-on {
-  background: #2563eb;
-  border-color: #2563eb;
+  background: var(--brand);
+  border-color: var(--brand);
   color: #fff;
 }
 
@@ -4428,6 +4428,144 @@
   font-weight: 800;
 }
 
+.operation-pattern-guide {
+  margin: 4px 0 14px;
+  border: 1px solid #dbe5f1;
+  border-radius: 7px;
+  background: #f8fafc;
+  padding: 10px 12px;
+  color: #526174;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.operation-pattern-guide code {
+  margin: 0 3px;
+  color: var(--brand);
+  font-weight: 800;
+}
+
+.operation-variable-head > div {
+  min-width: 0;
+}
+
+.operation-variable-head > div p {
+  margin: 4px 0 0;
+}
+
+.operation-variable-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 14px 0 16px;
+  border: 1px solid #dbe5f1;
+  border-radius: 7px;
+  background: #f8fafc;
+  padding: 10px;
+}
+
+.operation-variable-suggestions > span {
+  margin-right: 4px;
+  color: #526174;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.operation-variable-suggestions button {
+  min-height: 26px;
+  border: 1px solid #d9e0ea;
+  border-radius: 5px;
+  background: #fff;
+  padding: 0 8px;
+  color: #334155;
+  font-family: 'JetBrains Mono', 'Consolas', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.operation-variable-suggestions button:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+.operation-variable-labels {
+  display: grid;
+  grid-template-columns: minmax(110px, 1fr) minmax(100px, 0.9fr) 64px minmax(120px, 1fr) 36px;
+  gap: 8px;
+  padding: 0 4px 6px;
+  color: #657084;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.operation-variable-list {
+  display: grid;
+  gap: 8px;
+  max-height: 210px;
+  overflow-y: auto;
+  padding-right: 3px;
+}
+
+.operation-variable-row {
+  grid-template-columns: minmax(110px, 1fr) minmax(100px, 0.9fr) 64px minmax(120px, 1fr) 36px;
+}
+
+.operation-variable-row input {
+  width: 100%;
+}
+
+.operation-variable-row .ibtn {
+  width: 36px;
+  height: 36px;
+  border-color: #fecaca;
+  color: #dc2626;
+}
+
+.operation-template-preview {
+  margin-top: 18px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  padding: 14px;
+}
+
+.operation-template-preview > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.operation-template-preview h4,
+.operation-template-preview > div span {
+  margin: 0;
+}
+
+.operation-template-preview > div span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.operation-template-preview strong {
+  display: block;
+  color: #172033;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.operation-template-preview > p {
+  margin: 8px 0 0;
+  color: #526174;
+  font-size: 12px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 /* Keep operation lists as compact, scannable management tables. */
 .operation-page .btn {
   min-height: 34px;
@@ -4660,6 +4798,14 @@
 
   .operation-variable-row {
     grid-template-columns: 1fr;
+  }
+
+  .operation-variable-labels {
+    display: none;
+  }
+
+  .operation-variable-row .ibtn {
+    justify-self: end;
   }
 }
 .portal-initial-loader__ring {

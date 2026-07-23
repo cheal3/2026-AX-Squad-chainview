@@ -13,7 +13,7 @@ const operationMenuMeta = {
   "notification-templates": { section: "운영", label: "알림 템플릿 관리" },
 };
 
-const OPERATION_PAGE_SIZE = 10;
+const OPERATION_PAGE_SIZE = 5;
 
 function getOperationMenuMeta(activeMenu) {
   return operationMenuMeta[activeMenu] ?? { section: "운영", label: "운영" };
@@ -68,22 +68,27 @@ function OperationPageShell({ activeMenu, action, children, description, icon, t
 
 function OperationPager({ page, pageSize, setPage, total }) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const visiblePages = Array.from({ length: Math.min(5, totalPages) }, (_, index) => index + 1);
+  const firstVisiblePage = Math.max(1, Math.min(page - 2, totalPages - 4));
+  const visiblePages = Array.from(
+    { length: Math.min(5, totalPages) },
+    (_, index) => firstVisiblePage + index
+  );
   const start = total ? (page - 1) * pageSize + 1 : 0;
   const end = Math.min(page * pageSize, total);
+  const moveToPage = (nextPage) => {
+    setPage(Math.max(1, Math.min(nextPage, totalPages)));
+  };
 
   return (
     <div className="pager">
+      <div className="pager__info">전체 {total}건 · {start}-{end} / {page} 페이지</div>
       <div className="pager__nav">
-        <button disabled={page <= 1} onClick={() => setPage(page - 1)} type="button">‹</button>
+        <button aria-label="이전 페이지" disabled={page <= 1} onClick={() => moveToPage(page - 1)} type="button">‹</button>
         {visiblePages.map((pageNumber) => (
-          <button className={pageNumber === page ? "is-on" : ""} key={pageNumber} onClick={() => setPage(pageNumber)} type="button">{pageNumber}</button>
+          <button aria-current={pageNumber === page ? "page" : undefined} className={pageNumber === page ? "is-on" : ""} key={pageNumber} onClick={() => moveToPage(pageNumber)} type="button">{pageNumber}</button>
         ))}
-        {totalPages > 6 ? <span>...</span> : null}
-        {totalPages > 5 ? <button className={totalPages === page ? "is-on" : ""} onClick={() => setPage(totalPages)} type="button">{totalPages}</button> : null}
-        <button disabled={page >= totalPages} onClick={() => setPage(page + 1)} type="button">›</button>
+        <button aria-label="다음 페이지" disabled={page >= totalPages} onClick={() => moveToPage(page + 1)} type="button">›</button>
       </div>
-      <div className="pager__info">{start}-{end} of {total}</div>
     </div>
   );
 }
@@ -363,6 +368,51 @@ export function NotificationTemplatePage() {
 }
 
 function TemplateModal({ onClose, row }) {
+  const [titlePattern, setTitlePattern] = useState(row?.title ?? "[장애] {{serviceName}}");
+  const [bodyPattern, setBodyPattern] = useState(
+    "{{serviceName}}에서 {{severityName}} 등급의 장애가 발생했습니다.\n영향 범위: {{impactSummary}}"
+  );
+  const [variables, setVariables] = useState([
+    { key: "serviceName", label: "서비스명", required: true, example: "결제 서비스" },
+    { key: "severityName", label: "심각도", required: true, example: "치명" },
+    { key: "impactSummary", label: "영향 요약", required: false, example: "로그인 및 결제 지연" },
+  ]);
+  const recommendedVariables = [
+    ["hostName", "호스트명"],
+    ["incidentTitle", "인시던트 제목"],
+    ["mgmtDept", "관리 부서"],
+    ["serverName", "서버명"],
+    ["serviceCode", "서비스 코드"],
+  ];
+  const updateVariable = (index, field, value) => {
+    setVariables((current) =>
+      current.map((variable, variableIndex) =>
+        variableIndex === index ? { ...variable, [field]: value } : variable
+      )
+    );
+  };
+  const addVariable = (key = "", label = "") => {
+    if (key && variables.some((variable) => variable.key === key)) {
+      setBodyPattern((current) => `${current}${current ? " " : ""}{{${key}}}`);
+      return;
+    }
+    setVariables((current) => [
+      ...current,
+      { key, label, required: false, example: "" },
+    ]);
+    if (key) {
+      setBodyPattern((current) => `${current}${current ? " " : ""}{{${key}}}`);
+    }
+  };
+  const renderPreview = (pattern) =>
+    variables.reduce(
+      (result, variable) =>
+        variable.key
+          ? result.replaceAll(`{{${variable.key}}}`, variable.example || `[${variable.label || variable.key}]`)
+          : result,
+      pattern
+    );
+
   return (
     <ModalBackdrop onClose={onClose}>
       <div className="modal modal--lg operation-modal operation-modal--template" onClick={(event) => event.stopPropagation()}>
@@ -378,17 +428,41 @@ function TemplateModal({ onClose, row }) {
               <OperationFormRow label="용도" required><select defaultValue={row?.purpose ?? ""}><option value="">선택하세요</option><option>인시던트</option><option>서비스 장애</option></select></OperationFormRow>
               <OperationFormRow label="활성" required><select defaultValue={row?.active ?? "Y"}><option>Y</option><option>N</option></select></OperationFormRow>
             </div>
-            <OperationFormRow label="제목 패턴"><input defaultValue={row?.title ?? "[장애] {{serviceName}}"} type="text" /></OperationFormRow>
-            <OperationFormRow label="본문 패턴" required><textarea placeholder="본문 내용을 입력하세요." rows={5} /></OperationFormRow>
+            <div className="operation-pattern-guide">
+              제목과 본문에 <code>{"{{변수명}}"}</code>을 입력하면 발송 시 실제 값으로 치환됩니다.
+            </div>
+            <OperationFormRow label="제목 패턴"><input value={titlePattern} onChange={(event) => setTitlePattern(event.target.value)} type="text" /></OperationFormRow>
+            <OperationFormRow label="본문 패턴" required><textarea value={bodyPattern} onChange={(event) => setBodyPattern(event.target.value)} placeholder="예: {{serviceName}} 장애가 발생했습니다." rows={6} /></OperationFormRow>
             <OperationFormRow label="설명"><textarea placeholder="검색·관리를 위한 설명을 입력하세요. (선택)" rows={4} /></OperationFormRow>
           </section>
           <section className="operation-variable-panel">
-            <div className="operation-variable-head"><h4>템플릿 변수</h4><button className="btn btn--sm" type="button"><Plus size={14} /> 변수 추가</button></div>
-            <p>권장 키: hostName, impactSummary, incidentTitle, mgmtDept, serverName, serviceCode, serviceName, severityName</p>
-            <div className="operation-variable-row"><input defaultValue="serviceName" /><input defaultValue="서비스명" /><label><input defaultChecked type="checkbox" /> 필수</label><input defaultValue="결제 서비스" /><button className="btn btn--sm" type="button">×</button></div>
+            <div className="operation-variable-head"><div><h4>템플릿 변수</h4><p>변수명과 미리보기용 예시값을 등록하세요.</p></div><button className="btn btn--sm" onClick={() => addVariable()} type="button"><Plus size={14} /> 직접 추가</button></div>
+            <div className="operation-variable-suggestions">
+              <span>본문에 빠른 삽입</span>
+              {recommendedVariables.map(([key, label]) => (
+                <button key={key} onClick={() => addVariable(key, label)} title={`${label} 변수를 본문 끝에 삽입`} type="button">+ {key}</button>
+              ))}
+            </div>
+            <div className="operation-variable-labels"><span>변수명</span><span>표시 이름</span><span>필수</span><span>예시값</span><span /></div>
+            <div className="operation-variable-list">
+              {variables.map((variable, index) => (
+                <div className="operation-variable-row" key={`${variable.key}-${index}`}>
+                  <input aria-label="변수명" value={variable.key} onChange={(event) => updateVariable(index, "key", event.target.value)} placeholder="serviceName" />
+                  <input aria-label="표시 이름" value={variable.label} onChange={(event) => updateVariable(index, "label", event.target.value)} placeholder="서비스명" />
+                  <label><input checked={variable.required} onChange={(event) => updateVariable(index, "required", event.target.checked)} type="checkbox" /> 필수</label>
+                  <input aria-label="예시값" value={variable.example} onChange={(event) => updateVariable(index, "example", event.target.value)} placeholder="결제 서비스" />
+                  <button aria-label={`${variable.key || "변수"} 삭제`} className="ibtn" onClick={() => setVariables((current) => current.filter((_, variableIndex) => variableIndex !== index))} title="변수 삭제" type="button"><Trash2 size={15} /></button>
+                </div>
+              ))}
+            </div>
+            <div className="operation-template-preview">
+              <div><h4>발송 미리보기</h4><span>예시값 기준</span></div>
+              <strong>{renderPreview(titlePattern)}</strong>
+              <p>{renderPreview(bodyPattern)}</p>
+            </div>
           </section>
         </div>
-        <div className="modal__foot"><button className="btn" onClick={onClose} type="button">취소</button><button className="btn btn--primary op-btn-dark" onClick={onClose} type="button">등록</button></div>
+        <div className="modal__foot"><button className="btn" onClick={onClose} type="button">취소</button><button className="btn btn--primary op-btn-dark" onClick={onClose} type="button">{row ? "저장" : "등록"}</button></div>
       </div>
     </ModalBackdrop>
   );
