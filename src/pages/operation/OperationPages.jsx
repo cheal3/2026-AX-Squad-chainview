@@ -544,7 +544,7 @@ export function NotificationTemplatePage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [modal, setModal] = useState(null);
-  const [templates, setTemplates] = useState(() => notificationTemplateRows.map(normalizeTemplateRow));
+  const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState("");
   const pageSize = OPERATION_PAGE_SIZE;
@@ -564,7 +564,7 @@ export function NotificationTemplatePage() {
     } catch (error) {
       console.warn("알림 템플릿 목록 조회 실패", error);
       setLoadError(error?.message || "알림 템플릿 목록 조회에 실패했습니다.");
-      setTemplates(notificationTemplateRows.map(normalizeTemplateRow));
+      setTemplates([]);
     } finally {
       setLoading(false);
     }
@@ -646,25 +646,34 @@ export function NotificationTemplatePage() {
       </div>
       <div className="operation-summary"><b>총 {rows.length}개 템플릿</b>{loading ? <span>조회 중</span> : null}{loadError ? <span className="text-red-600">{loadError}</span> : null}</div>
       <div className="card operation-card">
-        <table className="tbl operation-table operation-table--templates">
-          <thead><tr><th>템플릿</th><th>채널</th><th>용도</th><th>변수</th><th>상태</th><th className="col-actions">관리</th></tr></thead>
-          <tbody>
-            {pagedRows.map((row) => (
-              <tr key={row.code}>
-                <td title={`${row.name} · ${row.code}`}><button className="op-text-link" onClick={() => setModal(row)} type="button"><span>{row.name}</span><small>{row.code}</small></button></td>
-                <td>{optionLabel(templateChannelOptions, row.channel)}</td>
-                <td>{optionLabel(templatePurposeOptions, row.purpose)}</td>
-                <td>{row.variables}</td>
-                <td><span className="pill pill--ok">{row.active === "Y" ? "활성" : "비활성"}</span></td>
-                <td><div className="row-actions op-row-actions"><OperationIconButton label="템플릿 수정" onClick={() => setModal(row)}><Pencil size={16} /></OperationIconButton><OperationIconButton danger label={row.active === "Y" ? "템플릿 비활성" : "템플릿 활성"} onClick={() => handleToggleTemplate(row)}><Power size={16} /></OperationIconButton></div></td>
-              </tr>
-            ))}
-            {!pagedRows.length ? (
-              <tr><td colSpan={6}>등록된 알림 템플릿이 없습니다.</td></tr>
-            ) : null}
-          </tbody>
-        </table>
-        <OperationPager page={page} pageSize={pageSize} setPage={setPage} total={rows.length} />
+        {loading && !rows.length ? (
+          <div className="inline-data-loader" role="status" aria-live="polite">
+            <span className="portal-initial-loader__ring" aria-hidden="true" />
+            <span>알림 템플릿을 불러오는 중입니다.</span>
+          </div>
+        ) : (
+          <>
+            <table className="tbl operation-table operation-table--templates">
+              <thead><tr><th>템플릿</th><th>채널</th><th>용도</th><th>변수</th><th>상태</th><th className="col-actions">관리</th></tr></thead>
+              <tbody>
+                {pagedRows.map((row) => (
+                  <tr key={row.code}>
+                    <td title={`${row.name} · ${row.code}`}><button className="op-text-link" onClick={() => setModal(row)} type="button"><span>{row.name}</span><small>{row.code}</small></button></td>
+                    <td>{optionLabel(templateChannelOptions, row.channel)}</td>
+                    <td>{optionLabel(templatePurposeOptions, row.purpose)}</td>
+                    <td>{row.variables}</td>
+                    <td><span className="pill pill--ok">{row.active === "Y" ? "활성" : "비활성"}</span></td>
+                    <td><div className="row-actions op-row-actions"><OperationIconButton label="템플릿 수정" onClick={() => setModal(row)}><Pencil size={16} /></OperationIconButton><OperationIconButton danger label={row.active === "Y" ? "템플릿 비활성" : "템플릿 활성"} onClick={() => handleToggleTemplate(row)}><Power size={16} /></OperationIconButton></div></td>
+                  </tr>
+                ))}
+                {!pagedRows.length ? (
+                  <tr><td colSpan={6}>등록된 알림 템플릿이 없습니다.</td></tr>
+                ) : null}
+              </tbody>
+            </table>
+            <OperationPager page={page} pageSize={pageSize} setPage={setPage} total={rows.length} />
+          </>
+        )}
       </div>
       {modal ? <TemplateModal row={modal.code ? modal : null} onClose={() => setModal(null)} onSave={handleSaveTemplate} /> : null}
     </OperationPageShell>
