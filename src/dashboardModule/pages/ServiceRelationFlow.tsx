@@ -433,7 +433,7 @@ export function ServiceRelationFlow({
     incidentMode ? 1 : initialRelationDepth ?? (hideDepthToggle ? MAX_RELATION_DEPTH : 1)
   );
   const [graphViewMode, setGraphViewMode] = useState<GraphViewMode>(
-    infraIncident
+    incidentMode || infraIncident
       ? "all"
       : initialInfraDepth > 0
         ? "infra"
@@ -462,7 +462,7 @@ export function ServiceRelationFlow({
 
   useEffect(() => {
     if (incidentMode) {
-      setGraphViewMode(infraIncident ? "all" : "service");
+      setGraphViewMode("all");
     }
   }, [incidentMode, infraIncident]);
 
@@ -957,7 +957,7 @@ export function ServiceRelationFlow({
     if (infraIncident) {
       return incidentInfraNodeIds ?? new Set<number>();
     }
-    if (!serviceFilter) {
+    if (!incidentMode && !serviceFilter) {
       return null;
     }
 
