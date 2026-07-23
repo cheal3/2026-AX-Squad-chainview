@@ -1725,12 +1725,8 @@ export function ServiceRelationFlow({
           id: String(relation.relationId),
           source: String(relation.sourceServiceId),
           target: String(relation.targetServiceId),
-          ...(showAllServices
-            ? {
-                sourceHandle: sourceIsLeft ? "right-source" : "left-source",
-                targetHandle: sourceIsLeft ? "left-target" : "right-target",
-              }
-            : {}),
+          sourceHandle: sourceIsLeft ? "right-source" : "left-source",
+          targetHandle: sourceIsLeft ? "left-target" : "right-target",
           type: "default",
           className: directlyConnected
             ? "chainview-flow-edge chainview-flow-edge-active"
@@ -3437,7 +3433,8 @@ function ServiceNode({ data }: { data: ServiceNodeData }) {
         data.onSelectServiceNode(data.serviceId);
       }}
     >
-      <Handle type="target" position={Position.Left} />
+      <Handle id="left-target" type="target" position={Position.Left} />
+      <Handle id="left-source" type="source" position={Position.Left} />
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="truncate text-sm font-semibold text-slate-950">
@@ -3477,7 +3474,8 @@ function ServiceNode({ data }: { data: ServiceNodeData }) {
           {data.ownerGroup}
         </span>
       </div>
-      <Handle type="source" position={Position.Right} />
+      <Handle id="right-target" type="target" position={Position.Right} />
+      <Handle id="right-source" type="source" position={Position.Right} />
     </button>
   );
 }
