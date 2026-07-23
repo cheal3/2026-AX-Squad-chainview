@@ -145,6 +145,31 @@ function fallbackInfraNodeIdForServer(serverId: number) {
   return -Math.abs(Number(serverId) || 0) - 100000;
 }
 
+function findCenterAnchorNode(nodes: Node<GraphNodeData>[]) {
+  const contentNodes = nodes.filter((node) => node.type !== "laneNode");
+  if (!contentNodes.length) {
+    return undefined;
+  }
+
+  const center = contentNodes.reduce(
+    (sum, node) => ({
+      x: sum.x + node.position.x,
+      y: sum.y + node.position.y,
+    }),
+    { x: 0, y: 0 }
+  );
+  center.x /= contentNodes.length;
+  center.y /= contentNodes.length;
+
+  return contentNodes.reduce((closest, node) => {
+    const closestDistance =
+      Math.abs(closest.position.x - center.x) + Math.abs(closest.position.y - center.y);
+    const nodeDistance =
+      Math.abs(node.position.x - center.x) + Math.abs(node.position.y - center.y);
+    return nodeDistance < closestDistance ? node : closest;
+  }, contentNodes[0]);
+}
+
 const NODE_WIDTH = 240;
 const X_SPACING = 470;
 const Y_SPACING = 238;
@@ -1649,8 +1674,8 @@ export function ServiceRelationFlow({
 
   const laneNodes = useMemo<Node<LaneNodeData>[]>(() => {
     const nodes: Node<LaneNodeData>[] = [];
-    const lanes = showAllServices
-      ? [0, 1, 2, 3, 4]
+    const lanes = showAllServices || graphViewMode !== "service"
+      ? [-2, -1, 0, 1, 2, 3, 4]
       : Array.from(
           { length: relationDepth * 2 + 1 },
           (_, index) => index - relationDepth
@@ -1678,7 +1703,7 @@ export function ServiceRelationFlow({
 
     });
     return nodes;
-  }, [relationDepth, showAllServices]);
+  }, [graphViewMode, relationDepth, showAllServices]);
 
   const openServiceDetail = (serviceId: number) => {
     setDetailServiceId(serviceId);
@@ -2343,10 +2368,10 @@ export function ServiceRelationFlow({
       }
 
       if (graphViewMode === "infra") {
-        return topologyNodes;
+        return [...laneNodes, ...topologyNodes];
       }
 
-      return [...serviceNodes, ...topologyNodes];
+      return [...laneNodes, ...serviceNodes, ...topologyNodes];
     },
     [graphViewMode, laneNodes, serviceNodes, topologyNodes]
   );
@@ -2409,7 +2434,12 @@ export function ServiceRelationFlow({
   ]);
 
   useEffect(() => {
-    if (!initialFitView || !flowInstance || initialFitViewDoneRef.current) {
+    if (
+      !initialFitView ||
+      !flowInstance ||
+      initialFitViewDoneRef.current ||
+      autoCenter
+    ) {
       return;
     }
 
@@ -2433,6 +2463,7 @@ export function ServiceRelationFlow({
     initialFitView,
     initialFitZoom,
     nodes.length,
+    autoCenter,
     showAllServices,
   ]);
 
@@ -2446,14 +2477,19 @@ export function ServiceRelationFlow({
         return;
       }
 
-      const anchorServiceId =
-        selectedServiceNodeId ??
-        (serviceById.has(focusedServiceId) ? focusedServiceId : filteredServices[0]?.serviceId);
+      const fallbackCenterNode = findCenterAnchorNode(nodes);
+      const anchorServiceId = selectedServiceNodeId ?? (
+        graphViewMode === "service" && serviceById.has(focusedServiceId)
+          ? focusedServiceId
+          : undefined
+      );
       const anchorNode = selectedInfraNodeId
         ? nodes.find((node) => node.id === `infra-${selectedInfraNodeId}`)
-        : nodes.find((node) => node.id === String(anchorServiceId));
+        : anchorServiceId
+          ? nodes.find((node) => node.id === String(anchorServiceId)) ?? fallbackCenterNode
+          : fallbackCenterNode;
       const expanded = relationDepth > 1;
-      const autoCenterKey = `${graphViewMode}:${anchorServiceId ?? "none"}:${selectedInfraNodeId ?? "none"}:${relationDepth}:${query}`;
+      const autoCenterKey = `${graphViewMode}:${anchorNode?.id ?? "none"}:${selectedInfraNodeId ?? "none"}:${relationDepth}:${query}`;
 
       if (
         userMovedViewportRef.current &&
@@ -2467,7 +2503,16 @@ export function ServiceRelationFlow({
       }
 
       flowInstance.setCenter(anchorNode.position.x + NODE_WIDTH / 2, anchorNode.position.y, {
-        zoom: showAllServices ? 0.62 : expanded ? 0.58 : 0.9,
+        zoom:
+          graphViewMode === "all"
+            ? incidentMode
+              ? 0.68
+              : 0.72
+            : graphViewMode === "infra"
+              ? 0.74
+              : expanded
+                ? 0.58
+                : 0.9,
         duration: 800,
       });
       autoCenteredKeyRef.current = autoCenterKey;
@@ -2486,6 +2531,7 @@ export function ServiceRelationFlow({
     selectedInfraNodeId,
     selectedServiceNodeId,
     serviceById,
+    incidentMode,
     showAllServices,
   ]);
 
@@ -2779,6 +2825,11 @@ export function ServiceRelationFlow({
         }
 
         .chainview-flow-all .chainview-lane-label {
+          display: none;
+        }
+
+        .chainview-flow-dark .chainview-lane-label,
+        .chainview-flow-incident .chainview-lane-label {
           display: none;
         }
 
