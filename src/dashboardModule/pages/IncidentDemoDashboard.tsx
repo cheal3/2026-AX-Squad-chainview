@@ -1413,7 +1413,13 @@ function IncidentCommandDashboard({
 }) {
   const rootService =
     services.find((service) => service.serviceId === incident.serviceId) ??
-    services[0];
+    (incident.incidentTypeCode === "SERVICE"
+      ? services.find(
+          (service) =>
+            service.serviceCode === incident.targetCode ||
+            service.serviceName === incident.targetLabel
+        )
+      : undefined);
   const impact = buildIncidentImpactColumns(rootService, services, relations);
   const impactedCount = impact.level1.length + impact.level2.length;
   const incidentTitle = incident.title || `${rootService?.serviceName ?? "서비스"} 장애 발생`;
@@ -1502,8 +1508,10 @@ function IncidentCommandDashboard({
               hideDetailPanel
               hideTopControl
               incidentMode
-              initialRelationDepth={2}
+              incident={incident}
+              initialRelationDepth={1}
               initialServiceId={rootService?.serviceId}
+              showAllServices={incident.incidentTypeCode === "SERVER"}
             />
           </div>
         </section>
@@ -1516,8 +1524,10 @@ function IncidentCommandDashboard({
             hideDepthToggle
             hideTopControl
             incidentMode
-            initialRelationDepth={2}
+            incident={incident}
+            initialRelationDepth={1}
             initialServiceId={rootService?.serviceId}
+            showAllServices={incident.incidentTypeCode === "SERVER"}
             />
           </RelationFlowModal>
         ) : null}

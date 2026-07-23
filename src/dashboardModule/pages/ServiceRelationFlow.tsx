@@ -303,6 +303,7 @@ export function ServiceRelationFlow({
   initialInfraDepth = 0,
   initialRelationDepth,
   initialViewport,
+  incident,
   incidentMode = false,
   incidentCanvasTone = "dark",
   initialServiceId,
@@ -327,6 +328,7 @@ export function ServiceRelationFlow({
   initialInfraDepth?: number;
   initialRelationDepth?: number;
   initialViewport?: { x: number; y: number; zoom: number };
+  incident?: IncidentRecord;
   incidentMode?: boolean;
   incidentCanvasTone?: IncidentCanvasTone;
   initialServiceId?: number;
@@ -351,17 +353,17 @@ export function ServiceRelationFlow({
     : portalData;
   const { services, relations, owners, servers, techStacks, incidents } =
     dataSource;
-  const filteredServices = useMemo(
+  const baseFilteredServices = useMemo(
     () => (serviceFilter ? services.filter((service) => serviceFilter(service)) : services),
     [serviceFilter, services]
-  );
-  const allowedServiceIds = useMemo(
-    () => new Set(filteredServices.map((service) => service.serviceId)),
-    [filteredServices]
   );
   const activeIncident = useMemo<IncidentRecord | undefined>(() => {
     if (!incidentMode) {
       return undefined;
+    }
+
+    if (incident) {
+      return incident;
     }
 
     return (
@@ -372,9 +374,31 @@ export function ServiceRelationFlow({
       ) ??
       incidents.find((incident) => incident.incidentStatusCode !== "RESOLVED")
     );
-  }, [incidentMode, incidents, initialServiceId]);
+  }, [incident, incidentMode, incidents, initialServiceId]);
+  const infraIncident = activeIncident?.incidentTypeCode === "SERVER";
+  const incidentServiceId = useMemo(() => {
+    if (!activeIncident || infraIncident) {
+      return undefined;
+    }
+    if (activeIncident.serviceId) {
+      return activeIncident.serviceId;
+    }
+
+    const targetValues = [activeIncident.targetCode, activeIncident.targetLabel]
+      .map(normalizeGraphLookupValue)
+      .filter(Boolean);
+    return services.find((service) => {
+      const code = normalizeGraphLookupValue(service.serviceCode);
+      const name = normalizeGraphLookupValue(service.serviceName);
+      return targetValues.some(
+        (target) =>
+          (Boolean(code) && (target === code || target.includes(code))) ||
+          (Boolean(name) && target === name)
+      );
+    })?.serviceId;
+  }, [activeIncident, infraIncident, services]);
   const initialFocusedServiceId =
-    initialServiceId ?? activeIncident?.serviceId ?? filteredServices[0]?.serviceId ?? 0;
+    initialServiceId ?? incidentServiceId ?? baseFilteredServices[0]?.serviceId ?? 0;
   const [focusedServiceId, setFocusedServiceId] = useState<number>(
     initialFocusedServiceId
   );
@@ -388,10 +412,16 @@ export function ServiceRelationFlow({
     number | null
   >(null);
   const [relationDepth, setRelationDepth] = useState(
-    initialRelationDepth ?? (hideDepthToggle ? MAX_RELATION_DEPTH : 1)
+    incidentMode ? 1 : initialRelationDepth ?? (hideDepthToggle ? MAX_RELATION_DEPTH : 1)
   );
   const [graphViewMode, setGraphViewMode] = useState<GraphViewMode>(
-    initialInfraDepth > 0 ? "infra" : showAllServices && !incidentMode ? "all" : "service"
+    infraIncident
+      ? "all"
+      : initialInfraDepth > 0
+        ? "infra"
+        : showAllServices && !incidentMode
+          ? "all"
+          : "service"
   );
   const remoteInfraEnabled = shouldUseRemoteInfraApi();
   const [infraGraphNodes, setInfraGraphNodes] = useState<InfraGraphNodeRecord[]>(
@@ -411,6 +441,12 @@ export function ServiceRelationFlow({
   const userMovedViewportRef = useRef(false);
   const autoCenteredKeyRef = useRef("");
   const initialFitViewDoneRef = useRef(false);
+
+  useEffect(() => {
+    if (incidentMode) {
+      setGraphViewMode(infraIncident ? "all" : "service");
+    }
+  }, [incidentMode, infraIncident]);
 
   useEffect(() => {
     if (graphViewMode === "service") {
@@ -628,7 +664,104 @@ export function ServiceRelationFlow({
 
     return next;
   }, [infraGraphNodes, serverById, services]);
+  const incidentInfraNodeId = useMemo(() => {
+    if (!infraIncident || !activeIncident) {
+      return undefined;
+    }
+
+    const incidentServer = activeIncident.serverId
+      ? serverById.get(activeIncident.serverId)
+      : undefined;
+    if (incidentServer?.infraNodeId) {
+      return incidentServer.infraNodeId;
+    }
+
+    const lookupValues = [
+      activeIncident.targetCode,
+      activeIncident.targetLabel,
+      incidentServer?.infraNodeCode,
+      incidentServer?.infraNodeName,
+      incidentServer?.hostName,
+      incidentServer?.serverName,
+      incidentServer ? inferInfraNodeCodeForServer(incidentServer) : undefined,
+    ]
+      .map(normalizeGraphLookupValue)
+      .filter(Boolean);
+
+    return infraGraphNodes.find((node) => {
+      const code = normalizeGraphLookupValue(node.nodeCode);
+      const name = normalizeGraphLookupValue(node.nodeName);
+      return lookupValues.some(
+        (lookup) =>
+          (Boolean(code) && (lookup === code || lookup.includes(code))) ||
+          (Boolean(name) && lookup === name)
+      );
+    })?.infraNodeId;
+  }, [activeIncident, infraGraphNodes, infraIncident, serverById]);
+  const incidentInfraNodeIds = useMemo(() => {
+    if (!incidentInfraNodeId) {
+      return null;
+    }
+
+    const nodeIds = new Set<number>([incidentInfraNodeId]);
+    infraGraphRelations.forEach((relation) => {
+      if (relation.sourceInfraNodeId === incidentInfraNodeId) {
+        nodeIds.add(relation.targetInfraNodeId);
+      }
+      if (relation.targetInfraNodeId === incidentInfraNodeId) {
+        nodeIds.add(relation.sourceInfraNodeId);
+      }
+    });
+    return nodeIds;
+  }, [incidentInfraNodeId, infraGraphRelations]);
+  const incidentServiceIds = useMemo(() => {
+    if (!incidentMode || !activeIncident) {
+      return null;
+    }
+
+    const directIds = new Set<number>();
+    if (infraIncident) {
+      if (!incidentInfraNodeId) {
+        return directIds;
+      }
+      serviceInfraTargetByServiceId.forEach((infraNodeId, serviceId) => {
+        if (infraNodeId === incidentInfraNodeId) {
+          directIds.add(serviceId);
+        }
+      });
+    } else if (incidentServiceId) {
+      directIds.add(incidentServiceId);
+    }
+
+    const scopedIds = new Set(directIds);
+    relations.forEach((relation) => {
+      if (relation.relationStatusCode !== "ACTIVE") {
+        return;
+      }
+      if (directIds.has(relation.sourceServiceId)) {
+        scopedIds.add(relation.targetServiceId);
+      }
+      if (directIds.has(relation.targetServiceId)) {
+        scopedIds.add(relation.sourceServiceId);
+      }
+    });
+    return scopedIds;
+  }, [activeIncident, incidentInfraNodeId, incidentMode, incidentServiceId, infraIncident, relations, serviceInfraTargetByServiceId]);
+  const filteredServices = useMemo(
+    () =>
+      incidentServiceIds
+        ? baseFilteredServices.filter((service) => incidentServiceIds.has(service.serviceId))
+        : baseFilteredServices,
+    [baseFilteredServices, incidentServiceIds]
+  );
+  const allowedServiceIds = useMemo(
+    () => new Set(filteredServices.map((service) => service.serviceId)),
+    [filteredServices]
+  );
   const filteredInfraNodeIds = useMemo(() => {
+    if (infraIncident) {
+      return incidentInfraNodeIds ?? new Set<number>();
+    }
     if (!serviceFilter) {
       return null;
     }
@@ -649,7 +782,7 @@ export function ServiceRelationFlow({
       }
     });
     return visibleNodeIds;
-  }, [filteredServices, infraGraphRelations, serviceFilter, serviceInfraTargetByServiceId]);
+  }, [filteredServices, incidentInfraNodeIds, infraGraphRelations, infraIncident, serviceFilter, serviceInfraTargetByServiceId]);
   const scopedInfraGraphNodes = useMemo(
     () =>
       filteredInfraNodeIds
@@ -736,7 +869,7 @@ export function ServiceRelationFlow({
     [allowedServiceIds, relations]
   );
   const activeIncidentServiceId =
-    activeIncident?.serviceId ?? initialFocusedServiceId;
+    incidentServiceId ?? initialFocusedServiceId;
   const activeIncidentConnectedServiceIds = useMemo(() => {
     const connected = new Set<number>();
     activeRelations.forEach((relation) => {
@@ -1259,7 +1392,7 @@ export function ServiceRelationFlow({
 
     return visibleServices.map((service) => {
       const incidentStatusCode =
-        service.serviceId === activeIncidentServiceId
+        !infraIncident && service.serviceId === activeIncidentServiceId
           ? "INCIDENT"
           : "IMPACTED";
       const lane = laneByServiceId.get(service.serviceId) ?? 0;
@@ -1329,6 +1462,7 @@ export function ServiceRelationFlow({
     detailServiceId,
     graphViewMode,
     incidentMode,
+    infraIncident,
     laneByServiceId,
     highlightServiceId,
     hideNodeActions,
@@ -1466,21 +1600,27 @@ export function ServiceRelationFlow({
             },
             data: {
               connected:
-                allMode
+                incidentMode
+                  ? true
+                  : allMode
                   ? (!hasSelectedServiceInAllMode &&
                       !hasSelectedInfraInAllMode) ||
                     connectedToSelectedService ||
                     connectedToSelectedInfra
                   : selectedInfraConnectedNodeIds.has(node.infraNodeId),
               dimmed:
-                allMode
+                incidentMode
+                  ? false
+                  : allMode
                   ? (hasSelectedServiceInAllMode ||
                       hasSelectedInfraInAllMode) &&
                     !connectedToSelectedService &&
                     !connectedToSelectedInfra
                   : Boolean(selectedInfraNodeId) &&
                     !selectedInfraConnectedNodeIds.has(node.infraNodeId),
-              focused: allMode
+              focused: incidentMode
+                ? node.infraNodeId === incidentInfraNodeId
+                : allMode
                 ? connectedToSelectedService ||
                   selectedInfraNodeId === node.infraNodeId
                 : selectedInfraNodeId === node.infraNodeId,
@@ -1499,6 +1639,8 @@ export function ServiceRelationFlow({
     return nodes;
   }, [
     graphViewMode,
+    incidentInfraNodeId,
+    incidentMode,
     scopedInfraGraphNodes,
     scopedInfraGraphRelations,
     selectedInfraConnectedNodeIds,
@@ -1799,7 +1941,7 @@ export function ServiceRelationFlow({
     setFocusedServiceId(initialFocusedServiceId);
     setDetailServiceId(initialFocusedServiceId);
     setDetailOpen(true);
-    setRelationDepth(initialRelationDepth ?? 2);
+    setRelationDepth(incidentMode ? 1 : initialRelationDepth ?? 2);
     userMovedViewportRef.current = false;
   }, [incidentMode, initialFocusedServiceId, initialRelationDepth, initialServiceId]);
 
