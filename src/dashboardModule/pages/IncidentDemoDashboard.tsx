@@ -25,8 +25,8 @@ import {
   type InfraGraphNodeRecord,
 } from "./ServiceRelationFlow";
 import { usePortalData } from "../PortalDataStore";
-import type { IncidentRecord, ServiceRecord, ServiceRelationRecord } from "../mockData";
-import { chainViewApi, chainViewEmployeeNo } from "../chainViewApi";
+import { codeLabels, type IncidentRecord, type ServiceRecord, type ServiceRelationRecord } from "../mockData";
+import { chainViewEmployeeNo } from "../chainViewApi";
 import { useNavigate } from "react-router-dom";
 
 const DASHBOARD_FILTER_STORAGE_KEY = "chainview.dashboard.service-filter.v1";
@@ -112,6 +112,7 @@ function uniqueLabels(values: string[]) {
 type DashboardManagementRow = [string, string, string];
 type DashboardChangeRow = {
   change: string;
+  detail: string;
   key: string;
   service: string;
   sortAt: string;
@@ -192,32 +193,30 @@ function buildManagementRows({
   ];
 }
 
-function normalizeDashboardChangeRow(row: unknown, service: ServiceRecord): DashboardChangeRow | null {
-  if (!row || typeof row !== "object") return null;
-  const record = row as Record<string, unknown>;
-  const at =
-    record.changedAt ||
-    record.createdAt ||
-    record.updatedAt ||
-    record.occurredAt ||
-    record.at ||
-    "";
-  const change =
-    record.changeTypeName ||
-    record.changeTypeCode ||
-    record.actionType ||
-    record.action ||
-    record.type ||
-    record.fieldName ||
-    record.changedField ||
-    "변경";
-  return {
-    change: String(change),
-    key: String(record.changeHistoryId || record.historyId || record.id || `${service.serviceId}-${at}-${change}`),
-    service: service.serviceName,
-    sortAt: String(at),
-    time: relativeDashboardTime(at),
-  };
+function buildRecentChangeRows(services: ServiceRecord[]): DashboardChangeRow[] {
+  return [...services]
+    .sort((left, right) => String(right.updatedAt || "").localeCompare(String(left.updatedAt || "")))
+    .slice(0, 4)
+    .map((service) => {
+      const statusLabel = service.statusCode
+        ? codeLabels.serviceStatus[service.statusCode] ?? service.statusCode
+        : "";
+      const deploymentLabel = service.deploymentStatusCode
+        ? codeLabels.deploymentStatus[service.deploymentStatusCode] ?? service.deploymentStatusCode
+        : "";
+      return {
+        change: service.updatedAt === service.createdAt ? "서비스 등록" : "서비스 정보 수정",
+        detail: [
+          statusLabel ? `상태 ${statusLabel}` : "",
+          deploymentLabel ? `배포 ${deploymentLabel}` : "",
+          service.updatedBy ? `수정자 ${service.updatedBy}` : "",
+        ].filter(Boolean).join(" · ") || service.categoryPath?.join(" > ") || "변경 상세 미등록",
+        key: `${service.serviceId}-${service.updatedAt}`,
+        service: service.serviceName,
+        sortAt: service.updatedAt,
+        time: relativeDashboardTime(service.updatedAt),
+      };
+    });
 }
 
 function buildRecentIncidentRows({
@@ -346,8 +345,6 @@ function DashboardCase({
     services,
     users,
   } = dashboardData;
-  const [recentChangeRows, setRecentChangeRows] = useState<DashboardChangeRow[]>([]);
-  const [recentChangeLoading, setRecentChangeLoading] = useState(false);
 
   useEffect(() => {
     if (activeIncident || !portalData.remoteApi.enabled || filterLookupRequestedRef.current) return;
@@ -359,49 +356,6 @@ function DashboardCase({
       void portalData.remoteApi.testQuery("users");
     }
   }, [activeIncident, portalData]);
-
-  useEffect(() => {
-    if (!services.length) {
-      setRecentChangeRows([]);
-      return undefined;
-    }
-
-    let cancelled = false;
-    setRecentChangeLoading(true);
-    Promise.all(
-      services.map((service) =>
-        chainViewApi.services
-          .changeHistory(Number(service.serviceId))
-          .then((rows) =>
-            Array.isArray(rows)
-              ? rows.map((row) => normalizeDashboardChangeRow(row, service))
-              : []
-          )
-          .catch(() => [])
-      )
-    )
-      .then((rowsByService) => {
-        if (cancelled) return;
-        setRecentChangeRows(
-          rowsByService
-            .flat()
-            .filter(Boolean)
-            .sort((left, right) =>
-              String(right.sortAt || "").localeCompare(String(left.sortAt || ""))
-            )
-            .slice(0, 5)
-        );
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setRecentChangeLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [services]);
 
   const relationCountByServiceId = useMemo(() => {
     const counts = new Map<number, number>();
@@ -449,6 +403,10 @@ function DashboardCase({
   const recentIncidentRows = useMemo(
     () => buildRecentIncidentRows({ incidentImpacts, incidents, serviceByCode, serviceById }),
     [incidentImpacts, incidents, serviceByCode, serviceById]
+  );
+  const recentChangeRows = useMemo(
+    () => buildRecentChangeRows(services),
+    [services]
   );
   const recentDeployRows = useMemo(
     () => buildRecentDeployRows({ deployments, serviceByCode, serviceById, services }),
@@ -743,7 +701,6 @@ function DashboardCase({
         deployRows={recentDeployRows}
         incidentRows={recentIncidentRows}
         managementRows={managementRows}
-        recentChangeLoading={recentChangeLoading}
       />
     </section>
   );
@@ -2061,13 +2018,11 @@ function BottomPanels({
   deployRows,
   incidentRows,
   managementRows,
-  recentChangeLoading,
 }: {
   changeRows: DashboardChangeRow[];
   deployRows: DashboardDeployRow[];
   incidentRows: DashboardIncidentRow[];
   managementRows: DashboardManagementRow[];
-  recentChangeLoading: boolean;
 }) {
   const navigate = useNavigate();
   const visibleChangeRows = changeRows.slice(0, 4);
@@ -2088,16 +2043,15 @@ function BottomPanels({
         ))}
       </Panel>
       <Panel title="최근 서비스 변경">
-        {recentChangeLoading && !visibleChangeRows.length ? (
-          <TinyEmpty>변경 이력을 불러오는 중입니다.</TinyEmpty>
-        ) : visibleChangeRows.length ? (
+        {visibleChangeRows.length ? (
           visibleChangeRows.map((row) => (
-            <div key={row.key} className="flex min-w-0 items-center justify-between gap-3 rounded-md px-1 py-1.5 text-[13px] leading-5 text-slate-900">
+            <div key={row.key} className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)_auto] items-center gap-2 rounded-md px-1 py-1.5 text-[13px] leading-5 text-slate-900">
               <div className="min-w-0">
-                <div className="truncate font-bold text-slate-950" title={row.service}>{row.service}</div>
-                <div className="truncate text-xs font-semibold text-slate-500" title={row.change}>{row.change}</div>
+                <div className="truncate text-slate-950" title={row.service}>{row.service}</div>
+                <div className="truncate text-xs text-slate-500" title={row.change}>{row.change}</div>
               </div>
-              <span className="shrink-0 whitespace-nowrap text-xs font-bold text-slate-500">{row.time}</span>
+              <span className="min-w-0 truncate text-xs text-slate-500" title={row.detail}>{row.detail}</span>
+              <span className="shrink-0 whitespace-nowrap text-xs text-slate-500">{row.time}</span>
             </div>
           ))
         ) : (
@@ -2112,10 +2066,10 @@ function BottomPanels({
         {visibleIncidentRows.length ? visibleIncidentRows.map(([service, incident, status, impact, end, tone]) => (
           <div key={incident} className="min-w-0 rounded-md px-1 py-1 text-[13px] leading-5 hover:bg-slate-50">
             <div className="flex min-w-0 items-center justify-between gap-3">
-              <span className="truncate font-bold text-slate-950" title={service}>{service}</span>
+              <span className="truncate text-slate-950" title={service}>{service}</span>
               <IncidentStatus tone={tone}>{status}</IncidentStatus>
             </div>
-            <div className="mt-0.5 flex min-w-0 items-center gap-2 text-xs font-semibold text-slate-500">
+            <div className="mt-0.5 flex min-w-0 items-center gap-2 text-xs text-slate-500">
               <span className="shrink-0 text-slate-700">{incident}</span>
               <span className="text-slate-300">·</span>
               <span className="shrink-0">영향 {impact}</span>
@@ -2230,5 +2184,5 @@ function IncidentStatus({ children, tone }: { children: ReactNode; tone: string 
         : tone === "sky"
           ? "bg-[#dbf1ff] text-[#008ec9]"
           : "bg-[#ffe8d6] text-[#ff6b00]";
-  return <span className={`inline-flex min-w-[48px] justify-center rounded-full px-1.5 py-0.5 text-[11px] font-black leading-4 ${className}`}>{children}</span>;
+  return <span className={`inline-flex min-w-[48px] justify-center rounded-full px-1.5 py-0.5 text-[11px] font-medium leading-4 ${className}`}>{children}</span>;
 }
