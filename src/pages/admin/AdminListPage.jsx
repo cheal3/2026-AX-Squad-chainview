@@ -34,6 +34,7 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
   const [apiDetailModal, setApiDetailModal] = useState(null);
   const [keyword, setKeyword] = useState("");
   const [selectedKeys, setSelectedKeys] = useState([]);
+  const lastRealtimeQueryRef = useRef("");
   const serviceById = useMemo(
     () => new Map(portalData.services.map((service) => [service.serviceId, service])),
     [portalData.services]
@@ -88,6 +89,19 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
       setApiDetailModal(status.detail);
     }
   };
+  useEffect(() => {
+    if (!portalData.remoteApi.enabled || portalData.remoteApi.initialLoading || !remoteQueryKey) {
+      return;
+    }
+
+    const queryKey = `${menu}:${remoteQueryKey}`;
+    if (lastRealtimeQueryRef.current === queryKey) {
+      return;
+    }
+
+    lastRealtimeQueryRef.current = queryKey;
+    void portalData.remoteApi.testQuery(remoteQueryKey);
+  }, [menu, portalData.remoteApi, remoteQueryKey]);
 
   useEffect(() => {
     setKeyword("");
@@ -423,7 +437,14 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
   const closeAdminModal = () => {
     setAdminModal(null);
   };
-  const openOwnerModal = (modal, owner) => {
+  const openOwnerModal = async (modal, owner) => {
+    if (portalData.remoteApi.enabled && modal !== "delete") {
+      await Promise.allSettled([
+        portalData.remoteApi.testQuery("users"),
+        portalData.remoteApi.testQuery("groups"),
+        portalData.remoteApi.testQuery("owners"),
+      ]);
+    }
     setSelectedOwner(owner);
     setOwnerModal(modal);
   };
@@ -492,7 +513,7 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
             {config.actionLabel ? (
               <button
                 className="btn btn--primary"
-                onClick={menu === "owners" ? () => setOwnerModal("create") : () => openAdminModal("create")}
+                onClick={menu === "owners" ? () => void openOwnerModal("create") : () => openAdminModal("create")}
                 type="button"
               >
                 {config.actionLabel}
