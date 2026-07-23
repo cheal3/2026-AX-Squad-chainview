@@ -96,12 +96,13 @@ function normalizeTemplateRow(row, index = 0) {
 
 function buildTemplatePayload(form, variables, bodyPattern, titlePattern) {
   const normalizedVariables = variables
-    .filter((variable) => String(variable.key ?? "").trim())
+    .filter((variable) => String(variable.key ?? "").trim() || String(variable.label ?? "").trim())
     .map((variable, index) => ({
       variableKey: String(variable.key).trim(),
       key: String(variable.key).trim(),
-      variableName: String(variable.label ?? variable.key).trim(),
-      label: String(variable.label ?? variable.key).trim(),
+      variableLabel: String(variable.label ?? "").trim(),
+      variableName: String(variable.label ?? "").trim(),
+      label: String(variable.label ?? "").trim(),
       requiredYn: variable.required ? "Y" : "N",
       required: Boolean(variable.required),
       exampleValue: String(variable.example ?? "").trim(),
@@ -115,6 +116,7 @@ function buildTemplatePayload(form, variables, bodyPattern, titlePattern) {
     channelCode: form.channel,
     purposeCode: form.purpose,
     templatePurposeCode: form.purpose,
+    usageTypeCode: form.purpose,
     providerCode: form.provider,
     activeYn: form.active,
     useYn: form.active,
@@ -131,23 +133,51 @@ function buildTemplatePayload(form, variables, bodyPattern, titlePattern) {
 }
 
 function collectMissingTemplateFields(payload) {
-  return [
+  const baseFields = [
     ["templateCode", "템플릿 코드"],
     ["templateName", "템플릿명"],
     ["channelCode", "채널"],
-    ["purposeCode", "용도"],
+    ["usageTypeCode", "용도"],
     ["providerCode", "Provider"],
     ["bodyTemplate", "본문 패턴"],
   ]
     .filter(([key]) => !String(payload[key] ?? "").trim())
     .map(([, label]) => label);
+  const variableFields = (payload.variables ?? [])
+    .map((variable, index) => {
+      if (!String(variable.variableKey ?? "").trim()) {
+        return `${index + 1}번째 변수의 변수명`;
+      }
+      if (!String(variable.variableLabel ?? "").trim()) {
+        return `${index + 1}번째 변수의 표시 이름`;
+      }
+      return "";
+    })
+    .filter(Boolean);
+
+  return [...baseFields, ...variableFields];
+}
+
+function collectInvalidTemplateFields(payload) {
+  return (payload.variables ?? [])
+    .map((variable, index) => {
+      const key = String(variable.variableKey ?? "").trim();
+      if (key && !/^[A-Za-z][A-Za-z0-9_]*$/.test(key)) {
+        return `${index + 1}번째 변수명은 영문으로 시작하고 영문/숫자/_만 사용할 수 있습니다.`;
+      }
+      return "";
+    })
+    .filter(Boolean);
 }
 
 function formatTemplateSaveError(error, payload) {
-  const lines = [error?.message || "알림 템플릿 저장에 실패했습니다."];
-  const missingFields = collectMissingTemplateFields(payload);
-  if (missingFields.length) {
-    lines.push(`부족한 필수값: ${missingFields.join(", ")}`);
+  const lines = ["알림 템플릿을 저장할 수 없습니다."];
+  const fieldsToCheck = [
+    ...collectMissingTemplateFields(payload),
+    ...collectInvalidTemplateFields(payload),
+  ];
+  if (fieldsToCheck.length) {
+    lines.push(`확인할 항목:\n${fieldsToCheck.map((field) => `- ${field}`).join("\n")}`);
   }
 
   const bodyText = error?.body;
@@ -177,14 +207,47 @@ function formatTemplateSaveError(error, payload) {
           : []),
       ].filter(Boolean);
       if (detailRows.length) {
-        lines.push(`서버 검증 상세:\n${Array.from(new Set(detailRows)).join("\n")}`);
+        const friendlyDetails = Array.from(new Set(detailRows))
+          .map(toFriendlyTemplateValidationMessage)
+          .filter(Boolean);
+        if (friendlyDetails.length) {
+          lines.push(`서버 확인 결과:\n${friendlyDetails.map((detail) => `- ${detail}`).join("\n")}`);
+        }
       }
     } catch {
-      lines.push(`서버 응답: ${bodyText.slice(0, 500)}`);
+      lines.push(`서버에서 요청값을 확인해달라고 응답했습니다.`);
     }
   }
 
   return Array.from(new Set(lines)).join("\n\n");
+}
+
+function toFriendlyTemplateValidationMessage(message) {
+  const text = String(message ?? "");
+  if (!text || text === "요청 값이 올바르지 않습니다.") {
+    return "";
+  }
+  const fieldLabelMap = [
+    [/variables\[(\d+)\]\.variableLabel/, (_, index) => `${Number(index) + 1}번째 변수의 표시 이름을 입력해주세요.`],
+    [/variables\[(\d+)\]\.variableKey/, (_, index) => `${Number(index) + 1}번째 변수의 변수명을 입력해주세요.`],
+    [/usageTypeCode/, () => "용도를 선택해주세요."],
+    [/channelCode/, () => "채널을 선택해주세요."],
+    [/templateCode/, () => "템플릿 코드를 입력해주세요."],
+    [/templateName/, () => "템플릿명을 입력해주세요."],
+    [/bodyTemplate|bodyPattern|messageBody/, () => "본문 패턴을 입력해주세요."],
+    [/titleTemplate|titlePattern|messageTitle/, () => "제목 패턴을 입력해주세요."],
+  ];
+  for (const [pattern, formatter] of fieldLabelMap) {
+    const match = text.match(pattern);
+    if (match) {
+      return formatter(...match);
+    }
+  }
+  return text
+    .replace(/공백일 수 없습니다/g, "입력해주세요")
+    .replace(/must not be blank/gi, "입력해주세요")
+    .replace(/요청 값이 올바르지 않습니다\./g, "")
+    .trim();
 }
 
 const notificationHistorySeed = [
@@ -527,8 +590,12 @@ export function NotificationTemplatePage() {
   const pagedRows = rows.slice((page - 1) * pageSize, page * pageSize);
   const handleSaveTemplate = async ({ form, variables, bodyPattern, titlePattern, row }) => {
     const payload = buildTemplatePayload(form, variables, bodyPattern, titlePattern);
-    if (!payload.templateCode || !payload.templateName || !payload.channelCode || !payload.purposeCode || !payload.bodyTemplate) {
-      window.alert(`필수값을 입력해주세요.\n부족한 필수값: ${collectMissingTemplateFields(payload).join(", ")}`);
+    const localValidationErrors = [
+      ...collectMissingTemplateFields(payload),
+      ...collectInvalidTemplateFields(payload),
+    ];
+    if (localValidationErrors.length) {
+      window.alert(`알림 템플릿을 저장할 수 없습니다.\n\n확인할 항목:\n${localValidationErrors.map((field) => `- ${field}`).join("\n")}`);
       return false;
     }
 
