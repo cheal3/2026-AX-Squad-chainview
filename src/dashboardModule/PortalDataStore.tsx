@@ -157,6 +157,11 @@ type PortalDataContextValue = {
   incidentEvents: IncidentEventRecord[];
   healthChecks: HealthCheckResult[];
   createIncident: (input: NewIncidentInput) => IncidentRecord;
+  updateIncident: (
+    incidentId: number,
+    input: Partial<IncidentRecord>
+  ) => void;
+  deleteIncident: (incidentId: number) => void;
   updateIncidentStatus: (
     incidentId: number,
     statusCode: IncidentStatusCode,
@@ -600,6 +605,112 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         testQuery: testRemoteQuery,
       },
       createIncident: createIncidentRecord,
+      updateIncident: (incidentId, input) => {
+        const previousIncident = incidents.find(
+          (incident) => incident.incidentId === incidentId
+        );
+        if (!previousIncident) {
+          return;
+        }
+
+        const nextIncident = { ...previousIncident, ...input, incidentId };
+        setIncidents((current) =>
+          current.map((incident) =>
+            incident.incidentId === incidentId ? nextIncident : incident
+          )
+        );
+
+        if (REMOTE_API_ENABLED) {
+          void chainViewApi.incidents
+            .update(
+              incidentId,
+              toIncidentUpdatePayload(
+                nextIncident,
+                nextIncident.incidentStatusCode,
+                timestamp()
+              )
+            )
+            .then(() => refreshRemoteData(300))
+            .catch((error) => {
+              setIncidents((current) =>
+                current.map((incident) =>
+                  incident.incidentId === incidentId
+                    ? previousIncident
+                    : incident
+                )
+              );
+              notifyRemoteMutationFailure(error, "인시던트 수정 API 호출에 실패했습니다.");
+            });
+        }
+      },
+      deleteIncident: (incidentId) => {
+        const target = incidents.find(
+          (incident) => incident.incidentId === incidentId
+        );
+        if (!target) {
+          return;
+        }
+
+        const previousIncidents = incidents;
+        const previousImpacts = incidentImpacts;
+        const previousEvents = incidentEvents;
+        const previousServices = services;
+        const affectedServiceIds = new Set([
+          ...(target.serviceId ? [target.serviceId] : []),
+          ...incidentImpacts
+            .filter((impact) => impact.incidentId === incidentId)
+            .map((impact) => impact.impactedServiceId),
+        ]);
+        const serviceIdsWithOtherIncidents = new Set<number>();
+
+        incidents
+          .filter(
+            (incident) =>
+              incident.incidentId !== incidentId &&
+              incident.incidentStatusCode !== "RESOLVED"
+          )
+          .forEach((incident) => {
+            if (incident.serviceId) {
+              serviceIdsWithOtherIncidents.add(incident.serviceId);
+            }
+            incidentImpacts
+              .filter((impact) => impact.incidentId === incident.incidentId)
+              .forEach((impact) =>
+                serviceIdsWithOtherIncidents.add(impact.impactedServiceId)
+              );
+          });
+
+        setIncidents((current) =>
+          current.filter((incident) => incident.incidentId !== incidentId)
+        );
+        setIncidentImpacts((current) =>
+          current.filter((impact) => impact.incidentId !== incidentId)
+        );
+        setIncidentEvents((current) =>
+          current.filter((event) => event.incidentId !== incidentId)
+        );
+        setServices((current) =>
+          current.map((service) =>
+            affectedServiceIds.has(service.serviceId) &&
+            !serviceIdsWithOtherIncidents.has(service.serviceId)
+              ? { ...service, statusCode: "NORMAL", updatedAt: timestamp() }
+              : service
+          )
+        );
+
+        if (REMOTE_API_ENABLED) {
+          void chainViewApi.incidents
+            .delete(incidentId)
+            .then(() => refreshRemoteData(300))
+            .catch((error) => {
+              setIncidents(previousIncidents);
+              setIncidentImpacts(previousImpacts);
+              setIncidentEvents(previousEvents);
+              setServices(previousServices);
+              notifyRemoteMutationFailure(error, "인시던트 삭제 API 호출에 실패했습니다.");
+            });
+        }
+      },
       updateIncidentStatus: (incidentId, statusCode, message) => {
         const now = timestamp();
         const previousIncident = incidents.find((incident) => incident.incidentId === incidentId);

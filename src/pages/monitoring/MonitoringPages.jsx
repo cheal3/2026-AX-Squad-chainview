@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { AppShell } from "../../components/AppShell.jsx";
+import { ModalBackdrop } from "../../components/ModalBackdrop.jsx";
 import { usePortalData } from "../../dashboardModule/PortalDataStore";
 import { IncidentDemoDashboard } from "../../dashboardModule/pages/IncidentDemoDashboard";
 import { ServiceRelationFlow } from "../../dashboardModule/pages/ServiceRelationFlow";
@@ -80,6 +81,8 @@ export function IncidentAdminPage() {
   const navigate = useNavigate();
   const portalData = usePortalData();
   const [keyword, setKeyword] = useState("");
+  const [editingIncident, setEditingIncident] = useState(null);
+  const [deletingIncident, setDeletingIncident] = useState(null);
   const serviceById = useMemo(
     () => new Map(portalData.services.map((service) => [service.serviceId, service])),
     [portalData.services]
@@ -105,13 +108,9 @@ export function IncidentAdminPage() {
       title: incident.title,
     };
   });
-  const dynamicCodes = new Set(dynamicRows.map((row) => row.code));
-  const rows = [
-    ...dynamicRows,
-    ...staticIncidentRows
-      .filter((row) => !dynamicCodes.has(row.code))
-      .map((row) => ({ ...row, source: "static" })),
-  ];
+  const rows = dynamicRows.length
+    ? dynamicRows
+    : staticIncidentRows.map((row) => ({ ...row, source: "static" }));
   const filteredRows = rows.filter((row) =>
     matchesSearchText(
       searchableText(
@@ -244,8 +243,30 @@ export function IncidentAdminPage() {
                   <td>{row.endedAt || "-"}</td>
                   <td className="col-actions">
                     <div className="row-actions">
-                      <button className="ibtn" onClick={(event) => event.stopPropagation()} type="button">✏️</button>
-                      <button className="ibtn ibtn--danger" onClick={(event) => event.stopPropagation()} type="button">🗑</button>
+                      <button
+                        className="ibtn"
+                        disabled={!row.incident}
+                        title={row.incident ? "인시던트 수정" : "예시 데이터는 수정할 수 없습니다."}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          if (row.incident) setEditingIncident(row.incident);
+                        }}
+                        type="button"
+                      >
+                        ✏️
+                      </button>
+                      <button
+                        className="ibtn ibtn--danger"
+                        disabled={!row.incident}
+                        title={row.incident ? "인시던트 삭제" : "예시 데이터는 삭제할 수 없습니다."}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          if (row.incident) setDeletingIncident(row.incident);
+                        }}
+                        type="button"
+                      >
+                        🗑
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -254,11 +275,129 @@ export function IncidentAdminPage() {
           </tbody>
         </table>
         <div className="pager">
-            <div className="pager__info">전체 {filteredRows.length}건 · 1-{filteredRows.length} / 1 페이지</div>
+          <div className="pager__info">전체 {filteredRows.length}건 · 1-{filteredRows.length} / 1 페이지</div>
           <div className="pager__nav"><button disabled>‹</button><button className="is-on">1</button><button disabled>›</button></div>
         </div>
       </div>
+      {editingIncident ? (
+        <IncidentEditModal
+          incident={editingIncident}
+          onClose={() => setEditingIncident(null)}
+          onSave={(input) => {
+            portalData.updateIncident(editingIncident.incidentId, input);
+            setEditingIncident(null);
+          }}
+        />
+      ) : null}
+      {deletingIncident ? (
+        <IncidentDeleteModal
+          incident={deletingIncident}
+          onClose={() => setDeletingIncident(null)}
+          onDelete={() => {
+            portalData.deleteIncident(deletingIncident.incidentId);
+            setDeletingIncident(null);
+          }}
+        />
+      ) : null}
     </>
+  );
+}
+
+function IncidentEditModal({ incident, onClose, onSave }) {
+  const [form, setForm] = useState({
+    title: incident.title || "",
+    severityCode: incident.severityCode || "MAJOR",
+    incidentStatusCode: incident.incidentStatusCode || "OPEN",
+    description: incident.description || "",
+  });
+
+  return (
+    <ModalBackdrop onClose={onClose}>
+      <form
+        className="modal"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!form.title.trim()) return;
+          onSave({ ...form, title: form.title.trim(), description: form.description.trim() });
+        }}
+      >
+        <div className="modal__head">
+          <h3>인시던트 수정</h3>
+          <button className="close" onClick={onClose} type="button">×</button>
+        </div>
+        <div className="modal__body">
+          <div className="form-row">
+            <label>인시던트 ID</label>
+            <input disabled value={incident.externalIncidentCode || incident.incidentId} />
+          </div>
+          <div className="form-row">
+            <label>제목<span className="req">*</span></label>
+            <input
+              required
+              value={form.title}
+              onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
+            />
+          </div>
+          <div className="form-row">
+            <label>심각도</label>
+            <select
+              value={form.severityCode}
+              onChange={(event) => setForm((current) => ({ ...current, severityCode: event.target.value }))}
+            >
+              <option value="CRITICAL">치명 (CRITICAL)</option>
+              <option value="MAJOR">높음 (MAJOR)</option>
+              <option value="MINOR">중간 (MINOR)</option>
+              <option value="NOTICE">정보 (NOTICE)</option>
+            </select>
+          </div>
+          <div className="form-row">
+            <label>상태</label>
+            <select
+              value={form.incidentStatusCode}
+              onChange={(event) => setForm((current) => ({ ...current, incidentStatusCode: event.target.value }))}
+            >
+              <option value="OPEN">진행중 (OPEN)</option>
+              <option value="MONITORING">모니터링 (MONITORING)</option>
+            </select>
+            <span className="help">종료 처리는 인시던트 종료 버튼을 이용해주세요.</span>
+          </div>
+          <div className="form-row">
+            <label>설명</label>
+            <textarea
+              rows="4"
+              value={form.description}
+              onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
+            />
+          </div>
+        </div>
+        <div className="modal__foot">
+          <button className="btn" onClick={onClose} type="button">취소</button>
+          <button className="btn btn--primary" type="submit">저장</button>
+        </div>
+      </form>
+    </ModalBackdrop>
+  );
+}
+
+function IncidentDeleteModal({ incident, onClose, onDelete }) {
+  return (
+    <ModalBackdrop onClose={onClose}>
+      <div className="modal confirm">
+        <div className="modal__head">
+          <h3>인시던트 삭제</h3>
+          <button className="close" onClick={onClose} type="button">×</button>
+        </div>
+        <div className="modal__body">
+          <div className="confirm__icon">⚠</div>
+          <div className="confirm__msg"><b>{incident.title}</b>을 삭제하시겠습니까?</div>
+          <div className="confirm__note">관련 영향 정보와 이벤트 이력도 함께 삭제됩니다.</div>
+        </div>
+        <div className="modal__foot">
+          <button className="btn" onClick={onClose} type="button">취소</button>
+          <button className="btn btn--danger" onClick={onDelete} type="button">삭제</button>
+        </div>
+      </div>
+    </ModalBackdrop>
   );
 }
 
@@ -530,7 +669,15 @@ function DashboardFrame() {
 
 export function IncidentDetailPage() {
   const location = useLocation();
-  const { incidentEvents, incidentImpacts, incidents, relations, services } = usePortalData();
+  const navigate = useNavigate();
+  const {
+    incidentEvents,
+    incidentImpacts,
+    incidents,
+    relations,
+    services,
+    updateIncidentStatus,
+  } = usePortalData();
   const [now, setNow] = useState(() => new Date());
   const incidentId = Number(new URLSearchParams(location.search).get("incidentId")) || undefined;
   const incident =
@@ -588,6 +735,21 @@ export function IncidentDetailPage() {
     return () => window.clearInterval(timer);
   }, []);
 
+  const resolveIncident = () => {
+    if (
+      !incident.incidentId ||
+      !window.confirm(`${incident.title} 인시던트를 종료 처리하시겠습니까?`)
+    ) {
+      return;
+    }
+    updateIncidentStatus(
+      incident.incidentId,
+      "RESOLVED",
+      "운영자가 인시던트를 종료 처리했습니다."
+    );
+    navigate("/dashboard", { replace: true });
+  };
+
   return (
     <AppShell activeMenu="dashboard" isDark>
       <main className="main chain-dashboard-main incident-detail-page">
@@ -614,9 +776,14 @@ export function IncidentDetailPage() {
               <span>STATUS <b>{codeLabels.serviceStatus?.[service?.statusCode] ?? "운영중"}</b></span>
             </div>
           </div>
-          <div className="incident-detail__timer">
-            <span>경과시간</span>
-            <strong>{elapsedLabel}</strong>
+          <div className="incident-detail__actions">
+            <div className="incident-detail__timer">
+              <span>경과시간</span>
+              <strong>{elapsedLabel}</strong>
+            </div>
+            {incident.incidentStatusCode !== "RESOLVED" ? (
+              <button type="button" onClick={resolveIncident}>인시던트 종료</button>
+            ) : null}
           </div>
         </section>
 

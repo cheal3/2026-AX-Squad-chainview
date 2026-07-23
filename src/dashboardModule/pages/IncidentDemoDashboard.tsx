@@ -377,6 +377,18 @@ function DashboardCase({
     return (
       <IncidentCommandDashboard
         incident={activeIncident}
+        onResolve={() => {
+          if (!window.confirm(`${activeIncident.title} 인시던트를 종료 처리하시겠습니까?`)) {
+            return;
+          }
+          portalData.updateIncidentStatus(
+            activeIncident.incidentId,
+            "RESOLVED",
+            "운영자가 인시던트를 종료 처리했습니다."
+          );
+          setCreatedIncidentId(undefined);
+          navigate("/dashboard", { replace: true });
+        }}
         relations={portalData.relations}
         services={portalData.services}
       />
@@ -1392,10 +1404,12 @@ function formatTimelineClock(date: Date) {
 
 function IncidentCommandDashboard({
   incident,
+  onResolve,
   relations,
   services,
 }: {
   incident: IncidentRecord;
+  onResolve: () => void;
   relations: ServiceRelationRecord[];
   services: ServiceRecord[];
 }) {
@@ -1509,7 +1523,12 @@ function IncidentCommandDashboard({
             />
           </RelationFlowModal>
         ) : null}
-        <IncidentSelectedPanel incident={incident} rootService={rootService} impactedCount={impactedCount} />
+        <IncidentSelectedPanel
+          incident={incident}
+          rootService={rootService}
+          impactedCount={impactedCount}
+          onResolve={onResolve}
+        />
       </div>
 
       <div className="mt-3 grid min-h-[240px] min-w-0 grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-3">
@@ -1594,10 +1613,12 @@ function buildIncidentImpactColumns(
 function IncidentSelectedPanel({
   impactedCount,
   incident,
+  onResolve,
   rootService,
 }: {
   impactedCount: number;
   incident: IncidentRecord;
+  onResolve: () => void;
   rootService?: ServiceRecord;
 }) {
   const targetLabel = incident.targetLabel || rootService?.serviceName || incident.targetCode || "-";
@@ -1648,6 +1669,13 @@ function IncidentSelectedPanel({
             onClick={() => navigate(`/dashboard-proto-detail?incidentId=${incident.incidentId}`)}
           >
             인시던트 상세 <ExternalLink className="inline" size={12} />
+          </button>
+          <button
+            className="col-span-2 h-8 rounded bg-[#b42335] text-xs font-black text-white hover:bg-[#cf2d42]"
+            type="button"
+            onClick={onResolve}
+          >
+            인시던트 종료 처리
           </button>
         </div>
       </aside>
