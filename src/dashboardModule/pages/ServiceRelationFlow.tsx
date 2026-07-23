@@ -141,6 +141,8 @@ const Y_SPACING = 238;
 const CHILD_Y_SPACING = 214;
 const ALL_SERVICES_Y_SPACING = 88;
 const ALL_SERVICES_CATEGORY_GAP = 36;
+const ALL_MODE_INFRA_RIGHTMOST_X = 360;
+const ALL_MODE_SERVICE_LEFTMOST_X = 760;
 const LANE_HEIGHT = 4600;
 const DEPENDS_ON_COLOR = "#475569";
 const IMPACT_COLOR = "#2563eb";
@@ -1218,6 +1220,13 @@ export function ServiceRelationFlow({
       return visibleServiceIds.has(service.serviceId);
     });
     const allMode = graphViewMode === "all";
+    const allModeMinServiceLane = allMode && visibleServices.length > 0
+      ? Math.min(
+          ...visibleServices.map(
+            (service) => laneByServiceId.get(service.serviceId) ?? 0
+          )
+        )
+      : 0;
     const hasSelectedInfraInAllMode =
       allMode && Boolean(selectedInfraNodeId);
     const highlightedServiceId = incidentMode || hasSelectedInfraInAllMode
@@ -1263,7 +1272,10 @@ export function ServiceRelationFlow({
         id: String(service.serviceId),
         type: "serviceNode",
         position: {
-          x: lane * X_SPACING + (allMode ? 980 : 0),
+          x: allMode
+            ? ALL_MODE_SERVICE_LEFTMOST_X +
+              (lane - allModeMinServiceLane) * X_SPACING
+            : lane * X_SPACING,
           y: yByServiceId.get(service.serviceId) ?? 0,
         },
         data: {
@@ -1398,8 +1410,9 @@ export function ServiceRelationFlow({
 
     const INFRA_X_SPACING = 430;
     const INFRA_Y_SPACING = 148;
-    const INFRA_ALL_MODE_X_OFFSET = -260;
-    const minInfraLane = Math.min(...groups.keys());
+    const infraLanes = [...groups.keys()];
+    const minInfraLane = infraLanes.length ? Math.min(...infraLanes) : 0;
+    const maxInfraLane = infraLanes.length ? Math.max(...infraLanes) : 0;
     const nodes: Node<ServerInfraNodeData>[] = [];
 
     Array.from(groups.entries())
@@ -1425,7 +1438,10 @@ export function ServiceRelationFlow({
             id: `infra-${node.infraNodeId}`,
             type: "serverInfraNode",
             position: {
-              x: lane * INFRA_X_SPACING + (allMode ? INFRA_ALL_MODE_X_OFFSET : 0),
+              x: allMode
+                ? ALL_MODE_INFRA_RIGHTMOST_X -
+                  (maxInfraLane - lane) * INFRA_X_SPACING
+                : lane * INFRA_X_SPACING,
               y:
                 centeredOffset(index, sortedNodes.length, INFRA_Y_SPACING) +
                 (sortedNodes.length === 1

@@ -1843,7 +1843,16 @@ function extractRemoteId(value: unknown) {
 }
 
 function toApiDateTime(value: string) {
-  return value.includes("T") ? value : `${value.replace(" ", "T")}:00`;
+  const normalized = value.trim().replace(" ", "T");
+  const localDateTime = normalized.match(
+    /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2})(?::(\d{2}))?/
+  );
+
+  if (!localDateTime) {
+    return normalized;
+  }
+
+  return `${localDateTime[1]}:${localDateTime[2] ?? "00"}`;
 }
 
 function slugCode(value: string) {
