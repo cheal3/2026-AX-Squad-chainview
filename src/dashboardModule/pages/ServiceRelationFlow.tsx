@@ -1971,11 +1971,15 @@ export function ServiceRelationFlow({
       .map((relation) => {
         const sourceLane = laneByServiceId.get(relation.sourceServiceId) ?? 0;
         const targetLane = laneByServiceId.get(relation.targetServiceId) ?? 0;
-        const highlightedServiceId = showAllServices
+        const highlightedServiceId = incidentMode
           ? selectedServiceNodeId
-          : selectedServiceNodeId ?? highlightServiceId ?? focusedServiceId;
+          : showAllServices
+            ? selectedServiceNodeId
+            : selectedServiceNodeId ?? highlightServiceId ?? focusedServiceId;
         const hasInfraHighlight =
-          graphViewMode === "all" && selectedInfraServiceIds.size > 0;
+          !incidentMode &&
+          graphViewMode === "all" &&
+          selectedInfraServiceIds.size > 0;
         const sourceInInfraScope = selectedInfraServiceIds.has(
           relation.sourceServiceId
         );
