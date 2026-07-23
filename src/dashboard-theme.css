@@ -16,9 +16,11 @@
 .ai-page {
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  background: #f6f7fb;
-  padding: 24px 32px 36px;
+  gap: 20px;
+  background:
+    radial-gradient(circle at 14% 0%, rgba(82, 116, 255, 0.08), transparent 26%),
+    #f7f8fc;
+  padding: 28px 38px 42px;
 }
 
 .ai-page__header {
@@ -41,8 +43,8 @@
   place-items: center;
   width: 48px;
   height: 48px;
-  border-radius: 12px;
-  background: #356bff;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #4f72ff, #3264f4);
   color: #fff;
   box-shadow: 0 10px 24px rgba(53, 107, 255, 0.22);
 }
@@ -88,18 +90,29 @@
   gap: 10px;
 }
 
+.ai-page .btn {
+  border-radius: 14px;
+  min-height: 42px;
+  padding-inline: 18px;
+}
+
+.ai-page .btn--primary {
+  background: #111827;
+  box-shadow: 0 12px 26px rgba(17, 24, 39, 0.16);
+}
+
 .ai-panel,
 .ai-chat-shell,
 .ai-input-shell,
 .ai-runbook-grid {
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #fff;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
+  border: 1px solid rgba(226, 232, 240, 0.82);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 18px 46px rgba(15, 23, 42, 0.055);
 }
 
 .ai-panel {
-  padding: 20px;
+  padding: 22px 24px;
 }
 
 .ai-panel h2 {
@@ -118,19 +131,20 @@
 .ai-chip {
   border: 1px solid #e2e8f0;
   border-radius: 999px;
-  background: #fff;
+  background: #fbfcff;
   color: #334155;
-  padding: 9px 14px;
+  padding: 10px 16px;
   font-size: 13px;
   font-weight: 800;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.035);
 }
 
 .ai-chat-shell {
   display: flex;
   flex-direction: column;
   gap: 18px;
-  min-height: 380px;
-  padding: 24px;
+  min-height: 410px;
+  padding: 28px;
 }
 
 .ai-message {
@@ -148,17 +162,17 @@
   place-items: center;
   width: 34px;
   height: 34px;
-  border-radius: 10px;
-  background: #356bff;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #4f72ff, #3264f4);
   color: #fff;
 }
 
 .ai-message__body {
   max-width: 520px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  background: #f8fafc;
-  padding: 14px 16px;
+  border: 1px solid #e8edf5;
+  border-radius: 16px;
+  background: #f9fbff;
+  padding: 16px 18px;
   color: #334155;
   font-size: 13px;
   font-weight: 650;
@@ -166,8 +180,9 @@
 }
 
 .ai-message--user .ai-message__body {
-  background: #eef5ff;
-  border-color: #dbeafe;
+  background: #eef6ff;
+  border-color: #e2efff;
+  box-shadow: 0 10px 24px rgba(53, 107, 255, 0.07);
 }
 
 .ai-message__body--wide {
@@ -190,6 +205,8 @@
   border-collapse: collapse;
   margin: 10px 0;
   background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
 }
 
 .ai-mini-table th,
@@ -209,7 +226,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 14px 16px;
+  padding: 16px 18px;
 }
 
 .ai-input-shell input,
@@ -217,8 +234,8 @@
 .ai-runbook-editor input,
 .ai-runbook-editor textarea {
   width: 100%;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
+  border: 1px solid #e3e9f3;
+  border-radius: 14px;
   background: #fff;
   color: var(--text);
   font-size: 13px;
@@ -227,17 +244,18 @@
 }
 
 .ai-input-shell input {
-  height: 44px;
-  padding: 0 14px;
+  height: 48px;
+  padding: 0 18px;
+  border-radius: 16px;
 }
 
 .ai-input-shell button {
   display: grid;
   place-items: center;
-  width: 42px;
-  height: 42px;
+  width: 46px;
+  height: 46px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 16px;
   background: #111827;
   color: #fff;
 }
@@ -246,7 +264,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 14px;
-  margin-top: 16px;
+  margin-top: 18px;
 }
 
 .ai-file-box {
@@ -254,9 +272,9 @@
   align-items: center;
   gap: 10px;
   min-height: 48px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  background: #f8fafc;
+  border: 1px solid #e3e9f3;
+  border-radius: 14px;
+  background: #f8faff;
   padding: 0 14px;
   color: #334155;
   font-size: 13px;
@@ -278,10 +296,10 @@
 
 .ai-wide-button {
   width: 100%;
-  min-height: 46px;
+  min-height: 48px;
   margin-top: 14px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 12px;
   background: #111827;
   color: #fff;
   font-size: 13px;
@@ -291,8 +309,8 @@
 .ai-runbook-grid {
   display: grid;
   grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
-  gap: 20px;
-  padding: 20px;
+  gap: 22px;
+  padding: 24px;
 }
 
 .ai-runbook-list,
@@ -311,8 +329,8 @@
 
 .ai-runbook-list input,
 .ai-runbook-editor input {
-  height: 42px;
-  padding: 0 12px;
+  height: 46px;
+  padding: 0 14px;
 }
 
 .ai-runbook-items {
@@ -322,11 +340,12 @@
 }
 
 .ai-runbook-items button {
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  background: #fff;
-  padding: 12px;
+  border: 1px solid #e5ebf5;
+  border-radius: 14px;
+  background: #fbfcff;
+  padding: 14px;
   text-align: left;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.035);
 }
 
 .ai-runbook-items strong,
@@ -349,7 +368,7 @@
 
 .ai-runbook-editor textarea {
   min-height: 280px;
-  padding: 12px;
+  padding: 14px;
   resize: vertical;
   line-height: 1.6;
 }
