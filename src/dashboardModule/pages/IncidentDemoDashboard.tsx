@@ -522,7 +522,7 @@ function DashboardServiceFilter({
     <section className="mt-1 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-[0_1px_3px_rgba(15,23,42,0.05)]">
       <h2 className="mb-2.5 text-sm font-black text-slate-900">조회조건</h2>
 
-      <div className="grid min-w-0 grid-cols-[200px_minmax(120px,1fr)_repeat(3,minmax(90px,110px))_minmax(160px,1.2fr)_auto] items-end gap-2">
+      <div className="grid min-w-0 grid-cols-[200px_repeat(3,minmax(100px,130px))_minmax(180px,1fr)_auto] items-end gap-2">
           <div
             className="relative grid h-10 min-w-0 grid-cols-2 overflow-hidden rounded-full border border-slate-200 bg-white p-1 shadow-md"
             style={{ borderRadius: 9999 }}
@@ -553,14 +553,6 @@ function DashboardServiceFilter({
                 {label}
               </button>
             ))}
-          </div>
-
-          <div className="flex h-10 min-w-0 items-center border-l border-slate-200 pl-2 text-[11px] font-bold text-slate-500">
-            <span className="truncate">
-              {filter.scope === "mine"
-                ? "내가 담당자로 등록된 서비스만 조회됩니다."
-                : "전체 서비스를 대상으로 조회됩니다."}
-            </span>
           </div>
 
         <FilterSelect
