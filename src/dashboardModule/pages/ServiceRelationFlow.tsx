@@ -141,6 +141,10 @@ function inferInfraNodeCodeForServer(server?: ServerRecord) {
   return undefined;
 }
 
+function fallbackInfraNodeIdForServer(serverId: number) {
+  return -Math.abs(Number(serverId) || 0) - 100000;
+}
+
 const NODE_WIDTH = 240;
 const X_SPACING = 470;
 const Y_SPACING = 238;
@@ -520,15 +524,6 @@ export function ServiceRelationFlow({
     return next;
   }, [infraGraphRelations, selectedInfraNodeId]);
 
-  const selectedInfraNode = useMemo(
-    () =>
-      selectedInfraNodeId
-        ? infraGraphNodes.find(
-            (node) => node.infraNodeId === selectedInfraNodeId
-          )
-        : undefined,
-    [infraGraphNodes, selectedInfraNodeId]
-  );
   const selectedInfraIncomingCount = useMemo(
     () =>
       selectedInfraNodeId
@@ -627,6 +622,63 @@ export function ServiceRelationFlow({
     () => new Map(servers.map((server) => [server.serverId, server])),
     [servers]
   );
+  const resolveInfraNodeIdForServer = useCallback(
+    (server?: ServerRecord) => {
+      if (!server) {
+        return undefined;
+      }
+      const infraById = new Map(
+        infraGraphNodes.map((node) => [node.infraNodeId, node])
+      );
+      const infraByCode = new Map(
+        infraGraphNodes.map((node) => [
+          normalizeGraphLookupValue(node.nodeCode),
+          node.infraNodeId,
+        ])
+      );
+      const infraByName = new Map(
+        infraGraphNodes.map((node) => [
+          normalizeGraphLookupValue(node.nodeName),
+          node.infraNodeId,
+        ])
+      );
+
+      if (server.infraNodeId && infraById.has(server.infraNodeId)) {
+        return server.infraNodeId;
+      }
+
+      const lookupValues = [
+        server.infraNodeCode,
+        server.infraNodeName,
+        server.serverName,
+        server.hostName,
+        server.ipAddress,
+        inferInfraNodeCodeForServer(server),
+      ]
+        .map(normalizeGraphLookupValue)
+        .filter(Boolean);
+
+      for (const lookup of lookupValues) {
+        const match =
+          infraByCode.get(lookup) ??
+          infraByName.get(lookup) ??
+          infraGraphNodes.find((node) => {
+            const code = normalizeGraphLookupValue(node.nodeCode);
+            const name = normalizeGraphLookupValue(node.nodeName);
+            return (
+              (Boolean(code) && (lookup.includes(code) || code.includes(lookup))) ||
+              (Boolean(name) && (lookup.includes(name) || name.includes(lookup)))
+            );
+          })?.infraNodeId;
+        if (match) {
+          return match;
+        }
+      }
+
+      return fallbackInfraNodeIdForServer(server.serverId);
+    },
+    [infraGraphNodes]
+  );
   const serviceServerIdsByServiceId = useMemo(() => {
     const next = new Map<number, number[]>();
     deployments.forEach((deployment) => {
@@ -646,45 +698,61 @@ export function ServiceRelationFlow({
     });
     return next;
   }, [deployments, services]);
+  const fallbackInfraNodes = useMemo<InfraGraphNodeRecord[]>(() => {
+    const existingIds = new Set(infraGraphNodes.map((node) => node.infraNodeId));
+    const fallbackNodeById = new Map<number, InfraGraphNodeRecord>();
+    services.forEach((service) => {
+      (serviceServerIdsByServiceId.get(service.serviceId) ?? []).forEach((serverId) => {
+        const server = serverById.get(serverId);
+        if (!server) {
+          return;
+        }
+        const infraNodeId = resolveInfraNodeIdForServer(server);
+        if (!infraNodeId || existingIds.has(infraNodeId) || infraNodeId > 0) {
+          return;
+        }
+        fallbackNodeById.set(infraNodeId, {
+          infraNodeId,
+          nodeCode: server.hostName || server.serverName,
+          nodeName: server.serverName,
+          nodeTypeCode: "DEPLOYMENT_SERVER",
+          nodeTypeName: "배포 서버",
+          statusCode: server.statusCode,
+          statusName: codeLabels.serverStatus[server.statusCode] || server.statusCode,
+          locationLabel: server.ipAddress,
+          vendorModel: server.osTypeCode,
+          serverCount: 1,
+        });
+      });
+    });
+    return [...fallbackNodeById.values()];
+  }, [
+    infraGraphNodes,
+    resolveInfraNodeIdForServer,
+    serverById,
+    serviceServerIdsByServiceId,
+    services,
+  ]);
+  const effectiveInfraGraphNodes = useMemo(
+    () => [...infraGraphNodes, ...fallbackInfraNodes],
+    [fallbackInfraNodes, infraGraphNodes]
+  );
+  const selectedInfraNode = useMemo(
+    () =>
+      selectedInfraNodeId
+        ? effectiveInfraGraphNodes.find(
+            (node) => node.infraNodeId === selectedInfraNodeId
+          )
+        : undefined,
+    [effectiveInfraGraphNodes, selectedInfraNodeId]
+  );
   const serviceInfraTargetsByServiceId = useMemo(() => {
-    const infraById = new Map(
-      infraGraphNodes.map((node) => [node.infraNodeId, node])
-    );
-    const infraByCode = new Map(
-      infraGraphNodes.map((node) => [
-        normalizeGraphLookupValue(node.nodeCode),
-        node.infraNodeId,
-      ])
-    );
-    const infraByName = new Map(
-      infraGraphNodes.map((node) => [
-        normalizeGraphLookupValue(node.nodeName),
-        node.infraNodeId,
-      ])
-    );
     const multiNext = new Map<number, number[]>();
 
     services.forEach((service) => {
       const infraNodeIds = (serviceServerIdsByServiceId.get(service.serviceId) ?? [])
         .map((serverId) => serverById.get(serverId))
-        .map((server) => {
-          if (!server) return undefined;
-          if (server.infraNodeId && infraById.has(server.infraNodeId)) {
-            return server.infraNodeId;
-          }
-
-          const directCode = normalizeGraphLookupValue(server.infraNodeCode);
-          const directName = normalizeGraphLookupValue(server.infraNodeName);
-          const inferredCode = normalizeGraphLookupValue(
-            inferInfraNodeCodeForServer(server)
-          );
-
-          return (
-            infraByCode.get(directCode) ??
-            infraByName.get(directName) ??
-            infraByCode.get(inferredCode)
-          );
-        })
+        .map((server) => resolveInfraNodeIdForServer(server))
         .filter((infraNodeId): infraNodeId is number => Boolean(infraNodeId));
 
       if (infraNodeIds.length) {
@@ -693,7 +761,7 @@ export function ServiceRelationFlow({
     });
 
     return multiNext;
-  }, [infraGraphNodes, serverById, serviceServerIdsByServiceId, services]);
+  }, [resolveInfraNodeIdForServer, serverById, serviceServerIdsByServiceId, services]);
   const serviceInfraTargetByServiceId = useMemo(() => {
     const next = new Map<number, number>();
     serviceInfraTargetsByServiceId.forEach((infraNodeIds, serviceId) => {
@@ -711,8 +779,15 @@ export function ServiceRelationFlow({
     const incidentServer = activeIncident.serverId
       ? serverById.get(activeIncident.serverId)
       : undefined;
-    if (incidentServer?.infraNodeId) {
+    if (
+      incidentServer?.infraNodeId &&
+      effectiveInfraGraphNodes.some((node) => node.infraNodeId === incidentServer.infraNodeId)
+    ) {
       return incidentServer.infraNodeId;
+    }
+    const resolvedIncidentServerInfraNodeId = resolveInfraNodeIdForServer(incidentServer);
+    if (resolvedIncidentServerInfraNodeId) {
+      return resolvedIncidentServerInfraNodeId;
     }
 
     const lookupValues = [
@@ -736,7 +811,7 @@ export function ServiceRelationFlow({
           (Boolean(name) && lookup === name)
       );
     })?.infraNodeId;
-  }, [activeIncident, infraGraphNodes, infraIncident, serverById]);
+  }, [activeIncident, effectiveInfraGraphNodes, infraGraphNodes, infraIncident, resolveInfraNodeIdForServer, serverById]);
   const incidentInfraNodeIds = useMemo(() => {
     if (!incidentInfraNodeId) {
       return null;
@@ -913,9 +988,9 @@ export function ServiceRelationFlow({
   const scopedInfraGraphNodes = useMemo(
     () =>
       filteredInfraNodeIds
-        ? infraGraphNodes.filter((node) => filteredInfraNodeIds.has(node.infraNodeId))
-        : infraGraphNodes,
-    [filteredInfraNodeIds, infraGraphNodes]
+        ? effectiveInfraGraphNodes.filter((node) => filteredInfraNodeIds.has(node.infraNodeId))
+        : effectiveInfraGraphNodes,
+    [effectiveInfraGraphNodes, filteredInfraNodeIds]
   );
   const scopedInfraGraphRelations = useMemo(
     () =>
