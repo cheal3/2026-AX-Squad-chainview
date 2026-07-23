@@ -1258,6 +1258,10 @@ export function ServiceRelationFlow({
     });
 
     return visibleServices.map((service) => {
+      const incidentStatusCode =
+        service.serviceId === activeIncidentServiceId
+          ? "INCIDENT"
+          : "IMPACTED";
       const lane = laneByServiceId.get(service.serviceId) ?? 0;
       const connectedByService =
         Boolean(highlightedServiceId) &&
@@ -1291,7 +1295,11 @@ export function ServiceRelationFlow({
           label: service.serviceName,
           code: service.serviceCode,
           category: service.categoryPath.join(" / "),
-          statusCode: showAllServices ? "NORMAL" : service.statusCode,
+          statusCode: incidentMode
+            ? incidentStatusCode
+            : showAllServices
+              ? "NORMAL"
+              : service.statusCode,
           importanceCode: service.importanceCode ?? "NORMAL",
           ownerGroup: ownerByServiceId.get(service.serviceId) ?? "미지정",
           serverCount: service.serverId ? 1 : 0,
@@ -1315,6 +1323,7 @@ export function ServiceRelationFlow({
     });
   }, [
     focusedServiceId,
+    activeIncidentServiceId,
     activeRelations,
     detailOpen,
     detailServiceId,

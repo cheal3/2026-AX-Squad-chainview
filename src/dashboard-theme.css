@@ -71,6 +71,160 @@
   line-height: 1;
 }
 
+.app-topbar__alerts {
+  position: relative;
+}
+
+.app-topbar__incident-popover {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: min(420px, calc(100vw - 32px));
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 20px 48px rgba(15, 23, 42, 0.18);
+}
+
+.app-topbar__incident-head {
+  min-height: 62px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border-bottom: 1px solid var(--line);
+  padding: 12px 16px;
+}
+
+.app-topbar__incident-head > div {
+  display: grid;
+  gap: 3px;
+}
+
+.app-topbar__incident-head strong {
+  color: var(--text);
+  font-size: 14px;
+}
+
+.app-topbar__incident-head span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.app-topbar__incident-head a {
+  color: var(--brand);
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.app-topbar__incident-list {
+  max-height: min(430px, calc(100vh - 100px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.app-topbar__incident-item {
+  width: 100%;
+  min-height: 72px;
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 11px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: var(--text);
+  padding: 11px 16px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.app-topbar__incident-item:last-child {
+  border-bottom: 0;
+}
+
+.app-topbar__incident-item:hover {
+  background: #f8fafc;
+}
+
+.app-topbar__incident-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #f59e0b;
+}
+
+.app-topbar__incident-dot.is-critical,
+.app-topbar__incident-dot.is-major {
+  background: #ef4444;
+}
+
+.app-topbar__incident-dot.is-minor {
+  background: #f59e0b;
+}
+
+.app-topbar__incident-dot.is-notice {
+  background: #64748b;
+}
+
+.app-topbar__incident-copy {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.app-topbar__incident-copy strong {
+  overflow: hidden;
+  color: inherit;
+  font-size: 13px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-topbar__incident-copy small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-topbar__incident-status {
+  border-radius: 999px;
+  background: #fff1f2;
+  color: #dc2626;
+  padding: 4px 7px;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.app-topbar__incident-status.is-resolved {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.app-topbar__incident-loading,
+.app-topbar__incident-empty {
+  min-height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.app-topbar__incident-loading .portal-initial-loader__ring {
+  width: 24px;
+  height: 24px;
+  border-width: 3px;
+}
+
 .app-topbar__account {
   position: relative;
 }
@@ -344,6 +498,38 @@
 
 .app.is-dark .app-topbar__menu button.is-logout {
   color: #fca5a5;
+}
+
+.app.is-dark .app-topbar__incident-popover {
+  border-color: #1f3549;
+  background: #081b2d;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.42);
+}
+
+.app.is-dark .app-topbar__incident-head,
+.app.is-dark .app-topbar__incident-item {
+  border-color: #1f3549;
+}
+
+.app.is-dark .app-topbar__incident-head strong,
+.app.is-dark .app-topbar__incident-item {
+  color: #e5edf7;
+}
+
+.app.is-dark .app-topbar__incident-head span,
+.app.is-dark .app-topbar__incident-copy small,
+.app.is-dark .app-topbar__incident-loading,
+.app.is-dark .app-topbar__incident-empty {
+  color: #91a7bd;
+}
+
+.app.is-dark .app-topbar__incident-item:hover {
+  background: #0b2135;
+}
+
+.app.is-dark .app-topbar__incident-list {
+  scrollbar-color: #486179 #061625;
+  scrollbar-width: thin;
 }
 
 .lnb.is-dark {

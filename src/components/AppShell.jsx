@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { Bell, ChevronDown, LogOut, Settings, UserRound } from "lucide-react";
 import { usePortalData } from "../dashboardModule/PortalDataStore";
 
@@ -74,11 +74,42 @@ export function AppShell({ activeMenu = "", children, isDark = false }) {
 }
 
 function TopBar({ isDark = false }) {
-  const { incidents } = usePortalData();
+  const navigate = useNavigate();
+  const { incidents, remoteApi } = usePortalData();
   const [isAccountOpen, setIsAccountOpen] = useState(false);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const notificationRef = useRef(null);
   const openIncidentCount = incidents.filter(
     (incident) => incident.incidentStatusCode !== "RESOLVED"
   ).length;
+  const recentIncidents = useMemo(
+    () =>
+      [...incidents]
+        .sort((left, right) => {
+          const leftOpen = left.incidentStatusCode !== "RESOLVED" ? 1 : 0;
+          const rightOpen = right.incidentStatusCode !== "RESOLVED" ? 1 : 0;
+          if (leftOpen !== rightOpen) return rightOpen - leftOpen;
+          return String(right.startedAt || "").localeCompare(String(left.startedAt || ""));
+        })
+        .slice(0, 6),
+    [incidents]
+  );
+
+  useEffect(() => {
+    if (!isNotificationOpen) return undefined;
+    const closeOnOutsideClick = (event) => {
+      if (!notificationRef.current?.contains(event.target)) {
+        setIsNotificationOpen(false);
+      }
+    };
+    document.addEventListener("pointerdown", closeOnOutsideClick);
+    return () => document.removeEventListener("pointerdown", closeOnOutsideClick);
+  }, [isNotificationOpen]);
+
+  const openIncidentDetail = (incidentId) => {
+    setIsNotificationOpen(false);
+    navigate(`/dashboard-proto-detail?incidentId=${incidentId}`);
+  };
   const handleAccountEdit = () => {
     window.alert("계정정보 수정 기능은 다음 단계에서 연결 예정입니다.");
     setIsAccountOpen(false);
@@ -92,17 +123,71 @@ function TopBar({ isDark = false }) {
     <header className={`app-topbar${isDark ? " is-dark" : ""}`}>
       <div className="app-topbar__spacer" />
       <div className="app-topbar__actions">
-        <button className="app-topbar__icon-button" aria-label="알림" type="button">
-          <Bell size={18} />
-          {openIncidentCount > 0 ? (
-            <span className="app-topbar__notification">{openIncidentCount}</span>
+        <div className="app-topbar__alerts" ref={notificationRef}>
+          <button
+            aria-expanded={isNotificationOpen}
+            aria-haspopup="dialog"
+            className="app-topbar__icon-button"
+            aria-label="인시던트 알림"
+            onClick={() => {
+              setIsNotificationOpen((current) => !current);
+              setIsAccountOpen(false);
+            }}
+            type="button"
+          >
+            <Bell size={18} />
+            {openIncidentCount > 0 ? (
+              <span className="app-topbar__notification">{openIncidentCount}</span>
+            ) : null}
+          </button>
+          {isNotificationOpen ? (
+            <section className="app-topbar__incident-popover" aria-label="인시던트 현황">
+              <div className="app-topbar__incident-head">
+                <div>
+                  <strong>인시던트 현황</strong>
+                  <span>미종료 {openIncidentCount}건</span>
+                </div>
+                <Link onClick={() => setIsNotificationOpen(false)} to="/admin-incidents">전체보기</Link>
+              </div>
+              <div className="app-topbar__incident-list">
+                {remoteApi.initialLoading ? (
+                  <div className="app-topbar__incident-loading" role="status">
+                    <span className="portal-initial-loader__ring" aria-hidden="true" />
+                    <span>인시던트를 불러오는 중입니다.</span>
+                  </div>
+                ) : recentIncidents.length ? (
+                  recentIncidents.map((incident) => (
+                    <button
+                      className="app-topbar__incident-item"
+                      key={incident.incidentId}
+                      onClick={() => openIncidentDetail(incident.incidentId)}
+                      type="button"
+                    >
+                      <span className={`app-topbar__incident-dot is-${String(incident.severityCode || "notice").toLowerCase()}`} />
+                      <span className="app-topbar__incident-copy">
+                        <strong>{incident.title}</strong>
+                        <small>{incident.externalIncidentCode || `INC-${incident.incidentId}`} · {formatTopbarIncidentTime(incident.startedAt)}</small>
+                      </span>
+                      <span className={`app-topbar__incident-status ${incident.incidentStatusCode === "RESOLVED" ? "is-resolved" : ""}`}>
+                        {incident.incidentStatusCode}
+                      </span>
+                    </button>
+                  ))
+                ) : (
+                  <div className="app-topbar__incident-empty">등록된 인시던트가 없습니다.</div>
+                )}
+              </div>
+            </section>
           ) : null}
-        </button>
+        </div>
         <div className="app-topbar__account">
           <button
             aria-expanded={isAccountOpen}
             className="app-topbar__account-button"
-            onClick={() => setIsAccountOpen((current) => !current)}
+            onClick={() => {
+              setIsAccountOpen((current) => !current);
+              setIsNotificationOpen(false);
+            }}
             type="button"
           >
             <span className="app-topbar__avatar" aria-hidden="true">김</span>
@@ -124,6 +209,11 @@ function TopBar({ isDark = false }) {
       </div>
     </header>
   );
+}
+
+function formatTopbarIncidentTime(value) {
+  if (!value) return "발생시각 미등록";
+  return String(value).replace("T", " ").slice(0, 16);
 }
 
 function Sidebar({ activeMenu = "", isDark = false }) {
