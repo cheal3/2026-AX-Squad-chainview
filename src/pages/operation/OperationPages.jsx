@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Filter, Play, Plus, Search, X } from "lucide-react";
+import { Filter, History, List, Pencil, Play, Plus, Power, RotateCcw, Search, Trash2, X } from "lucide-react";
 
 import { AppShell } from "../../components/AppShell.jsx";
 import { ModalBackdrop } from "../../components/ModalBackdrop.jsx";
@@ -92,6 +92,20 @@ function OperationFormRow({ children, label, required = false }) {
   return <label className="form-row"><span>{label}{required ? <i className="req">*</i> : null}</span>{children}</label>;
 }
 
+function OperationIconButton({ children, danger = false, label, onClick, primary = false }) {
+  return (
+    <button
+      aria-label={label}
+      className={`ibtn operation-icon-btn${primary ? " is-primary" : ""}${danger ? " is-danger" : ""}`}
+      onClick={onClick}
+      title={label}
+      type="button"
+    >
+      {children}
+    </button>
+  );
+}
+
 export function ServiceCheckPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -115,29 +129,27 @@ export function ServiceCheckPage() {
         <select defaultValue="all" aria-label="대상"><option value="all">대상 전체</option><option>서비스</option><option>서버</option></select>
         <select defaultValue="all" aria-label="실행"><option value="all">실행 전체</option><option>실행</option><option>중지</option></select>
         <select defaultValue="all" aria-label="활성"><option value="all">활성 전체</option><option>Y</option><option>N</option></select>
-        <button className="btn" type="button">초기화</button>
+        <button className="btn" type="button"><RotateCcw size={14} /> 초기화</button>
         <div className="right"><span className="op-period">기간&nbsp;&nbsp;<b>최근 29일</b></span></div>
       </div>
 
       <div className="card operation-card">
         <table className="tbl operation-table operation-table--checks">
-          <thead><tr><th>코드</th><th>점검명</th><th>대상</th><th>유형</th><th>Cron</th><th>상태</th><th>최근 점검</th><th className="col-actions">액션</th></tr></thead>
+          <thead><tr><th>점검</th><th>대상</th><th>실행 방식</th><th>상태</th><th>최근 결과</th><th className="col-actions">관리</th></tr></thead>
           <tbody>
             {pagedRows.map((row) => (
               <tr key={row.code}>
-                <td><code>{row.code}</code></td>
-                <td>{row.name}</td>
-                <td>{row.target}</td>
-                <td>{row.type}</td>
-                <td><code>{row.cron}</code></td>
-                <td>{row.status}</td>
-                <td><span>{row.lastCheckedAt}</span><small className={`op-result ${row.result === "성공" ? "is-ok" : ""}`}>{row.result}</small></td>
+                <td title={`${row.name} · ${row.code}`}><b className="operation-cell-primary">{row.name}</b><code className="operation-cell-sub">{row.code}</code></td>
+                <td title={row.target}>{row.target}</td>
+                <td title={`${row.type} · ${row.cron}`}><b className="operation-cell-primary">{row.type}</b><code className="operation-cell-sub">{row.cron}</code></td>
+                <td><span className="pill pill--idle">{row.status}</span></td>
+                <td title={`${row.lastCheckedAt} · ${row.result}`}><span className="operation-check-result"><span>{row.lastCheckedAt}</span><small className={`op-result ${row.result === "성공" ? "is-ok" : ""}`}>{row.result}</small></span></td>
                 <td>
                   <div className="row-actions op-row-actions">
-                    <button className="btn btn--sm op-action-btn op-action-btn--primary" type="button"><Play size={12} /> 시작</button>
-                    <button className="btn btn--sm op-action-btn" onClick={() => setModal({ type: "history", row })} type="button">이력</button>
-                    <button className="btn btn--sm op-action-btn" onClick={() => setModal({ type: "form", row })} type="button">수정</button>
-                    <button className="btn btn--sm op-action-btn op-action-btn--danger" type="button">삭제</button>
+                    <OperationIconButton label="점검 시작" primary><Play size={16} /></OperationIconButton>
+                    <OperationIconButton label="점검 이력" onClick={() => setModal({ type: "history", row })}><History size={16} /></OperationIconButton>
+                    <OperationIconButton label="점검 수정" onClick={() => setModal({ type: "form", row })}><Pencil size={16} /></OperationIconButton>
+                    <OperationIconButton danger label="점검 삭제"><Trash2 size={16} /></OperationIconButton>
                   </div>
                 </td>
               </tr>
@@ -239,7 +251,7 @@ export function NotificationHistoryPage() {
       description="장애(인시던트) 발생 시 발송된 알림 전송 기록을 조회합니다."
       icon="🔔"
       title="알림 전송 이력"
-      action={<button className="btn" onClick={() => navigate("/admin-incidents")} type="button">인시던트 목록</button>}
+      action={<button className="btn" onClick={() => navigate("/admin-incidents")} type="button"><List size={14} /> 인시던트 목록</button>}
     >
       <div className="toolbar operation-toolbar operation-toolbar--wide">
         <label className="search"><Search size={15} /><input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="장애 제목, 알림 제목, 수신자명, 사번, 그룹명 코드 검색" type="text" /></label>
@@ -247,13 +259,13 @@ export function NotificationHistoryPage() {
         <select defaultValue="all"><option value="all">대상 유형 전체</option><option>사용자</option><option>그룹</option></select>
         <select defaultValue="all"><option value="all">발송 대상 전체</option></select>
         <span className="op-date-range">2025-06-13 ~ 2025-06-20</span>
-        <button className="btn" type="button">초기화</button>
-        <button className="btn btn--primary op-btn-dark" type="button">조회</button>
+        <button className="btn" type="button"><RotateCcw size={14} /> 초기화</button>
+        <button className="btn btn--primary op-btn-dark" type="button"><Search size={14} /> 조회</button>
       </div>
       <div className="operation-summary"><b>전체 192</b><span>성공 180</span><span>실패 12</span><span>실행 중 0</span><span className="is-danger">(ALERT) 6</span></div>
       <div className="card operation-card">
         <table className="tbl operation-table operation-table--notifications">
-          <thead><tr><th>인시던트</th><th>알림 유형</th><th>대상 유형</th><th>발송 대상</th><th>연락처</th><th>알림 제목 · 템플릿</th><th>발송 시간</th></tr></thead>
+          <thead><tr><th>인시던트</th><th>채널</th><th>수신자</th><th>알림</th><th>발송 시간</th></tr></thead>
           <tbody>
             {pagedRows.map((row) => (
               <tr key={`${row.incidentCode}-${row.recipient}-${row.sentAt}`}>
@@ -264,10 +276,8 @@ export function NotificationHistoryPage() {
                   <span className="op-badges"><b>{row.severity}</b><em>{row.progress}</em></span>
                 </td>
                 <td><span className="op-channel-status"><span>{row.channel}</span><span className={`pill ${row.sendStatus === "성공" ? "pill--ok" : "pill--idle"}`}>{row.sendStatus}</span></span></td>
-                <td title={row.targetType}>{row.targetType}</td>
-                <td title={row.recipient}>{row.recipient}</td>
-                <td title={row.contact}>{row.contact}</td>
-                <td title={`${row.title} / ${row.template}`}><button className="op-text-link" onClick={() => setDetail(row)} type="button"><span>{row.title}</span></button><small>템플릿 : {row.template}</small></td>
+                <td title={`${row.targetType} · ${row.recipient} · ${row.contact}`}><b className="operation-cell-primary">{row.recipient}</b><span className="operation-cell-sub">{row.targetType}</span></td>
+                <td title={`${row.title} / ${row.template}`}><button className="op-text-link" onClick={() => setDetail(row)} type="button"><span>{row.title}</span><small>{row.template}</small></button></td>
                 <td title={row.sentAt}>{row.sentAt}</td>
               </tr>
             ))}
@@ -286,7 +296,7 @@ function NotificationDetailModal({ detail, onClose }) {
       <div className="modal operation-modal" onClick={(event) => event.stopPropagation()}>
         <div className="modal__head"><h3>알림 내용</h3><button className="close" onClick={onClose} type="button"><X size={18} /></button></div>
         <div className="modal__body">
-          <div className="operation-detail-grid"><span>인시던트</span><b>{detail.incidentCode}</b><span>알림 유형</span><b>{detail.channel}</b><span>수신자</span><b>{detail.recipient}</b><span>발송 시간</span><b>{detail.sentAt}</b></div>
+          <div className="operation-detail-grid"><span>인시던트</span><b>{detail.incidentCode}</b><span>알림 유형</span><b>{detail.channel} · {detail.sendStatus}</b><span>대상 유형</span><b>{detail.targetType}</b><span>수신자</span><b>{detail.recipient}</b><span>연락처</span><b>{detail.contact}</b><span>발송 시간</span><b>{detail.sentAt}</b></div>
           <div className="operation-message-preview"><h4>{detail.title}</h4><p>{detail.incidentTitle} 관련 영향 서비스 점검이 필요합니다. 담당자는 서비스 상태와 최근 점검 이력을 확인한 뒤 조치 결과를 등록해주세요.</p><code>template: {detail.template}</code></div>
         </div>
         <div className="modal__foot"><button className="btn" onClick={onClose} type="button">닫기</button></div>
@@ -331,18 +341,16 @@ export function NotificationTemplatePage() {
       <div className="operation-summary"><b>총 {rows.length}개 템플릿</b></div>
       <div className="card operation-card">
         <table className="tbl operation-table operation-table--templates">
-          <thead><tr><th>템플릿 코드</th><th>템플릿명</th><th>채널</th><th>용도</th><th>Provider</th><th>변수</th><th>활성</th><th className="col-actions">액션</th></tr></thead>
+          <thead><tr><th>템플릿</th><th>채널</th><th>용도</th><th>변수</th><th>상태</th><th className="col-actions">관리</th></tr></thead>
           <tbody>
             {pagedRows.map((row) => (
               <tr key={row.code}>
-                <td><code>{row.code}</code></td>
-                <td><button className="op-text-link" onClick={() => setModal(row)} type="button">{row.name}</button></td>
+                <td title={`${row.name} · ${row.code}`}><button className="op-text-link" onClick={() => setModal(row)} type="button"><b>{row.name}</b><small>{row.code}</small></button></td>
                 <td>{row.channel}</td>
                 <td>{row.purpose}</td>
-                <td>{row.provider}</td>
                 <td>{row.variables}</td>
-                <td><span className="pill pill--ok">{row.active}</span></td>
-                <td><div className="row-actions op-row-actions"><button className="btn btn--sm op-action-btn" onClick={() => setModal(row)} type="button">수정</button><button className="btn btn--sm op-action-btn op-action-btn--danger" type="button">비활성</button></div></td>
+                <td><span className="pill pill--ok">{row.active === "Y" ? "활성" : "비활성"}</span></td>
+                <td><div className="row-actions op-row-actions"><OperationIconButton label="템플릿 수정" onClick={() => setModal(row)}><Pencil size={16} /></OperationIconButton><OperationIconButton danger label="템플릿 비활성"><Power size={16} /></OperationIconButton></div></td>
               </tr>
             ))}
           </tbody>
@@ -375,7 +383,7 @@ function TemplateModal({ onClose, row }) {
             <OperationFormRow label="설명"><textarea placeholder="검색·관리를 위한 설명을 입력하세요. (선택)" rows={4} /></OperationFormRow>
           </section>
           <section className="operation-variable-panel">
-            <div className="operation-variable-head"><h4>템플릿 변수</h4><button className="btn btn--sm" type="button">변수 추가</button></div>
+            <div className="operation-variable-head"><h4>템플릿 변수</h4><button className="btn btn--sm" type="button"><Plus size={14} /> 변수 추가</button></div>
             <p>권장 키: hostName, impactSummary, incidentTitle, mgmtDept, serverName, serviceCode, serviceName, severityName</p>
             <div className="operation-variable-row"><input defaultValue="serviceName" /><input defaultValue="서비스명" /><label><input defaultChecked type="checkbox" /> 필수</label><input defaultValue="결제 서비스" /><button className="btn btn--sm" type="button">×</button></div>
           </section>
