@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Filter, History, List, Pencil, Play, Plus, Power, RotateCcw, Search, Trash2, X } from "lucide-react";
+import { History, List, Pencil, Play, Plus, Power, RotateCcw, Search, Trash2, X } from "lucide-react";
 
 import { AppShell } from "../../components/AppShell.jsx";
 import { ModalBackdrop } from "../../components/ModalBackdrop.jsx";
@@ -36,6 +36,30 @@ const notificationTemplateRows = [
   { code: "SERVICE_DOWN_SMS_V1", name: "서비스 장애 SMS", channel: "SMS", purpose: "서비스 장애", provider: "더미(개발)", variables: "2 / 2 (필수/전체)", active: "Y", title: "[장애] {{serviceName}}" },
 ];
 
+const templateChannelOptions = [
+  { code: "ALIMTALK", label: "알림톡" },
+  { code: "SMS", label: "SMS" },
+  { code: "EMAIL", label: "이메일" },
+];
+const templatePurposeOptions = [
+  { code: "INCIDENT", label: "인시던트" },
+  { code: "SERVICE_DOWN", label: "서비스 장애" },
+];
+const templateProviderOptions = [
+  { code: "DUMMY", label: "더미(개발)" },
+  { code: "PRODUCTION", label: "운영 Provider" },
+];
+
+function optionCode(options, value, fallback = "") {
+  const text = String(value ?? "").trim();
+  return options.find((option) => option.code === text || option.label === text)?.code ?? fallback;
+}
+
+function optionLabel(options, value, fallback = "-") {
+  const text = String(value ?? "").trim();
+  return options.find((option) => option.code === text || option.label === text)?.label ?? (text || fallback);
+}
+
 function normalizeTemplateRow(row, index = 0) {
   const variableRows = Array.isArray(row?.variables)
     ? row.variables
@@ -56,9 +80,9 @@ function normalizeTemplateRow(row, index = 0) {
     templateId: Number(row?.templateId ?? row?.notificationTemplateId) || undefined,
     code: String(row?.templateCode ?? row?.code ?? ""),
     name: String(row?.templateName ?? row?.name ?? ""),
-    channel: String(row?.channelCode ?? row?.channel ?? ""),
-    purpose: String(row?.purposeCode ?? row?.purpose ?? row?.templatePurposeCode ?? ""),
-    provider: String(row?.providerCode ?? row?.provider ?? row?.providerName ?? "더미(개발)"),
+    channel: optionCode(templateChannelOptions, row?.channelCode ?? row?.channel),
+    purpose: optionCode(templatePurposeOptions, row?.purposeCode ?? row?.purpose ?? row?.templatePurposeCode),
+    provider: optionCode(templateProviderOptions, row?.providerCode ?? row?.provider ?? row?.providerName, "DUMMY"),
     variables: variableCountText,
     variableRows,
     active: String(row?.activeYn ?? row?.useYn ?? row?.active ?? "Y").toUpperCase() === "N" ? "N" : "Y",
@@ -104,6 +128,63 @@ function buildTemplatePayload(form, variables, bodyPattern, titlePattern) {
     variables: normalizedVariables,
     variableDefinitions: normalizedVariables,
   };
+}
+
+function collectMissingTemplateFields(payload) {
+  return [
+    ["templateCode", "템플릿 코드"],
+    ["templateName", "템플릿명"],
+    ["channelCode", "채널"],
+    ["purposeCode", "용도"],
+    ["providerCode", "Provider"],
+    ["bodyTemplate", "본문 패턴"],
+  ]
+    .filter(([key]) => !String(payload[key] ?? "").trim())
+    .map(([, label]) => label);
+}
+
+function formatTemplateSaveError(error, payload) {
+  const lines = [error?.message || "알림 템플릿 저장에 실패했습니다."];
+  const missingFields = collectMissingTemplateFields(payload);
+  if (missingFields.length) {
+    lines.push(`부족한 필수값: ${missingFields.join(", ")}`);
+  }
+
+  const bodyText = error?.body;
+  if (bodyText) {
+    try {
+      const parsed = JSON.parse(bodyText);
+      const detailRows = [
+        parsed.message,
+        parsed.error,
+        parsed.detail,
+        ...(Array.isArray(parsed.errors)
+          ? parsed.errors.map((item) =>
+              typeof item === "string"
+                ? item
+                : `${item.field ?? item.name ?? item.code ?? "field"}: ${item.message ?? item.defaultMessage ?? item.reason ?? JSON.stringify(item)}`
+            )
+          : []),
+        ...(Array.isArray(parsed.fieldErrors)
+          ? parsed.fieldErrors.map((item) =>
+              `${item.field ?? item.name ?? "field"}: ${item.message ?? item.defaultMessage ?? item.reason ?? JSON.stringify(item)}`
+            )
+          : []),
+        ...(Array.isArray(parsed.violations)
+          ? parsed.violations.map((item) =>
+              `${item.field ?? item.propertyPath ?? "field"}: ${item.message ?? JSON.stringify(item)}`
+            )
+          : []),
+      ].filter(Boolean);
+      if (detailRows.length) {
+        lines.push(`서버 검증 상세:\n${Array.from(new Set(detailRows)).join("\n")}`);
+      }
+    } catch {
+      lines.push(`서버 응답: ${bodyText.slice(0, 500)}`);
+    }
+  }
+
+  return Array.from(new Set(lines)).join("\n\n");
 }
 
 const notificationHistorySeed = [
@@ -447,7 +528,7 @@ export function NotificationTemplatePage() {
   const handleSaveTemplate = async ({ form, variables, bodyPattern, titlePattern, row }) => {
     const payload = buildTemplatePayload(form, variables, bodyPattern, titlePattern);
     if (!payload.templateCode || !payload.templateName || !payload.channelCode || !payload.purposeCode || !payload.bodyTemplate) {
-      window.alert("필수값을 입력해주세요.");
+      window.alert(`필수값을 입력해주세요.\n부족한 필수값: ${collectMissingTemplateFields(payload).join(", ")}`);
       return false;
     }
 
@@ -462,7 +543,7 @@ export function NotificationTemplatePage() {
       return true;
     } catch (error) {
       console.error("알림 템플릿 저장 실패", error);
-      window.alert(error?.message || "알림 템플릿 저장에 실패했습니다.");
+      window.alert(formatTemplateSaveError(error, payload));
       return false;
     }
   };
@@ -504,8 +585,8 @@ export function NotificationTemplatePage() {
             {pagedRows.map((row) => (
               <tr key={row.code}>
                 <td title={`${row.name} · ${row.code}`}><button className="op-text-link" onClick={() => setModal(row)} type="button"><span>{row.name}</span><small>{row.code}</small></button></td>
-                <td>{row.channel}</td>
-                <td>{row.purpose}</td>
+                <td>{optionLabel(templateChannelOptions, row.channel)}</td>
+                <td>{optionLabel(templatePurposeOptions, row.purpose)}</td>
                 <td>{row.variables}</td>
                 <td><span className="pill pill--ok">{row.active === "Y" ? "활성" : "비활성"}</span></td>
                 <td><div className="row-actions op-row-actions"><OperationIconButton label="템플릿 수정" onClick={() => setModal(row)}><Pencil size={16} /></OperationIconButton><OperationIconButton danger label={row.active === "Y" ? "템플릿 비활성" : "템플릿 활성"} onClick={() => handleToggleTemplate(row)}><Power size={16} /></OperationIconButton></div></td>
@@ -530,7 +611,7 @@ function TemplateModal({ onClose, onSave, row }) {
     code: row?.code ?? "",
     description: row?.description ?? "",
     name: row?.name ?? "",
-    provider: row?.provider ?? "더미(개발)",
+    provider: row?.provider ?? "DUMMY",
     purpose: row?.purpose ?? "",
   });
   const [titlePattern, setTitlePattern] = useState(row?.title ?? "[장애] {{serviceName}}");
@@ -612,9 +693,9 @@ function TemplateModal({ onClose, onSave, row }) {
             <div className="operation-form-grid">
               <OperationFormRow label="템플릿 코드" required><input disabled={Boolean(row)} value={form.code} onChange={(event) => updateForm("code", event.target.value.toUpperCase())} placeholder="영문, 숫자, _ 입력" type="text" /></OperationFormRow>
               <OperationFormRow label="템플릿명" required><input value={form.name} onChange={(event) => updateForm("name", event.target.value)} placeholder="템플릿명을 입력하세요" type="text" /></OperationFormRow>
-              <OperationFormRow label="Provider" required><select value={form.provider} onChange={(event) => updateForm("provider", event.target.value)}><option>더미(개발)</option><option>운영 Provider</option></select></OperationFormRow>
-              <OperationFormRow label="채널" required><select value={form.channel} onChange={(event) => updateForm("channel", event.target.value)}><option value="">선택하세요</option><option>알림톡</option><option>SMS</option><option>이메일</option></select></OperationFormRow>
-              <OperationFormRow label="용도" required><select value={form.purpose} onChange={(event) => updateForm("purpose", event.target.value)}><option value="">선택하세요</option><option>인시던트</option><option>서비스 장애</option></select></OperationFormRow>
+              <OperationFormRow label="Provider" required><select value={form.provider} onChange={(event) => updateForm("provider", event.target.value)}>{templateProviderOptions.map((option) => <option key={option.code} value={option.code}>{option.label}</option>)}</select></OperationFormRow>
+              <OperationFormRow label="채널" required><select value={form.channel} onChange={(event) => updateForm("channel", event.target.value)}><option value="">선택하세요</option>{templateChannelOptions.map((option) => <option key={option.code} value={option.code}>{option.label}</option>)}</select></OperationFormRow>
+              <OperationFormRow label="용도" required><select value={form.purpose} onChange={(event) => updateForm("purpose", event.target.value)}><option value="">선택하세요</option>{templatePurposeOptions.map((option) => <option key={option.code} value={option.code}>{option.label}</option>)}</select></OperationFormRow>
               <OperationFormRow label="활성" required><select value={form.active} onChange={(event) => updateForm("active", event.target.value)}><option>Y</option><option>N</option></select></OperationFormRow>
             </div>
             <div className="operation-pattern-guide">

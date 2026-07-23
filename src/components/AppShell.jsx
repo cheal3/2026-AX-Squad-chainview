@@ -44,6 +44,13 @@ const sidebarSections = [
     ],
   },
   {
+    label: "AI",
+    items: [
+      { key: "ai-assistant", icon: "🤖", label: "AI 어시스턴트", to: "/ai/assistant" },
+      { key: "ai-runbook", icon: "📘", label: "Runbook", to: "/ai/runbook" },
+    ],
+  },
+  {
     label: "담당자",
     items: [
       { key: "owners", icon: "👨‍💼", label: "담당자 조회", to: "/admin-owners" },
@@ -57,13 +64,6 @@ const sidebarSections = [
       { key: "owner-management", icon: "👨‍💼", label: "서비스 담당자 관리", to: "/admin-owner-management" },
       { key: "categories", icon: "🗂️", label: "서비스 분류 관리", to: "/admin-categories" },
       { key: "codes", icon: "⚙️", label: "공통코드 관리", to: "/admin-codes" },
-    ],
-  },
-  {
-    label: "AI",
-    items: [
-      { key: "ai-assistant", icon: "🤖", label: "AI 어시스턴트", to: "/ai/assistant" },
-      { key: "ai-runbook", icon: "📘", label: "Runbook", to: "/ai/runbook" },
     ],
   },
 ];
