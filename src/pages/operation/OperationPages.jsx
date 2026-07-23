@@ -101,7 +101,7 @@ function OperationIconButton({ children, danger = false, label, onClick, primary
   return (
     <button
       aria-label={label}
-      className={`ibtn operation-icon-btn${primary ? " is-primary" : ""}${danger ? " is-danger" : ""}`}
+      className={`ibtn operation-icon-btn${primary ? " is-primary" : ""}${danger ? " ibtn--danger" : ""}`}
       onClick={onClick}
       title={label}
       type="button"
@@ -144,9 +144,9 @@ export function ServiceCheckPage() {
           <tbody>
             {pagedRows.map((row) => (
               <tr key={row.code}>
-                <td title={`${row.name} · ${row.code}`}><b className="operation-cell-primary">{row.name}</b><code className="operation-cell-sub">{row.code}</code></td>
+                <td title={`${row.name} · ${row.code}`}><span className="operation-inline-cell"><b>{row.name}</b><code>{row.code}</code></span></td>
                 <td title={row.target}>{row.target}</td>
-                <td title={`${row.type} · ${row.cron}`}><b className="operation-cell-primary">{row.type}</b><code className="operation-cell-sub">{row.cron}</code></td>
+                <td title={`${row.type} · ${row.cron}`}><span className="operation-inline-cell"><b>{row.type}</b><code>{row.cron}</code></span></td>
                 <td><span className="pill pill--idle">{row.status}</span></td>
                 <td title={`${row.lastCheckedAt} · ${row.result}`}><span className="operation-check-result"><span>{row.lastCheckedAt}</span><small className={`op-result ${row.result === "성공" ? "is-ok" : ""}`}>{row.result}</small></span></td>
                 <td>
@@ -276,12 +276,11 @@ export function NotificationHistoryPage() {
               <tr key={`${row.incidentCode}-${row.recipient}-${row.sentAt}`}>
                 <td title={`${row.incidentCode} ${row.incidentTitle}`}>
                   <button className="op-text-link" onClick={() => navigate(row.incidentId ? `/dashboard?incidentId=${row.incidentId}` : "/admin-incidents")} type="button">
-                    <small>{row.incidentCode}</small><span>{row.incidentTitle}</span>
+                    <span>{row.incidentTitle}</span><small>{row.incidentCode}</small>
                   </button>
-                  <span className="op-badges"><b>{row.severity}</b><em>{row.progress}</em></span>
                 </td>
                 <td><span className="op-channel-status"><span>{row.channel}</span><span className={`pill ${row.sendStatus === "성공" ? "pill--ok" : "pill--idle"}`}>{row.sendStatus}</span></span></td>
-                <td title={`${row.targetType} · ${row.recipient} · ${row.contact}`}><b className="operation-cell-primary">{row.recipient}</b><span className="operation-cell-sub">{row.targetType}</span></td>
+                <td title={`${row.targetType} · ${row.recipient} · ${row.contact}`}>{row.recipient}</td>
                 <td title={`${row.title} / ${row.template}`}><button className="op-text-link" onClick={() => setDetail(row)} type="button"><span>{row.title}</span><small>{row.template}</small></button></td>
                 <td title={row.sentAt}>{row.sentAt}</td>
               </tr>
@@ -350,7 +349,7 @@ export function NotificationTemplatePage() {
           <tbody>
             {pagedRows.map((row) => (
               <tr key={row.code}>
-                <td title={`${row.name} · ${row.code}`}><button className="op-text-link" onClick={() => setModal(row)} type="button"><b>{row.name}</b><small>{row.code}</small></button></td>
+                <td title={`${row.name} · ${row.code}`}><button className="op-text-link" onClick={() => setModal(row)} type="button"><span>{row.name}</span><small>{row.code}</small></button></td>
                 <td>{row.channel}</td>
                 <td>{row.purpose}</td>
                 <td>{row.variables}</td>

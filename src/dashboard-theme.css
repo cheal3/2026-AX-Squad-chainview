@@ -4614,13 +4614,9 @@
 
 /* Keep operation lists as compact, scannable management tables. */
 .operation-page .btn {
-  min-height: 34px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 800;
+  min-height: 0;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .operation-page .op-btn-dark,
@@ -4638,7 +4634,7 @@
 .operation-table td {
   min-width: 0;
   overflow: hidden;
-  padding: 12px 14px;
+  padding: 10px 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
   word-break: normal;
@@ -4646,21 +4642,19 @@
 }
 
 .operation-table th {
-  height: 44px;
-  color: #657084;
-  font-size: 11px;
-  font-weight: 800;
+  height: auto;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .operation-table td {
-  height: 66px;
-  color: #1f2937;
-  font-size: 12px;
+  height: auto;
+  color: var(--text);
+  font-size: 13px;
 }
 
 .operation-table code,
-.operation-table .operation-cell-primary,
-.operation-table .operation-cell-sub,
 .operation-table .op-text-link,
 .operation-table .op-text-link > * {
   max-width: 100%;
@@ -4670,25 +4664,25 @@
   word-break: normal;
 }
 
-.operation-cell-primary,
-.operation-cell-sub {
-  display: block;
+.operation-inline-cell {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
 }
 
-.operation-cell-primary {
-  color: #1f2937;
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.operation-cell-sub,
-.operation-table code.operation-cell-sub {
-  margin-top: 4px;
-  background: transparent;
-  padding: 0;
-  color: #7b8798;
-  font-size: 11px;
+.operation-inline-cell b {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 13px;
   font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.operation-inline-cell code {
+  flex: 0 1 auto;
 }
 
 .operation-check-result {
@@ -4720,39 +4714,33 @@
 
 .operation-table .op-row-actions {
   justify-content: center;
-  gap: 6px;
+  gap: 4px;
 }
 
 .operation-table .operation-icon-btn {
-  width: 36px;
-  min-width: 36px;
-  height: 36px;
-  border-color: #d9e0ea;
-  border-radius: 7px;
-  background: #fff;
-  color: #526174;
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  border-color: var(--line);
+  border-radius: 6px;
+  color: var(--muted);
 }
 
 .operation-table .operation-icon-btn:hover {
-  border-color: #aeb9c8;
-  background: #f8fafc;
-  color: #1f2a44;
+  border-color: #cbd5e1;
+  background: #fff;
+  color: var(--text);
+}
+
+.operation-table .operation-icon-btn svg {
+  width: 14px;
+  height: 14px;
 }
 
 .operation-table .operation-icon-btn.is-primary {
   border-color: var(--brand);
   background: var(--brand);
   color: #fff;
-}
-
-.operation-table .operation-icon-btn.is-danger {
-  border-color: #fecaca;
-  color: #dc2626;
-}
-
-.operation-table .operation-icon-btn.is-danger:hover {
-  border-color: #fca5a5;
-  background: #fff5f5;
 }
 
 .operation-table .col-actions,
@@ -4772,7 +4760,7 @@
 .operation-table--checks th:nth-child(5),
 .operation-table--checks td:nth-child(5) { width: auto; }
 .operation-table--checks th:nth-child(6),
-.operation-table--checks td:nth-child(6) { width: 174px; }
+.operation-table--checks td:nth-child(6) { width: 136px; }
 
 .operation-table--notifications th:nth-child(1),
 .operation-table--notifications td:nth-child(1) { width: 25%; }
@@ -4804,10 +4792,35 @@
 .operation-table--templates th:nth-child(5),
 .operation-table--templates td:nth-child(5) { width: 12%; }
 .operation-table--templates th:nth-child(6),
-.operation-table--templates td:nth-child(6) { width: 96px; }
+.operation-table--templates td:nth-child(6) { width: 72px; }
 
 .operation-table--templates .op-row-actions {
-  justify-content: flex-start;
+  justify-content: center;
+}
+
+.operation-table .op-text-link {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.operation-table .op-text-link > span,
+.operation-table .op-text-link > b {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0;
+  text-overflow: ellipsis;
+}
+
+.operation-table .op-text-link > small {
+  flex: 0 1 auto;
+  display: block;
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
 }
 
 .operation-detail-grid b {
