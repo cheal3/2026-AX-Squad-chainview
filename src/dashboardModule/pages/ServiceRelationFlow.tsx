@@ -1912,10 +1912,13 @@ export function ServiceRelationFlow({
             />
             <Controls />
           </ReactFlow>
-          {infraGraphLoading && graphViewMode !== "service" ? (
+          {portalData.remoteApi.initialLoading ||
+          (portalData.remoteApi.status.state === "loading" &&
+            portalData.remoteApi.status.source === "snapshot") ||
+          (infraGraphLoading && graphViewMode !== "service") ? (
             <div className="chainview-flow-loader" role="status" aria-live="polite">
               <span className="portal-initial-loader__ring" aria-hidden="true" />
-              <strong>인프라 관계를 불러오는 중입니다.</strong>
+              <strong>관계도를 불러오는 중입니다.</strong>
             </div>
           ) : null}
           {focusedService && !hideTopControl && (

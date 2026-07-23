@@ -809,7 +809,7 @@
 
 .incident-detail__layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.95fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
   align-items: start;
 }
@@ -835,6 +835,13 @@
 
 .incident-detail__card--summary {
   min-height: 282px;
+}
+
+.incident-detail__card--overview-primary {
+  height: 360px;
+  overflow: auto;
+  scrollbar-color: #486179 #061625;
+  scrollbar-width: thin;
 }
 
 .incident-detail__card--graph {
@@ -1009,6 +1016,15 @@
   border-radius: 8px;
   background: #0b2135;
   padding: 10px;
+}
+
+.incident-detail__relation-list div > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.incident-detail__relation-list div > code {
+  flex: 0 0 auto;
 }
 
 .incident-detail__relation-list div.is-danger {
@@ -3993,18 +4009,6 @@
     grid-template-columns: 1fr;
   }
 }
-.portal-initial-loader {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  background: #f5f7fb;
-  color: #1f2a44;
-  font-size: 14px;
-}
-
 .portal-initial-loader__ring {
   width: 42px;
   height: 42px;
@@ -4026,6 +4030,20 @@
 
 .inline-data-loader {
   min-height: 180px;
+}
+
+.incident-detail__loading {
+  display: grid;
+  min-height: min(520px, calc(100vh - 150px));
+  place-items: center;
+  border: 1px solid #1f3549;
+  border-radius: 10px;
+  background: #081b2d;
+}
+
+.incident-detail__loading .inline-data-loader {
+  min-height: 0;
+  color: #b9c8d8;
 }
 
 .inline-data-loader .portal-initial-loader__ring,

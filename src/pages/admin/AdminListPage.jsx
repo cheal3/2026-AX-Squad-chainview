@@ -69,8 +69,13 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
   const meta = getMenuMeta(activeMenu || menu);
   const remoteQueryKey = getRemoteQueryKey(menu);
   const remoteStatus = portalData.remoteApi.status;
+  const isInitialLoading = portalData.remoteApi.initialLoading;
   const isRemoteLoading =
     remoteStatus.state === "loading" && remoteStatus.source === remoteQueryKey;
+  const isTableLoading =
+    isInitialLoading ||
+    isRemoteLoading ||
+    (remoteStatus.state === "loading" && remoteStatus.source === "snapshot");
   const showRemoteStatus =
     remoteStatus.source === remoteQueryKey || remoteStatus.source === "snapshot";
   const showRemoteApiButton = Boolean(remoteQueryKey);
@@ -512,7 +517,17 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
             </tr>
           </thead>
           <tbody>
-            {filteredRows.map((row) => (
+            {isTableLoading ? (
+              <tr>
+                <td colSpan={config.columns.length + 2}>
+                  <div className="inline-data-loader" role="status" aria-live="polite">
+                    <span className="portal-initial-loader__ring" aria-hidden="true" />
+                    <strong>목록을 불러오는 중입니다.</strong>
+                  </div>
+                </td>
+              </tr>
+            ) : null}
+            {!isTableLoading && filteredRows.map((row) => (
               <tr className={row.onClick ? "is-clickable-incident" : undefined} key={row.key} onClick={row.onClick}>
                 <td className="col-check"><input className="chk" checked={selectedKeys.includes(String(row.key))} onChange={(event) => toggleRow(row.key, event.target.checked)} onClick={(event) => event.stopPropagation()} type="checkbox" /></td>
                 {row.cells.map((cell, index) => <td key={index}>{cell}</td>)}
@@ -570,7 +585,7 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
           </tbody>
         </table>
         <div className="pager">
-          <div className="pager__info">전체 {filteredRows.length}건 · 1-{filteredRows.length} / 1 페이지 · 선택 {selectedKeys.filter((key) => filteredRowKeys.includes(key)).length}건</div>
+          <div className="pager__info">{isTableLoading ? "데이터 조회 중" : `전체 ${filteredRows.length}건 · 1-${filteredRows.length} / 1 페이지 · 선택 ${selectedKeys.filter((key) => filteredRowKeys.includes(key)).length}건`}</div>
           <div className="pager__nav"><button disabled>‹</button><button className="is-on">1</button><button disabled>›</button></div>
         </div>
       </div>

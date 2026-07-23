@@ -683,6 +683,7 @@ export function IncidentDetailPage() {
     relations,
     services,
     updateIncidentStatus,
+    remoteApi,
   } = usePortalData();
   const [now, setNow] = useState(() => new Date());
   const [activeTab, setActiveTab] = useState("overview");
@@ -748,6 +749,21 @@ export function IncidentDetailPage() {
     const timer = window.setInterval(() => setNow(new Date()), 1000);
     return () => window.clearInterval(timer);
   }, []);
+
+  if (remoteApi.initialLoading) {
+    return (
+      <AppShell activeMenu="incidents" isDark>
+        <main className="main chain-dashboard-main incident-detail-page">
+          <section className="incident-detail__loading">
+            <div className="inline-data-loader" role="status" aria-live="polite">
+              <span className="portal-initial-loader__ring" aria-hidden="true" />
+              <strong>인시던트 상세 정보를 불러오는 중입니다.</strong>
+            </div>
+          </section>
+        </main>
+      </AppShell>
+    );
+  }
 
   if (!incident) {
     return (
@@ -835,7 +851,7 @@ export function IncidentDetailPage() {
         {activeTab === "overview" ? (
           <div className="incident-detail__layout" role="tabpanel">
             <section className="incident-detail__left">
-            <article className="incident-detail__card incident-detail__card--danger incident-detail__card--summary">
+            <article className="incident-detail__card incident-detail__card--danger incident-detail__card--summary incident-detail__card--overview-primary">
               <div className="incident-detail__card-head">
                 <h2>🚨 진행 중 인시던트</h2>
                 <span>id: {incident.externalIncidentCode ?? `#${incident.incidentId}`} · severity: {incident.severityCode} · occurredAt: {incident.startedAt}</span>
@@ -846,9 +862,29 @@ export function IncidentDetailPage() {
               </div>
               <p className="incident-detail__description">{incident.description || "등록된 인시던트 설명이 없습니다."}</p>
             </article>
+            <article className="incident-detail__card incident-detail__card--graph">
+              <div className="incident-detail__card-head">
+                <h2>영향 범위 (BLAST RADIUS)</h2>
+                <Link to={`/topology?incidentId=${incident.incidentId}&serviceId=${service?.serviceId ?? ""}`}>전체 토폴로지 보기 →</Link>
+              </div>
+              <div className="incident-detail__blast">
+                <ServiceRelationFlow
+                  embedded
+                  embeddedHeightClassName="h-full"
+                  frameless
+                  hideDepthToggle
+                  hideDetailPanel
+                  hideNodeActions
+                  hideTopControl
+                  incidentMode
+                  initialRelationDepth={2}
+                  initialServiceId={service?.serviceId}
+                />
+              </div>
+            </article>
             </section>
             <aside className="incident-detail__right">
-            <article className="incident-detail__card incident-detail__card--summary">
+            <article className="incident-detail__card incident-detail__card--summary incident-detail__card--overview-primary">
               <h2>📦 기본 정보 (SERVICE)</h2>
               <dl className="incident-detail__dl">
                 <dt>serviceCode</dt><dd><code>{service?.serviceCode ?? incident.targetCode}</code></dd>

@@ -211,6 +211,7 @@ type PortalDataContextValue = {
   runHealthCheck: (serviceId: number, url: string) => HealthCheckResult;
   remoteApi: {
     enabled: boolean;
+    initialLoading: boolean;
     origin: string;
     status: RemoteApiStatus;
     debugEnabled: boolean;
@@ -615,6 +616,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       healthChecks,
       remoteApi: {
         enabled: REMOTE_API_ENABLED,
+        initialLoading: !initialDataReady,
         origin: remoteOrigin,
         status: remoteApiStatus,
         debugEnabled: API_DEBUG_ENABLED,
@@ -1544,6 +1546,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
     }),
     [
       healthChecks,
+      initialDataReady,
       incidentEvents,
       incidentImpacts,
       incidents,
@@ -1563,23 +1566,10 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
     ]
   );
 
-  if (!initialDataReady) {
-    return <PortalInitialLoader />;
-  }
-
   return (
     <PortalDataContext.Provider value={value}>
       {children}
     </PortalDataContext.Provider>
-  );
-}
-
-function PortalInitialLoader() {
-  return (
-    <div className="portal-initial-loader" role="status" aria-live="polite">
-      <span className="portal-initial-loader__ring" aria-hidden="true" />
-      <strong>ChainView 데이터를 불러오는 중입니다.</strong>
-    </div>
   );
 }
 
