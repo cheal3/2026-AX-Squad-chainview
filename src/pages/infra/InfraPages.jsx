@@ -91,14 +91,11 @@ async function fetchInfraNodesFromApi() {
 }
 
 async function fetchInfraRelationsFromApi(nodes) {
-  const bulkEdges = await chainViewApi.infraNodes.listEdges().catch(() => null);
-  const edgeLists = Array.isArray(bulkEdges)
-    ? [bulkEdges]
-    : await Promise.all(
-        nodes.map((node) =>
-          chainViewApi.infraNodes.edges(Number(node.infraNodeId)).catch(() => [])
-        )
-      );
+  const edgeLists = await Promise.all(
+    nodes.map((node) =>
+      chainViewApi.infraNodes.edges(Number(node.infraNodeId)).catch(() => [])
+    )
+  );
   const edgeById = new Map();
   edgeLists.flat().forEach((edge) => {
     const relation = normalizeInfraRelation(edge);

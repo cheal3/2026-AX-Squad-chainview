@@ -308,7 +308,6 @@ export const chainViewApi = {
     update: (infraNodeId: number, body: unknown) =>
       requestJson<unknown>(`/api/infra-nodes/${infraNodeId}`, "PUT", { body }),
     delete: (infraNodeId: number) => requestJson<void>(`/api/infra-nodes/${infraNodeId}`, "DELETE"),
-    listEdges: () => requestJson<unknown[]>("/api/infra-nodes/edges", "GET"),
     edges: (infraNodeId: number) => requestJson<unknown[]>(`/api/infra-nodes/${infraNodeId}/edges`, "GET"),
     createEdge: (body: unknown) => requestJson<unknown>("/api/infra-nodes/edges", "POST", { body }),
     deleteEdge: (infraEdgeId: number) =>

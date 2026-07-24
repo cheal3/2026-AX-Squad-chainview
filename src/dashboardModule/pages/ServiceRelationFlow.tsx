@@ -246,33 +246,10 @@ async function fetchInfraGraphSnapshot() {
   const nodes = (await chainViewApi.infraNodes.list())
     .map(normalizeInfraNode)
     .filter((node) => node.infraNodeId);
-  const bulkEdges = await chainViewApi.infraNodes.listEdges().catch(() => null);
-  const edgeLists = Array.isArray(bulkEdges)
-    ? [bulkEdges]
-    : await Promise.all(
-        nodes.map((node) =>
-          chainViewApi.infraNodes.edges(node.infraNodeId).catch(() => [])
-        )
-      );
-  const relationById = new Map<number, InfraGraphRelationRecord>();
-
-  edgeLists.flat().forEach((edge) => {
-    const relation = normalizeInfraRelation(edge);
-    if (
-      !relation.infraRelationId ||
-      !relation.sourceInfraNodeId ||
-      !relation.targetInfraNodeId
-    ) {
-      return;
-    }
-    relationById.set(relation.infraRelationId, relation);
-  });
 
   return {
     nodes,
-    relations: [...relationById.values()].sort(
-      (first, second) => first.infraRelationId - second.infraRelationId
-    ),
+    relations: [],
   };
 }
 
@@ -1032,6 +1009,9 @@ export function ServiceRelationFlow({
     if (infraIncident) {
       return incidentInfraNodeIds ?? new Set<number>();
     }
+    if (graphViewMode === "infra") {
+      return null;
+    }
     if (!incidentMode && !serviceFilter) {
       return null;
     }
@@ -1060,6 +1040,7 @@ export function ServiceRelationFlow({
     filteredServices,
     incidentInfraNodeIds,
     effectiveInfraGraphRelations,
+    graphViewMode,
     incidentMode,
     infraIncident,
     serviceFilter,
