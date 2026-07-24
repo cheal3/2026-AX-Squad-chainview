@@ -183,6 +183,7 @@ const DEPENDS_ON_COLOR = "#475569";
 const IMPACT_COLOR = "#2563eb";
 const SERVICE_INFRA_COLOR = "#f59e0b";
 const MAX_RELATION_DEPTH = 2;
+const FLOW_ANIMATION_STORAGE_KEY = "chainview.flow.animations.enabled";
 const RELATION_DETAIL_WIDTH = 340;
 const RELATION_COLLAPSED_WIDTH = 112;
 const RELATION_COLLAPSED_HEIGHT = 40;
@@ -459,6 +460,12 @@ export function ServiceRelationFlow({
   );
   const [topControlMode, setTopControlMode] =
     useState<TopControlMode>("select");
+  const [animationsEnabled, setAnimationsEnabled] = useState(() => {
+    if (typeof window === "undefined") {
+      return true;
+    }
+    return window.localStorage.getItem(FLOW_ANIMATION_STORAGE_KEY) !== "N";
+  });
   const [flowInstance, setFlowInstance] =
     useState<ReactFlowInstance<GraphNodeData> | null>(null);
   const userMovedViewportRef = useRef(false);
@@ -476,6 +483,16 @@ export function ServiceRelationFlow({
       setSelectedServiceNodeId(null);
     }
   }, [graphViewMode]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    window.localStorage.setItem(
+      FLOW_ANIMATION_STORAGE_KEY,
+      animationsEnabled ? "Y" : "N"
+    );
+  }, [animationsEnabled]);
 
   useEffect(() => {
     if (!shouldUseRemoteInfraApi()) {
@@ -2321,7 +2338,7 @@ export function ServiceRelationFlow({
         sourceHandle: sourceIsLeft ? "right-source" : "left-source",
         targetHandle: sourceIsLeft ? "left-target" : "right-target",
         type: "default",
-        animated: true,
+        animated: animationsEnabled,
         className:
           `chainview-flow-edge chainview-flow-edge-normal-dashed chainview-flow-edge-infra ${
             directlyConnectedToSelected
@@ -2373,7 +2390,7 @@ export function ServiceRelationFlow({
                   sourceHandle: "left-source",
                   targetHandle: "right-target",
                   type: "default",
-                  animated: true,
+                  animated: animationsEnabled,
                   className:
                     `chainview-flow-edge chainview-flow-edge-service-infra ${
                       active
@@ -2403,6 +2420,7 @@ export function ServiceRelationFlow({
     return [...serviceRelationEdges, ...topologyRelationEdges, ...serviceInfraEdges];
   }, [
     activeRelations,
+    animationsEnabled,
     filteredServices,
     graphViewMode,
     focusedServiceId,
@@ -2651,7 +2669,7 @@ export function ServiceRelationFlow({
                   : showAllServices
                     ? "chainview-flow-all bg-[#f8fafc]"
                     : "bg-white"
-              }`
+              } ${animationsEnabled ? "" : "chainview-flow-no-animation"}`
             : "overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
         }
       >
@@ -2679,6 +2697,18 @@ export function ServiceRelationFlow({
             />
             <Controls />
           </ReactFlow>
+          <button
+            type="button"
+            onClick={() => setAnimationsEnabled((enabled) => !enabled)}
+            className={`absolute bottom-5 left-5 z-40 rounded-full border px-3 py-1.5 text-[11px] font-bold shadow-sm backdrop-blur transition ${
+              animationsEnabled
+                ? "border-slate-200 bg-white/90 text-slate-600 hover:bg-slate-50"
+                : "border-blue-200 bg-blue-50/95 text-blue-700 hover:bg-blue-100"
+            }`}
+            title="관계선 애니메이션 켜기/끄기"
+          >
+            애니메이션 {animationsEnabled ? "ON" : "OFF"}
+          </button>
           {portalData.remoteApi.initialLoading ||
           (portalData.remoteApi.status.state === "loading" &&
             portalData.remoteApi.status.source === "snapshot") ||
@@ -2954,6 +2984,10 @@ export function ServiceRelationFlow({
 
         .chainview-flow-edge-service-infra-muted path {
           animation: none;
+        }
+
+        .chainview-flow-no-animation .react-flow__edge path {
+          animation: none !important;
         }
 
         .chainview-flow-dark .react-flow {
