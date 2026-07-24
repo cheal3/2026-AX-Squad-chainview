@@ -1068,7 +1068,6 @@ function RelationMap({
             initialServiceId={selectedServiceId}
             onSelectInfraNode={onSelectInfraNode}
             onSelectService={onSelectService}
-            preserveDetailPanelStateOnSelect
             serviceFilter={serviceFilter}
             showAllServices
           />
@@ -1096,6 +1095,7 @@ function RelationMap({
             modeTogglePlacement="bottom-center"
             onSelectInfraNode={onSelectInfraNode}
             onSelectService={onSelectService}
+            preserveDetailPanelStateOnSelect
             serviceFilter={serviceFilter}
             showAllServices
           />
