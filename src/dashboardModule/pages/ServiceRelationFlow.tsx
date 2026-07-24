@@ -2161,9 +2161,17 @@ export function ServiceRelationFlow({
             (hasInfraHighlight && (sourceInInfraScope || targetInInfraScope));
         const stroke = incidentMode
           ? "#ff3344"
-          : sourceLane >= 0 && targetLane > sourceLane
+          : highlightedServiceId === relation.sourceServiceId
             ? IMPACT_COLOR
-            : DEPENDS_ON_COLOR;
+            : highlightedServiceId === relation.targetServiceId
+              ? DEPENDS_ON_COLOR
+              : showAllServices
+                ? targetLane > sourceLane
+                  ? IMPACT_COLOR
+                  : DEPENDS_ON_COLOR
+                : sourceLane >= 0 && targetLane > sourceLane
+                  ? IMPACT_COLOR
+                  : DEPENDS_ON_COLOR;
         const sourceIsLeft = sourceLane <= targetLane;
 
         return {
