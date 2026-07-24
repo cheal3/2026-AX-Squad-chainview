@@ -709,13 +709,70 @@ export function ServiceRelationFlow({
   );
   const serviceServerIdsByServiceId = useMemo(() => {
     const next = new Map<number, number[]>();
+    const matchServerIds = (deployment: Record<string, unknown>) => {
+      const explicitServerId = Number(
+        deployment.serverId ??
+          deployment.deploymentServerId ??
+          deployment.infraServerId
+      );
+      if (explicitServerId) {
+        return [explicitServerId];
+      }
+
+      const lookupValues = [
+        deployment.serverName,
+        deployment.hostName,
+        deployment.hostname,
+        deployment.ipAddress,
+        deployment.ip,
+        deployment.infraNodeCode,
+        deployment.infraNodeName,
+        deployment.nodeCode,
+        deployment.nodeName,
+      ]
+        .map(normalizeGraphLookupValue)
+        .filter(Boolean);
+
+      if (!lookupValues.length) {
+        return [];
+      }
+
+      return servers
+        .filter((server) => {
+          const serverValues = [
+            server.serverName,
+            server.hostName,
+            server.ipAddress,
+            server.infraNodeCode,
+            server.infraNodeName,
+            inferInfraNodeCodeForServer(server),
+          ]
+            .map(normalizeGraphLookupValue)
+            .filter(Boolean);
+
+          return lookupValues.some((lookup) =>
+            serverValues.some(
+              (serverValue) =>
+                lookup === serverValue ||
+                lookup.includes(serverValue) ||
+                serverValue.includes(lookup)
+            )
+          );
+        })
+        .map((server) => server.serverId);
+    };
+
     deployments.forEach((deployment) => {
       const serviceId = Number(deployment.serviceId);
-      const serverId = Number(deployment.serverId);
-      if (!serviceId || !serverId) {
+      if (!serviceId) {
         return;
       }
-      next.set(serviceId, Array.from(new Set([...(next.get(serviceId) ?? []), serverId])));
+      matchServerIds(deployment as Record<string, unknown>).forEach((serverId) => {
+        if (!serverId) {
+          return;
+        }
+        next.set(serviceId, Array.from(new Set([...(next.get(serviceId) ?? []), serverId])));
+      });
     });
     services.forEach((service) => {
       const serverId = Number(service.serverId);
