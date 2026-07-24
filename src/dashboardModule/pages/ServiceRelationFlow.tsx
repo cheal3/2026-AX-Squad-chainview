@@ -184,6 +184,7 @@ const IMPACT_COLOR = "#2563eb";
 const SERVICE_INFRA_COLOR = "#f59e0b";
 const MAX_RELATION_DEPTH = 2;
 const FLOW_ANIMATION_STORAGE_KEY = "chainview.flow.animations.enabled";
+const FLOW_ANIMATION_CHANGE_EVENT = "chainview.flow.animations.change";
 const RELATION_DETAIL_WIDTH = 340;
 const RELATION_COLLAPSED_WIDTH = 112;
 const RELATION_COLLAPSED_HEIGHT = 40;
@@ -194,6 +195,66 @@ type GraphViewMode = "all" | "service" | "infra";
 type GraphModeTogglePlacement = "top-right" | "bottom-center";
 type RelationLegendPlacement = "bottom-right" | "top-left";
 type IncidentCanvasTone = "dark" | "light";
+
+function readFlowAnimationsEnabled() {
+  if (typeof window === "undefined") {
+    return true;
+  }
+  return window.localStorage.getItem(FLOW_ANIMATION_STORAGE_KEY) !== "N";
+}
+
+function writeFlowAnimationsEnabled(enabled: boolean) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  window.localStorage.setItem(FLOW_ANIMATION_STORAGE_KEY, enabled ? "Y" : "N");
+  window.dispatchEvent(
+    new CustomEvent(FLOW_ANIMATION_CHANGE_EVENT, { detail: { enabled } })
+  );
+}
+
+export function FlowAnimationToggleButton({
+  className = "",
+}: {
+  className?: string;
+}) {
+  const [enabled, setEnabled] = useState(readFlowAnimationsEnabled);
+
+  useEffect(() => {
+    const sync = (event: Event) => {
+      if (
+        event instanceof CustomEvent &&
+        typeof event.detail?.enabled === "boolean"
+      ) {
+        setEnabled(event.detail.enabled);
+        return;
+      }
+      setEnabled(readFlowAnimationsEnabled());
+    };
+
+    window.addEventListener(FLOW_ANIMATION_CHANGE_EVENT, sync);
+    window.addEventListener("storage", sync);
+    return () => {
+      window.removeEventListener(FLOW_ANIMATION_CHANGE_EVENT, sync);
+      window.removeEventListener("storage", sync);
+    };
+  }, []);
+
+  return (
+    <button
+      type="button"
+      onClick={() => writeFlowAnimationsEnabled(!enabled)}
+      className={`inline-flex h-7 shrink-0 items-center rounded-full border px-2.5 text-[11px] font-bold shadow-sm transition ${
+        enabled
+          ? "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+          : "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"
+      } ${className}`}
+      title="관계선 애니메이션 켜기/끄기"
+    >
+      애니메이션 {enabled ? "ON" : "OFF"}
+    </button>
+  );
+}
 
 export type InfraGraphNodeRecord = {
   infraNodeId: number;
@@ -460,12 +521,9 @@ export function ServiceRelationFlow({
   );
   const [topControlMode, setTopControlMode] =
     useState<TopControlMode>("select");
-  const [animationsEnabled, setAnimationsEnabled] = useState(() => {
-    if (typeof window === "undefined") {
-      return true;
-    }
-    return window.localStorage.getItem(FLOW_ANIMATION_STORAGE_KEY) !== "N";
-  });
+  const [animationsEnabled, setAnimationsEnabled] = useState(
+    readFlowAnimationsEnabled
+  );
   const [flowInstance, setFlowInstance] =
     useState<ReactFlowInstance<GraphNodeData> | null>(null);
   const userMovedViewportRef = useRef(false);
@@ -485,14 +543,24 @@ export function ServiceRelationFlow({
   }, [graphViewMode]);
 
   useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-    window.localStorage.setItem(
-      FLOW_ANIMATION_STORAGE_KEY,
-      animationsEnabled ? "Y" : "N"
-    );
-  }, [animationsEnabled]);
+    const syncAnimationState = (event: Event) => {
+      if (
+        event instanceof CustomEvent &&
+        typeof event.detail?.enabled === "boolean"
+      ) {
+        setAnimationsEnabled(event.detail.enabled);
+        return;
+      }
+      setAnimationsEnabled(readFlowAnimationsEnabled());
+    };
+
+    window.addEventListener(FLOW_ANIMATION_CHANGE_EVENT, syncAnimationState);
+    window.addEventListener("storage", syncAnimationState);
+    return () => {
+      window.removeEventListener(FLOW_ANIMATION_CHANGE_EVENT, syncAnimationState);
+      window.removeEventListener("storage", syncAnimationState);
+    };
+  }, []);
 
   useEffect(() => {
     if (!shouldUseRemoteInfraApi()) {
@@ -2670,7 +2738,9 @@ export function ServiceRelationFlow({
                     ? "chainview-flow-all bg-[#f8fafc]"
                     : "bg-white"
               } ${animationsEnabled ? "" : "chainview-flow-no-animation"}`
-            : "overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
+            : `overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm ${
+                animationsEnabled ? "" : "chainview-flow-no-animation"
+              }`
         }
       >
         <div className={canvasClassName}>
@@ -2697,18 +2767,6 @@ export function ServiceRelationFlow({
             />
             <Controls />
           </ReactFlow>
-          <button
-            type="button"
-            onClick={() => setAnimationsEnabled((enabled) => !enabled)}
-            className={`absolute bottom-5 left-5 z-40 rounded-full border px-3 py-1.5 text-[11px] font-bold shadow-sm backdrop-blur transition ${
-              animationsEnabled
-                ? "border-slate-200 bg-white/90 text-slate-600 hover:bg-slate-50"
-                : "border-blue-200 bg-blue-50/95 text-blue-700 hover:bg-blue-100"
-            }`}
-            title="관계선 애니메이션 켜기/끄기"
-          >
-            애니메이션 {animationsEnabled ? "ON" : "OFF"}
-          </button>
           {portalData.remoteApi.initialLoading ||
           (portalData.remoteApi.status.state === "loading" &&
             portalData.remoteApi.status.source === "snapshot") ||
@@ -2988,6 +3046,14 @@ export function ServiceRelationFlow({
 
         .chainview-flow-no-animation .react-flow__edge path {
           animation: none !important;
+        }
+
+        .react-flow__edges,
+        .react-flow__edge,
+        .react-flow__edge path,
+        .chainview-flow-edge,
+        .chainview-flow-edge path {
+          pointer-events: none;
         }
 
         .chainview-flow-dark .react-flow {

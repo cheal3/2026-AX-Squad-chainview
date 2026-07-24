@@ -21,6 +21,7 @@ import {
   X,
 } from "lucide-react";
 import {
+  FlowAnimationToggleButton,
   ServiceRelationFlow,
   type InfraGraphNodeRecord,
 } from "./ServiceRelationFlow";
@@ -1037,8 +1038,9 @@ function RelationMap({
     <>
       <section className="relative h-full min-h-[300px] min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white">
         <div className="flex h-[44px] min-w-0 items-center justify-between gap-3 border-b border-slate-100 px-4">
-          <div className="flex min-w-0 items-center gap-8">
+          <div className="flex min-w-0 items-center gap-2">
             <span className="shrink-0 text-sm font-black">서비스 관계도</span>
+            <FlowAnimationToggleButton />
           </div>
           <button
             aria-label="서비스 관계도 전체 화면 보기"
@@ -1073,7 +1075,11 @@ function RelationMap({
       </section>
 
       {isExpanded ? (
-        <RelationFlowModal title="서비스 관계도" onClose={() => setIsExpanded(false)}>
+        <RelationFlowModal
+          title="서비스 관계도"
+          titleAction={<FlowAnimationToggleButton />}
+          onClose={() => setIsExpanded(false)}
+        >
           <ServiceRelationFlow
             autoCenter
             embedded
@@ -1103,11 +1109,13 @@ function RelationFlowModal({
   dark = false,
   onClose,
   title,
+  titleAction,
 }: {
   children: ReactNode;
   dark?: boolean;
   onClose: () => void;
   title: string;
+  titleAction?: ReactNode;
 }) {
   const backdropHandlers = useSafeBackdropClose(onClose);
   useEffect(() => {
@@ -1142,7 +1150,10 @@ function RelationFlowModal({
             dark ? "border-[#1f3549]" : "border-slate-200"
           }`}
         >
-          <div className="min-w-0 truncate text-base font-black">{title}</div>
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="min-w-0 truncate text-base font-black">{title}</div>
+            {titleAction}
+          </div>
           <button
             aria-label="전체 화면 닫기"
             className={`flex h-8 w-8 shrink-0 items-center justify-center rounded border ${
