@@ -1847,6 +1847,7 @@ function knownRemoteCode<T extends string>(
 }
 
 function mapServerFromRemote(row: RemoteListRecord): ServerRecord {
+  const serverServiceRefs = remoteServerServiceRefs(row);
   return {
     serverId: asRemoteNumber(row.serverId ?? row.id),
     serverName: asRemoteString(row.serverName ?? row.name),
@@ -1857,8 +1858,46 @@ function mapServerFromRemote(row: RemoteListRecord): ServerRecord {
     osVersion: asRemoteString(row.osVersion),
     statusCode: knownRemoteCode(row.statusCode, codeLabels.serverStatus, "RUNNING"),
     description: asRemoteString(row.description),
+    serviceCodes: serverServiceRefs.serviceCodes,
+    serviceIds: serverServiceRefs.serviceIds,
     createdAt: asRemoteString(row.createdAt),
     updatedAt: asRemoteString(row.updatedAt),
+  };
+}
+
+function remoteServerServiceRefs(row: RemoteListRecord) {
+  const serviceIds = new Set<number>();
+  const serviceCodes = new Set<string>();
+
+  [
+    row.serviceId,
+    ...(Array.isArray(row.serviceIds) ? row.serviceIds : []),
+  ].forEach((value) => {
+    const serviceId = asRemoteNumber(value);
+    if (serviceId) serviceIds.add(serviceId);
+  });
+
+  [
+    row.serviceCode,
+    ...(Array.isArray(row.serviceCodes) ? row.serviceCodes : []),
+  ].forEach((value) => {
+    const serviceCode = asRemoteString(value);
+    if (serviceCode) serviceCodes.add(serviceCode);
+  });
+
+  ["services", "serviceServers", "deployments", "serverMappings"].forEach((key) => {
+    asRemoteRecordArray(row[key]).forEach((record) => {
+      const service = isRemoteRecord(record.service) ? record.service : null;
+      const serviceId = asRemoteNumber(record.serviceId ?? record.id ?? service?.serviceId ?? service?.id);
+      const serviceCode = asRemoteString(record.serviceCode ?? record.code ?? service?.serviceCode ?? service?.code);
+      if (serviceId) serviceIds.add(serviceId);
+      if (serviceCode) serviceCodes.add(serviceCode);
+    });
+  });
+
+  return {
+    serviceCodes: [...serviceCodes],
+    serviceIds: [...serviceIds],
   };
 }
 

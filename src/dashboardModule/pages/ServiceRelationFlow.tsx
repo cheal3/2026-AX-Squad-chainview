@@ -637,6 +637,10 @@ export function ServiceRelationFlow({
     () => new Map(services.map((service) => [service.serviceId, service])),
     [services]
   );
+  const serviceIdByCode = useMemo(
+    () => new Map(services.map((service) => [service.serviceCode, service.serviceId])),
+    [services]
+  );
   const serverById = useMemo(
     () => new Map(servers.map((server) => [server.serverId, server])),
     [servers]
@@ -720,8 +724,22 @@ export function ServiceRelationFlow({
       }
       next.set(service.serviceId, Array.from(new Set([...(next.get(service.serviceId) ?? []), serverId])));
     });
+    servers.forEach((server) => {
+      const serviceIds = [
+        ...(server.serviceIds ?? []),
+        ...(server.serviceCodes ?? [])
+          .map((serviceCode) => serviceIdByCode.get(serviceCode))
+          .filter((serviceId): serviceId is number => Boolean(serviceId)),
+      ];
+      serviceIds.forEach((serviceId) => {
+        if (!serviceId || !server.serverId) {
+          return;
+        }
+        next.set(serviceId, Array.from(new Set([...(next.get(serviceId) ?? []), server.serverId])));
+      });
+    });
     return next;
-  }, [deployments, services]);
+  }, [deployments, serviceIdByCode, services, servers]);
   const usedServerIds = useMemo(() => {
     const ids = new Set<number>();
     serviceServerIdsByServiceId.forEach((serverIds) => {

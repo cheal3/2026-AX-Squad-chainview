@@ -194,6 +194,7 @@ function mapServiceDeployments(row: RemoteRecord, detail?: RemoteRecord) {
 
 function mapServer(row: RemoteRecord): ServerRecord {
   const now = formatDateTime(row.updatedAt);
+  const serverServiceRefs = extractServiceRefs(row);
 
   return {
     serverId: asNumber(row.serverId),
@@ -210,10 +211,48 @@ function mapServer(row: RemoteRecord): ServerRecord {
     infraNodeName: asString(row.infraNodeName) || undefined,
     serverRoleCode: asString(row.serverRoleCode) || undefined,
     serverRoleName: asString(row.serverRoleName) || undefined,
+    serviceCodes: serverServiceRefs.serviceCodes,
     serviceCount: asNumber(row.serviceCount) || undefined,
+    serviceIds: serverServiceRefs.serviceIds,
     instanceCount: asNumber(row.instanceCount) || undefined,
     createdAt: formatDateTime(row.createdAt) || now,
     updatedAt: now,
+  };
+}
+
+function extractServiceRefs(row: RemoteRecord) {
+  const serviceIds = new Set<number>();
+  const serviceCodes = new Set<string>();
+
+  [
+    row.serviceId,
+    ...(Array.isArray(row.serviceIds) ? row.serviceIds : []),
+  ].forEach((value) => {
+    const serviceId = asNumber(value);
+    if (serviceId) serviceIds.add(serviceId);
+  });
+
+  [
+    row.serviceCode,
+    ...(Array.isArray(row.serviceCodes) ? row.serviceCodes : []),
+  ].forEach((value) => {
+    const serviceCode = asString(value);
+    if (serviceCode) serviceCodes.add(serviceCode);
+  });
+
+  ["services", "serviceServers", "deployments", "serverMappings"].forEach((key) => {
+    asRecordArray(row[key]).forEach((record) => {
+      const service = isRecord(record.service) ? record.service : null;
+      const serviceId = asNumber(record.serviceId ?? record.id ?? service?.serviceId ?? service?.id);
+      const serviceCode = asString(record.serviceCode ?? record.code ?? service?.serviceCode ?? service?.code);
+      if (serviceId) serviceIds.add(serviceId);
+      if (serviceCode) serviceCodes.add(serviceCode);
+    });
+  });
+
+  return {
+    serviceCodes: [...serviceCodes],
+    serviceIds: [...serviceIds],
   };
 }
 

@@ -116,7 +116,9 @@ export interface ServerRecord {
   infraNodeName?: string;
   serverRoleCode?: string;
   serverRoleName?: string;
+  serviceCodes?: string[];
   serviceCount?: number;
+  serviceIds?: number[];
   instanceCount?: number;
   createdAt: string;
   updatedAt: string;
