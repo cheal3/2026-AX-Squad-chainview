@@ -83,8 +83,6 @@ export async function loadRemotePortalSnapshot(): Promise<RemotePortalSnapshot> 
 
   const incidents = await loadIncidentDetails(incidentRows);
   const incidentImpacts = await loadIncidentImpacts(incidents);
-  const notificationEvents = await loadNotificationEvents(incidents);
-
   return {
     servers: serverRows.map(mapServer),
     services: serviceRows.map((service) =>
@@ -106,7 +104,6 @@ export async function loadRemotePortalSnapshot(): Promise<RemotePortalSnapshot> 
     incidents,
     incidentImpacts,
     incidentEvents: [
-      ...notificationEvents,
       ...buildRemoteIncidentEvents(incidents, incidentImpacts),
     ].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
   };
@@ -143,31 +140,6 @@ async function loadIncidentImpacts(incidents: IncidentRecord[]) {
     return asRecordArray(result.value).map((impact) =>
       mapIncidentImpact(incidentId, impact)
     );
-  });
-}
-
-async function loadNotificationEvents(incidents: IncidentRecord[]) {
-  const settled = await Promise.allSettled(
-    incidents.map((incident) =>
-      chainViewApi.incidents.notifications(incident.incidentId)
-    )
-  );
-
-  return settled.flatMap((result, incidentIndex) => {
-    if (result.status !== "fulfilled") {
-      return [];
-    }
-    const incident = incidents[incidentIndex];
-    return asRecordArray(result.value).map((notification, notificationIndex) => ({
-      eventId: incident.incidentId * 10000 + notificationIndex + 5000,
-      incidentId: incident.incidentId,
-      eventType: "NOTIFICATION_SENT" as const,
-      message:
-        asString(notification.messageTitle) ||
-        `${asString(notification.channelCode) || "알림"} 발송 기록이 있습니다.`,
-      actor: asString(notification.targetUserName) || "SYSTEM",
-      createdAt: formatDateTime(notification.sentAt ?? notification.createdAt),
-    }));
   });
 }
 

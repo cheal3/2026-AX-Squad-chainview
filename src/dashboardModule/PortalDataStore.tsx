@@ -449,17 +449,29 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
 
   const applyRemoteQueryResult = (queryKey: RemoteQueryKey, result: unknown) => {
     const rows = asRemoteRecordArray(result);
-    if (queryKey === "users") {
-      setUsers(rows);
-    } else if (queryKey === "groups") {
-      setGroups(rows);
-    } else if (queryKey === "categories") {
-      setCategories(rows);
-    } else if (queryKey === "codes") {
-      setCodes(rows);
-    } else if (queryKey === "deployments") {
-      setDeployments(rows);
-    }
+      if (queryKey === "users") {
+        setUsers(rows);
+      } else if (queryKey === "groups") {
+        setGroups(rows);
+      } else if (queryKey === "categories") {
+        setCategories(rows);
+      } else if (queryKey === "codes") {
+        setCodes(rows);
+      } else if (queryKey === "deployments") {
+        setDeployments(rows);
+      } else if (queryKey === "incidents") {
+        setIncidents(rows.map((row) => mapIncidentFromRemote(row)));
+      } else if (queryKey === "servers") {
+        setServers(rows.map((row) => mapServerFromRemote(row)));
+      } else if (queryKey === "services") {
+        setServices(rows.map((row) => mapServiceFromRemote(row)));
+      } else if (queryKey === "relations") {
+        setRelations(rows.map((row) => mapRelationFromRemote(row)));
+      } else if (queryKey === "techstacks") {
+        setTechStacks(rows.map((row) => mapTechStackFromRemote(row)));
+      } else if (queryKey === "owners") {
+        setOwners(rows.map((row) => mapOwnerFromRemote(row)));
+      }
   };
 
   const testRemoteQuery = useCallback(
@@ -609,7 +621,6 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         return status;
       }
 
-      await loadRemoteSnapshot();
       const status = {
         state: "success" as const,
         message: `${uniqueQueryKeys.map((queryKey) => remoteQueryLabels[queryKey]).join(", ")} 최신 조회 완료`,
@@ -1821,6 +1832,119 @@ function toRemoteDeploymentPayload(input: Record<string, unknown>) {
     portInfo: asRemoteString(input.portInfo),
     deploymentStatusCode: asRemoteString(input.deploymentStatusCode) || "RUNNING",
     instanceCount: asRemoteNumber(input.instanceCount, 1),
+  };
+}
+
+function knownRemoteCode<T extends string>(
+  value: unknown,
+  labels: Record<T, string>,
+  fallback: T
+): T {
+  const code = asRemoteString(value) as T;
+  return code && Object.prototype.hasOwnProperty.call(labels, code)
+    ? code
+    : fallback;
+}
+
+function mapServerFromRemote(row: RemoteListRecord): ServerRecord {
+  return {
+    serverId: asRemoteNumber(row.serverId ?? row.id),
+    serverName: asRemoteString(row.serverName ?? row.name),
+    hostName: asRemoteString(row.hostName ?? row.hostname),
+    ipAddress: asRemoteString(row.ipAddress ?? row.ip),
+    envCode: knownRemoteCode(row.envCode, codeLabels.env, "PROD"),
+    osTypeCode: knownRemoteCode(row.osTypeCode, codeLabels.osType, "LINUX"),
+    osVersion: asRemoteString(row.osVersion),
+    statusCode: knownRemoteCode(row.statusCode, codeLabels.serverStatus, "RUNNING"),
+    description: asRemoteString(row.description),
+    createdAt: asRemoteString(row.createdAt),
+    updatedAt: asRemoteString(row.updatedAt),
+  };
+}
+
+function mapServiceFromRemote(row: RemoteListRecord): ServiceRecord {
+  return {
+    serviceId: asRemoteNumber(row.serviceId ?? row.id),
+    categoryPath: asRemoteString(row.categoryPath)
+      ? asRemoteString(row.categoryPath).split(/[>/]/).map((part) => part.trim()).filter(Boolean)
+      : [asRemoteString(row.categoryName)].filter(Boolean),
+    serviceCode: asRemoteString(row.serviceCode ?? row.code),
+    serviceName: asRemoteString(row.serviceName ?? row.name),
+    serviceTypeCode: knownRemoteCode(row.serviceTypeCode, codeLabels.serviceType, "WEB"),
+    importanceCode: knownRemoteCode(row.importanceCode, codeLabels.importance, "MEDIUM"),
+    statusCode: knownRemoteCode(row.statusCode, codeLabels.serviceStatus, "NORMAL"),
+    description: asRemoteString(row.description),
+    endpointUrl: asRemoteString(row.endpointUrl),
+    serverId: asRemoteNumber(row.serverId),
+    deployPath: asRemoteString(row.deployPath),
+    portInfo: asRemoteString(row.portInfo),
+    deploymentStatusCode: knownRemoteCode(row.deploymentStatusCode, codeLabels.deploymentStatus, "RUNNING"),
+    instanceCount: asRemoteNumber(row.instanceCount, 1),
+    createdBy: asRemoteString(row.createdBy),
+    updatedBy: asRemoteString(row.updatedBy),
+    createdAt: asRemoteString(row.createdAt),
+    updatedAt: asRemoteString(row.updatedAt),
+  };
+}
+
+function mapRelationFromRemote(row: RemoteListRecord): ServiceRelationRecord {
+  return {
+    relationId: asRemoteNumber(row.relationId ?? row.id),
+    sourceServiceId: asRemoteNumber(row.sourceServiceId),
+    targetServiceId: asRemoteNumber(row.targetServiceId),
+    relationTypeCode: knownRemoteCode(row.relationTypeCode, codeLabels.relationType, "REST"),
+    mandatoryYn: asRemoteString(row.mandatoryYn) === "Y" ? "Y" : "N",
+    relationStatusCode: knownRemoteCode(row.relationStatusCode, codeLabels.relationStatus, "ACTIVE"),
+    description: asRemoteString(row.description),
+    createdAt: asRemoteString(row.createdAt),
+    updatedAt: asRemoteString(row.updatedAt),
+  };
+}
+
+function mapTechStackFromRemote(row: RemoteListRecord): TechStackRecord {
+  return {
+    techStackId: asRemoteNumber(row.techStackId ?? row.id),
+    serviceId: asRemoteNumber(row.serviceId),
+    techTypeCode: knownRemoteCode(row.techTypeCode, codeLabels.techType, "ETC"),
+    techName: asRemoteString(row.techName ?? row.name),
+    version: asRemoteString(row.version),
+    vendor: asRemoteString(row.vendor),
+    description: asRemoteString(row.description),
+    createdAt: asRemoteString(row.createdAt),
+    updatedAt: asRemoteString(row.updatedAt),
+  };
+}
+
+function mapOwnerFromRemote(row: RemoteListRecord): ServiceOwnerRecord {
+  return {
+    serviceOwnerId: asRemoteNumber(row.serviceOwnerId ?? row.id),
+    serviceId: asRemoteNumber(row.serviceId),
+    ownerTypeCode: knownRemoteCode(row.ownerTypeCode, codeLabels.ownerType, "GROUP"),
+    ownerId: asRemoteNumber(row.ownerId),
+    ownerName: asRemoteString(row.ownerName ?? row.name),
+    roleName: asRemoteString(row.roleName),
+    primaryYn: asRemoteString(row.primaryYn) === "N" ? "N" : "Y",
+    createdAt: asRemoteString(row.createdAt),
+    updatedAt: asRemoteString(row.updatedAt),
+  };
+}
+
+function mapIncidentFromRemote(row: RemoteListRecord): IncidentRecord {
+  return {
+    incidentId: asRemoteNumber(row.incidentId ?? row.id),
+    externalIncidentCode: asRemoteString(row.externalIncidentCode ?? row.incidentCode),
+    title: asRemoteString(row.title),
+    incidentTypeCode: knownRemoteCode(row.incidentTypeCode, codeLabels.incidentType, "SERVICE"),
+    incidentStatusCode: knownRemoteCode(row.incidentStatusCode, codeLabels.incidentStatus, "OPEN"),
+    severityCode: knownRemoteCode(row.severityCode, codeLabels.severity, "MAJOR"),
+    serviceId: asRemoteNumber(row.serviceId) || undefined,
+    infraNodeId: asRemoteNumber(row.infraNodeId) || undefined,
+    startedAt: asRemoteString(row.startedAt ?? row.createdAt),
+    endedAt: asRemoteString(row.endedAt),
+    summary: asRemoteString(row.summary ?? row.description),
+    createdBy: asRemoteString(row.createdBy),
+    updatedBy: asRemoteString(row.updatedBy),
+    manualRegisteredYn: asRemoteString(row.manualRegisteredYn) === "Y" ? "Y" : "N",
   };
 }
 

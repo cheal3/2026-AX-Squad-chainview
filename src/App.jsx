@@ -4,7 +4,6 @@ import { initAdminInteractions } from "./adminInteractions.js";
 import { AppShell } from "./components/AppShell.jsx";
 import { pages } from "./pagesData.js";
 import { PortalDataProvider, usePortalData } from "./dashboardModule/PortalDataStore";
-import { remoteQueryKeys } from "./dashboardModule/remoteQueries";
 
 const DynamicAdminListPage = lazy(() => import("./pages/admin/AdminListPage.jsx").then((module) => ({ default: module.DynamicAdminListPage })));
 const InfraRelationsPage = lazy(() => import("./pages/infra/InfraPages.jsx").then((module) => ({ default: module.InfraRelationsPage })));
@@ -335,6 +334,7 @@ function RealtimeRemoteGetRefresh() {
   const location = useLocation();
   const { remoteApi } = usePortalData();
   const lastRefreshKeyRef = useRef("");
+  const initializedRef = useRef(false);
 
   useEffect(() => {
     if (!remoteApi.enabled || remoteApi.initialLoading) {
@@ -342,15 +342,73 @@ function RealtimeRemoteGetRefresh() {
     }
 
     const refreshKey = `${location.pathname}${location.search}`;
+    if (!initializedRef.current) {
+      initializedRef.current = true;
+      lastRefreshKeyRef.current = refreshKey;
+      return;
+    }
+
     if (lastRefreshKeyRef.current === refreshKey) {
       return;
     }
 
+    const queryKeys = remoteQueryKeysForPath(location.pathname);
+    if (!queryKeys.length) {
+      lastRefreshKeyRef.current = refreshKey;
+      return;
+    }
+
     lastRefreshKeyRef.current = refreshKey;
-    void remoteApi.refreshQueries(remoteQueryKeys);
+    void remoteApi.refreshQueries(queryKeys);
   }, [location.pathname, location.search, remoteApi]);
 
   return null;
+}
+
+function remoteQueryKeysForPath(pathname) {
+  if (pathname === "/dashboard" || pathname === "/dashboard-proto") {
+    return ["services", "relations", "owners", "incidents"];
+  }
+  if (pathname === "/incidents" || pathname === "/analysis-incidents") {
+    return ["incidents", "services", "relations"];
+  }
+  if (pathname === "/topology") {
+    return ["services", "servers", "relations", "deployments"];
+  }
+  if (pathname === "/services" || pathname.startsWith("/admin-services/")) {
+    return ["services", "deployments", "owners", "techstacks"];
+  }
+  if (pathname === "/relations") {
+    return ["services", "relations"];
+  }
+  if (pathname === "/techstacks") {
+    return ["services", "techstacks"];
+  }
+  if (pathname === "/servers") {
+    return ["servers"];
+  }
+  if (pathname === "/deployments" || pathname === "/service-infra-mapping") {
+    return ["services", "servers", "deployments"];
+  }
+  if (pathname === "/infra-relations" || pathname === "/infra-topology") {
+    return ["servers"];
+  }
+  if (pathname === "/owners" || pathname === "/owner-management") {
+    return ["users", "groups", "owners", "services"];
+  }
+  if (pathname === "/groups") {
+    return ["groups"];
+  }
+  if (pathname === "/users") {
+    return ["users"];
+  }
+  if (pathname === "/categories") {
+    return ["categories"];
+  }
+  if (pathname === "/codes") {
+    return ["codes"];
+  }
+  return [];
 }
 
 export default function App() {
