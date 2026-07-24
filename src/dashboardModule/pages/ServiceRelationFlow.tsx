@@ -176,8 +176,8 @@ const Y_SPACING = 238;
 const CHILD_Y_SPACING = 214;
 const ALL_SERVICES_Y_SPACING = 88;
 const ALL_SERVICES_CATEGORY_GAP = 36;
-const ALL_MODE_INFRA_RIGHTMOST_X = 360;
-const ALL_MODE_SERVICE_LEFTMOST_X = 760;
+const ALL_MODE_INFRA_RIGHTMOST_X = 420;
+const ALL_MODE_SERVICE_LEFTMOST_X = 860;
 const LANE_HEIGHT = 4600;
 const DEPENDS_ON_COLOR = "#475569";
 const IMPACT_COLOR = "#2563eb";
@@ -1009,7 +1009,7 @@ export function ServiceRelationFlow({
     if (infraIncident) {
       return incidentInfraNodeIds ?? new Set<number>();
     }
-    if (graphViewMode === "infra") {
+    if (graphViewMode === "all" || graphViewMode === "infra") {
       return null;
     }
     if (!incidentMode && !serviceFilter) {
