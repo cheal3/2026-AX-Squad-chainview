@@ -254,18 +254,9 @@ function remoteErrorMessage(error: unknown, fallback: string) {
 
 function remoteErrorDetailMessage(error: unknown, fallback: string) {
   const baseMessage = remoteErrorMessage(error, fallback);
-  const apiError = error as { body?: unknown; status?: unknown; url?: unknown };
-  const body = apiError?.body;
-  const status =
-    typeof apiError?.status === "number" && apiError.status > 0
-      ? `HTTP ${apiError.status}`
-      : "";
-  const url = typeof apiError?.url === "string" ? apiError.url : "";
-  const context = [status, url].filter(Boolean).join("\n");
-  const messageWithContext = context ? `${baseMessage}\n\n요청 정보:\n${context}` : baseMessage;
-
+  const body = (error as { body?: unknown })?.body;
   if (!body || typeof body !== "string") {
-    return messageWithContext;
+    return baseMessage;
   }
 
   try {
@@ -292,11 +283,9 @@ function remoteErrorDetailMessage(error: unknown, fallback: string) {
           )
         : []),
     ].filter(Boolean);
-    return details.length
-      ? `${messageWithContext}\n\n상세:\n${Array.from(new Set(details)).join("\n")}`
-      : messageWithContext;
+    return details.length ? `${baseMessage}\n\n상세:\n${Array.from(new Set(details)).join("\n")}` : baseMessage;
   } catch {
-    return `${messageWithContext}\n\n서버 응답:\n${body.slice(0, 700)}`;
+    return `${baseMessage}\n\n서버 응답:\n${body.slice(0, 700)}`;
   }
 }
 
@@ -909,9 +898,6 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       },
       updateIncidentStatus: (incidentId, statusCode, message) => {
         const now = timestamp();
-        const previousIncidents = incidents;
-        const previousServices = services;
-        const previousEvents = incidentEvents;
         setIncidents((current) =>
           current.map((incident) =>
             incident.incidentId === incidentId
@@ -960,9 +946,13 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         if (REMOTE_API_ENABLED && target) {
           const remoteUpdate =
             statusCode === "RESOLVED"
-              ? chainViewApi.incidents.resolve(
+              ? chainViewApi.incidents.update(
                   incidentId,
-                  toIncidentResolvePayload(message, now)
+                  toIncidentUpdatePayload(
+                    { ...target, incidentStatusCode: statusCode, endedAt: now },
+                    statusCode,
+                    now
+                  )
                 )
               : chainViewApi.incidents.update(
                   incidentId,
@@ -978,9 +968,13 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
                   : "인시던트 상태가 변경되었습니다.",
             }))
             .catch((error) => {
-              setIncidents(previousIncidents);
-              setServices(previousServices);
-              setIncidentEvents(previousEvents);
+              if (target) {
+                setIncidents((current) =>
+                  current.map((incident) =>
+                    incident.incidentId === incidentId ? target : incident
+                  )
+                );
+              }
               console.warn("[ChainView API] 인시던트 상태 변경 API 호출에 실패했습니다.", error);
               return {
                 ok: false,
@@ -2317,13 +2311,6 @@ function toIncidentUpdatePayload(
     description: incident.description,
     startedAt: toApiDateTime(incident.startedAt),
     endedAt: resolvedAt,
-  };
-}
-
-function toIncidentResolvePayload(message: string | undefined, updatedAt: string) {
-  return {
-    endedAt: toApiDateTime(updatedAt),
-    description: message || "인시던트 종료 처리",
   };
 }
 
