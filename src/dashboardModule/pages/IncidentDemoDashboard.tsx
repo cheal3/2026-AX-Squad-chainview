@@ -2042,7 +2042,7 @@ function BottomPanels({
   const visibleDeployRows = deployRows.slice(0, 5);
 
   return (
-    <div className="mt-3 grid h-[236px] min-w-0 flex-none grid-cols-[minmax(190px,0.78fr)_minmax(300px,1.12fr)_minmax(520px,1.85fr)_minmax(210px,0.82fr)] items-stretch gap-2 overflow-hidden">
+    <div className="mt-3 grid h-[236px] min-w-0 flex-none grid-cols-[minmax(190px,0.76fr)_minmax(290px,1.06fr)_minmax(560px,1.98fr)_minmax(210px,0.8fr)] items-stretch gap-2 overflow-hidden">
       <Panel title="관리 필요 서비스">
         {managementRows.map(([label, value, type]) => (
           <TinyRow
@@ -2076,20 +2076,20 @@ function BottomPanels({
       >
         {visibleIncidentRows.length ? (
           <div className="min-w-0">
-            <div className="grid min-w-0 grid-cols-[minmax(120px,1.35fr)_118px_78px_96px_78px] gap-2 px-1 pb-1.5 text-[11px] font-bold leading-4 text-slate-500">
+            <div className="grid min-w-0 grid-cols-[minmax(150px,1fr)_108px_70px_88px_72px] items-center gap-2 px-1 pb-1.5 text-[11px] font-bold leading-4 text-slate-500">
               <span>서비스</span>
               <span>인시던트</span>
-              <span>상태</span>
-              <span>영향 서비스</span>
+              <span className="text-center">상태</span>
+              <span className="text-center">영향 서비스</span>
               <span className="text-right">종료</span>
             </div>
             <div className="space-y-0.5">
               {visibleIncidentRows.map(([service, incident, status, impact, end, tone]) => (
-                <div key={incident} className="grid min-w-0 grid-cols-[minmax(120px,1.35fr)_118px_78px_96px_78px] items-center gap-2 px-1 py-1 text-[12px] font-medium leading-5 text-slate-600">
+                <div key={incident} className="grid min-w-0 grid-cols-[minmax(150px,1fr)_108px_70px_88px_72px] items-center gap-2 px-1 py-1 text-[12px] font-medium leading-5 text-slate-600">
                   <span className="min-w-0 truncate text-slate-700" title={service}>{service}</span>
                   <span className="truncate text-slate-500" title={incident}>{incident}</span>
-                  <IncidentStatus tone={tone}>{status}</IncidentStatus>
-                  <span className="whitespace-nowrap text-slate-500">{impact}</span>
+                  <span className="flex justify-center"><IncidentStatus tone={tone}>{status}</IncidentStatus></span>
+                  <span className="text-center whitespace-nowrap text-slate-500">{impact}</span>
                   <span className="truncate text-right text-slate-500" title={end}>{end}</span>
                 </div>
               ))}

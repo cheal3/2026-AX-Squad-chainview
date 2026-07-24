@@ -908,6 +908,19 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
               ? chainViewApi.incidents.resolve(incidentId, {
                   endedAt: toApiDateTime(now),
                   description: message ?? target.description,
+                }).catch((error) => {
+                  console.warn(
+                    "[ChainView API] incident resolve endpoint failed, retrying status update",
+                    error
+                  );
+                  return chainViewApi.incidents.update(
+                    incidentId,
+                    toIncidentUpdatePayload(
+                      { ...target, incidentStatusCode: statusCode, endedAt: now },
+                      statusCode,
+                      now
+                    )
+                  );
                 })
               : chainViewApi.incidents.update(
                   incidentId,
