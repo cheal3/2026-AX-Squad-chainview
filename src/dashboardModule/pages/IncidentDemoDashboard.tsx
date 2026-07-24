@@ -619,13 +619,6 @@ function DashboardCase({
 
   return (
     <section className="flex min-h-[calc(100vh-116px)] min-w-0 flex-1 flex-col">
-      {resolveToast ? (
-        <DashboardToast
-          message={resolveToast.message}
-          tone={resolveToast.tone}
-          onClose={() => setResolveToast(null)}
-        />
-      ) : null}
       <DashboardServiceFilter
         categoryL1Options={categoryL1Options}
         categoryL2Options={categoryL2Options}
@@ -672,7 +665,7 @@ function DashboardCase({
               return;
             }
 
-            void portalData.createIncident({
+            const incident = portalData.createIncident({
               incidentTypeCode: "SERVER",
               serverId: incidentServer.serverId,
               severityCode: "CRITICAL",
@@ -683,22 +676,15 @@ function DashboardCase({
               description: "대시보드에서 등록한 인프라 장애입니다.",
               manualRegisteredYn: "Y",
               registeredBy: "admin",
-            }).then((result) => {
-              setResolveToast({
-                message: result.message,
-                tone: result.ok ? "success" : "error",
-              });
-              if (result.ok && result.incident) {
-                navigate(`/dashboard?incidentId=${result.incident.incidentId}`);
-              }
             });
+            navigate(`/dashboard?incidentId=${incident.incidentId}`);
           }}
           onCreateIncident={() => {
             if (!selectedService) {
               return;
             }
 
-            void portalData.createIncident({
+            const incident = portalData.createIncident({
               serviceId: selectedService.serviceId,
               severityCode: "CRITICAL",
               externalIncidentCode: nextIncidentCode(),
@@ -708,15 +694,8 @@ function DashboardCase({
               description: "대시보드에서 등록한 서비스 장애입니다.",
               manualRegisteredYn: "Y",
               registeredBy: "admin",
-            }).then((result) => {
-              setResolveToast({
-                message: result.message,
-                tone: result.ok ? "success" : "error",
-              });
-              if (result.ok && result.incident) {
-                navigate(`/dashboard?incidentId=${result.incident.incidentId}`);
-              }
             });
+            navigate(`/dashboard?incidentId=${incident.incidentId}`);
           }}
           relationCount={
             selectedService
