@@ -2042,7 +2042,7 @@ function BottomPanels({
   const visibleDeployRows = deployRows.slice(0, 5);
 
   return (
-    <div className="mt-3 grid h-[236px] min-w-0 flex-none grid-cols-[minmax(180px,0.82fr)_minmax(300px,1.28fr)_minmax(360px,1.55fr)_minmax(220px,0.9fr)] items-stretch gap-2 overflow-hidden">
+    <div className="mt-3 grid h-[236px] min-w-0 flex-none grid-cols-[minmax(190px,0.82fr)_minmax(210px,0.88fr)_minmax(320px,1.22fr)_minmax(420px,1.58fr)] items-stretch gap-2 overflow-hidden">
       <Panel title="관리 필요 서비스">
         {managementRows.map(([label, value, type]) => (
           <TinyRow
@@ -2054,25 +2054,25 @@ function BottomPanels({
           />
         ))}
       </Panel>
+      <Panel
+        actionLabel="더보기 〉"
+        onAction={() => navigate("/admin-deployments")}
+        title="최근 배포"
+      >
+        {visibleDeployRows.length ? visibleDeployRows.map(([service, time, status]) => (
+          <TinyRow compact key={`${service}-${time}`} icon={status === "up" ? "↑" : "●"} label={service} value={time} tone={status === "up" ? "success" : "muted"} />
+        )) : <TinyEmpty>최근 배포가 없습니다.</TinyEmpty>}
+      </Panel>
       <Panel title="최근 서비스 변경">
         {visibleChangeRows.length ? (
-          <div className="min-w-0">
-            <div className="grid min-w-0 grid-cols-[minmax(0,1.05fr)_minmax(0,0.75fr)_minmax(0,1.35fr)_64px] gap-2 border-b border-slate-100 px-1 pb-1.5 text-[11px] font-bold text-slate-400">
-              <span>서비스</span>
-              <span>변경</span>
-              <span>내용</span>
-              <span className="text-right">시간</span>
-            </div>
-            <div className="mt-1 space-y-0.5">
-              {visibleChangeRows.map((row) => (
-                <div key={row.key} className="grid min-w-0 grid-cols-[minmax(0,1.05fr)_minmax(0,0.75fr)_minmax(0,1.35fr)_64px] items-center gap-2 rounded-md px-1 py-1.5 text-xs leading-5 text-slate-700 hover:bg-slate-50">
-                  <span className="min-w-0 truncate text-slate-900" title={row.service}>{row.service}</span>
-                  <span className="min-w-0 truncate text-slate-500" title={row.change}>{row.change}</span>
-                  <span className="min-w-0 truncate text-slate-500" title={row.detail}>{row.detail}</span>
-                  <span className="shrink-0 whitespace-nowrap text-right text-slate-500">{row.time}</span>
-                </div>
-              ))}
-            </div>
+          <div className="space-y-1">
+            {visibleChangeRows.map((row) => (
+              <div key={row.key} className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)_68px] items-center gap-3 px-1 py-1.5 text-[13px] leading-5">
+                <span className="min-w-0 truncate text-slate-900" title={row.service}>{row.service}</span>
+                <span className="min-w-0 truncate text-slate-500" title={row.detail || row.change}>{row.detail || row.change}</span>
+                <span className="shrink-0 whitespace-nowrap text-right text-slate-500">{row.time}</span>
+              </div>
+            ))}
           </div>
         ) : (
           <TinyEmpty>변경 이력이 없습니다.</TinyEmpty>
@@ -2085,35 +2085,26 @@ function BottomPanels({
       >
         {visibleIncidentRows.length ? (
           <div className="min-w-0">
-            <div className="grid min-w-0 grid-cols-[minmax(0,1.05fr)_86px_62px_64px_64px] gap-2 border-b border-slate-100 px-1 pb-1.5 text-[11px] font-bold text-slate-400">
+            <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_96px_68px_74px_68px] gap-3 px-1 pb-1.5 text-[11px] font-bold text-slate-500">
               <span>서비스</span>
               <span>인시던트</span>
               <span>상태</span>
-              <span>영향</span>
+              <span>영향 서비스</span>
               <span className="text-right">종료</span>
             </div>
-            <div className="mt-1 space-y-0.5">
+            <div className="space-y-1">
               {visibleIncidentRows.map(([service, incident, status, impact, end, tone]) => (
-                <div key={incident} className="grid min-w-0 grid-cols-[minmax(0,1.05fr)_86px_62px_64px_64px] items-center gap-2 rounded-md px-1 py-1.5 text-xs leading-5 text-slate-700 hover:bg-slate-50">
+                <div key={incident} className="grid min-w-0 grid-cols-[minmax(0,1fr)_96px_68px_74px_68px] items-center gap-3 px-1 py-1.5 text-[13px] leading-5 text-slate-700">
                   <span className="min-w-0 truncate text-slate-900" title={service}>{service}</span>
                   <span className="truncate text-slate-500" title={incident}>{incident}</span>
                   <IncidentStatus tone={tone}>{status}</IncidentStatus>
-                  <span className="whitespace-nowrap text-slate-500">영향 {impact}</span>
+                  <span className="whitespace-nowrap text-slate-500">{impact}</span>
                   <span className="truncate text-right text-slate-500" title={end}>{end}</span>
                 </div>
               ))}
             </div>
           </div>
         ) : <TinyEmpty>등록된 인시던트가 없습니다.</TinyEmpty>}
-      </Panel>
-      <Panel
-        actionLabel="더보기 〉"
-        onAction={() => navigate("/admin-deployments")}
-        title="최근 배포"
-      >
-        {visibleDeployRows.length ? visibleDeployRows.map(([service, time, status]) => (
-          <TinyRow compact key={`${service}-${time}`} icon={status === "up" ? "↑" : "●"} label={service} value={time} tone={status === "up" ? "success" : "muted"} />
-        )) : <TinyEmpty>최근 배포가 없습니다.</TinyEmpty>}
       </Panel>
     </div>
   );
