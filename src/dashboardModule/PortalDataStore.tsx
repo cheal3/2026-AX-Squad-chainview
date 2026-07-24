@@ -2091,36 +2091,17 @@ function mapOwnerFromRemote(row: RemoteListRecord): ServiceOwnerRecord {
 }
 
 function mapIncidentFromRemote(row: RemoteListRecord): IncidentRecord {
-  const statusCode = knownRemoteCode(
-    row.incidentStatusCode ?? row.status,
-    codeLabels.incidentStatus,
-    "OPEN"
-  );
-  const incidentTypeCode = knownRemoteCode(
-    row.incidentTypeCode ?? row.incidentType,
-    codeLabels.incidentType,
-    asRemoteString(row.targetType) === "SERVER" ? "SERVER" : "SERVICE"
-  );
   return {
     incidentId: asRemoteNumber(row.incidentId ?? row.id),
     externalIncidentCode: asRemoteString(row.externalIncidentCode ?? row.incidentCode),
     title: asRemoteString(row.title),
-    incidentTypeCode,
-    incidentStatusCode: statusCode,
-    severityCode: knownRemoteCode(row.severityCode ?? row.severity, codeLabels.severity, "MAJOR"),
-    serviceId:
-      asRemoteNumber(row.serviceId) ||
-      (asRemoteString(row.targetType) === "SERVICE" ? asRemoteNumber(row.targetId) : 0) ||
-      undefined,
-    serverId:
-      asRemoteNumber(row.serverId) ||
-      (asRemoteString(row.targetType) === "SERVER" ? asRemoteNumber(row.targetId) : 0) ||
-      undefined,
+    incidentTypeCode: knownRemoteCode(row.incidentTypeCode, codeLabels.incidentType, "SERVICE"),
+    incidentStatusCode: knownRemoteCode(row.incidentStatusCode, codeLabels.incidentStatus, "OPEN"),
+    severityCode: knownRemoteCode(row.severityCode, codeLabels.severity, "MAJOR"),
+    serviceId: asRemoteNumber(row.serviceId) || undefined,
     infraNodeId: asRemoteNumber(row.infraNodeId) || undefined,
-    targetCode: asRemoteString(row.targetCode ?? row.targetId),
-    targetLabel: asRemoteString(row.targetLabel),
-    startedAt: asRemoteString(row.startedAt ?? row.occurredAt ?? row.createdAt),
-    endedAt: asRemoteString(row.endedAt ?? row.resolvedAt),
+    startedAt: asRemoteString(row.startedAt ?? row.createdAt),
+    endedAt: asRemoteString(row.endedAt),
     summary: asRemoteString(row.summary ?? row.description),
     createdBy: asRemoteString(row.createdBy),
     updatedBy: asRemoteString(row.updatedBy),
@@ -2303,35 +2284,21 @@ function deploymentKey(input: RemoteListRecord) {
 }
 
 function toIncidentCreatePayload(input: NewIncidentInput, startedAt: string) {
-  const incidentType = input.incidentTypeCode ?? "SERVICE";
-  const targetType = incidentType === "SERVER" ? "SERVER" : "SERVICE";
-  const targetId =
-    targetType === "SERVER"
-      ? input.serverId ?? input.targetCode
-      : input.serviceId ?? input.targetCode;
   return {
-    incidentType,
-    incidentTypeCode: incidentType,
-    status: "OPEN",
+    incidentTypeCode: input.incidentTypeCode ?? "SERVICE",
     incidentStatusCode: "OPEN",
     serviceId: input.serviceId,
     serverId: input.serverId,
-    targetType,
-    targetId,
     severityCode: input.severityCode,
-    severity: input.severityCode,
     externalIncidentCode: input.externalIncidentCode,
     targetCode: input.targetCode,
     targetLabel: input.targetLabel,
     title: input.title,
     description: input.description,
-    occurredAt: toApiDateTime(startedAt),
     startedAt: toApiDateTime(startedAt),
     impactDepth: 2,
     manualRegisteredYn: input.manualRegisteredYn ?? "Y",
-    manualRegistered: (input.manualRegisteredYn ?? "Y") === "Y",
     registeredBy: input.registeredBy ?? "admin",
-    createdBy: input.registeredBy ?? "admin",
   };
 }
 
@@ -2340,37 +2307,23 @@ function toIncidentUpdatePayload(
   incidentStatusCode: IncidentStatusCode,
   updatedAt: string
 ) {
-  const incidentType = incident.incidentTypeCode ?? "SERVICE";
-  const targetType = incidentType === "SERVER" ? "SERVER" : "SERVICE";
-  const targetId =
-    targetType === "SERVER"
-      ? incident.serverId ?? incident.targetCode
-      : incident.serviceId ?? incident.targetCode;
-  const resolvedAt =
-    incidentStatusCode === "RESOLVED"
-      ? toApiDateTime(updatedAt)
-      : incident.endedAt
-        ? toApiDateTime(incident.endedAt)
-        : undefined;
   return {
-    incidentType,
-    incidentTypeCode: incidentType,
-    status: incidentStatusCode,
+    incidentTypeCode: incident.incidentTypeCode,
     incidentStatusCode,
     serviceId: incident.serviceId,
     serverId: incident.serverId,
-    targetType,
-    targetId,
     severityCode: incident.severityCode,
-    severity: incident.severityCode,
     targetCode: incident.targetCode,
     targetLabel: incident.targetLabel,
     title: incident.title,
     description: incident.description,
-    occurredAt: toApiDateTime(incident.startedAt),
     startedAt: toApiDateTime(incident.startedAt),
-    resolvedAt,
-    endedAt: resolvedAt,
+    endedAt:
+      incidentStatusCode === "RESOLVED"
+        ? toApiDateTime(updatedAt)
+        : incident.endedAt
+          ? toApiDateTime(incident.endedAt)
+          : undefined,
   };
 }
 
