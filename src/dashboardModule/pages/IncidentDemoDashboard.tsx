@@ -2042,7 +2042,7 @@ function BottomPanels({
   const visibleDeployRows = deployRows.slice(0, 5);
 
   return (
-    <div className="mt-3 grid h-[236px] min-w-0 flex-none grid-cols-[minmax(190px,0.82fr)_minmax(210px,0.88fr)_minmax(320px,1.22fr)_minmax(420px,1.58fr)] items-stretch gap-2 overflow-hidden">
+    <div className="mt-3 grid h-[236px] min-w-0 flex-none grid-cols-[minmax(190px,0.82fr)_minmax(320px,1.22fr)_minmax(420px,1.58fr)_minmax(210px,0.88fr)] items-stretch gap-2 overflow-hidden">
       <Panel title="관리 필요 서비스">
         {managementRows.map(([label, value, type]) => (
           <TinyRow
@@ -2053,15 +2053,6 @@ function BottomPanels({
             tone={type === "incident" ? "danger" : type === "relation" ? "success" : "muted"}
           />
         ))}
-      </Panel>
-      <Panel
-        actionLabel="더보기 〉"
-        onAction={() => navigate("/admin-deployments")}
-        title="최근 배포"
-      >
-        {visibleDeployRows.length ? visibleDeployRows.map(([service, time, status]) => (
-          <TinyRow compact key={`${service}-${time}`} icon={status === "up" ? "↑" : "●"} label={service} value={time} tone={status === "up" ? "success" : "muted"} />
-        )) : <TinyEmpty>최근 배포가 없습니다.</TinyEmpty>}
       </Panel>
       <Panel title="최근 서비스 변경">
         {visibleChangeRows.length ? (
@@ -2105,6 +2096,15 @@ function BottomPanels({
             </div>
           </div>
         ) : <TinyEmpty>등록된 인시던트가 없습니다.</TinyEmpty>}
+      </Panel>
+      <Panel
+        actionLabel="더보기 〉"
+        onAction={() => navigate("/admin-deployments")}
+        title="최근 배포"
+      >
+        {visibleDeployRows.length ? visibleDeployRows.map(([service, time, status]) => (
+          <TinyRow compact key={`${service}-${time}`} icon={status === "up" ? "↑" : "●"} label={service} value={time} tone={status === "up" ? "success" : "muted"} />
+        )) : <TinyEmpty>최근 배포가 없습니다.</TinyEmpty>}
       </Panel>
     </div>
   );
