@@ -1068,6 +1068,7 @@ function RelationMap({
             initialServiceId={selectedServiceId}
             onSelectInfraNode={onSelectInfraNode}
             onSelectService={onSelectService}
+            preserveDetailPanelStateOnSelect
             serviceFilter={serviceFilter}
             showAllServices
           />

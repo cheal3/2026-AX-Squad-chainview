@@ -388,6 +388,7 @@ export function ServiceRelationFlow({
   modeTogglePlacement = "top-right",
   onSelectInfraNode,
   onSelectService,
+  preserveDetailPanelStateOnSelect = false,
   serviceFilter,
   showAllServices = false,
 }: {
@@ -413,6 +414,7 @@ export function ServiceRelationFlow({
   modeTogglePlacement?: GraphModeTogglePlacement;
   onSelectInfraNode?: (node?: InfraGraphNodeRecord) => void;
   onSelectService?: (serviceId: number) => void;
+  preserveDetailPanelStateOnSelect?: boolean;
   serviceFilter?: (service: ServiceRecord) => boolean;
   showAllServices?: boolean;
 } = {}) {
@@ -658,7 +660,9 @@ export function ServiceRelationFlow({
     userMovedViewportRef.current = false;
     setSelectedInfraNodeId((current) => {
       const next = current === infraNodeId ? null : infraNodeId;
-      setDetailOpen(Boolean(next));
+      if (!preserveDetailPanelStateOnSelect) {
+        setDetailOpen(Boolean(next));
+      }
       if (next) {
         setSelectedServiceNodeId(null);
       }
@@ -669,14 +673,16 @@ export function ServiceRelationFlow({
       );
       return next;
     });
-  }, [infraGraphNodes, onSelectInfraNode]);
+  }, [infraGraphNodes, onSelectInfraNode, preserveDetailPanelStateOnSelect]);
 
   const toggleSelectedServiceNode = useCallback(
     (serviceId: number) => {
       userMovedViewportRef.current = false;
       setSelectedServiceNodeId((current) => {
         const next = current === serviceId ? null : serviceId;
-        setDetailOpen(false);
+        if (!preserveDetailPanelStateOnSelect) {
+          setDetailOpen(false);
+        }
         if (next) {
           setSelectedInfraNodeId(null);
           onSelectInfraNode?.(undefined);
@@ -685,7 +691,7 @@ export function ServiceRelationFlow({
         return next;
       });
     },
-    [onSelectInfraNode, onSelectService]
+    [onSelectInfraNode, onSelectService, preserveDetailPanelStateOnSelect]
   );
 
   const handleGraphViewModeChange = useCallback(
@@ -1866,7 +1872,9 @@ export function ServiceRelationFlow({
   const moveToFocusedService = (serviceId: number) => {
     userMovedViewportRef.current = false;
     setFocusedServiceId(serviceId);
-    setDetailOpen(false);
+    if (!preserveDetailPanelStateOnSelect) {
+      setDetailOpen(false);
+    }
     setQuery("");
     setSelectedServiceNodeId(serviceId);
     onSelectInfraNode?.(undefined);
@@ -2567,7 +2575,9 @@ export function ServiceRelationFlow({
 
     setFocusedServiceId(nextInitialFocusedServiceId);
     setDetailServiceId(nextInitialFocusedServiceId);
-    setDetailOpen(true);
+    if (!preserveDetailPanelStateOnSelect) {
+      setDetailOpen(true);
+    }
     setRelationDepth(incidentMode ? 1 : initialRelationDepth ?? 2);
     userMovedViewportRef.current = false;
   }, [
@@ -2577,6 +2587,7 @@ export function ServiceRelationFlow({
     initialFocusedServiceId,
     initialRelationDepth,
     initialServiceId,
+    preserveDetailPanelStateOnSelect,
   ]);
 
   useEffect(() => {
