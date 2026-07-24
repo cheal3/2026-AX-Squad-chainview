@@ -2037,12 +2037,12 @@ function BottomPanels({
   managementRows: DashboardManagementRow[];
 }) {
   const navigate = useNavigate();
-  const visibleChangeRows = changeRows.slice(0, 4);
+  const visibleChangeRows = changeRows.slice(0, 5);
   const visibleIncidentRows = incidentRows.slice(0, 4);
-  const visibleDeployRows = deployRows.slice(0, 4);
+  const visibleDeployRows = deployRows.slice(0, 5);
 
   return (
-    <div className="mt-3 grid h-[220px] min-w-0 flex-none grid-cols-[minmax(0,0.8fr)_minmax(0,1.25fr)_minmax(0,1.35fr)_minmax(0,1fr)] items-stretch gap-2 overflow-hidden">
+    <div className="mt-3 grid h-[184px] min-w-0 flex-none grid-cols-[minmax(180px,0.85fr)_minmax(220px,1.1fr)_minmax(300px,1.35fr)_minmax(220px,0.95fr)] items-stretch gap-2 overflow-hidden">
       <Panel title="관리 필요 서비스">
         {managementRows.map(([label, value, type]) => (
           <TinyRow
@@ -2057,13 +2057,13 @@ function BottomPanels({
       <Panel title="최근 서비스 변경">
         {visibleChangeRows.length ? (
           visibleChangeRows.map((row) => (
-            <div key={row.key} className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)_auto] items-center gap-2 rounded-md px-1 py-1.5 text-[13px] leading-5 text-slate-900">
+            <div key={row.key} className="grid min-w-0 grid-cols-[minmax(0,0.95fr)_minmax(0,1.35fr)_auto] items-center gap-2 rounded-md px-1 py-0.5 text-xs leading-5 text-slate-900">
               <div className="min-w-0">
                 <div className="truncate text-slate-950" title={row.service}>{row.service}</div>
-                <div className="truncate text-xs text-slate-500" title={row.change}>{row.change}</div>
+                <div className="truncate text-[11px] text-slate-500" title={row.change}>{row.change}</div>
               </div>
-              <span className="min-w-0 truncate text-xs text-slate-500" title={row.detail}>{row.detail}</span>
-              <span className="shrink-0 whitespace-nowrap text-xs text-slate-500">{row.time}</span>
+              <span className="min-w-0 truncate text-[11px] text-slate-500" title={row.detail}>{row.detail}</span>
+              <span className="shrink-0 whitespace-nowrap text-[11px] text-slate-500">{row.time}</span>
             </div>
           ))
         ) : (
@@ -2076,7 +2076,7 @@ function BottomPanels({
         title="최근 인시던트"
       >
         {visibleIncidentRows.length ? visibleIncidentRows.map(([service, incident, status, impact, end, tone]) => (
-          <div key={incident} className="min-w-0 rounded-md px-1 py-1 text-[13px] leading-5 hover:bg-slate-50">
+          <div key={incident} className="min-w-0 rounded-md px-1 py-1 text-xs leading-5 hover:bg-slate-50">
             <div className="flex min-w-0 items-center justify-between gap-3">
               <span className="truncate text-slate-950" title={service}>{service}</span>
               <IncidentStatus tone={tone}>{status}</IncidentStatus>
@@ -2097,7 +2097,7 @@ function BottomPanels({
         title="최근 배포"
       >
         {visibleDeployRows.length ? visibleDeployRows.map(([service, time, status]) => (
-          <TinyRow key={`${service}-${time}`} icon={status === "up" ? "↑" : "●"} label={service} value={time} tone={status === "up" ? "success" : "muted"} />
+          <TinyRow compact key={`${service}-${time}`} icon={status === "up" ? "↑" : "●"} label={service} value={time} tone={status === "up" ? "success" : "muted"} />
         )) : <TinyEmpty>최근 배포가 없습니다.</TinyEmpty>}
       </Panel>
     </div>
@@ -2151,11 +2151,13 @@ function managementIcon(type: string) {
 }
 
 function TinyRow({
+  compact = false,
   icon,
   label,
   tone = "muted",
   value,
 }: {
+  compact?: boolean;
   icon: ReactNode;
   label: string;
   tone?: "danger" | "muted" | "success";
@@ -2169,7 +2171,7 @@ function TinyRow({
         : "bg-slate-100 text-slate-500";
 
   return (
-    <div className="flex min-w-0 items-center justify-between gap-3 py-1.5 text-[13px] leading-5 text-slate-900">
+    <div className={`flex min-w-0 items-center justify-between gap-3 ${compact ? "py-0.5 text-xs" : "py-1.5 text-[13px]"} leading-5 text-slate-900`}>
       <div className="flex min-w-0 items-center gap-2">
         <span className={`grid h-[17px] w-[17px] shrink-0 place-items-center rounded-full ${toneClass}`}>{icon}</span>
         <span className="min-w-0 break-keep font-normal leading-5">{label}</span>
