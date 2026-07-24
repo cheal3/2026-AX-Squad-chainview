@@ -43,27 +43,23 @@ export class ChainViewApiError extends Error {
   status: number;
   body: string;
   authRequired: boolean;
-  url?: string;
 
   constructor({
     authRequired = false,
     body = "",
     message,
     status,
-    url,
   }: {
     authRequired?: boolean;
     body?: string;
     message: string;
     status: number;
-    url?: string;
   }) {
     super(message);
     this.name = "ChainViewApiError";
     this.status = status;
     this.body = body;
     this.authRequired = authRequired;
-    this.url = url;
   }
 }
 
@@ -350,8 +346,7 @@ async function requestJson<T>(
     await ensureSession();
   }
 
-  const url = buildUrl(path, options.query);
-  const response = await fetchWithApiError(url, {
+  const response = await fetch(buildUrl(path, options.query), {
     method,
     credentials: "include",
     redirect: "manual",
@@ -372,7 +367,6 @@ async function requestJson<T>(
         body: text,
         message: "ChainView 로그인 세션이 필요합니다.",
         status: response.status,
-        url,
       });
     }
 
@@ -385,7 +379,6 @@ async function requestJson<T>(
       body: text,
       message: extractErrorMessage(text) ?? `ChainView API 호출 실패 (${response.status})`,
       status: response.status,
-      url,
     });
   }
 
@@ -401,7 +394,6 @@ async function requestJson<T>(
           body: text,
           message: parsed.message ?? "ChainView API 요청이 실패했습니다.",
           status: response.status,
-          url,
         });
       }
       return parsed.data as T;
@@ -410,19 +402,6 @@ async function requestJson<T>(
   }
 
   return text as T;
-}
-
-async function fetchWithApiError(url: string, init: RequestInit) {
-  try {
-    return await fetch(url, init);
-  } catch (error) {
-    throw new ChainViewApiError({
-      message: "API 요청을 보낼 수 없습니다. 로그인 세션 또는 HTTPS/CORS 설정을 확인해 주세요.",
-      status: 0,
-      url,
-      body: error instanceof Error ? error.message : "",
-    });
-  }
 }
 
 async function requestBlob(
