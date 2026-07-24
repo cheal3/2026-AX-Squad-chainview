@@ -44,6 +44,7 @@ export async function loadRemotePortalSnapshot(): Promise<RemotePortalSnapshot> 
   await chainViewApi.auth.ensureSession();
 
   const serviceRows = asRecordArray(await chainViewApi.services.list());
+  const detailsByServiceId = await loadMissingServiceDeploymentDetails(serviceRows);
   const [
     serverRows,
     relationRows,
@@ -70,9 +71,11 @@ export async function loadRemotePortalSnapshot(): Promise<RemotePortalSnapshot> 
   const incidentImpacts = loadIncidentImpactsFromRows(incidentRows, incidents);
   return {
     servers: serverRows.map(mapServer),
-    services: serviceRows.map((service) => mapService(service)),
+    services: serviceRows.map((service) =>
+      mapService(service, detailsByServiceId.get(asNumber(service.serviceId)))
+    ),
     deployments: serviceRows.flatMap((service) =>
-      mapServiceDeployments(service)
+      mapServiceDeployments(service, detailsByServiceId.get(asNumber(service.serviceId)))
     ),
     relations: relationRows.map(mapRelation),
     techStacks: serviceTechStackRows.map(mapTechStack),
@@ -87,6 +90,34 @@ export async function loadRemotePortalSnapshot(): Promise<RemotePortalSnapshot> 
       ...buildRemoteIncidentEvents(incidents, incidentImpacts),
     ].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
   };
+}
+
+async function loadMissingServiceDeploymentDetails(rows: RemoteRecord[]) {
+  const needsDetail = rows.filter((service) => {
+    const serviceId = asNumber(service.serviceId);
+    return serviceId && serviceDeploymentRows(service).length === 0;
+  });
+  if (!needsDetail.length) {
+    return new Map<number, RemoteRecord>();
+  }
+
+  const settled = await Promise.allSettled(
+    needsDetail.map((service) =>
+      chainViewApi.services.detail(asNumber(service.serviceId))
+    )
+  );
+  const detailsByServiceId = new Map<number, RemoteRecord>();
+  settled.forEach((result, index) => {
+    if (result.status !== "fulfilled" || !isRecord(result.value)) {
+      return;
+    }
+    const fallbackServiceId = asNumber(needsDetail[index].serviceId);
+    const serviceId = asNumber(result.value.serviceId, fallbackServiceId);
+    if (serviceId) {
+      detailsByServiceId.set(serviceId, result.value);
+    }
+  });
+  return detailsByServiceId;
 }
 
 function loadIncidentImpactsFromRows(

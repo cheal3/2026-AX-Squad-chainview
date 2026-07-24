@@ -509,10 +509,17 @@ export function ServiceRelationFlow({
     };
   }, []);
 
+  const infraRelationsForSelection = useMemo(
+    () =>
+      infraGraphRelations.length
+        ? infraGraphRelations
+        : infraRelationsSnapshot.map(normalizeInfraRelation),
+    [infraGraphRelations]
+  );
   const infraRelationIndex = useMemo(() => {
     const incoming = new Map<number, InfraGraphRelationRecord[]>();
     const outgoing = new Map<number, InfraGraphRelationRecord[]>();
-    infraGraphRelations.forEach((relation) => {
+    infraRelationsForSelection.forEach((relation) => {
       outgoing.set(relation.sourceInfraNodeId, [
         ...(outgoing.get(relation.sourceInfraNodeId) ?? []),
         relation,
@@ -523,7 +530,7 @@ export function ServiceRelationFlow({
       ]);
     });
     return { incoming, outgoing };
-  }, [infraGraphRelations]);
+  }, [infraRelationsForSelection]);
 
   const selectedInfraConnectedNodeIds = useMemo(() => {
     const next = new Set<number>();

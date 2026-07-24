@@ -132,8 +132,9 @@ export function previewRemoteResponse(value: unknown) {
 
 async function loadServiceDeployments() {
   const serviceRows = asRemoteRecordArray(await chainViewApi.services.list());
+  const detailsByServiceId = await loadMissingServiceDeploymentDetails(serviceRows);
   return serviceRows.flatMap((service) => {
-    const detail = service;
+    const detail = detailsByServiceId.get(asRemoteNumber(service.serviceId)) ?? service;
     const deployments = serviceDeploymentRows(detail);
     const fallbackDeployment =
       deployments.length || !asRemoteNumber(service.serviceId)
@@ -157,6 +158,34 @@ async function loadServiceDeployments() {
       serverId: deploymentServerId(deployment, detail.serverId ?? service.serverId),
     }));
   });
+}
+
+async function loadMissingServiceDeploymentDetails(serviceRows: RemoteListRecord[]) {
+  const needsDetail = serviceRows.filter((service) => {
+    const serviceId = asRemoteNumber(service.serviceId);
+    return serviceId && serviceDeploymentRows(service).length === 0;
+  });
+  if (!needsDetail.length) {
+    return new Map<number, RemoteListRecord>();
+  }
+
+  const settled = await Promise.allSettled(
+    needsDetail.map((service) =>
+      chainViewApi.services.detail(asRemoteNumber(service.serviceId))
+    )
+  );
+  const detailsByServiceId = new Map<number, RemoteListRecord>();
+  settled.forEach((result, index) => {
+    if (result.status !== "fulfilled" || !isRemoteRecord(result.value)) {
+      return;
+    }
+    const fallbackServiceId = asRemoteNumber(needsDetail[index].serviceId);
+    const serviceId = asRemoteNumber(result.value.serviceId, fallbackServiceId);
+    if (serviceId) {
+      detailsByServiceId.set(serviceId, result.value);
+    }
+  });
+  return detailsByServiceId;
 }
 
 function serviceDeploymentRows(service: RemoteListRecord): RemoteListRecord[] {
