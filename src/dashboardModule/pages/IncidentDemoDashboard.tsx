@@ -2038,11 +2038,11 @@ function BottomPanels({
 }) {
   const navigate = useNavigate();
   const visibleChangeRows = changeRows.slice(0, 5);
-  const visibleIncidentRows = incidentRows.slice(0, 4);
+  const visibleIncidentRows = incidentRows.slice(0, 5);
   const visibleDeployRows = deployRows.slice(0, 5);
 
   return (
-    <div className="mt-3 grid h-[184px] min-w-0 flex-none grid-cols-[minmax(180px,0.85fr)_minmax(220px,1.1fr)_minmax(300px,1.35fr)_minmax(220px,0.95fr)] items-stretch gap-2 overflow-hidden">
+    <div className="mt-3 grid h-[236px] min-w-0 flex-none grid-cols-[minmax(180px,0.82fr)_minmax(300px,1.28fr)_minmax(360px,1.55fr)_minmax(220px,0.9fr)] items-stretch gap-2 overflow-hidden">
       <Panel title="관리 필요 서비스">
         {managementRows.map(([label, value, type]) => (
           <TinyRow
@@ -2056,16 +2056,24 @@ function BottomPanels({
       </Panel>
       <Panel title="최근 서비스 변경">
         {visibleChangeRows.length ? (
-          visibleChangeRows.map((row) => (
-            <div key={row.key} className="grid min-w-0 grid-cols-[minmax(0,0.95fr)_minmax(0,1.35fr)_auto] items-center gap-2 rounded-md px-1 py-0.5 text-xs leading-5 text-slate-900">
-              <div className="min-w-0">
-                <div className="truncate text-slate-950" title={row.service}>{row.service}</div>
-                <div className="truncate text-[11px] text-slate-500" title={row.change}>{row.change}</div>
-              </div>
-              <span className="min-w-0 truncate text-[11px] text-slate-500" title={row.detail}>{row.detail}</span>
-              <span className="shrink-0 whitespace-nowrap text-[11px] text-slate-500">{row.time}</span>
+          <div className="min-w-0">
+            <div className="grid min-w-0 grid-cols-[minmax(0,1.05fr)_minmax(0,0.75fr)_minmax(0,1.35fr)_64px] gap-2 border-b border-slate-100 px-1 pb-1.5 text-[11px] font-bold text-slate-400">
+              <span>서비스</span>
+              <span>변경</span>
+              <span>내용</span>
+              <span className="text-right">시간</span>
             </div>
-          ))
+            <div className="mt-1 space-y-0.5">
+              {visibleChangeRows.map((row) => (
+                <div key={row.key} className="grid min-w-0 grid-cols-[minmax(0,1.05fr)_minmax(0,0.75fr)_minmax(0,1.35fr)_64px] items-center gap-2 rounded-md px-1 py-1.5 text-xs leading-5 text-slate-700 hover:bg-slate-50">
+                  <span className="min-w-0 truncate text-slate-900" title={row.service}>{row.service}</span>
+                  <span className="min-w-0 truncate text-slate-500" title={row.change}>{row.change}</span>
+                  <span className="min-w-0 truncate text-slate-500" title={row.detail}>{row.detail}</span>
+                  <span className="shrink-0 whitespace-nowrap text-right text-slate-500">{row.time}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         ) : (
           <TinyEmpty>변경 이력이 없습니다.</TinyEmpty>
         )}
@@ -2075,21 +2083,28 @@ function BottomPanels({
         onAction={() => navigate("/admin-incidents")}
         title="최근 인시던트"
       >
-        {visibleIncidentRows.length ? visibleIncidentRows.map(([service, incident, status, impact, end, tone]) => (
-          <div key={incident} className="min-w-0 rounded-md px-1 py-1 text-xs leading-5 hover:bg-slate-50">
-            <div className="flex min-w-0 items-center justify-between gap-3">
-              <span className="truncate text-slate-950" title={service}>{service}</span>
-              <IncidentStatus tone={tone}>{status}</IncidentStatus>
+        {visibleIncidentRows.length ? (
+          <div className="min-w-0">
+            <div className="grid min-w-0 grid-cols-[minmax(0,1.05fr)_86px_62px_64px_64px] gap-2 border-b border-slate-100 px-1 pb-1.5 text-[11px] font-bold text-slate-400">
+              <span>서비스</span>
+              <span>인시던트</span>
+              <span>상태</span>
+              <span>영향</span>
+              <span className="text-right">종료</span>
             </div>
-            <div className="mt-0.5 flex min-w-0 items-center gap-2 text-xs text-slate-500">
-              <span className="shrink-0 text-slate-700">{incident}</span>
-              <span className="text-slate-300">·</span>
-              <span className="shrink-0">영향 {impact}</span>
-              <span className="text-slate-300">·</span>
-              <span className="truncate">{end}</span>
+            <div className="mt-1 space-y-0.5">
+              {visibleIncidentRows.map(([service, incident, status, impact, end, tone]) => (
+                <div key={incident} className="grid min-w-0 grid-cols-[minmax(0,1.05fr)_86px_62px_64px_64px] items-center gap-2 rounded-md px-1 py-1.5 text-xs leading-5 text-slate-700 hover:bg-slate-50">
+                  <span className="min-w-0 truncate text-slate-900" title={service}>{service}</span>
+                  <span className="truncate text-slate-500" title={incident}>{incident}</span>
+                  <IncidentStatus tone={tone}>{status}</IncidentStatus>
+                  <span className="whitespace-nowrap text-slate-500">영향 {impact}</span>
+                  <span className="truncate text-right text-slate-500" title={end}>{end}</span>
+                </div>
+              ))}
             </div>
           </div>
-        )) : <TinyEmpty>등록된 인시던트가 없습니다.</TinyEmpty>}
+        ) : <TinyEmpty>등록된 인시던트가 없습니다.</TinyEmpty>}
       </Panel>
       <Panel
         actionLabel="더보기 〉"
@@ -2116,8 +2131,8 @@ function Panel({
   title: string;
 }) {
   return (
-    <section className="h-full min-h-0 min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-      <div className="mb-2 flex min-w-0 items-center justify-between gap-3">
+    <section className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+      <div className="mb-2 flex min-w-0 shrink-0 items-center justify-between gap-3">
         <h3 className="truncate text-sm font-black leading-5 text-slate-950">{title}</h3>
         {actionLabel && onAction ? (
           <button
@@ -2129,7 +2144,7 @@ function Panel({
           </button>
         ) : null}
       </div>
-      <div className="min-w-0 overflow-hidden">{children}</div>
+      <div className="min-h-0 min-w-0 flex-1 overflow-hidden">{children}</div>
     </section>
   );
 }
