@@ -666,6 +666,8 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         services.find((service) => service.serviceId === input.serviceId)
           ?.serviceName ?? input.title,
     });
+    const previousServices = services;
+
     setIncidents((current) => [nextIncident, ...current]);
     setIncidentImpacts((current) => [...impacts, ...current]);
     setIncidentEvents((current) => [...events, ...current]);
@@ -732,6 +734,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
               )
             );
           }
+          await refreshRemoteData(300);
           return {
             ok: true,
             message: "인시던트가 생성되었습니다.",
@@ -739,14 +742,23 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           };
         })
         .catch((error) => {
+          setIncidents((current) =>
+            current.filter((incident) => incident.incidentId !== nextIncident.incidentId)
+          );
+          setIncidentImpacts((current) =>
+            current.filter((impact) => impact.incidentId !== nextIncident.incidentId)
+          );
+          setIncidentEvents((current) =>
+            current.filter((event) => event.incidentId !== nextIncident.incidentId)
+          );
+          setServices(previousServices);
           console.warn("[ChainView API] 인시던트 생성 API 호출에 실패했습니다.", error);
           return {
-            ok: true,
+            ok: false,
             message:
               error instanceof Error
-                ? `인시던트는 화면에 생성되었습니다. 서버 동기화는 실패했습니다. ${error.message}`
-                : "인시던트는 화면에 생성되었습니다. 서버 동기화는 실패했습니다.",
-            incident: nextIncident,
+                ? `인시던트 생성에 실패했습니다. ${error.message}`
+                : "인시던트 생성에 실패했습니다.",
           };
         });
     }
@@ -893,6 +905,8 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       },
       updateIncidentStatus: (incidentId, statusCode, message) => {
         const now = timestamp();
+        const previousIncident = incidents.find((incident) => incident.incidentId === incidentId);
+        const previousServices = services;
         setIncidents((current) =>
           current.map((incident) =>
             incident.incidentId === incidentId
@@ -955,6 +969,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
                 );
 
           return remoteUpdate
+            .then(() => refreshRemoteData(300))
             .then(() => ({
               ok: true,
               message:
@@ -963,13 +978,31 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
                   : "인시던트 상태가 변경되었습니다.",
             }))
             .catch((error) => {
+              if (previousIncident) {
+                setIncidents((current) =>
+                  current.map((incident) =>
+                    incident.incidentId === incidentId ? previousIncident : incident
+                  )
+                );
+              }
+              setServices(previousServices);
+              setIncidentEvents((current) =>
+                current.filter(
+                  (event) =>
+                    !(
+                      event.incidentId === incidentId &&
+                      event.eventType === (statusCode === "RESOLVED" ? "RESOLVED" : "STATUS_CHANGED") &&
+                      event.createdAt === now
+                    )
+                )
+              );
               console.warn("[ChainView API] 인시던트 상태 변경 API 호출에 실패했습니다.", error);
               return {
-                ok: true,
+                ok: false,
                 message:
                   error instanceof Error
-                    ? `인시던트는 화면에 종료 처리되었습니다. 서버 동기화는 실패했습니다. ${error.message}`
-                    : "인시던트는 화면에 종료 처리되었습니다. 서버 동기화는 실패했습니다.",
+                    ? `인시던트 상태 변경에 실패했습니다. ${error.message}`
+                    : "인시던트 상태 변경에 실패했습니다.",
               };
             });
         }
