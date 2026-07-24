@@ -169,7 +169,7 @@ type PortalDataContextValue = {
     incidentId: number,
     statusCode: IncidentStatusCode,
     message?: string
-  ) => void;
+  ) => Promise<{ ok: boolean; message: string }>;
   addIncidentEvent: (incidentId: number, message: string) => void;
   addServer: (input: NewServerInput) => ServerRecord;
   updateServer: (serverId: number, input: Partial<NewServerInput>) => void;
@@ -927,8 +927,15 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
                   toIncidentUpdatePayload(target, statusCode, now)
                 );
 
-          void remoteUpdate
+          return remoteUpdate
             .then(() => refreshRemoteData(300))
+            .then(() => ({
+              ok: true,
+              message:
+                statusCode === "RESOLVED"
+                  ? "인시던트가 종료 처리되었습니다."
+                  : "인시던트 상태가 변경되었습니다.",
+            }))
             .catch((error) => {
               if (previousIncident) {
                 setIncidents((current) =>
@@ -949,8 +956,23 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
                 )
               );
               notifyRemoteMutationFailure(error, "인시던트 상태 변경 API 호출에 실패했습니다.");
+              return {
+                ok: false,
+                message:
+                  error instanceof Error
+                    ? `인시던트 상태 변경에 실패했습니다. ${error.message}`
+                    : "인시던트 상태 변경에 실패했습니다.",
+              };
             });
         }
+
+        return Promise.resolve({
+          ok: true,
+          message:
+            statusCode === "RESOLVED"
+              ? "인시던트가 종료 처리되었습니다."
+              : "인시던트 상태가 변경되었습니다.",
+        });
       },
       addIncidentEvent: (incidentId, message) => {
         const cleaned = message.trim();

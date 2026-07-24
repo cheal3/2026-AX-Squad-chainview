@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode } from "react";
 import {
   AlertTriangle,
   Bell,
@@ -581,16 +581,19 @@ function DashboardCase({
     return (
       <IncidentCommandDashboard
         incident={activeIncident}
-        onResolve={() => {
+        onResolve={async () => {
           if (!window.confirm(`${activeIncident.title} 인시던트를 종료 처리하시겠습니까?`)) {
             return;
           }
-          portalData.updateIncidentStatus(
+          const result = await portalData.updateIncidentStatus(
             activeIncident.incidentId,
             "RESOLVED",
             "운영자가 인시던트를 종료 처리했습니다."
           );
-          navigate("/dashboard", { replace: true });
+          window.alert(result.message);
+          if (result.ok) {
+            navigate("/dashboard", { replace: true });
+          }
         }}
         relations={portalData.relations}
         services={portalData.services}
@@ -2037,12 +2040,49 @@ function BottomPanels({
   managementRows: DashboardManagementRow[];
 }) {
   const navigate = useNavigate();
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const dragStateRef = useRef({ left: 0, startX: 0, active: false });
   const visibleChangeRows = changeRows.slice(0, 5);
   const visibleIncidentRows = incidentRows.slice(0, 5);
   const visibleDeployRows = deployRows.slice(0, 5);
+  const handleBottomPanelsPointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    if ((event.target as HTMLElement).closest("button")) {
+      return;
+    }
+    const element = scrollRef.current;
+    if (!element) {
+      return;
+    }
+    dragStateRef.current = {
+      active: true,
+      left: element.scrollLeft,
+      startX: event.clientX,
+    };
+    element.setPointerCapture(event.pointerId);
+  };
+  const handleBottomPanelsPointerMove = (event: PointerEvent<HTMLDivElement>) => {
+    const element = scrollRef.current;
+    if (!element || !dragStateRef.current.active) {
+      return;
+    }
+    element.scrollLeft = dragStateRef.current.left - (event.clientX - dragStateRef.current.startX);
+  };
+  const handleBottomPanelsPointerEnd = (event: PointerEvent<HTMLDivElement>) => {
+    dragStateRef.current.active = false;
+    scrollRef.current?.releasePointerCapture(event.pointerId);
+  };
 
   return (
-    <div className="mt-3 grid h-[236px] min-w-0 flex-none grid-cols-[minmax(190px,0.76fr)_minmax(290px,1.06fr)_minmax(560px,1.98fr)_minmax(210px,0.8fr)] items-stretch gap-2 overflow-hidden">
+    <div
+      ref={scrollRef}
+      className="mt-3 h-[236px] min-w-0 flex-none cursor-grab overflow-x-auto overflow-y-hidden active:cursor-grabbing [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      onPointerDown={handleBottomPanelsPointerDown}
+      onPointerMove={handleBottomPanelsPointerMove}
+      onPointerUp={handleBottomPanelsPointerEnd}
+      onPointerCancel={handleBottomPanelsPointerEnd}
+      onPointerLeave={handleBottomPanelsPointerEnd}
+    >
+    <div className="grid h-full min-w-[1280px] grid-cols-[minmax(190px,0.76fr)_minmax(290px,1.06fr)_minmax(560px,1.98fr)_minmax(210px,0.8fr)] items-stretch gap-2 overflow-hidden">
       <Panel title="관리 필요 서비스">
         {managementRows.map(([label, value, type]) => (
           <TinyRow
@@ -2106,6 +2146,7 @@ function BottomPanels({
           <TinyRow compact key={`${service}-${time}`} icon={status === "up" ? "↑" : "●"} label={service} value={time} tone={status === "up" ? "success" : "muted"} />
         )) : <TinyEmpty>최근 배포가 없습니다.</TinyEmpty>}
       </Panel>
+    </div>
     </div>
   );
 }
