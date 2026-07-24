@@ -1,7 +1,7 @@
 const REMOTE_ORIGIN = "https://chainview.kro.kr";
 const DEFAULT_EMPLOYEE_NO = "8913812";
 const DEFAULT_DEV_LOGIN_PATH = "/admin/dashboard";
-const REQUEST_TIMEOUT_MS = 12000;
+const MUTATION_TIMEOUT_MS = 20000;
 
 export const chainViewRemoteOrigin =
   import.meta.env.VITE_CHAINVIEW_REMOTE_ORIGIN ?? REMOTE_ORIGIN;
@@ -347,7 +347,7 @@ async function requestJson<T>(
   options: RequestOptions = {}
 ): Promise<T> {
   const shouldAttachCsrf = method !== "GET";
-  if (!hasAuthenticatedSession || (shouldAttachCsrf && !csrfToken)) {
+  if (shouldAttachCsrf && (!hasAuthenticatedSession || !csrfToken)) {
     await ensureSession();
   }
 
@@ -358,7 +358,7 @@ async function requestJson<T>(
     redirect: "manual",
     headers: buildHeaders(options.body, shouldAttachCsrf),
     body: serializeBody(options.body),
-  });
+  }, method === "GET" ? undefined : MUTATION_TIMEOUT_MS);
 
   const contentType = response.headers.get("content-type") ?? "";
   const text = await response.text();
@@ -377,8 +377,18 @@ async function requestJson<T>(
       });
     }
 
-    await ensureSession();
-    return requestJson<T>(path, method, { ...options, retryAuth: false });
+    if (shouldAttachCsrf) {
+      await ensureSession();
+      return requestJson<T>(path, method, { ...options, retryAuth: false });
+    }
+
+    throw new ChainViewApiError({
+      authRequired: true,
+      body: text,
+      message: "ChainView 로그인 세션이 필요합니다.",
+      status: response.status,
+      url,
+    });
   }
 
   if (!response.ok) {
@@ -413,9 +423,26 @@ async function requestJson<T>(
   return text as T;
 }
 
-async function fetchWithApiError(url: string, init: RequestInit) {
+async function fetchWithApiError(
+  url: string,
+  init: RequestInit,
+  timeoutMs?: number
+) {
+  if (!timeoutMs) {
+    try {
+      return await fetch(url, init);
+    } catch (error) {
+      throw new ChainViewApiError({
+        message: "API 요청을 보낼 수 없습니다. 로그인 세션 또는 HTTPS/CORS 설정을 확인해 주세요.",
+        status: 0,
+        url,
+        body: error instanceof Error ? error.message : "",
+      });
+    }
+  }
+
   const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     return await fetch(url, {
