@@ -533,10 +533,6 @@ function DashboardCase({
   );
   const [selectedInfraNode, setSelectedInfraNode] =
     useState<InfraGraphNodeRecord | undefined>();
-  const [resolveToast, setResolveToast] = useState<{
-    message: string;
-    tone: "success" | "error";
-  } | null>(null);
 
   useEffect(() => {
     setSelectedServiceId((current) => {
@@ -583,37 +579,25 @@ function DashboardCase({
 
   if (activeIncident) {
     return (
-      <>
-        {resolveToast ? (
-          <DashboardToast
-            message={resolveToast.message}
-            tone={resolveToast.tone}
-            onClose={() => setResolveToast(null)}
-          />
-        ) : null}
-        <IncidentCommandDashboard
-          incident={activeIncident}
-          onResolve={async () => {
-            if (!window.confirm(`${activeIncident.title} 인시던트를 종료 처리하시겠습니까?`)) {
-              return;
-            }
-            const result = await portalData.updateIncidentStatus(
-              activeIncident.incidentId,
-              "RESOLVED",
-              "운영자가 인시던트를 종료 처리했습니다."
-            );
-            setResolveToast({
-              message: result.message,
-              tone: result.ok ? "success" : "error",
-            });
-            if (result.ok) {
-              window.setTimeout(() => navigate("/dashboard", { replace: true }), 700);
-            }
-          }}
-          relations={portalData.relations}
-          services={portalData.services}
-        />
-      </>
+      <IncidentCommandDashboard
+        incident={activeIncident}
+        onResolve={async () => {
+          if (!window.confirm(`${activeIncident.title} 인시던트를 종료 처리하시겠습니까?`)) {
+            return;
+          }
+          const result = await portalData.updateIncidentStatus(
+            activeIncident.incidentId,
+            "RESOLVED",
+            "운영자가 인시던트를 종료 처리했습니다."
+          );
+          window.alert(result.message);
+          if (result.ok) {
+            navigate("/dashboard", { replace: true });
+          }
+        }}
+        relations={portalData.relations}
+        services={portalData.services}
+      />
     );
   }
 
@@ -723,42 +707,6 @@ function DashboardCase({
         managementRows={managementRows}
       />
     </section>
-  );
-}
-
-function DashboardToast({
-  message,
-  onClose,
-  tone,
-}: {
-  message: string;
-  onClose: () => void;
-  tone: "success" | "error";
-}) {
-  return (
-    <div
-      className={`fixed right-6 top-6 z-[1200] flex max-w-[420px] items-start gap-3 rounded-lg border bg-white px-4 py-3 text-sm shadow-xl ${
-        tone === "success" ? "border-emerald-200" : "border-red-200"
-      }`}
-      role="status"
-    >
-      <span
-        className={`mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full ${
-          tone === "success" ? "bg-emerald-500" : "bg-red-500"
-        }`}
-      />
-      <div className="min-w-0 flex-1 whitespace-pre-line break-words font-semibold leading-5 text-slate-800">
-        {message}
-      </div>
-      <button
-        type="button"
-        className="shrink-0 rounded px-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-        onClick={onClose}
-        aria-label="알림 닫기"
-      >
-        <X size={15} />
-      </button>
-    </div>
   );
 }
 
