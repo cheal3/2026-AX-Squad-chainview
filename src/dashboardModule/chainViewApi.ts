@@ -2,19 +2,23 @@ const REMOTE_ORIGIN = "https://chainview.kro.kr";
 const DEFAULT_EMPLOYEE_NO = "8913812";
 const DEFAULT_DEV_LOGIN_PATH = "/admin/dashboard";
 
+function envValue(value: unknown, fallback: string) {
+  return typeof value === "string" && value.trim() ? value : fallback;
+}
+
 export const chainViewRemoteOrigin =
-  import.meta.env.VITE_CHAINVIEW_REMOTE_ORIGIN ?? REMOTE_ORIGIN;
+  envValue(import.meta.env.VITE_CHAINVIEW_REMOTE_ORIGIN, REMOTE_ORIGIN);
 
 export const chainViewApiBaseUrl =
-  import.meta.env.VITE_CHAINVIEW_API_BASE_URL ||
+  envValue(import.meta.env.VITE_CHAINVIEW_API_BASE_URL, "") ||
   (import.meta.env.DEV ? "/chainview-api" : chainViewRemoteOrigin);
 
 export const chainViewEmployeeNo =
-  import.meta.env.VITE_CHAINVIEW_EMPLOYEE_NO ?? DEFAULT_EMPLOYEE_NO;
+  envValue(import.meta.env.VITE_CHAINVIEW_EMPLOYEE_NO, DEFAULT_EMPLOYEE_NO);
 const chainViewPassword =
-  import.meta.env.VITE_CHAINVIEW_PASSWORD ?? "";
+  envValue(import.meta.env.VITE_CHAINVIEW_PASSWORD, "");
 const chainViewDevLoginPath =
-  import.meta.env.VITE_CHAINVIEW_DEV_LOGIN_PATH ?? DEFAULT_DEV_LOGIN_PATH;
+  envValue(import.meta.env.VITE_CHAINVIEW_DEV_LOGIN_PATH, DEFAULT_DEV_LOGIN_PATH);
 
 type QueryValue =
   | string
