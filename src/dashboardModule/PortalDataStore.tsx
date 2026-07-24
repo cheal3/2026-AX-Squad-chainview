@@ -905,23 +905,14 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         if (REMOTE_API_ENABLED && target) {
           const remoteUpdate =
             statusCode === "RESOLVED"
-              ? chainViewApi.incidents.resolve(incidentId, {
-                  endedAt: toApiDateTime(now),
-                  description: message ?? target.description,
-                }).catch((error) => {
-                  console.warn(
-                    "[ChainView API] incident resolve endpoint failed, retrying status update",
-                    error
-                  );
-                  return chainViewApi.incidents.update(
-                    incidentId,
-                    toIncidentUpdatePayload(
-                      { ...target, incidentStatusCode: statusCode, endedAt: now },
-                      statusCode,
-                      now
-                    )
-                  );
-                })
+              ? chainViewApi.incidents.update(
+                  incidentId,
+                  toIncidentUpdatePayload(
+                    { ...target, incidentStatusCode: statusCode, endedAt: now },
+                    statusCode,
+                    now
+                  )
+                )
               : chainViewApi.incidents.update(
                   incidentId,
                   toIncidentUpdatePayload(target, statusCode, now)
@@ -955,7 +946,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
                     )
                 )
               );
-              notifyRemoteMutationFailure(error, "인시던트 상태 변경 API 호출에 실패했습니다.");
+              console.warn("[ChainView API] 인시던트 상태 변경 API 호출에 실패했습니다.", error);
               return {
                 ok: false,
                 message:
@@ -2263,8 +2254,13 @@ function toIncidentUpdatePayload(
   updatedAt: string
 ) {
   return {
+    incidentTypeCode: incident.incidentTypeCode,
     incidentStatusCode,
+    serviceId: incident.serviceId,
+    serverId: incident.serverId,
     severityCode: incident.severityCode,
+    targetCode: incident.targetCode,
+    targetLabel: incident.targetLabel,
     title: incident.title,
     description: incident.description,
     startedAt: toApiDateTime(incident.startedAt),
