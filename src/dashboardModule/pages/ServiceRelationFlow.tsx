@@ -2484,6 +2484,30 @@ export function ServiceRelationFlow({
         return;
       }
 
+      if (
+        graphViewMode === "all" &&
+        !selectedInfraNodeId &&
+        !selectedServiceNodeId &&
+        nodes.length > 0
+      ) {
+        const autoFitKey = `all-fit:${nodes.length}:${relationDepth}:${query}`;
+        if (
+          userMovedViewportRef.current &&
+          autoCenteredKeyRef.current === autoFitKey
+        ) {
+          return;
+        }
+
+        flowInstance.fitView({
+          duration: 800,
+          maxZoom: incidentMode ? 0.62 : 0.52,
+          minZoom: incidentMode ? 0.38 : 0.32,
+          padding: incidentMode ? 0.18 : 0.14,
+        });
+        autoCenteredKeyRef.current = autoFitKey;
+        return;
+      }
+
       const fallbackCenterNode = findCenterAnchorNode(nodes);
       const anchorServiceId = selectedServiceNodeId ?? (
         graphViewMode === "service" && serviceById.has(focusedServiceId)
