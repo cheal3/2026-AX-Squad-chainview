@@ -159,7 +159,9 @@ type PortalDataContextValue = {
   incidentImpacts: IncidentImpactRecord[];
   incidentEvents: IncidentEventRecord[];
   healthChecks: HealthCheckResult[];
-  createIncident: (input: NewIncidentInput) => IncidentRecord;
+  createIncident: (
+    input: NewIncidentInput
+  ) => Promise<{ ok: boolean; message: string; incident?: IncidentRecord }>;
   updateIncident: (
     incidentId: number,
     input: Partial<IncidentRecord>
@@ -699,9 +701,46 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
     }
 
     if (REMOTE_API_ENABLED) {
-      void chainViewApi.incidents
+      return chainViewApi.incidents
         .create(toIncidentCreatePayload(input, now))
-        .then(() => refreshRemoteData(300))
+        .then(async (remoteIncident) => {
+          const remoteRecord = isRemoteRecord(remoteIncident)
+            ? mapIncidentFromRemote(remoteIncident)
+            : nextIncident;
+          const createdIncident = remoteRecord.incidentId
+            ? { ...nextIncident, ...remoteRecord }
+            : nextIncident;
+
+          setIncidents((current) =>
+            current.map((incident) =>
+              incident.incidentId === nextIncident.incidentId
+                ? createdIncident
+                : incident
+            )
+          );
+          if (createdIncident.incidentId !== nextIncident.incidentId) {
+            setIncidentImpacts((current) =>
+              current.map((impact) =>
+                impact.incidentId === nextIncident.incidentId
+                  ? { ...impact, incidentId: createdIncident.incidentId }
+                  : impact
+              )
+            );
+            setIncidentEvents((current) =>
+              current.map((event) =>
+                event.incidentId === nextIncident.incidentId
+                  ? { ...event, incidentId: createdIncident.incidentId }
+                  : event
+              )
+            );
+          }
+          await refreshRemoteData(300);
+          return {
+            ok: true,
+            message: "인시던트가 생성되었습니다.",
+            incident: createdIncident,
+          };
+        })
         .catch((error) => {
           setIncidents((current) =>
             current.filter((incident) => incident.incidentId !== nextIncident.incidentId)
@@ -713,11 +752,22 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             current.filter((event) => event.incidentId !== nextIncident.incidentId)
           );
           setServices(previousServices);
-          notifyRemoteMutationFailure(error, "인시던트 생성 API 호출에 실패했습니다.");
+          console.warn("[ChainView API] 인시던트 생성 API 호출에 실패했습니다.", error);
+          return {
+            ok: false,
+            message:
+              error instanceof Error
+                ? `인시던트 생성에 실패했습니다. ${error.message}`
+                : "인시던트 생성에 실패했습니다.",
+          };
         });
     }
 
-    return nextIncident;
+    return Promise.resolve({
+      ok: true,
+      message: "인시던트가 생성되었습니다.",
+      incident: nextIncident,
+    });
   };
 
   const value = useMemo<PortalDataContextValue>(
@@ -2236,15 +2286,19 @@ function deploymentKey(input: RemoteListRecord) {
 function toIncidentCreatePayload(input: NewIncidentInput, startedAt: string) {
   return {
     incidentTypeCode: input.incidentTypeCode ?? "SERVICE",
+    incidentStatusCode: "OPEN",
     serviceId: input.serviceId,
     serverId: input.serverId,
     severityCode: input.severityCode,
+    externalIncidentCode: input.externalIncidentCode,
     targetCode: input.targetCode,
     targetLabel: input.targetLabel,
     title: input.title,
     description: input.description,
     startedAt: toApiDateTime(startedAt),
     impactDepth: 2,
+    manualRegisteredYn: input.manualRegisteredYn ?? "Y",
+    registeredBy: input.registeredBy ?? "admin",
   };
 }
 
