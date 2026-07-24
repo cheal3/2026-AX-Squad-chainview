@@ -739,19 +739,14 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           };
         })
         .catch((error) => {
-          setIncidents((current) =>
-            current.filter((incident) => incident.incidentId !== nextIncident.incidentId)
-          );
-          setIncidentImpacts((current) =>
-            current.filter((impact) => impact.incidentId !== nextIncident.incidentId)
-          );
-          setIncidentEvents((current) =>
-            current.filter((event) => event.incidentId !== nextIncident.incidentId)
-          );
           console.warn("[ChainView API] 인시던트 생성 API 호출에 실패했습니다.", error);
           return {
-            ok: false,
-            message: remoteErrorDetailMessage(error, "인시던트 생성에 실패했습니다."),
+            ok: true,
+            message:
+              error instanceof Error
+                ? `인시던트는 화면에 생성되었습니다. 서버 동기화는 실패했습니다. ${error.message}`
+                : "인시던트는 화면에 생성되었습니다. 서버 동기화는 실패했습니다.",
+            incident: nextIncident,
           };
         });
     }
@@ -968,17 +963,13 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
                   : "인시던트 상태가 변경되었습니다.",
             }))
             .catch((error) => {
-              if (target) {
-                setIncidents((current) =>
-                  current.map((incident) =>
-                    incident.incidentId === incidentId ? target : incident
-                  )
-                );
-              }
               console.warn("[ChainView API] 인시던트 상태 변경 API 호출에 실패했습니다.", error);
               return {
-                ok: false,
-                message: remoteErrorDetailMessage(error, "인시던트 상태 변경에 실패했습니다."),
+                ok: true,
+                message:
+                  error instanceof Error
+                    ? `인시던트는 화면에 종료 처리되었습니다. 서버 동기화는 실패했습니다. ${error.message}`
+                    : "인시던트는 화면에 종료 처리되었습니다. 서버 동기화는 실패했습니다.",
               };
             });
         }
@@ -2280,16 +2271,34 @@ function deploymentKey(input: RemoteListRecord) {
 
 function toIncidentCreatePayload(input: NewIncidentInput, startedAt: string) {
   const incidentType = input.incidentTypeCode ?? "SERVICE";
+  const targetType = incidentType === "SERVER" ? "SERVER" : "SERVICE";
+  const targetId =
+    targetType === "SERVER"
+      ? input.serverId ?? input.targetCode
+      : input.serviceId ?? input.targetCode;
   return {
+    incidentType,
     incidentTypeCode: incidentType,
+    status: "OPEN",
+    incidentStatusCode: "OPEN",
     serviceId: input.serviceId,
     serverId: input.serverId,
-    infraNodeId: input.infraNodeId,
+    targetType,
+    targetId,
     severityCode: input.severityCode,
+    severity: input.severityCode,
+    externalIncidentCode: input.externalIncidentCode,
+    targetCode: input.targetCode,
+    targetLabel: input.targetLabel,
     title: input.title,
     description: input.description,
+    occurredAt: toApiDateTime(startedAt),
     startedAt: toApiDateTime(startedAt),
     impactDepth: 2,
+    manualRegisteredYn: input.manualRegisteredYn ?? "Y",
+    manualRegistered: (input.manualRegisteredYn ?? "Y") === "Y",
+    registeredBy: input.registeredBy ?? "admin",
+    createdBy: input.registeredBy ?? "admin",
   };
 }
 
@@ -2298,6 +2307,12 @@ function toIncidentUpdatePayload(
   incidentStatusCode: IncidentStatusCode,
   updatedAt: string
 ) {
+  const incidentType = incident.incidentTypeCode ?? "SERVICE";
+  const targetType = incidentType === "SERVER" ? "SERVER" : "SERVICE";
+  const targetId =
+    targetType === "SERVER"
+      ? incident.serverId ?? incident.targetCode
+      : incident.serviceId ?? incident.targetCode;
   const resolvedAt =
     incidentStatusCode === "RESOLVED"
       ? toApiDateTime(updatedAt)
@@ -2305,11 +2320,23 @@ function toIncidentUpdatePayload(
         ? toApiDateTime(incident.endedAt)
         : undefined;
   return {
+    incidentType,
+    incidentTypeCode: incidentType,
+    status: incidentStatusCode,
     incidentStatusCode,
+    serviceId: incident.serviceId,
+    serverId: incident.serverId,
+    targetType,
+    targetId,
     severityCode: incident.severityCode,
+    severity: incident.severityCode,
+    targetCode: incident.targetCode,
+    targetLabel: incident.targetLabel,
     title: incident.title,
     description: incident.description,
+    occurredAt: toApiDateTime(incident.startedAt),
     startedAt: toApiDateTime(incident.startedAt),
+    resolvedAt,
     endedAt: resolvedAt,
   };
 }
