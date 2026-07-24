@@ -1273,22 +1273,6 @@ export function ServiceRelationFlow({
     incidentServiceIds,
     infraIncident,
   ]);
-  const selectedInfraRelatedServiceIds = useMemo(() => {
-    const related = new Set(selectedInfraServiceIds);
-    if (selectedInfraServiceIds.size === 0) {
-      return related;
-    }
-
-    activeRelations.forEach((relation) => {
-      if (selectedInfraServiceIds.has(relation.sourceServiceId)) {
-        related.add(relation.targetServiceId);
-      }
-      if (selectedInfraServiceIds.has(relation.targetServiceId)) {
-        related.add(relation.sourceServiceId);
-      }
-    });
-    return related;
-  }, [activeRelations, selectedInfraServiceIds]);
   const activeIncidentServiceId =
     incidentServiceId ??
     (incidentMode && incidentServiceIds?.has(focusedServiceId)
@@ -1936,7 +1920,7 @@ export function ServiceRelationFlow({
           highlightedConnectedServiceIds.has(service.serviceId));
       const connectedByInfra =
         hasSelectedInfraInAllMode &&
-        selectedInfraRelatedServiceIds.has(service.serviceId);
+        selectedInfraServiceIds.has(service.serviceId);
       const connected = connectedByService || connectedByInfra;
       const focused =
         (Boolean(highlightedServiceId) &&
@@ -2009,7 +1993,6 @@ export function ServiceRelationFlow({
     filteredServices,
     selectedServiceNodeId,
     selectedInfraNodeId,
-    selectedInfraRelatedServiceIds,
     selectedInfraServiceIds,
     serviceServerIdsByServiceId,
     serviceById,
@@ -2226,23 +2209,11 @@ export function ServiceRelationFlow({
           : showAllServices
             ? selectedServiceNodeId
             : selectedServiceNodeId ?? highlightServiceId ?? focusedServiceId;
-        const hasInfraHighlight =
-          !incidentMode &&
-          graphViewMode === "all" &&
-          selectedInfraServiceIds.size > 0;
-        const sourceInInfraScope = selectedInfraServiceIds.has(
-          relation.sourceServiceId
-        );
-        const targetInInfraScope = selectedInfraServiceIds.has(
-          relation.targetServiceId
-        );
-        const hasHighlight =
-          Boolean(highlightedServiceId) || hasInfraHighlight;
+        const hasHighlight = Boolean(highlightedServiceId);
         const directlyConnected =
-          (Boolean(highlightedServiceId) &&
-            (relation.sourceServiceId === highlightedServiceId ||
-              relation.targetServiceId === highlightedServiceId)) ||
-            (hasInfraHighlight && (sourceInInfraScope || targetInInfraScope));
+          Boolean(highlightedServiceId) &&
+          (relation.sourceServiceId === highlightedServiceId ||
+            relation.targetServiceId === highlightedServiceId);
         const stroke = incidentMode
           ? "#ff3344"
           : highlightedServiceId === relation.sourceServiceId
