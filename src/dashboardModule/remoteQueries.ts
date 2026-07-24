@@ -3,6 +3,7 @@ import {
   asRemoteNumber,
   asRemoteRecordArray,
   asRemoteString,
+  isRemoteRecord,
   type RemoteRecord,
 } from "./remoteValue";
 
@@ -133,13 +134,13 @@ async function loadServiceDeployments() {
   const serviceRows = asRemoteRecordArray(await chainViewApi.services.list());
   return serviceRows.flatMap((service) => {
     const detail = service;
-    const deployments = asRemoteRecordArray(detail.deployments);
+    const deployments = serviceDeploymentRows(detail);
     const fallbackDeployment =
       deployments.length || !asRemoteNumber(service.serviceId)
         ? []
         : [{
             deploymentKey: `${asRemoteNumber(service.serviceId)}-primary`,
-            serverId: asRemoteNumber(detail.serverId ?? service.serverId),
+            serverId: deploymentServerId(undefined, detail.serverId ?? service.serverId),
             serverName: asRemoteString(detail.serverName ?? service.serverName),
             hostName: asRemoteString(detail.hostName ?? service.hostName),
             deployPath: asRemoteString(detail.deployPath ?? service.deployPath),
@@ -153,8 +154,53 @@ async function loadServiceDeployments() {
       serviceCode: asRemoteString(detail.serviceCode ?? service.serviceCode),
       serviceId: asRemoteNumber(detail.serviceId ?? service.serviceId),
       serviceName: asRemoteString(detail.serviceName ?? service.serviceName),
+      serverId: deploymentServerId(deployment, detail.serverId ?? service.serverId),
     }));
   });
+}
+
+function serviceDeploymentRows(service: RemoteListRecord): RemoteListRecord[] {
+  const arrayKeys = [
+    "deployments",
+    "serviceServers",
+    "deploymentServers",
+    "servers",
+    "serverMappings",
+  ];
+  for (const key of arrayKeys) {
+    const rows = asRemoteRecordArray(service[key]);
+    if (rows.length) {
+      return rows;
+    }
+  }
+
+  const serverIds = Array.isArray(service.serverIds)
+    ? service.serverIds
+    : Array.isArray(service.deploymentServerIds)
+      ? service.deploymentServerIds
+      : [];
+  const mappedServerIds = serverIds
+    .map((serverId) => asRemoteNumber(serverId))
+    .filter(Boolean);
+  if (mappedServerIds.length) {
+    return mappedServerIds.map((serverId) => ({ serverId }));
+  }
+
+  const serverId = asRemoteNumber(service.serverId);
+  return serverId ? [{ serverId }] : [];
+}
+
+function deploymentServerId(row: RemoteListRecord | undefined, fallback?: unknown) {
+  const nestedServer = isRemoteRecord(row?.server) ? row?.server : null;
+  return asRemoteNumber(
+    row?.serverId ??
+      row?.deploymentServerId ??
+      row?.infraServerId ??
+      row?.id ??
+      nestedServer?.serverId ??
+      nestedServer?.id ??
+      fallback
+  );
 }
 
 async function loadServiceCategories() {

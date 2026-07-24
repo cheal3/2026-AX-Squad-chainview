@@ -110,14 +110,58 @@ async function safeList(load: () => Promise<unknown>) {
   }
 }
 
+function serviceDeploymentRows(row: RemoteRecord, detail?: RemoteRecord) {
+  const arrayKeys = [
+    "deployments",
+    "serviceServers",
+    "deploymentServers",
+    "servers",
+    "serverMappings",
+  ];
+  for (const key of arrayKeys) {
+    const rows = asRecordArray(detail?.[key] ?? row[key]);
+    if (rows.length) {
+      return rows;
+    }
+  }
+
+  const serverIds = Array.isArray(detail?.serverIds ?? row.serverIds)
+    ? (detail?.serverIds ?? row.serverIds)
+    : Array.isArray(detail?.deploymentServerIds ?? row.deploymentServerIds)
+      ? (detail?.deploymentServerIds ?? row.deploymentServerIds)
+      : [];
+  const mappedServerIds = serverIds
+    .map((serverId) => asNumber(serverId))
+    .filter(Boolean);
+  if (mappedServerIds.length) {
+    return mappedServerIds.map((serverId) => ({ serverId }));
+  }
+
+  const serverId = asNumber(detail?.serverId ?? row.serverId);
+  return serverId ? [{ serverId }] : [];
+}
+
+function deploymentServerId(row: RemoteRecord | undefined, fallback?: unknown) {
+  const nestedServer = isRecord(row?.server) ? row?.server : null;
+  return asNumber(
+    row?.serverId ??
+      row?.deploymentServerId ??
+      row?.infraServerId ??
+      row?.id ??
+      nestedServer?.serverId ??
+      nestedServer?.id ??
+      fallback
+  );
+}
+
 function mapServiceDeployments(row: RemoteRecord, detail?: RemoteRecord) {
   const serviceId = asNumber(detail?.serviceId ?? row.serviceId);
-  const deployments = asRecordArray(detail?.deployments);
+  const deployments = serviceDeploymentRows(row, detail);
   const fallbackDeployment =
     deployments.length || !serviceId
       ? []
       : [{
-          serverId: asNumber(detail?.serverId ?? row.serverId),
+            serverId: deploymentServerId(undefined, detail?.serverId ?? row.serverId),
           serverName: asString(detail?.serverName ?? row.serverName),
           hostName: asString(detail?.hostName ?? row.hostName),
           deployPath:
@@ -174,7 +218,7 @@ function mapServer(row: RemoteRecord): ServerRecord {
 }
 
 function mapService(row: RemoteRecord, detail?: RemoteRecord): ServiceRecord {
-  const deployments = asRecordArray(detail?.deployments);
+  const deployments = serviceDeploymentRows(row, detail);
   const primaryDeployment = deployments[0];
   const updatedAt = formatDateTime(detail?.updatedAt ?? row.updatedAt);
   const instanceCount =
@@ -205,7 +249,7 @@ function mapService(row: RemoteRecord, detail?: RemoteRecord): ServiceRecord {
     ),
     description: asString(detail?.description),
     endpointUrl: asString(detail?.endpointUrl),
-    serverId: asNumber(primaryDeployment?.serverId),
+    serverId: deploymentServerId(primaryDeployment, detail?.serverId ?? row.serverId),
     deployPath:
       asString(primaryDeployment?.deployPath) ||
       asString(row.deploymentHostsSummary),

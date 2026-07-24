@@ -1862,7 +1862,53 @@ function mapServerFromRemote(row: RemoteListRecord): ServerRecord {
   };
 }
 
+function remoteServiceDeploymentRows(row: RemoteListRecord): RemoteListRecord[] {
+  const arrayKeys = [
+    "deployments",
+    "serviceServers",
+    "deploymentServers",
+    "servers",
+    "serverMappings",
+  ];
+  for (const key of arrayKeys) {
+    const rows = asRemoteRecordArray(row[key]);
+    if (rows.length) {
+      return rows;
+    }
+  }
+
+  const serverIds = Array.isArray(row.serverIds)
+    ? row.serverIds
+    : Array.isArray(row.deploymentServerIds)
+      ? row.deploymentServerIds
+      : [];
+  const mappedServerIds = serverIds
+    .map((serverId) => asRemoteNumber(serverId))
+    .filter(Boolean);
+  if (mappedServerIds.length) {
+    return mappedServerIds.map((serverId) => ({ serverId }));
+  }
+
+  const serverId = asRemoteNumber(row.serverId);
+  return serverId ? [{ serverId }] : [];
+}
+
+function remoteDeploymentServerId(row: RemoteListRecord | undefined, fallback?: unknown) {
+  const nestedServer = isRemoteRecord(row?.server) ? row?.server : null;
+  return asRemoteNumber(
+    row?.serverId ??
+      row?.deploymentServerId ??
+      row?.infraServerId ??
+      row?.id ??
+      nestedServer?.serverId ??
+      nestedServer?.id ??
+      fallback
+  );
+}
+
 function mapServiceFromRemote(row: RemoteListRecord): ServiceRecord {
+  const deploymentRows = remoteServiceDeploymentRows(row);
+  const primaryDeployment = deploymentRows[0];
   return {
     serviceId: asRemoteNumber(row.serviceId ?? row.id),
     categoryPath: asRemoteString(row.categoryPath)
@@ -1875,10 +1921,10 @@ function mapServiceFromRemote(row: RemoteListRecord): ServiceRecord {
     statusCode: knownRemoteCode(row.statusCode, codeLabels.serviceStatus, "NORMAL"),
     description: asRemoteString(row.description),
     endpointUrl: asRemoteString(row.endpointUrl),
-    serverId: asRemoteNumber(row.serverId),
-    deployPath: asRemoteString(row.deployPath),
-    portInfo: asRemoteString(row.portInfo),
-    deploymentStatusCode: knownRemoteCode(row.deploymentStatusCode, codeLabels.deploymentStatus, "RUNNING"),
+    serverId: remoteDeploymentServerId(primaryDeployment, row.serverId),
+    deployPath: asRemoteString(primaryDeployment?.deployPath ?? row.deployPath),
+    portInfo: asRemoteString(primaryDeployment?.portInfo ?? row.portInfo),
+    deploymentStatusCode: knownRemoteCode(primaryDeployment?.deploymentStatusCode ?? row.deploymentStatusCode, codeLabels.deploymentStatus, "RUNNING"),
     instanceCount: asRemoteNumber(row.instanceCount, 1),
     createdBy: asRemoteString(row.createdBy),
     updatedBy: asRemoteString(row.updatedBy),
