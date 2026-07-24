@@ -3,7 +3,6 @@ import {
   asRemoteNumber,
   asRemoteRecordArray,
   asRemoteString,
-  isRemoteRecord,
   type RemoteRecord,
 } from "./remoteValue";
 
@@ -77,7 +76,7 @@ export const remoteQueryPaths: Record<RemoteQueryKey, string> = {
   groups: "/api/ownership/groups",
   categories: "/api/service-categories/tree",
   codes: "/api/common-codes",
-  deployments: "/api/services + /api/services/{serviceId}",
+  deployments: "/api/services",
 };
 
 export const remoteQueryLabels: Record<RemoteQueryKey | "snapshot", string> = {
@@ -132,19 +131,8 @@ export function previewRemoteResponse(value: unknown) {
 
 async function loadServiceDeployments() {
   const serviceRows = asRemoteRecordArray(await chainViewApi.services.list());
-  const settled = await Promise.allSettled(
-    serviceRows.map((service) => {
-      const serviceId = asRemoteNumber(service.serviceId);
-      return serviceId ? chainViewApi.services.detail(serviceId) : null;
-    })
-  );
-
-  return settled.flatMap((result, index) => {
-    if (result.status !== "fulfilled") {
-      return [];
-    }
-    const detail = isRemoteRecord(result.value) ? result.value : {};
-    const service = serviceRows[index];
+  return serviceRows.flatMap((service) => {
+    const detail = service;
     const deployments = asRemoteRecordArray(detail.deployments);
     const fallbackDeployment =
       deployments.length || !asRemoteNumber(service.serviceId)

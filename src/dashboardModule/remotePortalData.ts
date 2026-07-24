@@ -44,21 +44,6 @@ export async function loadRemotePortalSnapshot(): Promise<RemotePortalSnapshot> 
   await chainViewApi.auth.ensureSession();
 
   const serviceRows = asRecordArray(await chainViewApi.services.list());
-  const detailSettled = await Promise.allSettled(
-    serviceRows.map((service) => {
-      const serviceId = asNumber(service.serviceId);
-      return serviceId ? chainViewApi.services.detail(serviceId) : null;
-    })
-  );
-  const detailsByServiceId = new Map<number, RemoteRecord>();
-
-  detailSettled.forEach((result) => {
-    if (result.status !== "fulfilled" || !isRecord(result.value)) {
-      return;
-    }
-    detailsByServiceId.set(asNumber(result.value.serviceId), result.value);
-  });
-
   const [
     serverRows,
     relationRows,
@@ -81,18 +66,13 @@ export async function loadRemotePortalSnapshot(): Promise<RemotePortalSnapshot> 
     safeList(() => chainViewApi.commonCodes.list()),
   ]);
 
-  const incidents = await loadIncidentDetails(incidentRows);
-  const incidentImpacts = await loadIncidentImpacts(incidents);
+  const incidents = incidentRows.map(mapIncident);
+  const incidentImpacts = loadIncidentImpactsFromRows(incidentRows, incidents);
   return {
     servers: serverRows.map(mapServer),
-    services: serviceRows.map((service) =>
-      mapService(service, detailsByServiceId.get(asNumber(service.serviceId)))
-    ),
+    services: serviceRows.map((service) => mapService(service)),
     deployments: serviceRows.flatMap((service) =>
-      mapServiceDeployments(
-        service,
-        detailsByServiceId.get(asNumber(service.serviceId))
-      )
+      mapServiceDeployments(service)
     ),
     relations: relationRows.map(mapRelation),
     techStacks: serviceTechStackRows.map(mapTechStack),
@@ -109,35 +89,13 @@ export async function loadRemotePortalSnapshot(): Promise<RemotePortalSnapshot> 
   };
 }
 
-async function loadIncidentDetails(rows: RemoteRecord[]) {
-  const settled = await Promise.allSettled(
-    rows.map((incident) => {
-      const incidentId = asNumber(incident.incidentId);
-      return incidentId ? chainViewApi.incidents.detail(incidentId) : incident;
-    })
-  );
-
-  return settled.map((result, index) => {
-    const fallback = rows[index];
-    return mapIncident(
-      result.status === "fulfilled" && isRecord(result.value)
-        ? result.value
-        : fallback
-    );
-  });
-}
-
-async function loadIncidentImpacts(incidents: IncidentRecord[]) {
-  const settled = await Promise.allSettled(
-    incidents.map((incident) => chainViewApi.incidents.impacts(incident.incidentId))
-  );
-
-  return settled.flatMap((result, index) => {
-    if (result.status !== "fulfilled") {
-      return [];
-    }
-    const incidentId = incidents[index].incidentId;
-    return asRecordArray(result.value).map((impact) =>
+function loadIncidentImpactsFromRows(
+  rows: RemoteRecord[],
+  incidents: IncidentRecord[]
+) {
+  return rows.flatMap((row, index) => {
+    const incidentId = incidents[index]?.incidentId ?? asNumber(row.incidentId);
+    return asRecordArray(row.impacts ?? row.incidentImpacts).map((impact) =>
       mapIncidentImpact(incidentId, impact)
     );
   });

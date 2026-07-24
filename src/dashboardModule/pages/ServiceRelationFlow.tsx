@@ -246,11 +246,14 @@ async function fetchInfraGraphSnapshot() {
   const nodes = (await chainViewApi.infraNodes.list())
     .map(normalizeInfraNode)
     .filter((node) => node.infraNodeId);
-  const edgeLists = await Promise.all(
-    nodes.map((node) =>
-      chainViewApi.infraNodes.edges(node.infraNodeId).catch(() => [])
-    )
-  );
+  const bulkEdges = await chainViewApi.infraNodes.listEdges().catch(() => null);
+  const edgeLists = Array.isArray(bulkEdges)
+    ? [bulkEdges]
+    : await Promise.all(
+        nodes.map((node) =>
+          chainViewApi.infraNodes.edges(node.infraNodeId).catch(() => [])
+        )
+      );
   const relationById = new Map<number, InfraGraphRelationRecord>();
 
   edgeLists.flat().forEach((edge) => {
