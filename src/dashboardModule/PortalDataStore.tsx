@@ -241,6 +241,15 @@ const REMOTE_API_ENABLED =
   (remoteApiEnabledFlag === undefined
     ? import.meta.env.DEV
     : remoteApiEnabledFlag === "true" || remoteApiEnabledFlag === "1");
+const SNAPSHOT_MANAGED_QUERY_KEYS = new Set<RemoteQueryKey>([
+  "services",
+  "servers",
+  "relations",
+  "techstacks",
+  "owners",
+  "incidents",
+  "deployments",
+]);
 
 function nowLabel() {
   return new Date().toLocaleTimeString("ko-KR", { hour12: false });
@@ -449,29 +458,29 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
 
   const applyRemoteQueryResult = (queryKey: RemoteQueryKey, result: unknown) => {
     const rows = asRemoteRecordArray(result);
-      if (queryKey === "users") {
-        setUsers(rows);
-      } else if (queryKey === "groups") {
-        setGroups(rows);
-      } else if (queryKey === "categories") {
-        setCategories(rows);
-      } else if (queryKey === "codes") {
-        setCodes(rows);
-      } else if (queryKey === "deployments") {
-        setDeployments(rows);
-      } else if (queryKey === "incidents") {
-        setIncidents(rows.map((row) => mapIncidentFromRemote(row)));
-      } else if (queryKey === "servers") {
-        setServers(rows.map((row) => mapServerFromRemote(row)));
-      } else if (queryKey === "services") {
-        setServices(rows.map((row) => mapServiceFromRemote(row)));
-      } else if (queryKey === "relations") {
-        setRelations(rows.map((row) => mapRelationFromRemote(row)));
-      } else if (queryKey === "techstacks") {
-        setTechStacks(rows.map((row) => mapTechStackFromRemote(row)));
-      } else if (queryKey === "owners") {
-        setOwners(rows.map((row) => mapOwnerFromRemote(row)));
-      }
+    if (queryKey === "users") {
+      setUsers(rows);
+    } else if (queryKey === "groups") {
+      setGroups(rows);
+    } else if (queryKey === "categories") {
+      setCategories(rows);
+    } else if (queryKey === "codes") {
+      setCodes(rows);
+    } else if (queryKey === "deployments") {
+      setDeployments(rows);
+    } else if (queryKey === "incidents") {
+      setIncidents(rows.map((row) => mapIncidentFromRemote(row)));
+    } else if (queryKey === "servers") {
+      setServers(rows.map((row) => mapServerFromRemote(row)));
+    } else if (queryKey === "services") {
+      setServices(rows.map((row) => mapServiceFromRemote(row)));
+    } else if (queryKey === "relations") {
+      setRelations(rows.map((row) => mapRelationFromRemote(row)));
+    } else if (queryKey === "techstacks") {
+      setTechStacks(rows.map((row) => mapTechStackFromRemote(row)));
+    } else if (queryKey === "owners") {
+      setOwners(rows.map((row) => mapOwnerFromRemote(row)));
+    }
   };
 
   const testRemoteQuery = useCallback(
@@ -533,7 +542,9 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           source: queryKey,
           detail,
         };
-        applyRemoteQueryResult(queryKey, result);
+        if (!SNAPSHOT_MANAGED_QUERY_KEYS.has(queryKey)) {
+          applyRemoteQueryResult(queryKey, result);
+        }
         setRemoteApiStatus(status);
         await loadRemoteSnapshot();
         setRemoteApiStatus(status);
@@ -571,6 +582,10 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       }
 
       if (uniqueQueryKeys.length === remoteQueryKeys.length) {
+        return loadRemoteSnapshot();
+      }
+
+      if (uniqueQueryKeys.some((queryKey) => SNAPSHOT_MANAGED_QUERY_KEYS.has(queryKey))) {
         return loadRemoteSnapshot();
       }
 

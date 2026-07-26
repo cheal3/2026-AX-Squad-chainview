@@ -903,7 +903,12 @@ export function ServiceRelationFlow({
       });
     });
     return next;
-  }, [deployments, serviceIdByCode, services, servers]);
+  }, [
+    deployments,
+    serviceIdByCode,
+    services,
+    servers,
+  ]);
   const usedServerIds = useMemo(() => {
     const ids = new Set<number>();
     serviceServerIdsByServiceId.forEach((serverIds) => {
@@ -2538,6 +2543,15 @@ export function ServiceRelationFlow({
     },
     [graphViewMode, laneNodes, serviceNodes, topologyNodes]
   );
+  const graphContentSignature = useMemo(
+    () =>
+      nodes
+        .filter((node) => node.type !== "laneNode")
+        .map((node) => `${node.id}:${Math.round(node.position.x)}:${Math.round(node.position.y)}`)
+        .sort()
+        .join("|"),
+    [nodes]
+  );
   const nodeTypes = useMemo(
     () => ({ laneNode: LaneNode, serviceNode: ServiceNode, serverInfraNode: ServerInfraNode }),
     []
@@ -2635,82 +2649,92 @@ export function ServiceRelationFlow({
       return;
     }
 
+    let innerFrame: number | undefined;
     const frame = window.requestAnimationFrame(() => {
-      if (!flowInstance) {
-        return;
-      }
+      innerFrame = window.requestAnimationFrame(() => {
+        if (!flowInstance) {
+          return;
+        }
 
-      if (
-        graphViewMode === "all" &&
-        !selectedInfraNodeId &&
-        !selectedServiceNodeId &&
-        nodes.length > 0
-      ) {
-        const autoFitKey = `all-fit:${nodes.length}:${relationDepth}:${query}`;
+        if (graphViewMode === "all" && nodes.length > 0) {
+          const contentNodes = nodes.filter((node) => node.type !== "laneNode");
+          const autoFitKey = `all-fit:${graphContentSignature}:${edges.length}:${relationDepth}:${query}`;
+          if (
+            !showAllServices &&
+            userMovedViewportRef.current &&
+            autoCenteredKeyRef.current === autoFitKey
+          ) {
+            return;
+          }
+
+          flowInstance.fitView({
+            duration: 800,
+            maxZoom: incidentMode ? 0.62 : 0.52,
+            minZoom: incidentMode ? 0.38 : 0.32,
+            nodes: contentNodes.length
+              ? contentNodes.map((node) => ({ id: node.id }))
+              : undefined,
+            padding: incidentMode ? 0.18 : 0.14,
+          });
+          autoCenteredKeyRef.current = autoFitKey;
+          return;
+        }
+
+        const fallbackCenterNode = findCenterAnchorNode(nodes);
+        const anchorServiceId = selectedServiceNodeId ?? (
+          graphViewMode === "service" && serviceById.has(focusedServiceId)
+            ? focusedServiceId
+            : undefined
+        );
+        const anchorNode = selectedInfraNodeId
+          ? nodes.find((node) => node.id === `infra-${selectedInfraNodeId}`)
+          : anchorServiceId
+            ? nodes.find((node) => node.id === String(anchorServiceId)) ?? fallbackCenterNode
+            : fallbackCenterNode;
+        const expanded = relationDepth > 1;
+        const autoCenterKey = `${graphViewMode}:${anchorNode?.id ?? "none"}:${selectedInfraNodeId ?? "none"}:${relationDepth}:${query}`;
+
         if (
           userMovedViewportRef.current &&
-          autoCenteredKeyRef.current === autoFitKey
+          autoCenteredKeyRef.current === autoCenterKey
         ) {
           return;
         }
 
-        flowInstance.fitView({
+        if (!anchorNode) {
+          return;
+        }
+
+        flowInstance.setCenter(anchorNode.position.x + NODE_WIDTH / 2, anchorNode.position.y, {
+          zoom:
+            graphViewMode === "all"
+              ? incidentMode
+                ? 0.68
+                : 0.72
+              : graphViewMode === "infra"
+                ? 0.74
+                : expanded
+                  ? 0.58
+                  : 0.9,
           duration: 800,
-          maxZoom: incidentMode ? 0.62 : 0.52,
-          minZoom: incidentMode ? 0.38 : 0.32,
-          padding: incidentMode ? 0.18 : 0.14,
         });
-        autoCenteredKeyRef.current = autoFitKey;
-        return;
-      }
-
-      const fallbackCenterNode = findCenterAnchorNode(nodes);
-      const anchorServiceId = selectedServiceNodeId ?? (
-        graphViewMode === "service" && serviceById.has(focusedServiceId)
-          ? focusedServiceId
-          : undefined
-      );
-      const anchorNode = selectedInfraNodeId
-        ? nodes.find((node) => node.id === `infra-${selectedInfraNodeId}`)
-        : anchorServiceId
-          ? nodes.find((node) => node.id === String(anchorServiceId)) ?? fallbackCenterNode
-          : fallbackCenterNode;
-      const expanded = relationDepth > 1;
-      const autoCenterKey = `${graphViewMode}:${anchorNode?.id ?? "none"}:${selectedInfraNodeId ?? "none"}:${relationDepth}:${query}`;
-
-      if (
-        userMovedViewportRef.current &&
-        autoCenteredKeyRef.current === autoCenterKey
-      ) {
-        return;
-      }
-
-      if (!anchorNode) {
-        return;
-      }
-
-      flowInstance.setCenter(anchorNode.position.x + NODE_WIDTH / 2, anchorNode.position.y, {
-        zoom:
-          graphViewMode === "all"
-            ? incidentMode
-              ? 0.68
-              : 0.72
-            : graphViewMode === "infra"
-              ? 0.74
-              : expanded
-                ? 0.58
-                : 0.9,
-        duration: 800,
+        autoCenteredKeyRef.current = autoCenterKey;
       });
-      autoCenteredKeyRef.current = autoCenterKey;
     });
 
-    return () => window.cancelAnimationFrame(frame);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      if (innerFrame !== undefined) {
+        window.cancelAnimationFrame(innerFrame);
+      }
+    };
   }, [
     autoCenter,
     filteredServices,
+    edges.length,
     flowInstance,
     focusedServiceId,
+    graphContentSignature,
     graphViewMode,
     nodes,
     query,
