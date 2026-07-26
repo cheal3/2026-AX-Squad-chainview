@@ -1068,7 +1068,6 @@ function RelationMap({
             initialFitView
             initialFitZoom={0.28}
             initialRelationDepth={2}
-            initialServiceId={selectedServiceId}
             onSelectInfraNode={onSelectInfraNode}
             onSelectService={onSelectService}
             serviceFilter={serviceFilter}
@@ -1093,7 +1092,6 @@ function RelationMap({
             highlightServiceId={selectedServiceId}
             initialFitView
             initialRelationDepth={2}
-            initialServiceId={selectedServiceId}
             legendPlacement="top-left"
             modeTogglePlacement="bottom-center"
             onSelectInfraNode={onSelectInfraNode}
