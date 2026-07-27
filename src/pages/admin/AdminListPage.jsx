@@ -22,6 +22,8 @@ const adminMenuMetaByKey = {
 };
 
 const groupRoleOptions = ["정담당", "부담당", "검토자", "승인자", "참조"];
+const groupMemberStatsCache = new Map();
+const groupMemberStatsInFlight = new Map();
 
 function getMenuMeta(menu) {
   return adminMenuMetaByKey[menu] || { section: "서비스", label: "화면", icon: "📄" };
@@ -34,6 +36,7 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
   const [selectedOwner, setSelectedOwner] = useState(null);
   const [adminModal, setAdminModal] = useState(null);
   const [groupMemberModal, setGroupMemberModal] = useState(null);
+  const [groupMemberStatsByGroupId, setGroupMemberStatsByGroupId] = useState({});
   const [keyword, setKeyword] = useState("");
   const [selectedKeys, setSelectedKeys] = useState([]);
   const lastRealtimeQueryRef = useRef("");
@@ -97,6 +100,43 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
     setKeyword("");
     setSelectedKeys([]);
   }, [menu]);
+
+  useEffect(() => {
+    if (menu !== "groups" || !portalData.remoteApi.enabled) {
+      return undefined;
+    }
+
+    const groupIds = portalData.groups
+      .map(groupRecordId)
+      .filter((groupId) => groupId && !groupMemberStatsByGroupId[groupId]);
+    const missingGroupIds = Array.from(new Set(groupIds)).filter((groupId) => {
+      const group = portalData.groups.find((item) => groupRecordId(item) === groupId);
+      return groupMemberCountFromRecord(group) === 0;
+    });
+    if (!missingGroupIds.length) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    loadGroupMemberStatsBatch(missingGroupIds)
+      .then((entries) => {
+        if (cancelled) return;
+        setGroupMemberStatsByGroupId((current) => {
+          const next = { ...current };
+          entries.forEach(([groupId, stats]) => {
+            next[groupId] = stats;
+          });
+          return next;
+        });
+      })
+      .catch((error) => {
+        console.warn("[ChainView API] group member count load failed", error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [menu, portalData.groups, portalData.remoteApi.enabled, groupMemberStatsByGroupId]);
 
   const configs = {
     services: {
@@ -289,7 +329,12 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
       columns: ["groupId", "groupCode", "그룹명", "분류", "구성원", "설명"],
       rows: portalData.groups.map((group) => {
         const members = groupMembersForGroup(group, portalData.users);
-        const memberCount = groupMemberCount(group, portalData.users);
+        const groupId = groupRecordId(group);
+        const memberCount = groupMemberCount(
+          group,
+          portalData.users,
+          groupId ? groupMemberStatsByGroupId[groupId] : null
+        );
         return {
           key: recordKey(group, "groupId", "groupCode"),
           record: group,
@@ -926,18 +971,95 @@ function groupMembersForGroup(group, users = []) {
   });
 }
 
-function groupMemberCount(group, users = []) {
+function groupRecordId(group) {
+  return Number(field(group, "groupId", field(group, "id", 0))) || 0;
+}
+
+function groupMemberCountFromRecord(group) {
+  return Number(
+    field(
+      group,
+      "memberCount",
+      field(
+        group,
+        "membersCount",
+        field(
+          group,
+          "userCount",
+          field(group, "memberUserCount", field(group, "groupMemberCount", 0))
+        )
+      )
+    )
+  ) || 0;
+}
+
+function groupMemberCount(group, users = [], stats = null) {
+  if (stats && Number.isFinite(Number(stats.count))) {
+    return stats.count;
+  }
   const explicitMemberIds = Array.isArray(group?.groupMemberUserIds)
     ? group.groupMemberUserIds.map((userId) => String(userId).trim()).filter(Boolean)
     : [];
   if (explicitMemberIds.length) {
     return new Set(explicitMemberIds).size;
   }
-  const apiCount = Number(field(group, "memberCount", 0)) || 0;
+  const apiCount = groupMemberCountFromRecord(group);
   if (apiCount) {
     return apiCount;
   }
   return groupMembersForGroup(group, users).length;
+}
+
+async function loadGroupMemberStats(groupId) {
+  if (groupMemberStatsCache.has(groupId)) {
+    return groupMemberStatsCache.get(groupId);
+  }
+  if (groupMemberStatsInFlight.has(groupId)) {
+    return groupMemberStatsInFlight.get(groupId);
+  }
+  const request = chainViewApi.ownership.groups.members(groupId)
+    .then((members) => {
+      const memberRows = Array.isArray(members)
+        ? members.filter((member) => member && typeof member === "object")
+        : [];
+      const stats = {
+        count: memberRows.length,
+        userIds: Array.from(
+          new Set(
+            memberRows
+              .map((member) => String(groupMemberUserId(member)).trim())
+              .filter(Boolean)
+          )
+        ),
+      };
+      groupMemberStatsCache.set(groupId, stats);
+      return stats;
+    })
+    .catch((error) => {
+      console.warn("[ChainView API] group member stats load failed", error);
+      const stats = { count: 0, userIds: [] };
+      groupMemberStatsCache.set(groupId, stats);
+      return stats;
+    })
+    .finally(() => {
+      groupMemberStatsInFlight.delete(groupId);
+    });
+  groupMemberStatsInFlight.set(groupId, request);
+  return request;
+}
+
+async function loadGroupMemberStatsBatch(groupIds) {
+  const entries = [];
+  const queue = [...groupIds];
+  const workers = Array.from({ length: Math.min(4, queue.length) }, async () => {
+    while (queue.length) {
+      const groupId = queue.shift();
+      const stats = await loadGroupMemberStats(groupId);
+      entries.push([groupId, stats]);
+    }
+  });
+  await Promise.all(workers);
+  return entries;
 }
 
 async function syncGroupMembers({ currentGroup, groupCode, groupId, groupName, groupRole = "", memberUserIds, portalData }) {
