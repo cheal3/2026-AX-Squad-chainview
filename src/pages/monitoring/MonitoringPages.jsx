@@ -837,6 +837,12 @@ export function IncidentDetailPage() {
     owners: incidentOwners,
     service,
   });
+  const ownerHistoryRows = buildIncidentOwnerHistoryRows({
+    incident,
+    notificationRows,
+    owners: incidentOwners,
+    service,
+  });
   const successfulNotificationCount = notificationRows.filter((row) => row.status === "성공").length;
 
   useEffect(() => {
@@ -1125,15 +1131,36 @@ export function IncidentDetailPage() {
 
         {activeTab === "owners" ? (
           <article className="incident-detail__card incident-detail__tab-card" role="tabpanel">
-            <h2>👥 담당자 (SERVICE_OWNER)</h2>
-            <div className="incident-detail__owner-grid">
-              {incidentOwners.length ? incidentOwners.map((owner) => (
-                <div className="incident-detail__owner" key={owner.id}>
-                  <b>{owner.name.slice(0, 1)}</b>
-                  <span>{owner.name} · {owner.role}<small>{owner.organization}{owner.email ? ` · ${owner.email}` : ""}</small></span>
-                  <em title={owner.email || "이메일 미등록"}>✉</em>
+            <div className="incident-detail__card-head">
+              <h2>👥 담당자 (SERVICE_OWNER)</h2>
+              <span>장애 담당자 이력 포함</span>
+            </div>
+            <div className="incident-detail__owner-layout">
+              <div className="incident-detail__owner-grid">
+                {incidentOwners.length ? incidentOwners.map((owner) => (
+                  <div className="incident-detail__owner" key={owner.id}>
+                    <b>{owner.name.slice(0, 1)}</b>
+                    <span>{owner.name} · {owner.role}<small>{owner.organization}{owner.email ? ` · ${owner.email}` : ""}</small></span>
+                    <em title={owner.email || "이메일 미등록"}>✉</em>
+                  </div>
+                )) : <div className="incident-detail__empty">등록된 서비스 담당자가 없습니다.</div>}
+              </div>
+              <div className="incident-detail__owner-history">
+                <h3>장애 담당자 이력</h3>
+                <div className="incident-detail__owner-history-list incident-detail__scroll-area">
+                  {ownerHistoryRows.map((row) => (
+                    <div className="incident-detail__owner-history-row" key={`${row.time}-${row.stage}-${row.owner}`}>
+                      <time>{row.time}</time>
+                      <span className={`is-${row.tone}`}>{row.stage}</span>
+                      <div>
+                        <strong>{row.owner}</strong>
+                        <p>{row.action}</p>
+                      </div>
+                      <em>{row.status}</em>
+                    </div>
+                  ))}
                 </div>
-              )) : <div className="incident-detail__empty">등록된 서비스 담당자가 없습니다.</div>}
+              </div>
             </div>
           </article>
         ) : null}
@@ -1266,6 +1293,62 @@ function buildIncidentNotificationRows({
       title: `[${severityLabelFor(severity)}] ${incident?.title || `${serviceName} 인시던트`}`,
     };
   });
+}
+
+function buildIncidentOwnerHistoryRows({
+  incident,
+  notificationRows = [],
+  owners = [],
+  service,
+}) {
+  const startedAt = String(incident?.startedAt || incident?.occurredAt || "");
+  const serviceName = service?.serviceName || incident?.targetCode || "대상 서비스";
+  const primaryOwner = owners[0];
+  const backupOwner = owners[1];
+  const rows = [
+    {
+      action: `${serviceName} 장애 접수 후 담당자/담당그룹을 조회했습니다.`,
+      owner: "SYSTEM",
+      stage: "담당 조회",
+      status: owners.length ? `${owners.length}명 확인` : "미등록",
+      time: formatIncidentProgressTime(startedAt, 0),
+      tone: owners.length ? "success" : "warn",
+    },
+    {
+      action: primaryOwner
+        ? `${primaryOwner.role || "주담당"}에게 1차 알림을 발송했습니다.`
+        : "주담당 미등록으로 기본 운영 수신자에게 알림을 발송했습니다.",
+      owner: primaryOwner?.name || "운영 관제",
+      stage: "1차 알림",
+      status: notificationRows[0]?.status || "대기",
+      time: notificationRows[0]?.sentAt || formatIncidentProgressTime(startedAt, 1),
+      tone: notificationRows[0]?.status === "성공" ? "success" : "warn",
+    },
+  ];
+
+  if (backupOwner || notificationRows[1]) {
+    rows.push({
+      action: backupOwner
+        ? `${backupOwner.role || "백업 담당"}에게 후속 확인을 요청했습니다.`
+        : "보조 수신자에게 장애 알림을 전파했습니다.",
+      owner: backupOwner?.name || notificationRows[1]?.recipient || "보조 수신자",
+      stage: "에스컬레이션",
+      status: notificationRows[1]?.status || "진행",
+      time: notificationRows[1]?.sentAt || formatIncidentProgressTime(startedAt, 3),
+      tone: notificationRows[1]?.status === "성공" ? "success" : "info",
+    });
+  }
+
+  rows.push({
+    action: "장애 대응 현황과 알림 수신 상태를 인시던트 상세에 기록했습니다.",
+    owner: incident?.updatedBy || incident?.createdBy || "SYSTEM",
+    stage: "이력 기록",
+    status: incident?.incidentStatusCode === "RESOLVED" ? "종료" : "진행중",
+    time: formatIncidentProgressTime(startedAt, 5),
+    tone: incident?.incidentStatusCode === "RESOLVED" ? "success" : "info",
+  });
+
+  return rows;
 }
 
 function buildRelationImpactedServices(service, services = [], relations = []) {

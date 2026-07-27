@@ -56,6 +56,10 @@ export function StatisticsPage({ activeMenu = "analysis-statistics", sectionLabe
     () => buildTechStackRows(portalData.techStacks, serviceById),
     [portalData.techStacks, serviceById]
   );
+  const techStackExportRows = useMemo(
+    () => buildTechStackExportRows(portalData.techStacks, serviceById),
+    [portalData.techStacks, serviceById]
+  );
   const techTypeOptions = useMemo(
     () => Array.from(new Set(techStackRows.map((row) => row.typeLabel))).filter(Boolean).sort((a, b) => a.localeCompare(b)),
     [techStackRows]
@@ -70,6 +74,17 @@ export function StatisticsPage({ activeMenu = "analysis-statistics", sectionLabe
       return matchesType && matchesKeyword;
     }),
     [techSearch, techStackRows, techTypeFilter]
+  );
+  const filteredTechStackExportRows = useMemo(
+    () => techStackExportRows.filter((row) => {
+      const matchesType = techTypeFilter === "all" || row.typeLabel === techTypeFilter;
+      const matchesKeyword = matchesSearchText(
+        searchableText(row.serviceId, row.serviceName, row.category, row.typeLabel, row.techName, row.version, row.vendor),
+        techSearch
+      );
+      return matchesType && matchesKeyword;
+    }),
+    [techSearch, techStackExportRows, techTypeFilter]
   );
   const techTypeStats = topEntries(countBy(techStackRows, (row) => row.typeLabel), 5);
   const topTechStats = techStackRows
@@ -259,7 +274,7 @@ export function StatisticsPage({ activeMenu = "analysis-statistics", sectionLabe
                 <div className="statistics-tech-list__head">
                   <div>
                     <h2>등록된 기술스택 목록</h2>
-                    <span>총 {filteredTechStackRows.length}건</span>
+                    <span>총 {filteredTechStackRows.length}건 · 다운로드 {filteredTechStackExportRows.length}행</span>
                   </div>
                   <div className="statistics-tech-list__tools">
                     <label className="statistics-search-field">
@@ -275,7 +290,7 @@ export function StatisticsPage({ activeMenu = "analysis-statistics", sectionLabe
                       <option value="all">전체 유형</option>
                       {techTypeOptions.map((type) => <option key={type} value={type}>{type}</option>)}
                     </select>
-                    <button className="btn" type="button" onClick={() => downloadTechStackCsv(filteredTechStackRows)}>
+                    <button className="btn" type="button" onClick={() => downloadTechStackCsv(filteredTechStackExportRows)}>
                       <Download size={15} aria-hidden="true" /> 엑셀 다운로드
                     </button>
                   </div>
@@ -667,6 +682,33 @@ function buildTechStackRows(techStacks = [], serviceById = new Map()) {
     .sort((a, b) => b.serviceCount - a.serviceCount || a.name.localeCompare(b.name) || a.version.localeCompare(b.version));
 }
 
+function buildTechStackExportRows(techStacks = [], serviceById = new Map()) {
+  return techStacks
+    .map((techStack, index) => {
+      const service = serviceById.get(Number(techStack.serviceId));
+      const typeLabel =
+        compactText(techStack.techTypeName) ||
+        codeLabels.techType?.[techStack.techTypeCode] ||
+        compactText(techStack.techTypeCode) ||
+        "기타";
+      return {
+        key: `${techStack.techStackId ?? index}-${techStack.serviceId ?? "service"}`,
+        category: service?.categoryPath?.join(" > ") || "-",
+        serviceId: Number(techStack.serviceId) || service?.serviceId || "",
+        serviceName: service?.serviceName || service?.serviceCode || "서비스 미지정",
+        techName: compactText(techStack.techName) || "기술명 미등록",
+        typeLabel,
+        vendor: compactText(techStack.vendorName) || inferTechVendor(techStack.techName),
+        version: compactText(techStack.versionText) || "-",
+      };
+    })
+    .sort((a, b) =>
+      String(a.serviceName).localeCompare(String(b.serviceName), "ko", { numeric: true }) ||
+      String(a.techName).localeCompare(String(b.techName), "ko", { numeric: true }) ||
+      String(a.version).localeCompare(String(b.version), "ko", { numeric: true })
+    );
+}
+
 function buildTechVersionStats(rows = []) {
   const preferredNames = ["Java", "Spring Boot", "MySQL"];
   const grouped = new Map();
@@ -729,23 +771,22 @@ function formatDateText(value) {
 }
 
 function downloadTechStackCsv(rows) {
-  const headers = ["기술명", "유형", "카테고리", "버전", "벤더", "설명", "등록일", "사용 서비스 수"];
+  const headers = ["서비스ID", "서비스명", "카테고리", "기술유형", "기술명", "버전", "벤더"];
   const body = rows.map((row) => [
-    row.name,
-    row.typeLabel,
+    row.serviceId,
+    row.serviceName,
     row.category,
+    row.typeLabel,
+    row.techName,
     row.version,
     row.vendor,
-    row.description,
-    row.registeredAt,
-    row.serviceCount,
   ]);
   const csv = [headers, ...body].map((cells) => cells.map(csvCell).join(",")).join("\n");
   const blob = new Blob([`\ufeff${csv}`], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = "chainview-tech-stacks.csv";
+  link.download = "기술스택-버전-현황.csv";
   link.click();
   URL.revokeObjectURL(url);
 }

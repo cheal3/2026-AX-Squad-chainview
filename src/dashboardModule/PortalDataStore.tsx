@@ -62,6 +62,11 @@ type NewServerInput = Pick<
   | "osVersion"
   | "statusCode"
   | "description"
+  | "infraNodeId"
+  | "infraNodeCode"
+  | "infraNodeName"
+  | "serverRoleCode"
+  | "serverRoleName"
 >;
 
 type NewServiceInput = {
@@ -1797,6 +1802,11 @@ function toServerPayload(input: NewServerInput) {
     osVersion: input.osVersion,
     statusCode: input.statusCode,
     description: input.description,
+    infraNodeId: input.infraNodeId,
+    infraNodeCode: input.infraNodeCode,
+    infraNodeName: input.infraNodeName,
+    serverRoleCode: input.serverRoleCode,
+    serverRoleName: input.serverRoleName,
   };
 }
 
@@ -1903,11 +1913,19 @@ function mapServerFromRemote(row: RemoteListRecord): ServerRecord {
     serverName: asRemoteString(row.serverName ?? row.name),
     hostName: asRemoteString(row.hostName ?? row.hostname),
     ipAddress: asRemoteString(row.ipAddress ?? row.ip),
-    envCode: knownRemoteCode(row.envCode, codeLabels.env, "PROD"),
+    envCode: knownRemoteCode(row.envCode, codeLabels.envType, "PROD"),
     osTypeCode: knownRemoteCode(row.osTypeCode, codeLabels.osType, "LINUX"),
     osVersion: asRemoteString(row.osVersion),
-    statusCode: knownRemoteCode(row.statusCode, codeLabels.serverStatus, "RUNNING"),
+    statusCode: knownRemoteCode(row.statusCode, codeLabels.serverStatus, "NORMAL"),
     description: asRemoteString(row.description),
+    infraNodeId:
+      asRemoteNumber(row.infraNodeId ?? row.nodeId ?? row.infrastructureNodeId) ||
+      undefined,
+    infraNodeCode: asRemoteString(row.infraNodeCode ?? row.nodeCode),
+    infraNodeName:
+      asRemoteString(row.infraNodeName ?? row.nodeName ?? row.infrastructureNodeName),
+    serverRoleCode: asRemoteString(row.serverRoleCode ?? row.roleCode),
+    serverRoleName: asRemoteString(row.serverRoleName ?? row.roleName),
     serviceCodes: serverServiceRefs.serviceCodes,
     serviceIds: serverServiceRefs.serviceIds,
     createdAt: asRemoteString(row.createdAt),
@@ -2098,6 +2116,10 @@ function toUserCreatePayload(input: RemoteListRecord) {
   return {
     employeeNo: asRemoteString(input.employeeNo),
     userName: asRemoteString(input.userName),
+    groupId: asRemoteNumber(input.groupId) || undefined,
+    groupCode: asRemoteString(input.groupCode),
+    groupName: asRemoteString(input.groupName),
+    groupRole: asRemoteString(input.groupRole),
     orgName: asRemoteString(input.orgName),
     departmentName: asRemoteString(input.departmentName),
     roleName: asRemoteString(input.roleName),
@@ -2110,6 +2132,10 @@ function toUserCreatePayload(input: RemoteListRecord) {
 function toUserUpdatePayload(input: RemoteListRecord) {
   return {
     userName: asRemoteString(input.userName),
+    groupId: asRemoteNumber(input.groupId) || undefined,
+    groupCode: asRemoteString(input.groupCode),
+    groupName: asRemoteString(input.groupName),
+    groupRole: asRemoteString(input.groupRole),
     orgName: asRemoteString(input.orgName),
     departmentName: asRemoteString(input.departmentName),
     roleName: asRemoteString(input.roleName),

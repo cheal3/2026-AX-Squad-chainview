@@ -31,7 +31,9 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
   const [ownerModal, setOwnerModal] = useState(null);
   const [selectedOwner, setSelectedOwner] = useState(null);
   const [adminModal, setAdminModal] = useState(null);
+  const [groupMemberModal, setGroupMemberModal] = useState(null);
   const [keyword, setKeyword] = useState("");
+  const [selectedGroupKey, setSelectedGroupKey] = useState("");
   const [selectedKeys, setSelectedKeys] = useState([]);
   const lastRealtimeQueryRef = useRef("");
   const serviceById = useMemo(
@@ -95,6 +97,20 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
     setSelectedKeys([]);
   }, [menu]);
 
+  useEffect(() => {
+    if (menu !== "groups") {
+      return;
+    }
+    const groupKeys = portalData.groups.map((group) => String(recordKey(group, "groupId", "groupCode")));
+    if (!groupKeys.length) {
+      setSelectedGroupKey("");
+      return;
+    }
+    if (!groupKeys.includes(String(selectedGroupKey))) {
+      setSelectedGroupKey(groupKeys[0]);
+    }
+  }, [menu, portalData.groups, selectedGroupKey]);
+
   const configs = {
     services: {
       actionLabel: "＋ 서비스 등록",
@@ -140,7 +156,7 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
     },
     servers: {
       actionLabel: "＋ 서버 등록",
-      columns: ["서버명", "호스트", "IP", "환경", "OS", "상태", "설명"],
+      columns: ["서버명", "호스트", "IP", "환경", "OS", "인프라 노드", "서버 역할", "상태", "설명"],
       rows: portalData.servers.map((server) => ({
         key: server.serverId,
         record: server,
@@ -154,6 +170,12 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
           codeLabels.osType[server.osTypeCode],
           server.osTypeCode,
           server.osVersion,
+          server.infraNodeName,
+          server.infraNodeCode,
+          server.infraNodeId,
+          codeLabels.serverRole?.[server.serverRoleCode],
+          server.serverRoleName,
+          server.serverRoleCode,
           codeLabels.serverStatus[server.statusCode],
           server.statusCode,
           server.description
@@ -164,6 +186,8 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
           server.ipAddress,
           codeLabels.envType[server.envCode] || server.envCode,
           `${codeLabels.osType[server.osTypeCode] || server.osTypeCode} ${server.osVersion}`,
+          server.infraNodeName || server.infraNodeCode || (server.infraNodeId ? `NODE-${server.infraNodeId}` : "-"),
+          server.serverRoleName || codeLabels.serverRole?.[server.serverRoleCode] || server.serverRoleCode || "-",
           codeLabels.serverStatus[server.statusCode] || server.statusCode,
           server.description || "-",
         ],
@@ -275,23 +299,35 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
     },
     groups: {
       actionLabel: "＋ 그룹 등록",
-      columns: ["groupId", "groupCode", "그룹명", "설명"],
-      rows: portalData.groups.map((group) => ({
-        key: recordKey(group, "groupId", "groupCode"),
-        record: group,
-        searchText: adminSearchText(
-          field(group, "groupId", ""),
-          field(group, "groupCode", ""),
-          field(group, "groupName", ""),
-          field(group, "description", "")
-        ),
-        cells: [
-          <code>{field(group, "groupId")}</code>,
-          <code>{field(group, "groupCode")}</code>,
-          <b>{field(group, "groupName")}</b>,
-          field(group, "description"),
-        ],
-      })),
+      columns: ["groupId", "groupCode", "그룹명", "분류", "구성원", "배포 서버", "설명"],
+      rows: portalData.groups.map((group) => {
+        const members = groupMembersForGroup(group, portalData.users);
+        const servers = groupServerIds(group)
+          .map((serverId) => portalData.servers.find((server) => String(server.serverId) === String(serverId))?.serverName)
+          .filter(Boolean);
+        return {
+          key: recordKey(group, "groupId", "groupCode"),
+          record: group,
+          searchText: adminSearchText(
+            field(group, "groupId", ""),
+            field(group, "groupCode", ""),
+            field(group, "groupName", ""),
+            groupCategoryLabel(group),
+            members.map((user) => field(user, "userName", "")),
+            servers,
+            field(group, "description", "")
+          ),
+          cells: [
+            <code>{field(group, "groupId")}</code>,
+            <code>{field(group, "groupCode")}</code>,
+            <b>{field(group, "groupName")}</b>,
+            groupCategoryLabel(group),
+            `${members.length || Number(field(group, "memberCount", 0))}명`,
+            servers.length ? servers.join(", ") : "-",
+            field(group, "description"),
+          ],
+        };
+      }),
     },
     categories: {
       actionLabel: "＋ 분류 등록",
@@ -455,6 +491,29 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
 
     openOwnerModal("create", { serviceId: row.record.serviceId, lockedService: true });
   };
+  const selectedGroupRow =
+    menu === "groups"
+      ? filteredRows.find((row) => String(row.key) === String(selectedGroupKey)) ??
+        filteredRows[0] ??
+        config.rows[0] ??
+        null
+      : null;
+  const selectedGroup = selectedGroupRow?.record ?? null;
+  const selectedGroupMembers = selectedGroup
+    ? groupMembersForGroup(selectedGroup, portalData.users)
+    : [];
+  const handleRemoveGroupMember = (user) => {
+    const userId = Number(field(user, "userId", 0));
+    if (!userId) return;
+    portalData.updateUser(userId, {
+      ...user,
+      active: String(field(user, "activeYn", field(user, "active", "Y"))).toUpperCase() !== "N",
+      groupId: null,
+      groupCode: "",
+      groupName: "",
+      groupRole: "",
+    });
+  };
 
   return (
     <>
@@ -481,93 +540,114 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
         </div>
       </div>
 
-      <div className="toolbar">
-        <div className="search">🔍<input type="text" value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder={`${meta.label} 검색...`} /></div>
-        <div className="right"><button className="btn btn--ghost btn--sm" onClick={resetList} type="button">초기화</button></div>
-      </div>
+      {menu === "groups" ? (
+        <GroupManagementPanel
+          groups={filteredRows}
+          keyword={keyword}
+          members={selectedGroupMembers}
+          onAddMember={() => selectedGroup ? setGroupMemberModal({ group: selectedGroup }) : null}
+          onDeleteGroup={() => selectedGroup ? openAdminModal("delete", { record: selectedGroup }) : null}
+          onEditGroup={() => selectedGroup ? openAdminModal("edit", { record: selectedGroup }) : null}
+          onKeywordChange={setKeyword}
+          onRemoveMember={handleRemoveGroupMember}
+          onReset={resetList}
+          onSelectGroup={(row) => setSelectedGroupKey(String(row.key))}
+          selectedGroup={selectedGroup}
+          selectedGroupKey={selectedGroupRow ? String(selectedGroupRow.key) : ""}
+          servers={portalData.servers}
+          users={portalData.users}
+        />
+      ) : (
+        <>
+          <div className="toolbar">
+            <div className="search">🔍<input type="text" value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder={`${meta.label} 검색...`} /></div>
+            <div className="right"><button className="btn btn--ghost btn--sm" onClick={resetList} type="button">초기화</button></div>
+          </div>
 
-      <div className="card">
-        <table className="tbl">
-          <thead>
-            <tr>
-              <th className="col-check"><input type="checkbox" className="chk" checked={isAllChecked} onChange={(event) => toggleAllRows(event.target.checked)} /></th>
-              {config.columns.map((column) => <th key={column}>{column}</th>)}
-              <th className="col-actions">관리</th>
-            </tr>
-          </thead>
-          <tbody>
-            {isTableLoading ? (
-              <tr>
-                <td colSpan={config.columns.length + 2}>
-                  <div className="inline-data-loader" role="status" aria-live="polite">
-                    <span className="portal-initial-loader__ring" aria-hidden="true" />
-                    <strong>목록을 불러오는 중입니다.</strong>
-                  </div>
-                </td>
-              </tr>
-            ) : null}
-            {!isTableLoading && filteredRows.map((row) => (
-              <tr className={row.onClick ? "is-clickable-incident" : undefined} key={row.key} onClick={row.onClick}>
-                <td className="col-check"><input className="chk" checked={selectedKeys.includes(String(row.key))} onChange={(event) => toggleRow(row.key, event.target.checked)} onClick={(event) => event.stopPropagation()} type="checkbox" /></td>
-                {row.cells.map((cell, index) => <td key={index}>{cell}</td>)}
-                <td className="col-actions">
-                  {config.readOnly ? (
-                    <span className="pill pill--gray">조회</span>
-                  ) : (
-                    <div className="row-actions">
-                      <button
-                        className="ibtn"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          handleEditRow(row);
-                        }}
-                        type="button"
-                        title="수정"
-                      >
-                        ✏️
-                      </button>
-                      {menu === "services" ? (
-                        <button
-                          aria-label={row.hasOwner ? "담당자 관리" : "담당자 등록"}
-                          className={`ibtn ibtn--owner ${row.hasOwner ? "is-registered" : "is-empty"}`}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            handleOwnerAction(row);
-                          }}
-                          title={row.hasOwner ? "담당자 관리" : "담당자 등록"}
-                          type="button"
-                        >
-                          <svg className="owner-status-icon" viewBox="0 0 24 22" aria-hidden="true">
-                            <path
-                              className="owner-status-icon__shape"
-                              d="M9.8 10.7c3.1 0 5.7 2.5 5.7 5.6V19H1.5v-2.7c0-3.1 2.6-5.6 5.7-5.6h2.6Zm-1.3-9C11 1.7 13 3.6 13 6s-2 4.3-4.5 4.3S4 8.4 4 6s2-4.3 4.5-4.3Zm9.6 10.1c2.4 0 4.4 2 4.4 4.4V19h-5.3v-2.7c0-2-.8-3.8-2-5.1.4.4.9.6 1.4.6h1.5Zm-.7-8.6c2 0 3.5 1.5 3.5 3.4S19.4 10 17.4 10 14 8.5 14 6.6s1.5-3.4 3.4-3.4Z"
-                            />
-                          </svg>
-                        </button>
-                      ) : null}
-                      <button
-                        className="ibtn ibtn--danger"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          handleDeleteRow(row);
-                        }}
-                        type="button"
-                        title="삭제"
-                      >
-                        🗑
-                      </button>
-                    </div>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <div className="pager">
-          <div className="pager__info">{isTableLoading ? "데이터 조회 중" : `전체 ${filteredRows.length}건 · 1-${filteredRows.length} / 1 페이지 · 선택 ${selectedKeys.filter((key) => filteredRowKeys.includes(key)).length}건`}</div>
-          <div className="pager__nav"><button disabled>‹</button><button className="is-on">1</button><button disabled>›</button></div>
-        </div>
-      </div>
+          <div className="card">
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th className="col-check"><input type="checkbox" className="chk" checked={isAllChecked} onChange={(event) => toggleAllRows(event.target.checked)} /></th>
+                  {config.columns.map((column) => <th key={column}>{column}</th>)}
+                  <th className="col-actions">관리</th>
+                </tr>
+              </thead>
+              <tbody>
+                {isTableLoading ? (
+                  <tr>
+                    <td colSpan={config.columns.length + 2}>
+                      <div className="inline-data-loader" role="status" aria-live="polite">
+                        <span className="portal-initial-loader__ring" aria-hidden="true" />
+                        <strong>목록을 불러오는 중입니다.</strong>
+                      </div>
+                    </td>
+                  </tr>
+                ) : null}
+                {!isTableLoading && filteredRows.map((row) => (
+                  <tr className={row.onClick ? "is-clickable-incident" : undefined} key={row.key} onClick={row.onClick}>
+                    <td className="col-check"><input className="chk" checked={selectedKeys.includes(String(row.key))} onChange={(event) => toggleRow(row.key, event.target.checked)} onClick={(event) => event.stopPropagation()} type="checkbox" /></td>
+                    {row.cells.map((cell, index) => <td key={index}>{cell}</td>)}
+                    <td className="col-actions">
+                      {config.readOnly ? (
+                        <span className="pill pill--gray">조회</span>
+                      ) : (
+                        <div className="row-actions">
+                          <button
+                            className="ibtn"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleEditRow(row);
+                            }}
+                            type="button"
+                            title="수정"
+                          >
+                            ✏️
+                          </button>
+                          {menu === "services" ? (
+                            <button
+                              aria-label={row.hasOwner ? "담당자 관리" : "담당자 등록"}
+                              className={`ibtn ibtn--owner ${row.hasOwner ? "is-registered" : "is-empty"}`}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleOwnerAction(row);
+                              }}
+                              title={row.hasOwner ? "담당자 관리" : "담당자 등록"}
+                              type="button"
+                            >
+                              <svg className="owner-status-icon" viewBox="0 0 24 22" aria-hidden="true">
+                                <path
+                                  className="owner-status-icon__shape"
+                                  d="M9.8 10.7c3.1 0 5.7 2.5 5.7 5.6V19H1.5v-2.7c0-3.1 2.6-5.6 5.7-5.6h2.6Zm-1.3-9C11 1.7 13 3.6 13 6s-2 4.3-4.5 4.3S4 8.4 4 6s2-4.3 4.5-4.3Zm9.6 10.1c2.4 0 4.4 2 4.4 4.4V19h-5.3v-2.7c0-2-.8-3.8-2-5.1.4.4.9.6 1.4.6h1.5Zm-.7-8.6c2 0 3.5 1.5 3.5 3.4S19.4 10 17.4 10 14 8.5 14 6.6s1.5-3.4 3.4-3.4Z"
+                                />
+                              </svg>
+                            </button>
+                          ) : null}
+                          <button
+                            className="ibtn ibtn--danger"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleDeleteRow(row);
+                            }}
+                            type="button"
+                            title="삭제"
+                          >
+                            🗑
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="pager">
+              <div className="pager__info">{isTableLoading ? "데이터 조회 중" : `전체 ${filteredRows.length}건 · 1-${filteredRows.length} / 1 페이지 · 선택 ${selectedKeys.filter((key) => filteredRowKeys.includes(key)).length}건`}</div>
+              <div className="pager__nav"><button disabled>‹</button><button className="is-on">1</button><button disabled>›</button></div>
+            </div>
+          </div>
+        </>
+      )}
       {ownerModal ? (
         <OwnerManagementModals
           modal={ownerModal}
@@ -584,6 +664,13 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
           portalData={portalData}
           serverById={serverById}
           serviceById={serviceById}
+        />
+      ) : null}
+      {groupMemberModal ? (
+        <GroupMemberModal
+          group={groupMemberModal.group}
+          onClose={() => setGroupMemberModal(null)}
+          portalData={portalData}
         />
       ) : null}
     </>
@@ -654,6 +741,31 @@ function normalizeSelectedServerIds(serverIds, fallbackServerId, servers) {
   ]));
 }
 
+function buildInfraNodeOptions(servers = []) {
+  const map = new Map();
+  servers.forEach((server) => {
+    const nodeId = Number(server.infraNodeId) || 0;
+    const nodeCode = String(server.infraNodeCode || "").trim();
+    const nodeName = String(server.infraNodeName || "").trim();
+    if (!nodeId && !nodeCode && !nodeName) return;
+    const value = String(nodeId || nodeCode || nodeName);
+    if (map.has(value)) return;
+    map.set(value, {
+      code: nodeCode,
+      label: `${nodeName || nodeCode || `인프라 노드 ${nodeId}`}${nodeCode ? ` · ${nodeCode}` : ""}`,
+      name: nodeName,
+      value,
+    });
+  });
+  return [...map.values()].sort((a, b) => a.label.localeCompare(b.label, "ko", { numeric: true }));
+}
+
+function findInfraNodeOption(servers = [], value) {
+  const normalized = String(value || "").trim();
+  if (!normalized) return null;
+  return buildInfraNodeOptions(servers).find((option) => String(option.value) === normalized) ?? null;
+}
+
 function deploymentServerSummary(service, deployments, serverById) {
   const serverIds = serviceDeploymentRows(service, deployments)
     .map((deployment) => Number(deployment.serverId))
@@ -718,6 +830,271 @@ function downloadAdminCsv(filename, columns, rows) {
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+}
+
+function GroupManagementPanel({
+  groups,
+  keyword,
+  members,
+  onAddMember,
+  onDeleteGroup,
+  onEditGroup,
+  onKeywordChange,
+  onRemoveMember,
+  onReset,
+  onSelectGroup,
+  selectedGroup,
+  selectedGroupKey,
+  servers,
+  users,
+}) {
+  const groupServers = selectedGroup
+    ? groupServerIds(selectedGroup).map((serverId) =>
+        servers.find((server) => String(server.serverId) === String(serverId))
+      ).filter(Boolean)
+    : [];
+
+  return (
+    <div className="group-management">
+      <aside className="group-management__list card">
+        <div className="group-management__list-head">
+          <div>
+            <h2>그룹 목록</h2>
+            <span>그룹을 선택하여 구성원을 관리합니다.</span>
+          </div>
+          <strong>{groups.length}건</strong>
+        </div>
+        <div className="group-management__search">
+          <Search size={15} aria-hidden="true" />
+          <input
+            value={keyword}
+            onChange={(event) => onKeywordChange(event.target.value)}
+            placeholder="그룹 코드, 이름, 설명 검색..."
+            type="text"
+          />
+          {keyword ? <button type="button" onClick={onReset}>초기화</button> : null}
+        </div>
+        <div className="group-management__items">
+          {groups.map((row) => {
+            const group = row.record;
+            const active = String(row.key) === String(selectedGroupKey);
+            const count = groupMembersForGroup(group, users).length || Number(field(group, "memberCount", 0));
+            return (
+              <button
+                className={`group-management__item ${active ? "is-active" : ""}`}
+                key={row.key}
+                onClick={() => onSelectGroup(row)}
+                type="button"
+              >
+                <span>
+                  <b>{field(group, "groupName", "그룹명 미등록")}</b>
+                  <small>{field(group, "description", "설명 없음")}</small>
+                  <em>{field(group, "groupCode", "-")}</em>
+                </span>
+                <strong>{count}명</strong>
+              </button>
+            );
+          })}
+          {!groups.length ? <div className="group-management__empty">검색된 그룹이 없습니다.</div> : null}
+        </div>
+      </aside>
+
+      <section className="group-management__detail card">
+        {selectedGroup ? (
+          <>
+            <div className="group-management__detail-head">
+              <div>
+                <h2>{field(selectedGroup, "groupName", "그룹명 미등록")}</h2>
+                <span>{field(selectedGroup, "description", "설명 없음")}</span>
+              </div>
+              <div className="group-management__actions">
+                <button className="btn" onClick={onEditGroup} type="button">✏️ 그룹 수정</button>
+                <button className="btn" onClick={onAddMember} type="button">👥 구성원 추가</button>
+                <button className="btn btn--danger" onClick={onDeleteGroup} type="button">🗑 그룹 삭제</button>
+              </div>
+            </div>
+            <div className="group-management__summary">
+              <div>
+                <span>그룹 코드</span>
+                <strong>{field(selectedGroup, "groupCode", "-")}</strong>
+              </div>
+              <div>
+                <span>구성원 수</span>
+                <strong>{members.length}명</strong>
+              </div>
+              <div>
+                <span>분류</span>
+                <strong>{groupCategoryLabel(selectedGroup)}</strong>
+              </div>
+              <div>
+                <span>배포 서버</span>
+                <strong>{groupServers.length}대</strong>
+              </div>
+            </div>
+            <div className="group-management__section">
+              <h3>구성원 목록</h3>
+              <div className="group-management__table-wrap">
+                <table className="tbl group-management__table">
+                  <thead>
+                    <tr>
+                      <th>사번</th>
+                      <th>이름</th>
+                      <th>조직</th>
+                      <th>부서</th>
+                      <th>역할</th>
+                      <th>그룹 내 역할</th>
+                      <th>활성 여부</th>
+                      <th>액션</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {members.length ? members.map((user) => (
+                      <tr key={recordKey(user, "userId", "employeeNo")}>
+                        <td><code>{field(user, "employeeNo", field(user, "userId", "-"))}</code></td>
+                        <td><b>{field(user, "userName", "-")}</b></td>
+                        <td>{field(user, "orgName", "-")}</td>
+                        <td>{field(user, "departmentName", "-")}</td>
+                        <td>{field(user, "roleName", "-")}</td>
+                        <td>{field(user, "groupRole", "정담당")}</td>
+                        <td>{yesNoPill(field(user, "activeYn", "Y"))}</td>
+                        <td><button className="ibtn ibtn--danger" onClick={() => onRemoveMember(user)} type="button">제거</button></td>
+                      </tr>
+                    )) : (
+                      <tr>
+                        <td colSpan={8}><div className="group-management__empty">등록된 구성원이 없습니다.</div></td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div className="group-management__section">
+              <h3>배포 정보</h3>
+              <div className="group-management__server-list">
+                {groupServers.length ? groupServers.map((server) => (
+                  <div className="group-management__server" key={server.serverId}>
+                    <b>{server.serverName}</b>
+                    <span>{server.hostName} · {server.ipAddress} · {codeLabels.envType[server.envCode] || server.envCode}</span>
+                  </div>
+                )) : <div className="group-management__empty">연결된 배포 서버가 없습니다. 그룹 수정에서 서버를 선택해주세요.</div>}
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="group-management__empty">그룹을 선택해주세요.</div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function GroupMemberModal({ group, onClose, portalData }) {
+  const [form, setForm] = useState(() => ({
+    groupRole: "정담당",
+    userId: String(portalData.users[0]?.userId ?? ""),
+  }));
+  const handleSubmit = () => {
+    const user = portalData.users.find((item) => String(item.userId) === String(form.userId));
+    if (!user) {
+      window.alert("사용자를 선택해주세요.");
+      return;
+    }
+    portalData.updateUser(Number(user.userId), {
+      ...user,
+      active: String(field(user, "activeYn", field(user, "active", "Y"))).toUpperCase() !== "N",
+      groupId: Number(field(group, "groupId", 0)) || null,
+      groupCode: field(group, "groupCode", ""),
+      groupName: field(group, "groupName", ""),
+      groupRole: form.groupRole.trim() || "구성원",
+    });
+    onClose();
+  };
+
+  return (
+    <ModalBackdrop onClose={onClose}>
+      <div className="modal" onClick={(event) => event.stopPropagation()}>
+        <div className="modal__head">
+          <h3>구성원 추가</h3>
+          <button className="close" onClick={onClose} type="button">×</button>
+        </div>
+        <div className="modal__body">
+          <div className="form-section">
+            <h4 className="form-section__title">"{field(group, "groupName", "그룹")}"에 사용자를 추가합니다.</h4>
+            <div className="form-grid">
+              <div className="form-row">
+                <label>사용자<span className="req">*</span></label>
+                <select value={form.userId} onChange={(event) => setForm((current) => ({ ...current, userId: event.target.value }))}>
+                  <option value="">선택하세요</option>
+                  {portalData.users.map((user) => (
+                    <option key={user.userId} value={user.userId}>{field(user, "employeeNo", "-")} {field(user, "userName", "-")} · {field(user, "departmentName", "-")}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-row">
+                <label>그룹 내 역할</label>
+                <input
+                  value={form.groupRole}
+                  onChange={(event) => setForm((current) => ({ ...current, groupRole: event.target.value }))}
+                  placeholder="업무에 사용할 역할명을 입력합니다."
+                  type="text"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="modal__foot">
+          <button className="btn" onClick={onClose} type="button">취소</button>
+          <button className="btn btn--primary" onClick={handleSubmit} type="button">추가</button>
+        </div>
+      </div>
+    </ModalBackdrop>
+  );
+}
+
+function groupMembersForGroup(group, users = []) {
+  const groupId = String(field(group, "groupId", "")).trim();
+  const groupCode = String(field(group, "groupCode", "")).trim();
+  const groupName = String(field(group, "groupName", "")).trim();
+  return users.filter((user) => {
+    const userGroupId = String(field(user, "groupId", "")).trim();
+    const userGroupCode = String(field(user, "groupCode", "")).trim();
+    const userGroupName = String(field(user, "groupName", "")).trim();
+    return (
+      (groupId && userGroupId === groupId) ||
+      (groupCode && userGroupCode === groupCode) ||
+      (groupName && userGroupName === groupName)
+    );
+  });
+}
+
+function groupServerIds(group) {
+  const raw =
+    group?.serverIds ??
+    group?.deploymentServerIds ??
+    group?.servers ??
+    group?.deploymentServers ??
+    [];
+  if (Array.isArray(raw)) {
+    return raw
+      .map((item) => Number(typeof item === "object" ? item.serverId : item))
+      .filter(Boolean)
+      .map(String);
+  }
+  return String(raw)
+    .split(",")
+    .map((item) => Number(item.trim()))
+    .filter(Boolean)
+    .map(String);
+}
+
+function groupCategoryLabel(group) {
+  const categoryPath =
+    group?.categoryPath ??
+    [group?.categoryL1, group?.categoryL2, group?.categoryL3].filter(Boolean);
+  if (Array.isArray(categoryPath) && categoryPath.length) {
+    return categoryPath.filter(Boolean).join(" > ");
+  }
+  return "-";
 }
 
 function isValidServiceCode(value) {
@@ -847,6 +1224,8 @@ function AdminRecordModal({ modal, onClose, portalData, serverById, serviceById 
       const hostName = requireValue(form.hostName, "hostname");
       const ipAddress = requireValue(form.ipAddress, "IP 주소");
       if (!serverName || !hostName || !ipAddress) return;
+      const infraNode = findInfraNodeOption(portalData.servers, form.infraNodeId);
+      const serverRoleCode = form.serverRoleCode || "WAS";
       const payload = {
         serverName,
         hostName,
@@ -855,6 +1234,11 @@ function AdminRecordModal({ modal, onClose, portalData, serverById, serviceById 
         osTypeCode: form.osTypeCode,
         osVersion: form.osVersion.trim(),
         statusCode: form.statusCode,
+        infraNodeId: Number(form.infraNodeId) || undefined,
+        infraNodeCode: infraNode?.code || form.infraNodeCode || "",
+        infraNodeName: infraNode?.name || form.infraNodeName || "",
+        serverRoleCode,
+        serverRoleName: codeLabels.serverRole?.[serverRoleCode] || form.serverRoleName || serverRoleCode,
         description: form.description.trim(),
       };
       if (isCreate) {
@@ -937,9 +1321,29 @@ function AdminRecordModal({ modal, onClose, portalData, serverById, serviceById 
       const groupCode = requireValue(form.groupCode, "groupCode");
       const groupName = requireValue(form.groupName, "그룹명");
       if (!groupCode || !groupName) return;
+      const categoryPath = buildSelectedCategoryPath(form, portalData.categories).filter(Boolean);
+      const selectedServerIds = Array.isArray(form.serverIds)
+        ? form.serverIds.map((serverId) => Number(serverId)).filter(Boolean)
+        : [];
+      const selectedServers = selectedServerIds.map((serverId) =>
+        portalData.servers.find((server) => Number(server.serverId) === serverId)
+      ).filter(Boolean);
       const payload = {
         groupCode,
         groupName,
+        categoryId: Number(form.categoryId || form.categoryL3Id || form.categoryL2Id || form.categoryL1Id) || undefined,
+        categoryPath,
+        categoryL1: categoryPath[0] || "",
+        categoryL2: categoryPath[1] || "",
+        categoryL3: categoryPath[2] || "",
+        serverIds: selectedServerIds,
+        deploymentServerIds: selectedServerIds,
+        servers: selectedServers.map((server) => ({
+          serverId: server.serverId,
+          serverName: server.serverName,
+          hostName: server.hostName,
+          ipAddress: server.ipAddress,
+        })),
         description: form.description.trim(),
       };
       if (isCreate) {
@@ -1045,7 +1449,7 @@ function AdminRecordModal({ modal, onClose, portalData, serverById, serviceById 
             />
           ) : null}
           {menu === "servers" ? (
-            <ServerAdminForm form={form} onChange={updateField} isEdit={isEdit} />
+            <ServerAdminForm form={form} onChange={updateField} isEdit={isEdit} servers={portalData.servers} />
           ) : null}
           {menu === "relations" ? (
             <RelationAdminForm form={form} onChange={updateField} services={portalData.services} serviceById={serviceById} isEdit={isEdit} />
@@ -1821,7 +2225,8 @@ function ServerMultiSelect({ servers, value, onChange }) {
   );
 }
 
-function ServerAdminForm({ form, onChange, isEdit }) {
+function ServerAdminForm({ form, onChange, isEdit, servers }) {
+  const infraNodeOptions = buildInfraNodeOptions(servers);
   return (
     <>
       <div className="form-section">
@@ -1848,6 +2253,24 @@ function ServerAdminForm({ form, onChange, isEdit }) {
         <div className="form-grid">
           <div className="form-row"><label>OS 유형 (OS_TYPE)<span className="req">*</span></label><CodeSelect labels={codeLabels.osType} value={form.osTypeCode} onChange={(value) => onChange("osTypeCode", value)} /></div>
           <div className="form-row"><label>OS 버전</label><input type="text" value={form.osVersion} onChange={(event) => onChange("osVersion", event.target.value)} placeholder="예: RHEL 8.9" /></div>
+        </div>
+      </div>
+      <div className="form-section">
+        <h4 className="form-section__title">서버 분류 정보</h4>
+        <div className="form-grid">
+          <div className="form-row">
+            <label>소속 인프라 노드<span className="req">*</span></label>
+            <select value={form.infraNodeId} onChange={(event) => onChange("infraNodeId", event.target.value)}>
+              <option value="">선택하세요</option>
+              {infraNodeOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="form-row">
+            <label>서버 역할<span className="req">*</span></label>
+            <CodeSelect labels={codeLabels.serverRole} value={form.serverRoleCode} onChange={(value) => onChange("serverRoleCode", value)} />
+          </div>
         </div>
       </div>
       <div className="form-section">
@@ -1957,15 +2380,91 @@ function RemoteAdminForm({ form, isEdit, menu, onChange, portalData }) {
   }
 
   if (menu === "groups") {
+    const categoryCatalog = buildCategoryCatalog(portalData.categories, portalData.services);
+    const selectedL1 = findCategoryOptionById(categoryCatalog.level1, form.categoryL1Id) ||
+      findCategoryOptionByName(categoryCatalog.level1, form.categoryL1);
+    const selectedL2 = findCategoryOptionById(categoryCatalog.level2, form.categoryL2Id) ||
+      findCategoryOptionByName(categoryCatalog.level2, form.categoryL2, selectedL1?.name);
+    const selectedL3 = findCategoryOptionById(categoryCatalog.level3, form.categoryL3Id) ||
+      findCategoryOptionByName(categoryCatalog.level3, form.categoryL3, selectedL2?.name, selectedL1?.name);
+    const level2Options = selectedL1 ? selectableChildCategoryOptions(categoryCatalog.level2, selectedL1) : [];
+    const level3Options = selectedL2 ? selectableChildCategoryOptions(categoryCatalog.level3, selectedL2, selectedL1) : [];
+    const members = isEdit ? groupMembersForGroup(form, portalData.users) : [];
+    const changeCategory = (level, option) => {
+      const nextName = option?.name ?? "";
+      const nextId = option?.id ? String(option.id) : "";
+      if (level === 1) {
+        onChange("categoryL1", nextName);
+        onChange("categoryL1Id", nextId);
+        onChange("categoryL2", "");
+        onChange("categoryL2Id", "");
+        onChange("categoryL3", "");
+        onChange("categoryL3Id", "");
+        onChange("categoryId", nextId);
+        return;
+      }
+      if (level === 2) {
+        onChange("categoryL2", nextName);
+        onChange("categoryL2Id", nextId);
+        onChange("categoryL3", "");
+        onChange("categoryL3Id", "");
+        onChange("categoryId", nextId || form.categoryL1Id);
+        return;
+      }
+      onChange("categoryL3", nextName);
+      onChange("categoryL3Id", nextId);
+      onChange("categoryId", nextId || form.categoryL2Id || form.categoryL1Id);
+    };
+
     return (
-      <div className="form-section">
-        <h4 className="form-section__title">그룹 정보</h4>
-        <div className="form-grid">
-          <div className="form-row"><label>groupCode<span className="req">*</span></label><input type="text" value={form.groupCode} onChange={(event) => onChange("groupCode", event.target.value.toUpperCase())} disabled={isEdit} /></div>
-          <div className="form-row"><label>그룹명<span className="req">*</span></label><input type="text" value={form.groupName} onChange={(event) => onChange("groupName", event.target.value)} /></div>
+      <>
+        <div className="form-section">
+          <h4 className="form-section__title">그룹 정보</h4>
+          <div className="form-grid">
+            <div className="form-row"><label>groupCode<span className="req">*</span></label><input type="text" value={form.groupCode} onChange={(event) => onChange("groupCode", event.target.value.toUpperCase())} disabled={isEdit} /></div>
+            <div className="form-row"><label>그룹명<span className="req">*</span></label><input type="text" value={form.groupName} onChange={(event) => onChange("groupName", event.target.value)} /></div>
+          </div>
+        </div>
+        <div className="form-section">
+          <h4 className="form-section__title">분류</h4>
+          <div className="form-grid">
+            <div className="form-row">
+              <label>대분류 (categoryL1)</label>
+              <select value={getCategoryOptionValue(selectedL1)} onChange={(event) => changeCategory(1, findCategoryOptionByValue(categoryCatalog.level1, event.target.value))}>
+                <option value="">선택</option>
+                {categoryCatalog.level1.map((option) => <option key={getCategoryOptionValue(option)} value={getCategoryOptionValue(option)}>{option.name}</option>)}
+              </select>
+            </div>
+            <div className="form-row"><label>중분류 (categoryL2)</label><SearchableCategorySelect disabled={!selectedL1 || !level2Options.length} options={level2Options} value={selectedL2?.name ?? form.categoryL2} onChange={(_value, option) => changeCategory(2, option)} placeholder={level2Options.length ? "검색 또는 선택하세요" : "등록된 중분류가 없습니다"} /></div>
+            <div className="form-row"><label>소분류 (categoryL3)</label><SearchableCategorySelect disabled={!selectedL2 || !level3Options.length} options={level3Options} value={selectedL3?.name ?? form.categoryL3} onChange={(_value, option) => changeCategory(3, option)} placeholder={level3Options.length ? "검색 또는 선택하세요" : "등록된 소분류가 없습니다"} /></div>
+          </div>
+        </div>
+        {isEdit ? (
+          <div className="form-section">
+            <h4 className="form-section__title">구성원 목록</h4>
+            <div className="group-member-preview">
+              {members.length ? members.map((user) => (
+                <span key={recordKey(user, "userId", "employeeNo")}>{field(user, "userName", "-")} · {field(user, "groupRole", "정담당")}</span>
+              )) : <em>등록된 구성원이 없습니다.</em>}
+            </div>
+          </div>
+        ) : null}
+        <div className="form-section">
+          <h4 className="form-section__title">배포 정보</h4>
+          <div className="form-row">
+            <label>서버 선택</label>
+            <ServerMultiSelect
+              servers={portalData.servers}
+              value={form.serverIds}
+              onChange={(value) => onChange("serverIds", value)}
+            />
+          </div>
+        </div>
+        <div className="form-section">
+          <h4 className="form-section__title">설명</h4>
           <div className="form-row full"><label>설명</label><textarea value={form.description} onChange={(event) => onChange("description", event.target.value)} /></div>
         </div>
-      </div>
+      </>
     );
   }
 
@@ -2083,6 +2582,11 @@ function buildAdminFormState(menu, record, portalData) {
       osTypeCode: record?.osTypeCode ?? "LINUX",
       osVersion: record?.osVersion ?? "",
       statusCode: record?.statusCode ?? "NORMAL",
+      infraNodeId: field(record, "infraNodeId", ""),
+      infraNodeCode: field(record, "infraNodeCode", ""),
+      infraNodeName: field(record, "infraNodeName", ""),
+      serverRoleCode: field(record, "serverRoleCode", "WAS"),
+      serverRoleName: field(record, "serverRoleName", ""),
       description: record?.description ?? "",
     };
   }
@@ -2125,9 +2629,22 @@ function buildAdminFormState(menu, record, portalData) {
   }
 
   if (menu === "groups") {
+    const rawCategoryPath = Array.isArray(record?.categoryPath)
+      ? record.categoryPath
+      : [record?.categoryL1, record?.categoryL2, record?.categoryL3].filter(Boolean);
+    const categorySelection = resolveCategorySelection(rawCategoryPath, portalData.categories, record?.categoryId ?? "");
+    const serverIds = groupServerIds(record);
     return {
       groupCode: field(record, "groupCode", ""),
       groupName: field(record, "groupName", ""),
+      categoryId: field(record, "categoryId", categorySelection.categoryId),
+      categoryL1: field(record, "categoryL1", categorySelection.categoryPath[0] ?? ""),
+      categoryL2: field(record, "categoryL2", categorySelection.categoryPath[1] ?? ""),
+      categoryL3: field(record, "categoryL3", categorySelection.categoryPath[2] ?? ""),
+      categoryL1Id: field(record, "categoryL1Id", categorySelection.categoryL1Id),
+      categoryL2Id: field(record, "categoryL2Id", categorySelection.categoryL2Id),
+      categoryL3Id: field(record, "categoryL3Id", categorySelection.categoryL3Id),
+      serverIds,
       description: field(record, "description", ""),
     };
   }

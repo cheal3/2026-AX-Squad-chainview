@@ -12,6 +12,15 @@ export const codeLabels = {
     MAINTENANCE: "점검중",
     INACTIVE: "비활성",
   },
+  serverRole: {
+    WEB_SERVER: "WEB SERVER",
+    WAS: "WEB APPLICATION SERVER",
+    DB_SERVER: "DATABASE SERVER",
+    BATCH_SERVER: "BATCH SERVER",
+    CACHE_SERVER: "CACHE SERVER",
+    MQ_SERVER: "MESSAGE QUEUE SERVER",
+    ETC: "ETC",
+  },
   envType: {
     PROD: "운영",
     STAGE: "스테이징",
