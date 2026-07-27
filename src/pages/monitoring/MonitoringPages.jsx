@@ -777,6 +777,8 @@ export function IncidentDetailPage() {
     .filter((impact) => impact.incidentId === incident?.incidentId)
     .map((impact) => services.find((item) => item.serviceId === impact.impactedServiceId))
     .filter(Boolean);
+  const relationImpactedServices = buildRelationImpactedServices(service, services, relations);
+  const displayImpactedServices = impactedServices.length ? impactedServices : relationImpactedServices;
   const relatedRelations = relations
     .filter(
       (relation) =>
@@ -823,7 +825,7 @@ export function IncidentDetailPage() {
     });
   const generatedProgressRows = buildIncidentProgressRows({
     deployments: recentDeploymentRows,
-    impactedServices,
+    impactedServices: displayImpactedServices,
     incident,
     owners: incidentOwners,
     service,
@@ -943,9 +945,9 @@ export function IncidentDetailPage() {
               </div>
               <div className="incident-detail__summary">
                 <b>title</b>
-                <p>{incident.title} · incidentType: 서비스 장애 · affectedServices: {impactedServices.length}</p>
+                <p>{incident.title} · incidentType: 서비스 장애 · affectedServices: {displayImpactedServices.length}</p>
               </div>
-              <p className="incident-detail__description">{incident.description || "등록된 인시던트 설명이 없습니다."}</p>
+              {incident.description ? <p className="incident-detail__description">{incident.description}</p> : null}
               <div className="incident-detail__progress">
                 <h3>진행상황</h3>
                 {generatedProgressRows.map(([time, message, actor], index) => (
@@ -1175,6 +1177,22 @@ function buildIncidentProgressRows({
   }
 
   return rows;
+}
+
+function buildRelationImpactedServices(service, services = [], relations = []) {
+  if (!service?.serviceId) {
+    return [];
+  }
+  const relatedIds = new Set();
+  relations.forEach((relation) => {
+    if (relation.sourceServiceId === service.serviceId && relation.targetServiceId) {
+      relatedIds.add(Number(relation.targetServiceId));
+    }
+    if (relation.targetServiceId === service.serviceId && relation.sourceServiceId) {
+      relatedIds.add(Number(relation.sourceServiceId));
+    }
+  });
+  return services.filter((item) => relatedIds.has(Number(item.serviceId)));
 }
 
 function formatIncidentProgressTime(startedAt, plusMinutes = 0) {
