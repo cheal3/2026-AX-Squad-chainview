@@ -821,6 +821,14 @@ export function IncidentDetailPage() {
         email: String(user?.email ?? ""),
       };
     });
+  const generatedProgressRows = buildIncidentProgressRows({
+    deployments: recentDeploymentRows,
+    impactedServices,
+    incident,
+    owners: incidentOwners,
+    service,
+    timelineRows,
+  });
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 1000);
@@ -938,6 +946,16 @@ export function IncidentDetailPage() {
                 <p>{incident.title} · incidentType: 서비스 장애 · affectedServices: {impactedServices.length}</p>
               </div>
               <p className="incident-detail__description">{incident.description || "등록된 인시던트 설명이 없습니다."}</p>
+              <div className="incident-detail__progress">
+                <h3>진행상황</h3>
+                {generatedProgressRows.map(([time, message, actor], index) => (
+                  <div className="incident-detail__progress-row" key={`${time}-${message}`}>
+                    <span>{time}</span>
+                    <p>{message}</p>
+                    <em>{actor}</em>
+                  </div>
+                ))}
+              </div>
             </article>
             <article className="incident-detail__card incident-detail__card--graph">
               <div className="incident-detail__card-head">
@@ -999,7 +1017,7 @@ export function IncidentDetailPage() {
               <span>인시던트 발생 이후 기록</span>
             </div>
             <div className="incident-detail__timeline incident-detail__scroll-area">
-              {timelineRows.length ? timelineRows.map(([time, message, actor], index) => (
+              {generatedProgressRows.length ? generatedProgressRows.map(([time, message, actor], index) => (
                 <div className="incident-detail__timeline-row" key={`${time}-${message}`}>
                   <span>{time}</span>
                   <i className={index < 2 ? "is-danger" : index < 4 ? "is-warn" : ""} />
@@ -1081,4 +1099,89 @@ function formatIncidentElapsed(startedAt, now = new Date()) {
   const seconds = elapsed % 60;
   const pad = (value) => String(value).padStart(2, "0");
   return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+}
+
+function buildIncidentProgressRows({
+  deployments = [],
+  impactedServices = [],
+  incident,
+  owners = [],
+  service,
+  timelineRows = [],
+}) {
+  if (timelineRows.length) {
+    return timelineRows;
+  }
+
+  const startedAt = String(incident?.startedAt || incident?.occurredAt || "");
+  const serviceName = service?.serviceName || incident?.targetCode || "대상 서비스";
+  const serviceCode = service?.serviceCode || incident?.targetCode || "-";
+  const primaryOwner = owners[0];
+  const backupOwner = owners[1];
+  const ownerLabel = primaryOwner
+    ? `${primaryOwner.name}${primaryOwner.organization ? ` (${primaryOwner.organization})` : ""}`
+    : "담당자/담당그룹 미등록";
+  const ownerContact = primaryOwner?.email ? ` · ${primaryOwner.email}` : "";
+  const backupLabel = backupOwner
+    ? `${backupOwner.name}${backupOwner.organization ? ` (${backupOwner.organization})` : ""}`
+    : null;
+  const affectedNames = impactedServices
+    .map((item) => item.serviceName || item.serviceCode)
+    .filter(Boolean)
+    .slice(0, 3);
+  const affectedLabel = impactedServices.length
+    ? `${affectedNames.join(", ")}${impactedServices.length > affectedNames.length ? ` 외 ${impactedServices.length - affectedNames.length}개` : ""}`
+    : "영향 서비스 없음";
+  const deploy = deployments[0];
+
+  const rows = [
+    [
+      formatIncidentProgressTime(startedAt, 0),
+      `${serviceName}(${serviceCode}) 장애가 접수되어 영향도 산출을 시작했습니다.`,
+      incident?.registeredBy || "SYSTEM",
+    ],
+    [
+      formatIncidentProgressTime(startedAt, 1),
+      `${ownerLabel}${ownerContact}에게 ${incident?.severityCode || "장애"} 알림을 발송했습니다.`,
+      "알림 전송",
+    ],
+    [
+      formatIncidentProgressTime(startedAt, 3),
+      `서비스 관계 기준 영향 서비스 ${impactedServices.length}건을 확인했습니다. 대상: ${affectedLabel}`,
+      "영향도 분석",
+    ],
+  ];
+
+  if (backupLabel) {
+    rows.push([
+      formatIncidentProgressTime(startedAt, 5),
+      `백업 담당 ${backupLabel}에게 후속 확인 요청을 전파했습니다.`,
+      "에스컬레이션",
+    ]);
+  }
+
+  if (deploy) {
+    rows.push([
+      formatIncidentProgressTime(startedAt, 7),
+      `최근 배포 이력(${deploy.title}, ${deploy.date})을 확인하고 장애 연관 여부를 점검 중입니다.`,
+      deploy.owner || "배포 확인",
+    ]);
+  } else {
+    rows.push([
+      formatIncidentProgressTime(startedAt, 7),
+      "최근 배포 이력은 확인되지 않았으며, 서비스 상태와 연계 구간을 우선 점검 중입니다.",
+      "운영 확인",
+    ]);
+  }
+
+  return rows;
+}
+
+function formatIncidentProgressTime(startedAt, plusMinutes = 0) {
+  const date = new Date(String(startedAt).includes("T") ? startedAt : String(startedAt).replace(" ", "T"));
+  if (Number.isNaN(date.getTime())) {
+    return "-";
+  }
+  date.setMinutes(date.getMinutes() + plusMinutes);
+  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 }
