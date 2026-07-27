@@ -215,10 +215,18 @@ function mergeGroupsWithMemberCounts(
   memberRows: RemoteRecord[]
 ) {
   const counts = new Map<number, number>();
+  const memberUserIdsByGroupId = new Map<number, number[]>();
   memberRows.forEach((member) => {
     const groupId = asNumber(member.groupId);
     if (groupId) {
       counts.set(groupId, (counts.get(groupId) ?? 0) + 1);
+      const userId = groupMembershipUserId(member);
+      if (userId) {
+        memberUserIdsByGroupId.set(groupId, [
+          ...(memberUserIdsByGroupId.get(groupId) ?? []),
+          userId,
+        ]);
+      }
     }
   });
 
@@ -227,6 +235,7 @@ function mergeGroupsWithMemberCounts(
     return {
       ...group,
       memberCount: counts.get(groupId) ?? asNumber(group.memberCount),
+      groupMemberUserIds: Array.from(new Set(memberUserIdsByGroupId.get(groupId) ?? [])),
     };
   });
 }

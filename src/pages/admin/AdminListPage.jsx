@@ -857,11 +857,18 @@ function groupMembersForGroup(group, users = []) {
   const groupId = String(field(group, "groupId", "")).trim();
   const groupCode = String(field(group, "groupCode", "")).trim();
   const groupName = String(field(group, "groupName", "")).trim();
+  const groupMemberUserIds = new Set(
+    (Array.isArray(group?.groupMemberUserIds) ? group.groupMemberUserIds : [])
+      .map((userId) => String(userId).trim())
+      .filter(Boolean)
+  );
   return users.filter((user) => {
     const userGroupId = String(field(user, "groupId", "")).trim();
     const userGroupCode = String(field(user, "groupCode", "")).trim();
     const userGroupName = String(field(user, "groupName", "")).trim();
+    const userId = String(field(user, "userId", "")).trim();
     return (
+      (userId && groupMemberUserIds.has(userId)) ||
       (groupId && userGroupId === groupId) ||
       (groupCode && userGroupCode === groupCode) ||
       (groupName && userGroupName === groupName)
@@ -900,27 +907,33 @@ async function syncGroupMembers({ currentGroup, groupCode, groupId, groupName, g
         }
       });
 
-      const jobs = [];
+      const addUserIds = [];
       selectedIds.forEach((userId) => {
         if (!remoteMemberByUserId.has(userId)) {
-          jobs.push(
-            chainViewApi.ownership.groups.addMember(normalizedGroupId, {
-              userId: Number(userId),
-              groupRole: groupRole || "구성원",
-            })
-          );
+          addUserIds.push(userId);
         }
       });
+      const removeMemberIds = [];
       remoteMemberRows.forEach((member) => {
         const userId = String(groupMemberUserId(member)).trim();
         if (!userId || selectedIds.has(userId)) return;
         const groupMemberId = groupMemberRecordId(member);
         if (groupMemberId) {
-          jobs.push(chainViewApi.ownership.groups.removeMember(normalizedGroupId, groupMemberId));
+          removeMemberIds.push(groupMemberId);
         }
       });
 
-      await Promise.all(jobs);
+      for (const userId of addUserIds) {
+        await chainViewApi.ownership.groups.addMember(normalizedGroupId, {
+          userId: Number(userId),
+          memberUserId: Number(userId),
+          groupRole: groupRole || "구성원",
+          memberRole: groupRole || "구성원",
+        });
+      }
+      for (const groupMemberId of removeMemberIds) {
+        await chainViewApi.ownership.groups.removeMember(normalizedGroupId, groupMemberId);
+      }
     } catch (error) {
       console.warn("[ChainView API] group member sync failed", error);
       return {
