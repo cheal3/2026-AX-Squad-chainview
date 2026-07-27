@@ -67,7 +67,7 @@ export async function loadRemotePortalSnapshot(): Promise<RemotePortalSnapshot> 
     safeList(() => chainViewApi.commonCodes.list()),
   ]);
 
-  const groupMemberRows = await loadGroupMembershipRows(groupRows);
+  const groupMemberRows = extractEmbeddedGroupMembershipRows(groupRows);
   const usersWithGroupMemberships = mergeUsersWithGroupMemberships(
     userRows,
     groupRows,
@@ -148,26 +148,25 @@ async function safeList(load: () => Promise<unknown>) {
   }
 }
 
-async function loadGroupMembershipRows(groupRows: RemoteRecord[]) {
-  const settled = await Promise.allSettled(
-    groupRows.map(async (group) => {
-      const groupId = asNumber(group.groupId ?? group.id);
-      if (!groupId) {
-        return [];
-      }
-      const members = await safeList(() => chainViewApi.ownership.groups.members(groupId));
-      return members.map((member) => ({
-        ...member,
-        groupId,
-        groupCode: asString(member.groupCode) || asString(group.groupCode ?? group.code),
-        groupName: asString(member.groupName) || asString(group.groupName ?? group.name),
-      }));
-    })
-  );
-
-  return settled.flatMap((result) =>
-    result.status === "fulfilled" ? result.value : []
-  );
+function extractEmbeddedGroupMembershipRows(groupRows: RemoteRecord[]) {
+  return groupRows.flatMap((group) => {
+    const groupId = asNumber(group.groupId ?? group.id);
+    if (!groupId) {
+      return [];
+    }
+    const members = [
+      ...asRecordArray(group.members),
+      ...asRecordArray(group.groupMembers),
+      ...asRecordArray(group.memberUsers),
+      ...asRecordArray(group.users),
+    ];
+    return members.map((member) => ({
+      ...member,
+      groupId,
+      groupCode: asString(member.groupCode) || asString(group.groupCode ?? group.code),
+      groupName: asString(member.groupName) || asString(group.groupName ?? group.name),
+    }));
+  });
 }
 
 function mergeUsersWithGroupMemberships(

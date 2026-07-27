@@ -289,6 +289,7 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
       columns: ["groupId", "groupCode", "그룹명", "분류", "구성원", "설명"],
       rows: portalData.groups.map((group) => {
         const members = groupMembersForGroup(group, portalData.users);
+        const memberCount = groupMemberCount(group, portalData.users);
         return {
           key: recordKey(group, "groupId", "groupCode"),
           record: group,
@@ -298,6 +299,7 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
             field(group, "groupName", ""),
             groupCategoryLabel(group),
             members.map((user) => field(user, "userName", "")),
+            `${memberCount}명`,
             field(group, "description", "")
           ),
           cells: [
@@ -305,7 +307,7 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
             <code>{field(group, "groupCode")}</code>,
             <b>{field(group, "groupName")}</b>,
             groupCategoryLabel(group),
-            `${members.length || Number(field(group, "memberCount", 0))}명`,
+            `${memberCount}명`,
             field(group, "description"),
           ],
         };
@@ -785,10 +787,57 @@ function downloadAdminCsv(filename, columns, rows) {
 
 function GroupMemberModal({ group, onClose, portalData }) {
   const [saving, setSaving] = useState(false);
+  const [loadingMembers, setLoadingMembers] = useState(false);
   const [form, setForm] = useState(() => ({
     groupRole: "정담당",
     userIds: groupMembersForGroup(group, portalData.users).map((user) => String(field(user, "userId", ""))).filter(Boolean),
   }));
+
+  useEffect(() => {
+    if (!portalData.remoteApi.enabled) {
+      return undefined;
+    }
+    const groupId = Number(field(group, "groupId", 0)) || 0;
+    if (!groupId) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    setLoadingMembers(true);
+    chainViewApi.ownership.groups.members(groupId)
+      .then((members) => {
+        if (cancelled) return;
+        const memberRows = Array.isArray(members)
+          ? members.filter((member) => member && typeof member === "object")
+          : [];
+        const userIds = Array.from(
+          new Set(
+            memberRows
+              .map((member) => String(groupMemberUserId(member)).trim())
+              .filter(Boolean)
+          )
+        );
+        const role = memberRows.map(groupMemberRole).find((value) => groupRoleOptions.includes(value));
+        setForm((current) => ({
+          ...current,
+          groupRole: role || current.groupRole,
+          userIds: userIds.length ? userIds : current.userIds,
+        }));
+      })
+      .catch((error) => {
+        console.warn("[ChainView API] group member modal load failed", error);
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoadingMembers(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [group, portalData.remoteApi.enabled]);
+
   const handleSubmit = async () => {
     const selectedUserIds = Array.isArray(form.userIds)
       ? form.userIds.map(String).filter(Boolean)
@@ -839,6 +888,7 @@ function GroupMemberModal({ group, onClose, portalData }) {
                 value={form.userIds}
                 onChange={(value) => setForm((current) => ({ ...current, userIds: value }))}
               />
+              {loadingMembers ? <p className="form-hint">구성원 조회 중...</p> : null}
             </div>
           </div>
         </div>
@@ -874,6 +924,20 @@ function groupMembersForGroup(group, users = []) {
       (groupName && userGroupName === groupName)
     );
   });
+}
+
+function groupMemberCount(group, users = []) {
+  const explicitMemberIds = Array.isArray(group?.groupMemberUserIds)
+    ? group.groupMemberUserIds.map((userId) => String(userId).trim()).filter(Boolean)
+    : [];
+  if (explicitMemberIds.length) {
+    return new Set(explicitMemberIds).size;
+  }
+  const apiCount = Number(field(group, "memberCount", 0)) || 0;
+  if (apiCount) {
+    return apiCount;
+  }
+  return groupMembersForGroup(group, users).length;
 }
 
 async function syncGroupMembers({ currentGroup, groupCode, groupId, groupName, groupRole = "", memberUserIds, portalData }) {
@@ -974,6 +1038,10 @@ async function syncGroupMembers({ currentGroup, groupCode, groupId, groupName, g
 function groupMemberUserId(member) {
   const nestedUser = member?.user && typeof member.user === "object" ? member.user : null;
   return Number(member?.userId ?? member?.memberUserId ?? nestedUser?.userId ?? nestedUser?.id ?? 0) || "";
+}
+
+function groupMemberRole(member) {
+  return String(member?.groupRole ?? member?.memberRole ?? member?.roleName ?? "").trim();
 }
 
 function groupMemberRecordId(member) {
