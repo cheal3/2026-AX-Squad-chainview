@@ -277,7 +277,7 @@ function Sidebar({ activeMenu = "", isDark = false }) {
             return (
               <Link className={itemClass(item.key)} data-key={item.key} key={item.key} title={isCollapsed ? item.label : undefined} to={item.to}>
                 <span className="lnb__item-icon" aria-hidden="true">
-                  {typeof Icon === "string" ? Icon : <Icon size={22} strokeWidth={2.4} />}
+                  {typeof Icon === "string" ? Icon : <Icon size={17} strokeWidth={2.1} />}
                 </span>
                 <span className="lnb__item-text">{item.label}</span>
                 {item.badge ? <span className="badge">{item.badge}</span> : null}

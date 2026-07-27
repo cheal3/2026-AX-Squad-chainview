@@ -941,10 +941,13 @@ export function AiRagKnowledgePage() {
   return (
     <AppShell activeMenu="ai-rag">
       <main className="main assistant-admin-page">
-        <div className="assistant-admin-head">
+        <div className="page-head page-head--standardized assistant-page-head">
           <div>
-            <h1>RAG 지식 검색</h1>
-            <p>운영 매뉴얼, 장애보고서, 서비스 정보를 검색합니다.</p>
+            <h1 className="page-head__title">
+              <span className="page-head__icon" aria-hidden="true">📚</span>
+              <span>RAG 지식 검색</span>
+            </h1>
+            <p className="page-head__desc assistant-page-desc">운영 매뉴얼, 장애보고서, 서비스 정보를 검색합니다.</p>
           </div>
           <div className="assistant-admin-actions">
             <button className="btn" type="button">새로고침</button>
@@ -976,10 +979,12 @@ export function AiRagKnowledgePage() {
                 <option>summary</option>
               </select>
             </label>
-            <label className="assistant-file-field">
+            <label className="assistant-upload-field">
               <span>파일</span>
-              <FileUp size={16} />
-              <input type="file" />
+              <div className="assistant-file-control">
+                <FileUp size={15} />
+                <input type="file" />
+              </div>
             </label>
           </div>
           <button className="assistant-wide-primary" type="button">업로드</button>
@@ -1045,10 +1050,13 @@ export function AiRoutingRulesPage() {
   return (
     <AppShell activeMenu="ai-routing">
       <main className="main assistant-admin-page">
-        <div className="assistant-admin-head">
+        <div className="page-head page-head--standardized assistant-page-head">
           <div>
-            <h1>Assistant 라우팅 규칙</h1>
-            <p>자연어 질문의 라우팅 키워드·패턴을 관리합니다. 저장 시 메모리 캐시가 자동 갱신됩니다.</p>
+            <h1 className="page-head__title">
+              <span className="page-head__icon" aria-hidden="true">🔀</span>
+              <span>Assistant 라우팅 규칙</span>
+            </h1>
+            <p className="page-head__desc assistant-page-desc">자연어 질문의 라우팅 키워드·패턴을 관리합니다. 저장 시 메모리 캐시가 자동 갱신됩니다.</p>
           </div>
           <div className="assistant-admin-actions">
             <button className="btn" type="button"><RefreshCw size={14} /> 메모리 갱신</button>
