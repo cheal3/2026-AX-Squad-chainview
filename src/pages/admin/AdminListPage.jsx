@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronDown, CircleHelp, RefreshCw, Search } from "lucide-react";
+import { ChevronDown, CircleHelp, Search } from "lucide-react";
 
 import { ModalBackdrop } from "../../components/ModalBackdrop.jsx";
 import { chainViewApi } from "../../dashboardModule/chainViewApi";
@@ -31,7 +31,6 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
   const [ownerModal, setOwnerModal] = useState(null);
   const [selectedOwner, setSelectedOwner] = useState(null);
   const [adminModal, setAdminModal] = useState(null);
-  const [apiDetailModal, setApiDetailModal] = useState(null);
   const [keyword, setKeyword] = useState("");
   const [selectedKeys, setSelectedKeys] = useState([]);
   const lastRealtimeQueryRef = useRef("");
@@ -77,18 +76,6 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
     isInitialLoading ||
     isRemoteLoading ||
     (remoteStatus.state === "loading" && remoteStatus.source === "snapshot");
-  const showRemoteStatus =
-    remoteStatus.source === remoteQueryKey || remoteStatus.source === "snapshot";
-  const showRemoteApiButton = Boolean(remoteQueryKey);
-  const handleRemoteApiTest = async () => {
-    if (!remoteQueryKey) {
-      return;
-    }
-    const status = await portalData.remoteApi.testQuery(remoteQueryKey);
-    if (status.detail) {
-      setApiDetailModal(status.detail);
-    }
-  };
   useEffect(() => {
     if (!portalData.remoteApi.enabled || portalData.remoteApi.initialLoading || !remoteQueryKey) {
       return;
@@ -480,28 +467,6 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
             <h1 className="page-head__title"><span className="page-head__icon" aria-hidden="true">{meta.icon}</span><span>{meta.label}</span></h1>
           </div>
           <div className="page-head__right">
-            {showRemoteApiButton ? (
-              <>
-                <button
-                  className="btn btn--ghost btn--sm"
-                  disabled={isRemoteLoading}
-                  onClick={handleRemoteApiTest}
-                  title={`${meta.label} API 실행`}
-                  type="button"
-                >
-                  <RefreshCw size={14} />
-                  {isRemoteLoading ? "실행 중" : "API 실행"}
-                </button>
-                {showRemoteStatus ? (
-                  <span
-                    className={`pill ${remoteStatus.state === "success" ? "pill--ok" : remoteStatus.state === "error" || remoteStatus.state === "blocked" ? "pill--warn" : "pill--gray"}`}
-                    title={`${portalData.remoteApi.origin}${remoteStatus.lastLoadedAt ? ` · ${remoteStatus.lastLoadedAt}` : ""}`}
-                  >
-                    {remoteStatus.message}
-                  </span>
-                ) : null}
-              </>
-            ) : null}
             <button className="btn" onClick={exportCsv} type="button">📥 CSV 내보내기</button>
             {config.actionLabel ? (
               <button
@@ -615,75 +580,13 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
       {adminModal ? (
         <AdminRecordModal
           modal={adminModal}
-          onOpenApiDetail={setApiDetailModal}
           onClose={closeAdminModal}
           portalData={portalData}
           serverById={serverById}
           serviceById={serviceById}
         />
       ) : null}
-      {apiDetailModal ? (
-        <ApiQueryDetailModal
-          detail={apiDetailModal}
-          onClose={() => setApiDetailModal(null)}
-        />
-      ) : null}
     </>
-  );
-}
-
-function ApiQueryDetailModal({ detail, onClose }) {
-  const isSuccess = detail.state === "success";
-  const stateLabel = {
-    blocked: "차단",
-    error: "실패",
-    loading: "진행 중",
-    success: "성공",
-  }[detail.state] || detail.state;
-  const previewText = JSON.stringify(detail.responsePreview ?? null, null, 2);
-
-  return (
-    <ModalBackdrop onClose={onClose}>
-      <div className="modal modal--lg api-detail-modal" onClick={(event) => event.stopPropagation()}>
-        <div className="modal__head">
-          <h3>API 조회 상세</h3>
-          <button className="close" onClick={onClose} type="button">×</button>
-        </div>
-        <div className="modal__body">
-          <div className="api-detail-summary">
-            <span className={`pill ${isSuccess ? "pill--ok" : "pill--warn"}`}>{stateLabel}</span>
-            <b>{detail.label}</b>
-            <span>{detail.durationMs ?? 0}ms</span>
-          </div>
-          <div className="api-detail-grid">
-            <div><span>Method</span><b>{detail.method}</b></div>
-            <div><span>Path</span><code>{detail.path}</code></div>
-            <div><span>Origin</span><code>{detail.origin}</code></div>
-            <div><span>URL</span><code>{detail.url}</code></div>
-            <div><span>시작</span><b>{formatApiDate(detail.startedAt)}</b></div>
-            <div><span>완료</span><b>{formatApiDate(detail.finishedAt)}</b></div>
-            <div><span>결과 건수</span><b>{detail.rowCount ?? "-"}</b></div>
-            <div><span>실행 가능 모드</span><b>development / test / production 서비스 조회</b></div>
-          </div>
-          {detail.errorMessage ? (
-            <div className="api-detail-error">
-              <b>오류</b>
-              <p>{detail.errorMessage}</p>
-            </div>
-          ) : null}
-          <div className="api-detail-response">
-            <div className="api-detail-response__head">
-              <b>응답 미리보기</b>
-              <span>배열 응답은 앞 3건만 표시</span>
-            </div>
-            <pre>{previewText}</pre>
-          </div>
-        </div>
-        <div className="modal__foot">
-          <button className="btn btn--primary" onClick={onClose} type="button">확인</button>
-        </div>
-      </div>
-    </ModalBackdrop>
   );
 }
 
@@ -817,18 +720,11 @@ function downloadAdminCsv(filename, columns, rows) {
   URL.revokeObjectURL(url);
 }
 
-function formatApiDate(value) {
-  if (!value) {
-    return "-";
-  }
-  return value.replace("T", " ").slice(0, 19);
-}
-
 function isValidServiceCode(value) {
   return /^[A-Z0-9_-]+(?:-[A-Z0-9_-]+)*$/.test(String(value ?? ""));
 }
 
-function AdminRecordModal({ modal, onClose, onOpenApiDetail, portalData, serverById, serviceById }) {
+function AdminRecordModal({ modal, onClose, portalData, serverById, serviceById }) {
   const { mode, menu, record } = modal;
   const isEdit = mode === "edit";
   const isCreate = mode === "create";
@@ -1144,7 +1040,6 @@ function AdminRecordModal({ modal, onClose, onOpenApiDetail, portalData, serverB
               form={form}
               isEdit={isEdit}
               onChange={updateField}
-              onOpenApiDetail={onOpenApiDetail}
               portalData={portalData}
               servers={portalData.servers}
             />
@@ -1715,17 +1610,12 @@ function SearchableServiceSelect({ disabled = false, onChange, placeholder = "�
   );
 }
 
-function ServiceAdminForm({ form, onChange, onOpenApiDetail, portalData, servers, isEdit }) {
+function ServiceAdminForm({ form, onChange, portalData, servers, isEdit }) {
   const [apiCategories, setApiCategories] = useState([]);
-  const [categorySourceLabel, setCategorySourceLabel] = useState("포털 데이터 기준");
   const categoryCatalog = useMemo(
     () => buildCategoryCatalog(apiCategories.length ? apiCategories : portalData.categories, portalData.services),
     [apiCategories, portalData.categories, portalData.services]
   );
-  const categoryApiStatus = portalData.remoteApi.status;
-  const isServiceApiLoading =
-    categoryApiStatus.state === "loading" && categoryApiStatus.source === "categories";
-  const showServiceApiStatus = categoryApiStatus.source === "categories";
   const selectedL1 = findCategoryOptionById(categoryCatalog.level1, form.categoryL1Id) ||
     findCategoryOptionByName(categoryCatalog.level1, form.categoryL1);
   const selectedL2 = findCategoryOptionById(categoryCatalog.level2, form.categoryL2Id) ||
@@ -1739,11 +1629,9 @@ function ServiceAdminForm({ form, onChange, onOpenApiDetail, portalData, servers
   useEffect(() => {
     if (!portalData.remoteApi.enabled) {
       setApiCategories([]);
-      setCategorySourceLabel("포털 데이터 기준");
       return undefined;
     }
     let cancelled = false;
-    setCategorySourceLabel("카테고리 API 조회 중");
     (async () => {
       try {
         const treeRows = flattenServiceCategoryTree(await chainViewApi.serviceCategories.tree().catch(() => []));
@@ -1752,12 +1640,10 @@ function ServiceAdminForm({ form, onChange, onOpenApiDetail, portalData, servers
           : await chainViewApi.serviceCategories.list();
         if (cancelled) return;
         setApiCategories(Array.isArray(nextCategories) ? nextCategories : []);
-        setCategorySourceLabel("카테고리 API 기준");
       } catch (error) {
         console.warn("서비스 카테고리 API 조회 실패, 포털 데이터를 사용합니다.", error);
         if (cancelled) return;
         setApiCategories([]);
-        setCategorySourceLabel("포털 데이터 기준");
       }
     })();
     return () => {
@@ -1794,13 +1680,6 @@ function ServiceAdminForm({ form, onChange, onOpenApiDetail, portalData, servers
   const changeSuffix = (value) => {
     onChange("serviceCodeSuffix", normalizeServiceCodeSuffix(value));
   };
-  const handleServiceApiLookup = async () => {
-    const status = await portalData.remoteApi.testQuery("categories");
-    if (status.detail) {
-      onOpenApiDetail?.(status.detail);
-    }
-  };
-
   useEffect(() => {
     if (!isEdit) {
       onChange("serviceCode", serviceCodePreview);
@@ -1809,31 +1688,6 @@ function ServiceAdminForm({ form, onChange, onOpenApiDetail, portalData, servers
 
   return (
     <>
-      <div className="service-api-lookup">
-        <div>
-          <b>서비스 분류 API</b>
-          <span>/api/service-categories/tree 응답으로 대/중/소분류를 구성합니다.</span>
-        </div>
-        <div className="service-api-lookup__actions">
-          <span className={`pill ${categorySourceLabel === "카테고리 API 기준" ? "pill--ok" : categorySourceLabel.includes("조회 중") ? "pill--gray" : "pill--warn"}`}>
-            {categorySourceLabel}
-          </span>
-          {showServiceApiStatus ? (
-            <span className={`pill ${categoryApiStatus.state === "success" ? "pill--ok" : categoryApiStatus.state === "error" || categoryApiStatus.state === "blocked" ? "pill--warn" : "pill--gray"}`}>
-              {categoryApiStatus.message}
-            </span>
-          ) : null}
-          <button
-            className="btn btn--ghost btn--sm"
-            disabled={isServiceApiLoading}
-            onClick={handleServiceApiLookup}
-            type="button"
-          >
-            <RefreshCw size={14} />
-            {isServiceApiLoading ? "조회 중" : "API 결과 조회"}
-          </button>
-        </div>
-      </div>
       <div className="form-section">
         <h4 className="form-section__title">분류 및 상태</h4>
         <div className="form-grid">

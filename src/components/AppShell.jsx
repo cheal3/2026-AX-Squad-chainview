@@ -197,10 +197,10 @@ function TopBar({ isDark = false }) {
             }}
             type="button"
           >
-            <span className="app-topbar__avatar" aria-hidden="true">김</span>
+            <span className="app-topbar__avatar" aria-hidden="true">이</span>
             <span className="app-topbar__account-text">
-              <strong>김OO</strong>
-              <small>모니터링팀 · ADMIN</small>
+              <strong>이혜림</strong>
+              <small>IT채널업무1팀 · ADMIN</small>
             </span>
             <ChevronDown size={16} />
           </button>
@@ -259,7 +259,10 @@ function Sidebar({ activeMenu = "", isDark = false }) {
           <span aria-hidden="true">☰</span>
         </button>
         <div className="lnb__brand-text">
-          <Link to="/dashboard"><h2>ChainView</h2></Link>
+          <Link className="lnb__brand-link" to="/dashboard">
+            <img alt="" className="lnb__brand-icon" src={`${import.meta.env.BASE_URL}chainview-icon.png?v=2`} />
+            <h2>ChainView</h2>
+          </Link>
         </div>
       </div>
       {sectionItems.map((section) => (

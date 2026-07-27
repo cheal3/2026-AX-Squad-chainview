@@ -322,7 +322,6 @@ function DashboardCase({
   const portalData = usePortalData();
   const navigate = useNavigate();
   const stableDataRef = useRef(portalData);
-  const filterLookupRequestedRef = useRef(false);
   useEffect(() => {
     if (portalData.services.length > 0) {
       stableDataRef.current = portalData;
@@ -346,17 +345,6 @@ function DashboardCase({
     services,
     users,
   } = dashboardData;
-
-  useEffect(() => {
-    if (activeIncident || !portalData.remoteApi.enabled || filterLookupRequestedRef.current) return;
-    filterLookupRequestedRef.current = true;
-    if (portalData.categories.length === 0) {
-      void portalData.remoteApi.testQuery("categories");
-    }
-    if (portalData.users.length === 0) {
-      void portalData.remoteApi.testQuery("users");
-    }
-  }, [activeIncident, portalData]);
 
   const relationCountByServiceId = useMemo(() => {
     const counts = new Map<number, number>();

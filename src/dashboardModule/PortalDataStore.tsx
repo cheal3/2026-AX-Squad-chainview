@@ -336,7 +336,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
   const [remoteApiStatus, setRemoteApiStatus] = useState<RemoteApiStatus>({
     state: "idle",
     message: MANUAL_API_LOAD_MODE
-      ? "API 실행 전"
+      ? "원격 조회 대기"
       : API_ONLY_DATA_MODE
       ? "API 전용 모드: 원격 조회 대기"
       : REMOTE_API_ENABLED
