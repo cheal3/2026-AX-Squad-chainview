@@ -67,6 +67,13 @@ export async function loadRemotePortalSnapshot(): Promise<RemotePortalSnapshot> 
     safeList(() => chainViewApi.commonCodes.list()),
   ]);
 
+  const groupMemberRows = await loadGroupMembershipRows(groupRows);
+  const usersWithGroupMemberships = mergeUsersWithGroupMemberships(
+    userRows,
+    groupRows,
+    groupMemberRows
+  );
+  const groupsWithMemberCounts = mergeGroupsWithMemberCounts(groupRows, groupMemberRows);
   const incidents = incidentRows.map(mapIncident);
   const incidentImpacts = loadIncidentImpactsFromRows(incidentRows, incidents);
   return {
@@ -80,8 +87,8 @@ export async function loadRemotePortalSnapshot(): Promise<RemotePortalSnapshot> 
     relations: relationRows.map(mapRelation),
     techStacks: serviceTechStackRows.map(mapTechStack),
     owners: ownerRows.map(mapOwner),
-    users: userRows,
-    groups: groupRows,
+    users: usersWithGroupMemberships,
+    groups: groupsWithMemberCounts,
     categories: categoryRows,
     codes: codeRows,
     incidents,
@@ -139,6 +146,98 @@ async function safeList(load: () => Promise<unknown>) {
     console.warn("[ChainView API] optional list load failed", error);
     return [];
   }
+}
+
+async function loadGroupMembershipRows(groupRows: RemoteRecord[]) {
+  const settled = await Promise.allSettled(
+    groupRows.map(async (group) => {
+      const groupId = asNumber(group.groupId ?? group.id);
+      if (!groupId) {
+        return [];
+      }
+      const members = await safeList(() => chainViewApi.ownership.groups.members(groupId));
+      return members.map((member) => ({
+        ...member,
+        groupId,
+        groupCode: asString(member.groupCode) || asString(group.groupCode ?? group.code),
+        groupName: asString(member.groupName) || asString(group.groupName ?? group.name),
+      }));
+    })
+  );
+
+  return settled.flatMap((result) =>
+    result.status === "fulfilled" ? result.value : []
+  );
+}
+
+function mergeUsersWithGroupMemberships(
+  userRows: RemoteRecord[],
+  groupRows: RemoteRecord[],
+  memberRows: RemoteRecord[]
+) {
+  const groupById = new Map(
+    groupRows
+      .map((group) => [asNumber(group.groupId ?? group.id), group] as const)
+      .filter(([groupId]) => Boolean(groupId))
+  );
+  const memberByUserId = new Map<number, RemoteRecord>();
+  memberRows.forEach((member) => {
+    const userId = groupMembershipUserId(member);
+    if (userId) {
+      memberByUserId.set(userId, member);
+    }
+  });
+
+  return userRows.map((user) => {
+    const userId = asNumber(user.userId ?? user.id);
+    const member = memberByUserId.get(userId);
+    if (!member) {
+      return user;
+    }
+    const groupId = asNumber(member.groupId);
+    const group = groupById.get(groupId);
+    return {
+      ...user,
+      groupMemberId: groupMembershipRecordId(member),
+      groupId,
+      groupCode: asString(member.groupCode) || asString(group?.groupCode ?? group?.code),
+      groupName: asString(member.groupName) || asString(group?.groupName ?? group?.name),
+      groupRole:
+        asString(member.groupRole ?? member.memberRole ?? member.roleName) ||
+        asString(user.groupRole) ||
+        "구성원",
+    };
+  });
+}
+
+function mergeGroupsWithMemberCounts(
+  groupRows: RemoteRecord[],
+  memberRows: RemoteRecord[]
+) {
+  const counts = new Map<number, number>();
+  memberRows.forEach((member) => {
+    const groupId = asNumber(member.groupId);
+    if (groupId) {
+      counts.set(groupId, (counts.get(groupId) ?? 0) + 1);
+    }
+  });
+
+  return groupRows.map((group) => {
+    const groupId = asNumber(group.groupId ?? group.id);
+    return {
+      ...group,
+      memberCount: counts.get(groupId) ?? asNumber(group.memberCount),
+    };
+  });
+}
+
+function groupMembershipUserId(row: RemoteRecord) {
+  const user = isRecord(row.user) ? row.user : null;
+  return asNumber(row.userId ?? row.memberUserId ?? user?.userId ?? user?.id);
+}
+
+function groupMembershipRecordId(row: RemoteRecord) {
+  return asNumber(row.groupMemberId ?? row.membershipId ?? row.groupUserId ?? row.id);
 }
 
 function serviceDeploymentRows(row: RemoteRecord, detail?: RemoteRecord) {

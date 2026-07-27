@@ -961,15 +961,17 @@ function GroupManagementPanel({
 }
 
 function GroupMemberModal({ group, onClose, portalData }) {
+  const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(() => ({
     groupRole: "정담당",
     userIds: groupMembersForGroup(group, portalData.users).map((user) => String(field(user, "userId", ""))).filter(Boolean),
   }));
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const selectedUserIds = Array.isArray(form.userIds)
       ? form.userIds.map(String).filter(Boolean)
       : [];
-    syncGroupMembers({
+    setSaving(true);
+    const result = await syncGroupMembers({
       currentGroup: group,
       groupCode: field(group, "groupCode", ""),
       groupId: Number(field(group, "groupId", 0)) || null,
@@ -978,6 +980,11 @@ function GroupMemberModal({ group, onClose, portalData }) {
       memberUserIds: selectedUserIds,
       portalData,
     });
+    setSaving(false);
+    if (!result.ok) {
+      window.alert(result.message);
+      return;
+    }
     onClose();
   };
 
@@ -1013,8 +1020,10 @@ function GroupMemberModal({ group, onClose, portalData }) {
           </div>
         </div>
         <div className="modal__foot">
-          <button className="btn" onClick={onClose} type="button">취소</button>
-          <button className="btn btn--primary" onClick={handleSubmit} type="button">저장</button>
+          <button className="btn" disabled={saving} onClick={onClose} type="button">취소</button>
+          <button className="btn btn--primary" disabled={saving} onClick={handleSubmit} type="button">
+            {saving ? "저장 중..." : "저장"}
+          </button>
         </div>
       </div>
     </ModalBackdrop>
@@ -1037,7 +1046,7 @@ function groupMembersForGroup(group, users = []) {
   });
 }
 
-function syncGroupMembers({ currentGroup, groupCode, groupId, groupName, groupRole = "", memberUserIds, portalData }) {
+async function syncGroupMembers({ currentGroup, groupCode, groupId, groupName, groupRole = "", memberUserIds, portalData }) {
   const selectedIds = new Set(
     (Array.isArray(memberUserIds) ? memberUserIds : [])
       .map((userId) => String(userId).trim())
@@ -1048,23 +1057,108 @@ function syncGroupMembers({ currentGroup, groupCode, groupId, groupName, groupRo
       .map((user) => String(field(user, "userId", "")).trim())
       .filter(Boolean)
   );
+  const normalizedGroupId = Number(groupId) || 0;
 
-  portalData.users.forEach((user) => {
-    const userId = String(field(user, "userId", "")).trim();
-    if (!userId) return;
-    const shouldAssign = selectedIds.has(userId);
-    const shouldRemove = currentMemberIds.has(userId) && !shouldAssign;
-    if (!shouldAssign && !shouldRemove) return;
+  if (portalData.remoteApi.enabled) {
+    if (!normalizedGroupId) {
+      return { ok: false, message: "그룹 저장 후 생성된 groupId를 확인할 수 없습니다." };
+    }
 
-    portalData.updateUser(Number(userId), {
-      ...user,
-      active: String(field(user, "activeYn", field(user, "active", "Y"))).toUpperCase() !== "N",
-      groupId: shouldAssign ? Number(groupId) || null : null,
-      groupCode: shouldAssign ? groupCode : "",
-      groupName: shouldAssign ? groupName : "",
-      groupRole: shouldAssign ? groupRole || field(user, "groupRole", "구성원") : "",
+    try {
+      const remoteMembers = await chainViewApi.ownership.groups.members(normalizedGroupId);
+      const remoteMemberRows = Array.isArray(remoteMembers)
+        ? remoteMembers.filter((member) => member && typeof member === "object")
+        : [];
+      const remoteMemberByUserId = new Map();
+      remoteMemberRows.forEach((member) => {
+        const userId = String(groupMemberUserId(member)).trim();
+        if (userId) {
+          remoteMemberByUserId.set(userId, member);
+        }
+      });
+
+      const jobs = [];
+      selectedIds.forEach((userId) => {
+        if (!remoteMemberByUserId.has(userId)) {
+          jobs.push(
+            chainViewApi.ownership.groups.addMember(normalizedGroupId, {
+              userId: Number(userId),
+              groupRole: groupRole || "구성원",
+            })
+          );
+        }
+      });
+      remoteMemberRows.forEach((member) => {
+        const userId = String(groupMemberUserId(member)).trim();
+        if (!userId || selectedIds.has(userId)) return;
+        const groupMemberId = groupMemberRecordId(member);
+        if (groupMemberId) {
+          jobs.push(chainViewApi.ownership.groups.removeMember(normalizedGroupId, groupMemberId));
+        }
+      });
+
+      await Promise.all(jobs);
+    } catch (error) {
+      console.warn("[ChainView API] group member sync failed", error);
+      return {
+        ok: false,
+        message: remoteFailureMessage(error, "그룹 구성원 저장 API 호출에 실패했습니다."),
+      };
+    }
+  }
+
+  if (!portalData.remoteApi.enabled) {
+    portalData.users.forEach((user) => {
+      const userId = String(field(user, "userId", "")).trim();
+      if (!userId) return;
+      const shouldAssign = selectedIds.has(userId);
+      const shouldRemove = currentMemberIds.has(userId) && !shouldAssign;
+      if (!shouldAssign && !shouldRemove) return;
+
+      portalData.updateUser(Number(userId), {
+        ...user,
+        active: String(field(user, "activeYn", field(user, "active", "Y"))).toUpperCase() !== "N",
+        groupId: shouldAssign ? Number(groupId) || null : null,
+        groupCode: shouldAssign ? groupCode : "",
+        groupName: shouldAssign ? groupName : "",
+        groupRole: shouldAssign ? groupRole || field(user, "groupRole", "구성원") : "",
+      });
     });
-  });
+  }
+
+  if (portalData.remoteApi.enabled) {
+    await portalData.remoteApi.refresh().catch((error) => {
+      console.warn("[ChainView API] group member refresh failed", error);
+    });
+  }
+
+  return { ok: true, message: "그룹 구성원이 저장되었습니다." };
+}
+
+function groupMemberUserId(member) {
+  const nestedUser = member?.user && typeof member.user === "object" ? member.user : null;
+  return Number(member?.userId ?? member?.memberUserId ?? nestedUser?.userId ?? nestedUser?.id ?? 0) || "";
+}
+
+function groupMemberRecordId(member) {
+  return Number(member?.groupMemberId ?? member?.membershipId ?? member?.groupUserId ?? member?.id ?? 0) || 0;
+}
+
+function remoteFailureMessage(error, fallback) {
+  const baseMessage = error instanceof Error && error.message ? error.message : fallback;
+  const body = error?.body;
+  if (typeof body !== "string" || !body.trim()) {
+    return baseMessage;
+  }
+  try {
+    const parsed = JSON.parse(body);
+    const details = [parsed.message, parsed.error, parsed.detail]
+      .concat(Array.isArray(parsed.errors) ? parsed.errors.map((item) => item?.message || item?.reason || JSON.stringify(item)) : [])
+      .filter(Boolean);
+    return details.length ? `${baseMessage}\n\n상세:\n${[...new Set(details)].join("\n")}` : baseMessage;
+  } catch {
+    return `${baseMessage}\n\n서버 응답:\n${body.slice(0, 700)}`;
+  }
 }
 
 function groupCategoryLabel(group) {
@@ -1312,19 +1406,28 @@ function AdminRecordModal({ modal, onClose, portalData, serverById, serviceById 
         categoryL3: categoryPath[2] || "",
         description: form.description.trim(),
       };
-      if (isCreate) {
-        portalData.createGroup(payload);
-      } else {
-        portalData.updateGroup(Number(record.groupId), payload);
+      setSaving(true);
+      const groupResult = isCreate
+        ? await portalData.createGroup(payload)
+        : await portalData.updateGroup(Number(record.groupId), payload);
+      if (!groupResult.ok) {
+        setSaving(false);
+        window.alert(groupResult.message);
+        return;
       }
-      syncGroupMembers({
+      const memberResult = await syncGroupMembers({
         currentGroup: record,
         groupCode,
-        groupId: Number(form.groupId || record?.groupId) || null,
+        groupId: groupResult.groupId || Number(form.groupId || record?.groupId) || null,
         groupName,
         memberUserIds: form.memberUserIds,
         portalData,
       });
+      setSaving(false);
+      if (!memberResult.ok) {
+        window.alert(memberResult.message);
+        return;
+      }
     } else if (menu === "categories") {
       const categoryCode = requireValue(form.categoryCode, "분류코드");
       const categoryName = requireValue(form.categoryName, "분류명");

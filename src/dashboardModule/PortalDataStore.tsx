@@ -149,6 +149,12 @@ type NewIncidentInput = {
   registeredBy: string;
 };
 
+type RemoteMutationResult = {
+  ok: boolean;
+  message: string;
+  groupId?: number;
+};
+
 type PortalDataContextValue = {
   servers: ServerRecord[];
   services: ServiceRecord[];
@@ -204,8 +210,8 @@ type PortalDataContextValue = {
   createUser: (input: RemoteListRecord) => void;
   updateUser: (userId: number, input: RemoteListRecord) => void;
   deleteUser: (userId: number) => void;
-  createGroup: (input: RemoteListRecord) => void;
-  updateGroup: (groupId: number, input: RemoteListRecord) => void;
+  createGroup: (input: RemoteListRecord) => Promise<RemoteMutationResult>;
+  updateGroup: (groupId: number, input: RemoteListRecord) => Promise<RemoteMutationResult>;
   deleteGroup: (groupId: number) => void;
   createCategory: (input: RemoteListRecord) => void;
   updateCategory: (categoryId: number, input: RemoteListRecord) => void;
@@ -1518,33 +1524,81 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
             });
         }
       },
-      createGroup: (input) => {
-        setGroups((current) => [
-          { groupId: nextRemoteId(current, "groupId"), ...input },
-          ...current,
-        ]);
-        if (REMOTE_API_ENABLED) {
-          void chainViewApi.ownership.groups
-            .create(toGroupCreatePayload(input))
-            .then(() => testRemoteQuery("groups"))
-            .catch((error) => {
-              console.warn("[ChainView API] group create failed", error);
-            });
+      createGroup: async (input) => {
+        const localGroupId = nextRemoteId(groups, "groupId");
+        const optimisticGroup = { groupId: localGroupId, ...input };
+        setGroups((current) => [optimisticGroup, ...current]);
+
+        if (!REMOTE_API_ENABLED) {
+          return { ok: true, message: "그룹이 등록되었습니다.", groupId: localGroupId };
+        }
+
+        try {
+          const created = await chainViewApi.ownership.groups.create(toGroupCreatePayload(input));
+          const refreshedGroups = asRemoteRecordArray(
+            await chainViewApi.ownership.groups.list().catch(() => [])
+          );
+          const matchingGroup =
+            refreshedGroups.find(
+              (group) => asRemoteString(group.groupCode) === asRemoteString(input.groupCode)
+            ) ??
+            refreshedGroups.find(
+              (group) => asRemoteString(group.groupName) === asRemoteString(input.groupName)
+            );
+          const remoteGroupId =
+            extractRemoteId(created) ||
+            asRemoteNumber(matchingGroup?.groupId ?? matchingGroup?.id) ||
+            localGroupId;
+
+          setGroups((current) =>
+            current.map((group) =>
+              asRemoteNumber(group.groupId) === localGroupId
+                ? { ...optimisticGroup, groupId: remoteGroupId }
+                : group
+            )
+          );
+          await testRemoteQuery("groups");
+          return { ok: true, message: "그룹이 등록되었습니다.", groupId: remoteGroupId };
+        } catch (error) {
+          setGroups((current) =>
+            current.filter((group) => asRemoteNumber(group.groupId) !== localGroupId)
+          );
+          console.warn("[ChainView API] group create failed", error);
+          return {
+            ok: false,
+            message: remoteErrorDetailMessage(error, "그룹 등록 API 호출에 실패했습니다."),
+          };
         }
       },
-      updateGroup: (groupId, input) => {
+      updateGroup: async (groupId, input) => {
+        const previousGroup = groups.find((group) => asRemoteNumber(group.groupId) === groupId);
         setGroups((current) =>
           current.map((group) =>
             asRemoteNumber(group.groupId) === groupId ? { ...group, ...input } : group
           )
         );
-        if (REMOTE_API_ENABLED) {
-          void chainViewApi.ownership.groups
-            .update(groupId, toGroupUpdatePayload(input))
-            .then(() => testRemoteQuery("groups"))
-            .catch((error) => {
-              console.warn("[ChainView API] group update failed", error);
-            });
+
+        if (!REMOTE_API_ENABLED) {
+          return { ok: true, message: "그룹이 수정되었습니다.", groupId };
+        }
+
+        try {
+          await chainViewApi.ownership.groups.update(groupId, toGroupUpdatePayload(input));
+          await testRemoteQuery("groups");
+          return { ok: true, message: "그룹이 수정되었습니다.", groupId };
+        } catch (error) {
+          if (previousGroup) {
+            setGroups((current) =>
+              current.map((group) =>
+                asRemoteNumber(group.groupId) === groupId ? previousGroup : group
+              )
+            );
+          }
+          console.warn("[ChainView API] group update failed", error);
+          return {
+            ok: false,
+            message: remoteErrorDetailMessage(error, "그룹 수정 API 호출에 실패했습니다."),
+          };
         }
       },
       deleteGroup: (groupId) => {
