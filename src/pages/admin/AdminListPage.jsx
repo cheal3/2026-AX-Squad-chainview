@@ -299,12 +299,9 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
     },
     groups: {
       actionLabel: "＋ 그룹 등록",
-      columns: ["groupId", "groupCode", "그룹명", "분류", "구성원", "배포 서버", "설명"],
+      columns: ["groupId", "groupCode", "그룹명", "분류", "구성원", "설명"],
       rows: portalData.groups.map((group) => {
         const members = groupMembersForGroup(group, portalData.users);
-        const servers = groupServerIds(group)
-          .map((serverId) => portalData.servers.find((server) => String(server.serverId) === String(serverId))?.serverName)
-          .filter(Boolean);
         return {
           key: recordKey(group, "groupId", "groupCode"),
           record: group,
@@ -314,7 +311,6 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
             field(group, "groupName", ""),
             groupCategoryLabel(group),
             members.map((user) => field(user, "userName", "")),
-            servers,
             field(group, "description", "")
           ),
           cells: [
@@ -323,7 +319,6 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
             <b>{field(group, "groupName")}</b>,
             groupCategoryLabel(group),
             `${members.length || Number(field(group, "memberCount", 0))}명`,
-            servers.length ? servers.join(", ") : "-",
             field(group, "description"),
           ],
         };
@@ -554,7 +549,6 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
           onSelectGroup={(row) => setSelectedGroupKey(String(row.key))}
           selectedGroup={selectedGroup}
           selectedGroupKey={selectedGroupRow ? String(selectedGroupRow.key) : ""}
-          servers={portalData.servers}
           users={portalData.users}
         />
       ) : (
@@ -845,15 +839,8 @@ function GroupManagementPanel({
   onSelectGroup,
   selectedGroup,
   selectedGroupKey,
-  servers,
   users,
 }) {
-  const groupServers = selectedGroup
-    ? groupServerIds(selectedGroup).map((serverId) =>
-        servers.find((server) => String(server.serverId) === String(serverId))
-      ).filter(Boolean)
-    : [];
-
   return (
     <div className="group-management">
       <aside className="group-management__list card">
@@ -909,7 +896,7 @@ function GroupManagementPanel({
               </div>
               <div className="group-management__actions">
                 <button className="btn" onClick={onEditGroup} type="button">✏️ 그룹 수정</button>
-                <button className="btn" onClick={onAddMember} type="button">👥 구성원 추가</button>
+                <button className="btn" onClick={onAddMember} type="button">👥 구성원 선택</button>
                 <button className="btn btn--danger" onClick={onDeleteGroup} type="button">🗑 그룹 삭제</button>
               </div>
             </div>
@@ -925,10 +912,6 @@ function GroupManagementPanel({
               <div>
                 <span>분류</span>
                 <strong>{groupCategoryLabel(selectedGroup)}</strong>
-              </div>
-              <div>
-                <span>배포 서버</span>
-                <strong>{groupServers.length}대</strong>
               </div>
             </div>
             <div className="group-management__section">
@@ -968,17 +951,6 @@ function GroupManagementPanel({
                 </table>
               </div>
             </div>
-            <div className="group-management__section">
-              <h3>배포 정보</h3>
-              <div className="group-management__server-list">
-                {groupServers.length ? groupServers.map((server) => (
-                  <div className="group-management__server" key={server.serverId}>
-                    <b>{server.serverName}</b>
-                    <span>{server.hostName} · {server.ipAddress} · {codeLabels.envType[server.envCode] || server.envCode}</span>
-                  </div>
-                )) : <div className="group-management__empty">연결된 배포 서버가 없습니다. 그룹 수정에서 서버를 선택해주세요.</div>}
-              </div>
-            </div>
           </>
         ) : (
           <div className="group-management__empty">그룹을 선택해주세요.</div>
@@ -991,21 +963,20 @@ function GroupManagementPanel({
 function GroupMemberModal({ group, onClose, portalData }) {
   const [form, setForm] = useState(() => ({
     groupRole: "정담당",
-    userId: String(portalData.users[0]?.userId ?? ""),
+    userIds: groupMembersForGroup(group, portalData.users).map((user) => String(field(user, "userId", ""))).filter(Boolean),
   }));
   const handleSubmit = () => {
-    const user = portalData.users.find((item) => String(item.userId) === String(form.userId));
-    if (!user) {
-      window.alert("사용자를 선택해주세요.");
-      return;
-    }
-    portalData.updateUser(Number(user.userId), {
-      ...user,
-      active: String(field(user, "activeYn", field(user, "active", "Y"))).toUpperCase() !== "N",
-      groupId: Number(field(group, "groupId", 0)) || null,
+    const selectedUserIds = Array.isArray(form.userIds)
+      ? form.userIds.map(String).filter(Boolean)
+      : [];
+    syncGroupMembers({
+      currentGroup: group,
       groupCode: field(group, "groupCode", ""),
+      groupId: Number(field(group, "groupId", 0)) || null,
       groupName: field(group, "groupName", ""),
-      groupRole: form.groupRole.trim() || "구성원",
+      groupRole: form.groupRole.trim(),
+      memberUserIds: selectedUserIds,
+      portalData,
     });
     onClose();
   };
@@ -1014,22 +985,13 @@ function GroupMemberModal({ group, onClose, portalData }) {
     <ModalBackdrop onClose={onClose}>
       <div className="modal" onClick={(event) => event.stopPropagation()}>
         <div className="modal__head">
-          <h3>구성원 추가</h3>
+          <h3>구성원 선택</h3>
           <button className="close" onClick={onClose} type="button">×</button>
         </div>
         <div className="modal__body">
           <div className="form-section">
-            <h4 className="form-section__title">"{field(group, "groupName", "그룹")}"에 사용자를 추가합니다.</h4>
+            <h4 className="form-section__title">"{field(group, "groupName", "그룹")}" 구성원을 선택합니다.</h4>
             <div className="form-grid">
-              <div className="form-row">
-                <label>사용자<span className="req">*</span></label>
-                <select value={form.userId} onChange={(event) => setForm((current) => ({ ...current, userId: event.target.value }))}>
-                  <option value="">선택하세요</option>
-                  {portalData.users.map((user) => (
-                    <option key={user.userId} value={user.userId}>{field(user, "employeeNo", "-")} {field(user, "userName", "-")} · {field(user, "departmentName", "-")}</option>
-                  ))}
-                </select>
-              </div>
               <div className="form-row">
                 <label>그룹 내 역할</label>
                 <input
@@ -1040,11 +1002,19 @@ function GroupMemberModal({ group, onClose, portalData }) {
                 />
               </div>
             </div>
+            <div className="form-row full">
+              <label>구성원 선택<span className="req">*</span></label>
+              <UserMultiSelect
+                users={portalData.users}
+                value={form.userIds}
+                onChange={(value) => setForm((current) => ({ ...current, userIds: value }))}
+              />
+            </div>
           </div>
         </div>
         <div className="modal__foot">
           <button className="btn" onClick={onClose} type="button">취소</button>
-          <button className="btn btn--primary" onClick={handleSubmit} type="button">추가</button>
+          <button className="btn btn--primary" onClick={handleSubmit} type="button">저장</button>
         </div>
       </div>
     </ModalBackdrop>
@@ -1067,24 +1037,34 @@ function groupMembersForGroup(group, users = []) {
   });
 }
 
-function groupServerIds(group) {
-  const raw =
-    group?.serverIds ??
-    group?.deploymentServerIds ??
-    group?.servers ??
-    group?.deploymentServers ??
-    [];
-  if (Array.isArray(raw)) {
-    return raw
-      .map((item) => Number(typeof item === "object" ? item.serverId : item))
+function syncGroupMembers({ currentGroup, groupCode, groupId, groupName, groupRole = "", memberUserIds, portalData }) {
+  const selectedIds = new Set(
+    (Array.isArray(memberUserIds) ? memberUserIds : [])
+      .map((userId) => String(userId).trim())
       .filter(Boolean)
-      .map(String);
-  }
-  return String(raw)
-    .split(",")
-    .map((item) => Number(item.trim()))
-    .filter(Boolean)
-    .map(String);
+  );
+  const currentMemberIds = new Set(
+    groupMembersForGroup(currentGroup, portalData.users)
+      .map((user) => String(field(user, "userId", "")).trim())
+      .filter(Boolean)
+  );
+
+  portalData.users.forEach((user) => {
+    const userId = String(field(user, "userId", "")).trim();
+    if (!userId) return;
+    const shouldAssign = selectedIds.has(userId);
+    const shouldRemove = currentMemberIds.has(userId) && !shouldAssign;
+    if (!shouldAssign && !shouldRemove) return;
+
+    portalData.updateUser(Number(userId), {
+      ...user,
+      active: String(field(user, "activeYn", field(user, "active", "Y"))).toUpperCase() !== "N",
+      groupId: shouldAssign ? Number(groupId) || null : null,
+      groupCode: shouldAssign ? groupCode : "",
+      groupName: shouldAssign ? groupName : "",
+      groupRole: shouldAssign ? groupRole || field(user, "groupRole", "구성원") : "",
+    });
+  });
 }
 
 function groupCategoryLabel(group) {
@@ -1322,12 +1302,6 @@ function AdminRecordModal({ modal, onClose, portalData, serverById, serviceById 
       const groupName = requireValue(form.groupName, "그룹명");
       if (!groupCode || !groupName) return;
       const categoryPath = buildSelectedCategoryPath(form, portalData.categories).filter(Boolean);
-      const selectedServerIds = Array.isArray(form.serverIds)
-        ? form.serverIds.map((serverId) => Number(serverId)).filter(Boolean)
-        : [];
-      const selectedServers = selectedServerIds.map((serverId) =>
-        portalData.servers.find((server) => Number(server.serverId) === serverId)
-      ).filter(Boolean);
       const payload = {
         groupCode,
         groupName,
@@ -1336,14 +1310,6 @@ function AdminRecordModal({ modal, onClose, portalData, serverById, serviceById 
         categoryL1: categoryPath[0] || "",
         categoryL2: categoryPath[1] || "",
         categoryL3: categoryPath[2] || "",
-        serverIds: selectedServerIds,
-        deploymentServerIds: selectedServerIds,
-        servers: selectedServers.map((server) => ({
-          serverId: server.serverId,
-          serverName: server.serverName,
-          hostName: server.hostName,
-          ipAddress: server.ipAddress,
-        })),
         description: form.description.trim(),
       };
       if (isCreate) {
@@ -1351,6 +1317,14 @@ function AdminRecordModal({ modal, onClose, portalData, serverById, serviceById 
       } else {
         portalData.updateGroup(Number(record.groupId), payload);
       }
+      syncGroupMembers({
+        currentGroup: record,
+        groupCode,
+        groupId: Number(form.groupId || record?.groupId) || null,
+        groupName,
+        memberUserIds: form.memberUserIds,
+        portalData,
+      });
     } else if (menu === "categories") {
       const categoryCode = requireValue(form.categoryCode, "분류코드");
       const categoryName = requireValue(form.categoryName, "분류명");
@@ -2225,6 +2199,85 @@ function ServerMultiSelect({ servers, value, onChange }) {
   );
 }
 
+function UserMultiSelect({ users, value, onChange }) {
+  const [query, setQuery] = useState("");
+  const selectedIds = Array.isArray(value) ? value.map(String) : [];
+  const selectedUsers = users.filter((user) =>
+    selectedIds.includes(String(user.userId))
+  );
+  const filteredUsers = users.filter((user) =>
+    matchesSearchText(
+      searchableText(
+        user.employeeNo,
+        user.userName,
+        user.orgName,
+        user.departmentName,
+        user.roleName,
+        user.email
+      ),
+      query
+    )
+  );
+  const toggleUser = (userId, checked) => {
+    const next = checked
+      ? Array.from(new Set([...selectedIds, String(userId)]))
+      : selectedIds.filter((id) => id !== String(userId));
+    onChange(next);
+  };
+
+  return (
+    <div className="server-multi-select user-multi-select">
+      <div className="server-multi-select__selected">
+        {selectedUsers.length ? selectedUsers.map((user) => (
+          <button
+            className="server-multi-select__chip"
+            key={user.userId}
+            onClick={() => toggleUser(user.userId, false)}
+            type="button"
+          >
+            {field(user, "userName", "-")}
+            <span>×</span>
+          </button>
+        )) : <span className="server-multi-select__placeholder">선택된 구성원이 없습니다.</span>}
+      </div>
+      <div className="server-multi-select__toolbar">
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="사번, 이름, 조직, 부서, 이메일 검색"
+          type="text"
+        />
+        <button
+          type="button"
+          onClick={() => onChange(users.map((user) => String(field(user, "userId", ""))).filter(Boolean))}
+        >
+          전체 선택
+        </button>
+        <button type="button" onClick={() => onChange([])}>해제</button>
+      </div>
+      <div className="server-multi-select__list">
+        {filteredUsers.map((user) => {
+          const checked = selectedIds.includes(String(user.userId));
+          return (
+            <label className="server-multi-select__option" key={user.userId}>
+              <input
+                checked={checked}
+                onChange={(event) => toggleUser(user.userId, event.target.checked)}
+                type="checkbox"
+              />
+              <span>
+                <b>{field(user, "employeeNo", "-")} · {field(user, "userName", "-")}</b>
+                <small>{field(user, "orgName", "-")} · {field(user, "departmentName", "-")} · {field(user, "email", "-")}</small>
+              </span>
+            </label>
+          );
+        })}
+        {!filteredUsers.length ? <div className="server-multi-select__empty">검색 결과가 없습니다.</div> : null}
+      </div>
+    </div>
+  );
+}
+
 function ServerAdminForm({ form, onChange, isEdit, servers }) {
   const infraNodeOptions = buildInfraNodeOptions(servers);
   return (
@@ -2389,7 +2442,6 @@ function RemoteAdminForm({ form, isEdit, menu, onChange, portalData }) {
       findCategoryOptionByName(categoryCatalog.level3, form.categoryL3, selectedL2?.name, selectedL1?.name);
     const level2Options = selectedL1 ? selectableChildCategoryOptions(categoryCatalog.level2, selectedL1) : [];
     const level3Options = selectedL2 ? selectableChildCategoryOptions(categoryCatalog.level3, selectedL2, selectedL1) : [];
-    const members = isEdit ? groupMembersForGroup(form, portalData.users) : [];
     const changeCategory = (level, option) => {
       const nextName = option?.name ?? "";
       const nextId = option?.id ? String(option.id) : "";
@@ -2439,24 +2491,14 @@ function RemoteAdminForm({ form, isEdit, menu, onChange, portalData }) {
             <div className="form-row"><label>소분류 (categoryL3)</label><SearchableCategorySelect disabled={!selectedL2 || !level3Options.length} options={level3Options} value={selectedL3?.name ?? form.categoryL3} onChange={(_value, option) => changeCategory(3, option)} placeholder={level3Options.length ? "검색 또는 선택하세요" : "등록된 소분류가 없습니다"} /></div>
           </div>
         </div>
-        {isEdit ? (
-          <div className="form-section">
-            <h4 className="form-section__title">구성원 목록</h4>
-            <div className="group-member-preview">
-              {members.length ? members.map((user) => (
-                <span key={recordKey(user, "userId", "employeeNo")}>{field(user, "userName", "-")} · {field(user, "groupRole", "정담당")}</span>
-              )) : <em>등록된 구성원이 없습니다.</em>}
-            </div>
-          </div>
-        ) : null}
         <div className="form-section">
-          <h4 className="form-section__title">배포 정보</h4>
+          <h4 className="form-section__title">구성원 선택</h4>
           <div className="form-row">
-            <label>서버 선택</label>
-            <ServerMultiSelect
-              servers={portalData.servers}
-              value={form.serverIds}
-              onChange={(value) => onChange("serverIds", value)}
+            <label>구성원</label>
+            <UserMultiSelect
+              users={portalData.users}
+              value={form.memberUserIds}
+              onChange={(value) => onChange("memberUserIds", value)}
             />
           </div>
         </div>
@@ -2633,8 +2675,11 @@ function buildAdminFormState(menu, record, portalData) {
       ? record.categoryPath
       : [record?.categoryL1, record?.categoryL2, record?.categoryL3].filter(Boolean);
     const categorySelection = resolveCategorySelection(rawCategoryPath, portalData.categories, record?.categoryId ?? "");
-    const serverIds = groupServerIds(record);
+    const memberUserIds = groupMembersForGroup(record, portalData.users)
+      .map((user) => String(field(user, "userId", "")).trim())
+      .filter(Boolean);
     return {
+      groupId: field(record, "groupId", ""),
       groupCode: field(record, "groupCode", ""),
       groupName: field(record, "groupName", ""),
       categoryId: field(record, "categoryId", categorySelection.categoryId),
@@ -2644,7 +2689,7 @@ function buildAdminFormState(menu, record, portalData) {
       categoryL1Id: field(record, "categoryL1Id", categorySelection.categoryL1Id),
       categoryL2Id: field(record, "categoryL2Id", categorySelection.categoryL2Id),
       categoryL3Id: field(record, "categoryL3Id", categorySelection.categoryL3Id),
-      serverIds,
+      memberUserIds,
       description: field(record, "description", ""),
     };
   }

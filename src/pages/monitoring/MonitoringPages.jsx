@@ -770,30 +770,34 @@ export function IncidentDetailPage() {
     (!incidentId
       ? incidents.find((item) => item.incidentStatusCode !== "RESOLVED")
       : undefined);
+  const incidentServiceId = Number(incident?.serviceId) || 0;
+  const incidentTargetCode = String(incident?.targetCode || "");
   const service =
-    services.find((item) => item.serviceId === incident?.serviceId) ??
-    services.find((item) => item.serviceCode === incident?.targetCode);
+    services.find((item) => Number(item.serviceId) === incidentServiceId) ??
+    services.find((item) =>
+      [item.serviceCode, item.serviceName].map(String).includes(incidentTargetCode)
+    );
   const impactedServices = incidentImpacts
-    .filter((impact) => impact.incidentId === incident?.incidentId)
-    .map((impact) => services.find((item) => item.serviceId === impact.impactedServiceId))
+    .filter((impact) => Number(impact.incidentId) === Number(incident?.incidentId))
+    .map((impact) => services.find((item) => Number(item.serviceId) === Number(impact.impactedServiceId)))
     .filter(Boolean);
   const relationImpactedServices = buildRelationImpactedServices(service, services, relations);
   const displayImpactedServices = impactedServices.length ? impactedServices : relationImpactedServices;
-  const relatedRelations = relations
-    .filter(
-      (relation) =>
-        relation.sourceServiceId === service?.serviceId ||
-        relation.targetServiceId === service?.serviceId
-    )
-    .slice(0, 6);
+  const allRelatedRelations = relations.filter(
+    (relation) =>
+      Number(relation.sourceServiceId) === Number(service?.serviceId) ||
+      Number(relation.targetServiceId) === Number(service?.serviceId)
+  );
+  const relatedRelations = allRelatedRelations.slice(0, 6);
   const relationServiceName = (serviceId) =>
-    services.find((item) => item.serviceId === serviceId)?.serviceName ?? `SERVICE-${serviceId}`;
+    services.find((item) => Number(item.serviceId) === Number(serviceId))?.serviceName ?? `SERVICE-${serviceId}`;
   const elapsedLabel = incident?.startedAt ? formatIncidentElapsed(incident.startedAt, now) : "00:00:00";
+  const affectedServiceCount = Math.max(displayImpactedServices.length, allRelatedRelations.length);
   const timelineRows = incidentEvents
     .filter((event) => event.incidentId === incident?.incidentId)
     .map((event) => [event.createdAt?.slice(11, 16) || "-", event.message, event.actor]);
   const recentDeploymentRows = deployments
-    .filter((deployment) => Number(deployment.serviceId) === service?.serviceId)
+    .filter((deployment) => Number(deployment.serviceId) === Number(service?.serviceId))
     .slice(0, 5)
     .map((deployment) => ({
       date: String(deployment.deployedAt ?? deployment.updatedAt ?? deployment.createdAt ?? "-").slice(0, 10),
@@ -804,7 +808,7 @@ export function IncidentDetailPage() {
   const incidentOwners = owners
     .filter(
       (owner) =>
-        owner.serviceId === service?.serviceId ||
+        Number(owner.serviceId) === Number(service?.serviceId) ||
         (owner.serviceCode && owner.serviceCode === service?.serviceCode)
     )
     .map((owner) => {
@@ -823,19 +827,21 @@ export function IncidentDetailPage() {
         email: String(user?.email ?? ""),
       };
     });
-  const generatedProgressRows = buildIncidentProgressRows({
-    deployments: recentDeploymentRows,
-    impactedServices: displayImpactedServices,
-    incident,
-    owners: incidentOwners,
-    service,
-    timelineRows,
-  });
   const notificationRows = buildIncidentNotificationRows({
     impactedServices: displayImpactedServices,
     incident,
     owners: incidentOwners,
     service,
+  });
+  const generatedProgressRows = buildIncidentProgressRows({
+    deployments: recentDeploymentRows,
+    impactedServices: displayImpactedServices,
+    incident,
+    notificationRows,
+    owners: incidentOwners,
+    relatedRelations: allRelatedRelations,
+    service,
+    timelineRows,
   });
   const ownerHistoryRows = buildIncidentOwnerHistoryRows({
     incident,
@@ -958,7 +964,7 @@ export function IncidentDetailPage() {
               </div>
               <div className="incident-detail__summary">
                 <b>title</b>
-                <p>{incident.title} · incidentType: 서비스 장애 · affectedServices: {displayImpactedServices.length}</p>
+                <p>{incident.title} · incidentType: 서비스 장애 · affectedServices: {affectedServiceCount}</p>
               </div>
               {incident.description ? <p className="incident-detail__description">{incident.description}</p> : null}
               <div className="incident-detail__progress">
@@ -1183,17 +1189,16 @@ function buildIncidentProgressRows({
   deployments = [],
   impactedServices = [],
   incident,
+  notificationRows = [],
   owners = [],
+  relatedRelations = [],
   service,
   timelineRows = [],
 }) {
-  if (timelineRows.length) {
-    return timelineRows;
-  }
-
   const startedAt = String(incident?.startedAt || incident?.occurredAt || "");
   const serviceName = service?.serviceName || incident?.targetCode || "대상 서비스";
   const serviceCode = service?.serviceCode || incident?.targetCode || "-";
+  const severity = severityLabelFor(String(incident?.severityCode || "MAJOR").toUpperCase());
   const primaryOwner = owners[0];
   const backupOwner = owners[1];
   const ownerLabel = primaryOwner
@@ -1203,56 +1208,145 @@ function buildIncidentProgressRows({
   const backupLabel = backupOwner
     ? `${backupOwner.name}${backupOwner.organization ? ` (${backupOwner.organization})` : ""}`
     : null;
+  const relationCount = Math.max(relatedRelations.length, impactedServices.length);
+  const relationTypeSummary = summarizeRelationTypes(relatedRelations);
   const affectedNames = impactedServices
     .map((item) => item.serviceName || item.serviceCode)
     .filter(Boolean)
     .slice(0, 3);
-  const affectedLabel = impactedServices.length
+  const relationAffectedNames = relationServiceNames(relatedRelations, service).slice(0, 3);
+  const affectedLabel = affectedNames.length
     ? `${affectedNames.join(", ")}${impactedServices.length > affectedNames.length ? ` 외 ${impactedServices.length - affectedNames.length}개` : ""}`
-    : "영향 서비스 없음";
+    : relationAffectedNames.length
+      ? relationAffectedNames.join(", ")
+      : "추가 영향 서비스 미확인";
   const deploy = deployments[0];
 
   const rows = [
     [
       formatIncidentProgressTime(startedAt, 0),
-      `${serviceName}(${serviceCode}) 장애가 접수되어 영향도 산출을 시작했습니다.`,
+      `${serviceName}(${serviceCode}) ${severity} 인시던트가 접수되어 서비스 기준 영향도 산출을 시작했습니다.`,
       incident?.registeredBy || "SYSTEM",
     ],
     [
-      formatIncidentProgressTime(startedAt, 1),
-      `${ownerLabel}${ownerContact}에게 ${incident?.severityCode || "장애"} 알림을 발송했습니다.`,
-      "알림 전송",
+      formatIncidentProgressTime(startedAt, 2),
+      `담당자 매핑을 조회해 ${ownerLabel}${ownerContact}을 1차 대응 대상으로 지정했습니다.`,
+      "담당 조회",
     ],
     [
-      formatIncidentProgressTime(startedAt, 3),
-      `서비스 관계 기준 영향 서비스 ${impactedServices.length}건을 확인했습니다. 대상: ${affectedLabel}`,
+      formatIncidentProgressTime(startedAt, 4),
+      `서비스 관계 ${relationCount}건${relationTypeSummary ? `(${relationTypeSummary})` : ""}을 분석했습니다. 예상 영향: ${affectedLabel}`,
       "영향도 분석",
     ],
   ];
 
+  if (notificationRows.length) {
+    const notification = notificationRows[0];
+    rows.push([
+      formatIncidentProgressTime(startedAt, 6),
+      `${notification.channel} 채널로 ${notification.recipient}에게 템플릿 ${notification.template} 알림을 전송했습니다. 상태: ${notification.status}`,
+      "알림 전송",
+    ]);
+  }
+
   if (backupLabel) {
     rows.push([
-      formatIncidentProgressTime(startedAt, 5),
-      `백업 담당 ${backupLabel}에게 후속 확인 요청을 전파했습니다.`,
+      formatIncidentProgressTime(startedAt, 8),
+      `백업 담당 ${backupLabel}에게 서비스 연계 구간 확인을 요청했습니다.`,
       "에스컬레이션",
     ]);
   }
 
   if (deploy) {
     rows.push([
-      formatIncidentProgressTime(startedAt, 7),
-      `최근 배포 이력(${deploy.title}, ${deploy.date})을 확인하고 장애 연관 여부를 점검 중입니다.`,
+      formatIncidentProgressTime(startedAt, 10),
+      `최근 배포 ${deploy.title}(${deploy.date}, ${deploy.status})와 장애 발생 시점을 대조했습니다.`,
       deploy.owner || "배포 확인",
     ]);
   } else {
     rows.push([
-      formatIncidentProgressTime(startedAt, 7),
-      "최근 배포 이력은 확인되지 않았으며, 서비스 상태와 연계 구간을 우선 점검 중입니다.",
+      formatIncidentProgressTime(startedAt, 10),
+      `${serviceName}의 최근 배포 이력은 확인되지 않아 관계 서비스와 런타임 상태를 우선 점검 중입니다.`,
       "운영 확인",
     ]);
   }
 
-  return rows;
+  timelineRows.slice(0, 3).forEach(([time, message, actor], index) => {
+    rows.push([
+      time && time !== "-" ? time : formatIncidentProgressTime(startedAt, 12 + index * 2),
+      normalizeIncidentTimelineMessage(message, {
+        affectedLabel,
+        relationCount,
+        serviceName,
+      }),
+      actor || "remote",
+    ]);
+  });
+
+  return ensureUniqueProgressTimes(rows, startedAt);
+}
+
+function summarizeRelationTypes(relations = []) {
+  const summary = new Map();
+  relations.forEach((relation) => {
+    const type = relation.relationTypeCode || relation.relationTypeName || "REL";
+    summary.set(type, (summary.get(type) || 0) + 1);
+  });
+  return Array.from(summary.entries())
+    .slice(0, 3)
+    .map(([type, count]) => `${type} ${count}`)
+    .join(", ");
+}
+
+function relationServiceNames(relations = [], service) {
+  const serviceId = Number(service?.serviceId);
+  return relations
+    .map((relation) => {
+      const sourceName =
+        relation.sourceServiceName ||
+        relation.sourceServiceCode ||
+        (relation.sourceServiceId ? `SERVICE-${relation.sourceServiceId}` : "");
+      const targetName =
+        relation.targetServiceName ||
+        relation.targetServiceCode ||
+        (relation.targetServiceId ? `SERVICE-${relation.targetServiceId}` : "");
+      if (Number(relation.sourceServiceId) === serviceId) {
+        return targetName;
+      }
+      if (Number(relation.targetServiceId) === serviceId) {
+        return sourceName;
+      }
+      return targetName || sourceName;
+    })
+    .filter(Boolean);
+}
+
+function normalizeIncidentTimelineMessage(message, { affectedLabel, relationCount, serviceName }) {
+  const text = String(message || "").trim();
+  if (!text) {
+    return `${serviceName} 관련 원격 이벤트가 수신되어 진행 이력에 반영했습니다.`;
+  }
+  if (text.includes("서비스 관계") && text.includes("0건")) {
+    return `서비스 관계 기준 예상 영향 ${relationCount}건을 재계산했습니다. 대상: ${affectedLabel}`;
+  }
+  if (text.includes("인시던트가 등록")) {
+    return `${serviceName} 장애 이벤트가 원격 API에서 수신되어 상세 진행상황에 반영되었습니다.`;
+  }
+  return text;
+}
+
+function ensureUniqueProgressTimes(rows, startedAt) {
+  const usedTimes = new Set();
+  return rows.map(([time, message, actor], index) => {
+    let nextTime = time && time !== "-" ? time : formatIncidentProgressTime(startedAt, index * 2);
+    let offset = index * 2;
+    while (usedTimes.has(nextTime)) {
+      offset += 1;
+      nextTime = formatIncidentProgressTime(startedAt, offset);
+    }
+    usedTimes.add(nextTime);
+    return [nextTime, message, actor];
+  });
 }
 
 function buildIncidentNotificationRows({
@@ -1355,12 +1449,13 @@ function buildRelationImpactedServices(service, services = [], relations = []) {
   if (!service?.serviceId) {
     return [];
   }
+  const serviceId = Number(service.serviceId);
   const relatedIds = new Set();
   relations.forEach((relation) => {
-    if (relation.sourceServiceId === service.serviceId && relation.targetServiceId) {
+    if (Number(relation.sourceServiceId) === serviceId && relation.targetServiceId) {
       relatedIds.add(Number(relation.targetServiceId));
     }
-    if (relation.targetServiceId === service.serviceId && relation.sourceServiceId) {
+    if (Number(relation.targetServiceId) === serviceId && relation.sourceServiceId) {
       relatedIds.add(Number(relation.sourceServiceId));
     }
   });
