@@ -831,6 +831,13 @@ export function IncidentDetailPage() {
     service,
     timelineRows,
   });
+  const notificationRows = buildIncidentNotificationRows({
+    impactedServices: displayImpactedServices,
+    incident,
+    owners: incidentOwners,
+    service,
+  });
+  const successfulNotificationCount = notificationRows.filter((row) => row.status === "성공").length;
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 1000);
@@ -1013,22 +1020,64 @@ export function IncidentDetailPage() {
         ) : null}
 
         {activeTab === "history" ? (
-          <article className="incident-detail__card incident-detail__tab-card" role="tabpanel">
-            <div className="incident-detail__card-head">
-              <h2>감지 및 알림 이력</h2>
-              <span>인시던트 발생 이후 기록</span>
-            </div>
-            <div className="incident-detail__timeline incident-detail__scroll-area">
-              {generatedProgressRows.length ? generatedProgressRows.map(([time, message, actor], index) => (
-                <div className="incident-detail__timeline-row" key={`${time}-${message}`}>
-                  <span>{time}</span>
-                  <i className={index < 2 ? "is-danger" : index < 4 ? "is-warn" : ""} />
-                  <p>{message}</p>
-                  <em>{actor}</em>
+          <div className="incident-detail__history-layout" role="tabpanel">
+            <article className="incident-detail__card incident-detail__tab-card">
+              <div className="incident-detail__card-head">
+                <h2>감지 이력</h2>
+                <span>인시던트 발생 이후 기록</span>
+              </div>
+              <div className="incident-detail__timeline incident-detail__scroll-area">
+                {generatedProgressRows.length ? generatedProgressRows.map(([time, message, actor], index) => (
+                  <div className="incident-detail__timeline-row" key={`${time}-${message}`}>
+                    <span>{time}</span>
+                    <i className={index < 2 ? "is-danger" : index < 4 ? "is-warn" : ""} />
+                    <p>{message}</p>
+                    <em>{actor}</em>
+                  </div>
+                )) : <div className="incident-detail__empty">등록된 감지 이력이 없습니다.</div>}
+              </div>
+            </article>
+            <article className="incident-detail__card incident-detail__notification-panel">
+              <div className="incident-detail__card-head">
+                <h2>알림 내역</h2>
+                <span>{successfulNotificationCount}/{notificationRows.length}건 전송 성공</span>
+              </div>
+              <div className="incident-detail__notification-summary">
+                <div>
+                  <span>대상 인시던트</span>
+                  <strong>{incident.externalIncidentCode ?? `#${incident.incidentId}`}</strong>
+                  <small>{incident.title}</small>
                 </div>
-              )) : <div className="incident-detail__empty">등록된 감지 및 알림 이력이 없습니다.</div>}
-            </div>
-          </article>
+                <div>
+                  <span>영향 서비스</span>
+                  <strong>{displayImpactedServices.length}건</strong>
+                  <small>{service?.serviceName ?? incident.targetCode}</small>
+                </div>
+                <div>
+                  <span>수신 대상</span>
+                  <strong>{notificationRows.length}건</strong>
+                  <small>{incidentOwners.length ? "담당자/그룹 기준" : "시스템 기본 대상"}</small>
+                </div>
+              </div>
+              <div className="incident-detail__notification-list incident-detail__scroll-area">
+                {notificationRows.length ? notificationRows.map((row) => (
+                  <div className="incident-detail__notification-row" key={`${row.sentAt}-${row.recipient}-${row.channel}`}>
+                    <time>{row.sentAt}</time>
+                    <span className={`incident-detail__notification-channel is-${row.channelTone}`}>{row.channel}</span>
+                    <div className="incident-detail__notification-message">
+                      <strong>{row.title}</strong>
+                      <p>{row.message}</p>
+                      <small>{row.template} · {row.targetType} · {row.contact}</small>
+                    </div>
+                    <div className="incident-detail__notification-recipient">
+                      <b>{row.recipient}</b>
+                      <em className={row.status === "성공" ? "is-success" : "is-waiting"}>{row.status}</em>
+                    </div>
+                  </div>
+                )) : <div className="incident-detail__empty">등록된 알림 내역이 없습니다.</div>}
+              </div>
+            </article>
+          </div>
         ) : null}
 
         {activeTab === "impact" ? (
@@ -1177,6 +1226,46 @@ function buildIncidentProgressRows({
   }
 
   return rows;
+}
+
+function buildIncidentNotificationRows({
+  impactedServices = [],
+  incident,
+  owners = [],
+  service,
+}) {
+  const startedAt = String(incident?.startedAt || incident?.occurredAt || "");
+  const serviceName = service?.serviceName || incident?.targetCode || "대상 서비스";
+  const severity = String(incident?.severityCode || "MAJOR").toUpperCase();
+  const incidentCode = incident?.externalIncidentCode || `#${incident?.incidentId ?? "-"}`;
+  const recipientRows = owners.length
+    ? owners.slice(0, 5)
+    : [
+        { email: "ops@chainview.local", name: "운영 관제", organization: "SYSTEM", role: "ONCALL" },
+        { email: "manager@chainview.local", name: "서비스 운영", organization: "담당 그룹", role: "GROUP" },
+      ];
+  const channels = severity === "CRITICAL"
+    ? ["알림톡", "SMS", "이메일"]
+    : ["알림톡", "이메일", "SMS"];
+  const template = severity === "CRITICAL" ? "INCIDENT_CRITICAL_V1" : "INCIDENT_MAJOR_V1";
+
+  return recipientRows.map((owner, index) => {
+    const channel = channels[index % channels.length];
+    const targetType = owner.role === "GROUP" || owner.organization?.includes("그룹") ? "그룹" : "사용자";
+    const status = index === recipientRows.length - 1 && severity !== "CRITICAL" ? "대기" : "성공";
+    return {
+      channel,
+      channelTone: channel === "SMS" ? "sms" : channel === "이메일" ? "mail" : "talk",
+      contact: owner.email || owner.organization || "-",
+      message: `${incidentCode} · ${serviceName} 장애 알림 · 영향 서비스 ${impactedServices.length}건`,
+      recipient: owner.name || "수신자 미등록",
+      sentAt: formatIncidentProgressTime(startedAt, index + 1),
+      status,
+      targetType,
+      template,
+      title: `[${severityLabelFor(severity)}] ${incident?.title || `${serviceName} 인시던트`}`,
+    };
+  });
 }
 
 function buildRelationImpactedServices(service, services = [], relations = []) {

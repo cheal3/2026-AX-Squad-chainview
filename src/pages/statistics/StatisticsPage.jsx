@@ -1,8 +1,10 @@
 import { useMemo, useState } from "react";
+import { Download, Search } from "lucide-react";
 
 import { AppShell } from "../../components/AppShell.jsx";
 import { usePortalData } from "../../dashboardModule/PortalDataStore";
 import { codeLabels } from "../../dashboardModule/mockData";
+import { matchesSearchText, searchableText } from "../../utils/search";
 
 function compactText(value) {
   return String(value ?? "").trim();
@@ -14,6 +16,8 @@ function serviceLabel(service) {
 export function StatisticsPage({ activeMenu = "analysis-statistics", sectionLabel = "분석" }) {
   const portalData = usePortalData();
   const [activeStatsTab, setActiveStatsTab] = useState("service");
+  const [techSearch, setTechSearch] = useState("");
+  const [techTypeFilter, setTechTypeFilter] = useState("all");
   const serviceById = useMemo(
     () => new Map(portalData.services.map((service) => [service.serviceId, service])),
     [portalData.services]
@@ -48,6 +52,32 @@ export function StatisticsPage({ activeMenu = "analysis-statistics", sectionLabe
     countBy(portalData.services, (service) => codeLabels.serviceStatus[service.statusCode] || service.statusCode || "미지정"),
     6
   );
+  const techStackRows = useMemo(
+    () => buildTechStackRows(portalData.techStacks, serviceById),
+    [portalData.techStacks, serviceById]
+  );
+  const techTypeOptions = useMemo(
+    () => Array.from(new Set(techStackRows.map((row) => row.typeLabel))).filter(Boolean).sort((a, b) => a.localeCompare(b)),
+    [techStackRows]
+  );
+  const filteredTechStackRows = useMemo(
+    () => techStackRows.filter((row) => {
+      const matchesType = techTypeFilter === "all" || row.typeLabel === techTypeFilter;
+      const matchesKeyword = matchesSearchText(
+        searchableText(row.name, row.typeLabel, row.category, row.version, row.vendor, row.description, row.serviceNames),
+        techSearch
+      );
+      return matchesType && matchesKeyword;
+    }),
+    [techSearch, techStackRows, techTypeFilter]
+  );
+  const techTypeStats = topEntries(countBy(techStackRows, (row) => row.typeLabel), 5);
+  const topTechStats = techStackRows
+    .slice()
+    .sort((a, b) => b.serviceCount - a.serviceCount || a.name.localeCompare(b.name))
+    .slice(0, 10)
+    .map((row) => ({ label: row.name, value: row.serviceCount }));
+  const techVersionStats = buildTechVersionStats(techStackRows);
   const deploymentStats = topEntries(
     countBy(portalData.deployments, (deployment) =>
       deployment.serverName ||
@@ -110,6 +140,7 @@ export function StatisticsPage({ activeMenu = "analysis-statistics", sectionLabe
     { key: "service", label: "서비스" },
     { key: "incident", label: "인시던트" },
     { key: "relation", label: "관계·인프라" },
+    { key: "tech", label: "기술스택" },
     { key: "quality", label: "품질 점검" },
   ];
 
@@ -197,6 +228,93 @@ export function StatisticsPage({ activeMenu = "analysis-statistics", sectionLabe
                   <span><b>{portalData.owners.length}</b> 담당자 매핑</span>
                   <span><b>{activeRelations}</b> 활성 관계</span>
                   <span><b>{mandatoryRelations}</b> 필수 관계</span>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {activeStatsTab === "tech" ? (
+            <div className="statistics-tech-tab">
+              <div className="statistics-chart-grid statistics-chart-grid--tech">
+                <ChartCard title="기술스택 유형 분포">
+                  <DonutChart rows={techTypeStats} />
+                </ChartCard>
+                <ChartCard title="많이 사용되는 기술 TOP 10">
+                  <HorizontalBarChart rows={topTechStats} />
+                </ChartCard>
+                <div className="statistics-panel statistics-tech-versions">
+                  <h2>주요 기술 버전 분포</h2>
+                  <div className="statistics-tech-versions__grid">
+                    {techVersionStats.length ? techVersionStats.map((group) => (
+                      <div className="statistics-tech-version-card" key={group.name}>
+                        <h3>{group.name} 버전 분포</h3>
+                        <MiniDonutChart rows={group.rows} />
+                      </div>
+                    )) : <div className="statistics-empty">표시할 버전 데이터가 없습니다.</div>}
+                  </div>
+                </div>
+              </div>
+
+              <div className="statistics-panel statistics-tech-list">
+                <div className="statistics-tech-list__head">
+                  <div>
+                    <h2>등록된 기술스택 목록</h2>
+                    <span>총 {filteredTechStackRows.length}건</span>
+                  </div>
+                  <div className="statistics-tech-list__tools">
+                    <label className="statistics-search-field">
+                      <Search size={15} aria-hidden="true" />
+                      <input
+                        type="text"
+                        value={techSearch}
+                        onChange={(event) => setTechSearch(event.target.value)}
+                        placeholder="기술명, 유형, 설명 검색..."
+                      />
+                    </label>
+                    <select value={techTypeFilter} onChange={(event) => setTechTypeFilter(event.target.value)}>
+                      <option value="all">전체 유형</option>
+                      {techTypeOptions.map((type) => <option key={type} value={type}>{type}</option>)}
+                    </select>
+                    <button className="btn" type="button" onClick={() => downloadTechStackCsv(filteredTechStackRows)}>
+                      <Download size={15} aria-hidden="true" /> 엑셀 다운로드
+                    </button>
+                  </div>
+                </div>
+                <div className="statistics-table-wrap">
+                  <table className="tbl statistics-tech-table">
+                    <thead>
+                      <tr>
+                        <th>기술명</th>
+                        <th>유형</th>
+                        <th>카테고리</th>
+                        <th>버전</th>
+                        <th>벤더</th>
+                        <th>설명</th>
+                        <th>등록일</th>
+                        <th>사용 서비스 수</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredTechStackRows.length ? filteredTechStackRows.map((row) => (
+                        <tr key={row.key}>
+                          <td><b>{row.name}</b></td>
+                          <td>{row.typeLabel}</td>
+                          <td>{row.category}</td>
+                          <td>{row.version}</td>
+                          <td>{row.vendor}</td>
+                          <td>{row.description}</td>
+                          <td>{row.registeredAt}</td>
+                          <td>{row.serviceCount}</td>
+                        </tr>
+                      )) : (
+                        <tr>
+                          <td colSpan={8}>
+                            <div className="statistics-empty">검색 조건에 맞는 기술스택이 없습니다.</div>
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>
@@ -343,6 +461,50 @@ function DonutChart({ rows }) {
   );
 }
 
+function MiniDonutChart({ rows }) {
+  const total = rows.reduce((sum, row) => sum + row.value, 0);
+  const radius = 31;
+  const circumference = 2 * Math.PI * radius;
+  let offset = 0;
+
+  return (
+    <div className="mini-donut-chart">
+      <div className="mini-donut-chart__body">
+        <svg className="mini-donut-chart__svg" viewBox="0 0 92 92" role="img" aria-label="버전 분포">
+          <circle className="mini-donut-chart__base" cx="46" cy="46" r={radius} />
+          {rows.map((row, index) => {
+            const length = total ? (row.value / total) * circumference : 0;
+            const segment = (
+              <circle
+                className="mini-donut-chart__segment"
+                cx="46"
+                cy="46"
+                key={row.label}
+                r={radius}
+                stroke={chartColors[index % chartColors.length]}
+                strokeDasharray={`${length} ${circumference - length}`}
+                strokeDashoffset={-offset}
+              />
+            );
+            offset += length;
+            return segment;
+          })}
+        </svg>
+        <strong>{total}</strong>
+      </div>
+      <div className="mini-donut-chart__legend">
+        {rows.map((row, index) => (
+          <span key={row.label}>
+            <i style={{ background: chartColors[index % chartColors.length] }} />
+            {row.label}
+            <b>{row.value}</b>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function HorizontalBarChart({ rows }) {
   const max = Math.max(...rows.map((row) => row.value), 1);
 
@@ -447,4 +609,147 @@ function topEntries(map, limit) {
     .map(([label, value]) => ({ label, value }))
     .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label))
     .slice(0, limit);
+}
+
+function buildTechStackRows(techStacks = [], serviceById = new Map()) {
+  const grouped = new Map();
+
+  techStacks.forEach((techStack, index) => {
+    const name = compactText(techStack.techName) || "기술명 미등록";
+    const typeLabel =
+      compactText(techStack.techTypeName) ||
+      codeLabels.techType?.[techStack.techTypeCode] ||
+      compactText(techStack.techTypeCode) ||
+      "기타";
+    const version = compactText(techStack.versionText) || "-";
+    const vendor = compactText(techStack.vendorName) || inferTechVendor(name);
+    const key = [name, typeLabel, version, vendor].join("|");
+    const service = serviceById.get(Number(techStack.serviceId));
+
+    if (!grouped.has(key)) {
+      grouped.set(key, {
+        key,
+        categorySet: new Set(),
+        description: compactText(techStack.description) || buildTechDescription(name, version),
+        name,
+        recordCount: 0,
+        registeredAt: formatDateText(techStack.createdAt || techStack.updatedAt || techStack.registeredAt),
+        serviceIds: new Set(),
+        serviceNames: new Set(),
+        sortIndex: index,
+        typeLabel,
+        vendor,
+        version,
+      });
+    }
+
+    const row = grouped.get(key);
+    row.recordCount += 1;
+    if (!row.registeredAt || row.registeredAt === "-") {
+      row.registeredAt = formatDateText(techStack.createdAt || techStack.updatedAt || techStack.registeredAt);
+    }
+    if (service?.serviceId) {
+      row.serviceIds.add(Number(service.serviceId));
+      row.serviceNames.add(service.serviceName || service.serviceCode);
+      const serviceCategory = compactText(service.categoryPath?.[1] || service.categoryPath?.[0]);
+      if (serviceCategory) row.categorySet.add(serviceCategory);
+    }
+    row.categorySet.add(normalizeTechCategory(techStack.techTypeCode, typeLabel));
+  });
+
+  return [...grouped.values()]
+    .map((row) => ({
+      ...row,
+      category: Array.from(row.categorySet).filter(Boolean).slice(0, 2).join(", ") || "기타",
+      serviceCount: row.serviceIds.size || row.recordCount,
+      serviceNames: Array.from(row.serviceNames).join(", "),
+    }))
+    .sort((a, b) => b.serviceCount - a.serviceCount || a.name.localeCompare(b.name) || a.version.localeCompare(b.version));
+}
+
+function buildTechVersionStats(rows = []) {
+  const preferredNames = ["Java", "Spring Boot", "MySQL"];
+  const grouped = new Map();
+
+  rows.forEach((row) => {
+    const key = row.name;
+    if (!grouped.has(key)) {
+      grouped.set(key, new Map());
+    }
+    const version = row.version && row.version !== "-" ? row.version : "미지정";
+    grouped.get(key).set(version, (grouped.get(key).get(version) || 0) + Math.max(row.serviceCount, row.recordCount, 1));
+  });
+
+  const preferred = preferredNames.filter((name) => grouped.has(name));
+  const fallback = [...grouped.entries()]
+    .filter(([name, versionMap]) => !preferred.includes(name) && versionMap.size > 1)
+    .sort(([, a], [, b]) => sumMapValues(b) - sumMapValues(a))
+    .map(([name]) => name);
+  const names = [...preferred, ...fallback].slice(0, 3);
+
+  return names.map((name) => ({
+    name,
+    rows: topEntries(grouped.get(name), 4),
+  }));
+}
+
+function sumMapValues(map) {
+  return [...map.values()].reduce((sum, value) => sum + value, 0);
+}
+
+function normalizeTechCategory(typeCode, typeLabel) {
+  const code = String(typeCode || "").toUpperCase();
+  const label = compactText(typeLabel);
+  if (code.includes("LANG") || label.includes("언어") || label.includes("런타임")) return "언어";
+  if (code.includes("DATABASE") || label.includes("데이터베이스") || label === "DB") return "DB";
+  if (code.includes("FRAMEWORK") || label.includes("프레임워크")) return "프레임워크";
+  if (label.includes("미들웨어") || label.includes("WAS")) return "미들웨어";
+  if (label.includes("DevOps") || label.includes("도구")) return "도구";
+  if (label.includes("솔루션")) return "솔루션";
+  return label || "기타";
+}
+
+function inferTechVendor(name) {
+  const normalized = String(name || "").toLowerCase();
+  if (normalized.includes("java") || normalized.includes("mysql") || normalized.includes("oracle")) return "Oracle";
+  if (normalized.includes("spring")) return "VMware";
+  if (normalized.includes("postgres")) return "PostgreSQL";
+  if (normalized.includes("jeus") || normalized.includes("tmax") || normalized.includes("webtob")) return "TmaxSoft";
+  if (normalized.includes("docker")) return "Docker";
+  return "-";
+}
+
+function buildTechDescription(name, version) {
+  return `${name}${version && version !== "-" ? ` ${version}` : ""} 적용 기술`;
+}
+
+function formatDateText(value) {
+  const text = compactText(value);
+  return text ? text.slice(0, 10) : "-";
+}
+
+function downloadTechStackCsv(rows) {
+  const headers = ["기술명", "유형", "카테고리", "버전", "벤더", "설명", "등록일", "사용 서비스 수"];
+  const body = rows.map((row) => [
+    row.name,
+    row.typeLabel,
+    row.category,
+    row.version,
+    row.vendor,
+    row.description,
+    row.registeredAt,
+    row.serviceCount,
+  ]);
+  const csv = [headers, ...body].map((cells) => cells.map(csvCell).join(",")).join("\n");
+  const blob = new Blob([`\ufeff${csv}`], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "chainview-tech-stacks.csv";
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function csvCell(value) {
+  return `"${String(value ?? "").replaceAll('"', '""')}"`;
 }
