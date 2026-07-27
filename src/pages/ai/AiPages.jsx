@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Bot, BookOpen, FileUp, Send, Sparkles } from "lucide-react";
+import { Bot, FileUp, Plus, RefreshCw, Search, Send, Sparkles } from "lucide-react";
 import { AppShell } from "../../components/AppShell.jsx";
 import { chainViewApi } from "../../dashboardModule/chainViewApi";
 
@@ -45,10 +45,77 @@ const suggestActionMap = {
   "서비스명으로 질문하기": { focusInput: true },
 };
 
-const runbookRows = [
-  { title: "SSO/EAM 인증 장애", slug: "sso-eam-auth-failure" },
-  { title: "배치 지연 대응", slug: "batch-delay-response" },
-  { title: "DB 커넥션 고갈", slug: "db-connection-pool" },
+const routingRuleGroups = [
+  "BOILERPLATE_EXACT",
+  "ENTITY_STOPWORD",
+  "ENTITY_STRIP_REGEX",
+  "IMPACT_KEYWORD",
+  "INCIDENT_BLOCK_CUE",
+  "INCIDENT_DIRECT_PHRASE",
+  "INCIDENT_EXISTENCE_CUE",
+  "INCIDENT_GUIDANCE_CUE",
+  "INCIDENT_LIST_CUE",
+  "INCIDENT_REQUIRED_TERM",
+  "INCIDENT_STATUS_FILTER",
+  "INTENT_KEYWORD",
+  "NARRATIVE_ANALYSIS_CUE",
+  "NARRATIVE_ENABLE",
+  "NARRATIVE_SUPPRESS_COUNT",
+  "NARRATIVE_SUPPRESS_LIST",
+  "NARRATIVE_SUPPRESS_LOOKUP",
+  "RELATION_IN",
+  "RELATION_OUT",
+  "SCOPE_ALL",
+  "SERVICE_ALIAS",
+];
+
+const routingRules = [
+  ["BOILERPLATE_EXACT", "SKIP", "EXACT", "특정 서비스", "100", "Y"],
+  ["BOILERPLATE_EXACT", "SKIP", "EXACT", "전체 서비스", "100", "Y"],
+  ["BOILERPLATE_EXACT", "SKIP", "EXACT", "특정", "100", "Y"],
+  ["BOILERPLATE_EXACT", "SKIP", "EXACT", "전체", "100", "Y"],
+  ["BOILERPLATE_EXACT", "SKIP", "EXACT", "서비스명으로 질문하기", "100", "Y"],
+  ["BOILERPLATE_EXACT", "SKIP", "EXACT", "상위 분류로", "100", "Y"],
+  ["BOILERPLATE_EXACT", "SKIP", "EXACT", "전체 서비스로 보기", "100", "Y"],
+  ["BOILERPLATE_EXACT", "SKIP", "EXACT", "서비스명으로 질문", "100", "Y"],
+  ["BOILERPLATE_EXACT", "SKIP", "EXACT", "처음으로", "100", "Y"],
+  ["ENTITY_STOPWORD", "STOP", "CONTAINS", "서비스", "50", "Y"],
+  ["ENTITY_STOPWORD", "STOP", "CONTAINS", "조회해주세요", "50", "Y"],
+  ["ENTITY_STOPWORD", "STOP", "CONTAINS", "확인해주세요", "50", "Y"],
+];
+
+const previewRules = [
+  ["INCIDENT_REQUIRED_TERM", "TERM", "장애", "100", "장애 관련 필수어"],
+  ["INCIDENT_LIST_CUE", "CUE", "몇건", "100", "장애 목록/건수 cue"],
+  ["INCIDENT_LIST_CUE", "CUE", "건", "88", "장애 건수·건 질의"],
+  ["INCIDENT_DIRECT_PHRASE", "DIRECT", "서비스 장애", "100", "장애 목록 단독 구분"],
+  ["SCOPE_ALL", "ALL", "전체", "100", "전체 스코프"],
+  ["SCOPE_ALL", "ALL", "전체 서비스", "100", "전체 스코프"],
+  ["NARRATIVE_ENABLE", "NARRATE", "?", "90", "물음표"],
+  ["NARRATIVE_SUPPRESS_COUNT", "SUPPRESS", "몇건", "100", "건수 질의 서술 억제"],
+  ["NARRATIVE_SUPPRESS_COUNT", "SUPPRESS", "몇\\s*건", "100", "몇건 regex"],
+  ["ENTITY_STOPWORD", "STOP", "서비스", "50", "엔티티 검색 제외어"],
+  ["ENTITY_STOPWORD", "STOP", "장애", "50", "엔티티 검색 제외어"],
+  ["ENTITY_STOPWORD", "STOP", "전체", "50", "엔티티 검색 제외어"],
+];
+
+const ragDocuments = [
+  ["guidelines", "EDMS-이미지-OZ-공통솔루션-일월점검장애대응-운영지침.md", "15.6 KB", "2026-07-27 02:50:35", "색인됨 (참고 23개)"],
+  ["guidelines", "FEP-EAI-대외기관연계-일월점검장애대응-운영지침.md", "14.3 KB", "2026-07-27 02:50:36", "색인됨 (참고 21개)"],
+  ["incident-reports", "20260529-edms-month-end-document-hang-incident-report.md", "8.7 KB", "2026-07-27 02:50:08", "색인됨 (참고 14개)"],
+  ["incident-reports", "20260617-sso-eam-login-latency-incident-report.md", "7.9 KB", "2026-07-27 02:50:08", "색인됨 (참고 13개)"],
+  ["manuals", "SSO-EAM-통합인증-로그인-응답지연-대응매뉴얼.md", "5.5 KB", "2026-07-27 02:49:41", "색인됨 (참고 11개)"],
+  ["manuals", "UMS-알림톡-SMS-발송후-장애-플랫폼-대응매뉴얼.md", "10.4 KB", "2026-07-27 02:49:45", "색인됨 (참고 17개)"],
+  ["summary", "catalog.md", "6.1 KB", "2026-07-27 03:01:18", "색인됨 (참고 10개)"],
+  ["summary", "deployment.md", "5.7 KB", "2026-07-27 03:01:18", "색인됨 (참고 40개)"],
+  ["summary", "incidents.md", "2.8 KB", "2026-07-27 03:01:18", "색인됨 (참고 4개)"],
+  ["summary", "ownership.md", "6.3 KB", "2026-07-27 03:01:18", "색인됨 (참고 41개)"],
+];
+
+const ragResults = [
+  ["SSO-EAM-통합인증-로그인-응답지연-대응매뉴얼.md", "운영 매뉴얼", "서비스: SSO_EAM", "최종 수정일: 2026-07-27 02:49:41", "영향 범위 IMPACT", "'SSO_EAM'을 통한 로그인 경로를 사용하는 임직원·업무 시스템의 신규 로그인이 지연되거나 실패할 수 있다.", "0.966", "manuals"],
+  ["20260617-sso-eam-login-latency-incident-report.md", "장애 보고서", "서비스: SSO_EAM", "최종 수정일: 2026-06-17 10:30:18", "업무 영향 IMPACT", "'SSO_EAM'을 사용하는 42개 업무시스템 중 31개 시스템에서 신규 로그인 지연이 확인되었다.", "0.832", "incident-reports"],
+  ["EDMS-웹마감-전자문서-처리지연-HANG-대응매뉴얼.md", "운영 매뉴얼", "서비스: EDMS", "최종 수정일: 2026-07-27 02:49:42", "영향 범위", "월 마감 프로세스 처리 지연 또는 HANG 발생 시 진행률 생성/저장/전송이 지연될 수 있다.", "0.801", "manuals"],
 ];
 
 export function AiAssistantPage() {
@@ -870,64 +937,193 @@ function escapeHtml(value) {
     .replace(/"/g, "&quot;");
 }
 
-export function AiRunbookPage() {
+export function AiRagKnowledgePage() {
   return (
-    <AppShell activeMenu="ai-runbook">
-      <main className="main ai-page">
-        <AiPageHeader
-          icon={<BookOpen size={22} />}
-          eyebrow="AI ASSISTANT / Runbook 관리"
-          title="Assistant Runbook"
-          description="운영 runbook 편집 및 검색 컨텍스트 관리"
-          action={
-            <div className="ai-page__actions">
-              <button className="btn" type="button">벡터 새로고침</button>
-              <button className="btn btn--primary" type="button">새 Runbook</button>
-            </div>
-          }
-        />
-
-        <section className="ai-panel">
-          <h2>장애 보고서 업로드</h2>
-          <p>DOCX/TXT/MD 보고서를 업로드하면 LLM이 구조화하고 runbook 초안을 생성합니다.</p>
-          <div className="ai-upload-row">
-            <label className="ai-file-box">
-              <FileUp size={16} />
-              <span>파일 선택</span>
-              <input type="file" />
-            </label>
-            <label className="ai-check"><input defaultChecked type="checkbox" /> LLM 구조화 사용</label>
+    <AppShell activeMenu="ai-rag">
+      <main className="main assistant-admin-page">
+        <div className="assistant-admin-head">
+          <div>
+            <h1>RAG 지식 검색</h1>
+            <p>운영 매뉴얼, 장애보고서, 서비스 정보를 검색합니다.</p>
           </div>
-          <button className="ai-wide-button" type="button">보고서 ingest</button>
+          <div className="assistant-admin-actions">
+            <button className="btn" type="button">새로고침</button>
+            <button className="btn btn--primary" type="button">전체 재처리</button>
+          </div>
+        </div>
+
+        <section className="assistant-card assistant-status-card">
+          <h2>상태</h2>
+          <div className="assistant-status-row">
+            <span>RAG 활성화: <b>예</b></span>
+            <span>응답 모드: <b>HYBRID</b></span>
+            <span>VectorStore: <b>정상</b></span>
+            <span>임베딩: <b>openai / text-embedding-3-small</b></span>
+            <span>테이블: <b>assistant_rag_documents_openai</b></span>
+          </div>
         </section>
 
-        <section className="ai-runbook-grid">
-          <div className="ai-runbook-list">
-            <label>검색</label>
-            <input placeholder="파일명/slug 검색" />
-            <div className="ai-runbook-items">
-              {runbookRows.map((row) => (
-                <button key={row.slug} type="button">
-                  <strong>{row.title}</strong>
-                  <span>{row.slug}</span>
-                </button>
-              ))}
-            </div>
+        <section className="assistant-card">
+          <h2>문서 업로드</h2>
+          <p>.md, .txt, .docx 파일을 category별로 업로드합니다. 업로드만으로는 검색에 반영되지 않으며, 위 전체 재처리 버튼을 눌러야 임베딩·색인이 수행됩니다.</p>
+          <div className="assistant-upload-grid">
+            <label>
+              <span>Category</span>
+              <select defaultValue="manuals">
+                <option>manuals</option>
+                <option>guidelines</option>
+                <option>incident-reports</option>
+                <option>summary</option>
+              </select>
+            </label>
+            <label className="assistant-file-field">
+              <span>파일</span>
+              <FileUp size={16} />
+              <input type="file" />
+            </label>
           </div>
-          <div className="ai-runbook-editor">
-            <label>Slug (파일명, 확장자 제외)</label>
-            <input defaultValue="sso-eam-auth-failure" />
-            <label>Markdown 본문</label>
-            <textarea defaultValue={"# SSO/EAM 인증 장애\n\n## 증상\n\n## 확인 절차\n\n## 조치"} />
-            <div className="ai-runbook-footer">
-              <button className="btn btn--danger" type="button">삭제</button>
-              <button className="btn" type="button">미리보기</button>
-              <button className="btn btn--primary" type="button">저장</button>
-            </div>
+          <button className="assistant-wide-primary" type="button">업로드</button>
+        </section>
+
+        <section className="assistant-card">
+          <div className="assistant-card-head">
+            <h2>문서 목록</h2>
+            <input placeholder="파일명·category 검색" />
+          </div>
+          <AssistantDataTable
+            columns={["Category", "파일명", "크기", "수정일", "색인 상태", "작업"]}
+            rows={ragDocuments.map((row) => [
+              row[0],
+              row[1],
+              row[2],
+              row[3],
+              <span className="assistant-ok" key="status">{row[4]}</span>,
+              <span className="assistant-row-actions" key="actions"><button>정보 보기</button><button>다운로드</button><button className="is-danger">삭제</button></span>,
+            ])}
+          />
+        </section>
+
+        <section className="assistant-card">
+          <h2>지식 검색</h2>
+          <p>질문을 입력하면 실제 임베딩 기반으로 유사한 문서를 검색합니다.</p>
+          <div className="assistant-search-row">
+            <input defaultValue="SSO 로그인 장애" placeholder="예) SSO 로그인 장애 발생 시 조치 방법" />
+            <button className="btn btn--primary" type="button">조회</button>
+          </div>
+        </section>
+
+        <section className="assistant-card">
+          <div className="assistant-card-head">
+            <h2>검색 결과</h2>
+            <span>검색 결과 5건</span>
+          </div>
+          <div className="assistant-result-list">
+            {ragResults.map((result) => (
+              <article className="assistant-result-card" key={result[0]}>
+                <div>
+                  <h3>{result[0]}</h3>
+                  <p>{result[1]} <span>|</span> {result[2]} <span>|</span> {result[3]}</p>
+                  <strong>{result[4]}</strong>
+                  <p>{result[5]}</p>
+                </div>
+                <div className="assistant-result-side">
+                  <b>유사도 {result[6]}</b>
+                  <div><button>상세 보기</button><button>다운로드</button></div>
+                  <span>{result[7]}</span>
+                </div>
+              </article>
+            ))}
           </div>
         </section>
       </main>
     </AppShell>
+  );
+}
+
+export function AiRoutingRulesPage() {
+  const [previewText, setPreviewText] = useState("전체 서비스 장애는 몇건이지?");
+  return (
+    <AppShell activeMenu="ai-routing">
+      <main className="main assistant-admin-page">
+        <div className="assistant-admin-head">
+          <div>
+            <h1>Assistant 라우팅 규칙</h1>
+            <p>자연어 질문의 라우팅 키워드·패턴을 관리합니다. 저장 시 메모리 캐시가 자동 갱신됩니다.</p>
+          </div>
+          <div className="assistant-admin-actions">
+            <button className="btn" type="button"><RefreshCw size={14} /> 메모리 갱신</button>
+            <button className="btn btn--primary" type="button"><Plus size={14} /> 규칙 등록</button>
+          </div>
+        </div>
+
+        <section className="assistant-card">
+          <h2>규칙 그룹</h2>
+          <div className="assistant-rule-chips">
+            <button className="is-active" type="button">전체</button>
+            {routingRuleGroups.map((group) => <button key={group} type="button">{group}</button>)}
+          </div>
+        </section>
+
+        <section className="assistant-card">
+          <div className="assistant-rule-toolbar">
+            <label><Search size={16} /><input placeholder="그룹, 패턴, target, 설명 검색..." /></label>
+            <div className="assistant-pages"><button disabled>‹</button><button className="is-active">1</button><button>2</button><button>3</button><span>...</span><button>19</button><button>›</button></div>
+          </div>
+          <p className="assistant-muted">메모리 적재 <b>930건</b> · 필터 결과 <b>930건</b> | 1 / 19 페이지</p>
+          <AssistantDataTable
+            columns={["그룹", "Target", "모드", "패턴", "우선순위", "사용", "작업"]}
+            rows={routingRules.map((row) => [
+              row[0],
+              row[1],
+              row[2],
+              row[3],
+              row[4],
+              <span className="assistant-yn" key="yn">{row[5]}</span>,
+              <span className="assistant-icon-actions" key="actions"><button>✎</button><button className="is-danger">⌫</button></span>,
+            ])}
+          />
+        </section>
+
+        <section className="assistant-card">
+          <h2>규칙 매칭 미리보기</h2>
+          <p>질문을 입력하면 현재 메모리 규칙 기준 매칭 결과와 추론 액션을 확인합니다.</p>
+          <div className="assistant-preview-row">
+            <input onChange={(event) => setPreviewText(event.target.value)} value={previewText} />
+            <button className="btn btn--primary" type="button">▷ 미리보기</button>
+          </div>
+          <div className="assistant-preview-summary">
+            추론 액션: <b>INCIDENT_HISTORY</b>
+            <span>· 서비스: --</span>
+            <span>· 게이트: PROCEED</span>
+            <span>· 정형 파이프라인: Y</span>
+            <span>· 장애 목록: Y</span>
+            <span>· 영향도: N</span>
+            <span>· 장애 필터: DEFAULT</span>
+            <span>· LLM 서술: N</span>
+            <span>· 매칭 규칙: 12건</span>
+          </div>
+          <AssistantDataTable
+            columns={["그룹", "Target", "패턴", "우선순위", "설명"]}
+            rows={previewRules}
+          />
+        </section>
+      </main>
+    </AppShell>
+  );
+}
+
+function AssistantDataTable({ columns, rows }) {
+  return (
+    <div className="assistant-table-wrap">
+      <table className="assistant-table">
+        <thead><tr>{columns.map((column) => <th key={column}>{column}</th>)}</tr></thead>
+        <tbody>
+          {rows.map((row, rowIndex) => (
+            <tr key={rowIndex}>{row.map((cell, cellIndex) => <td key={cellIndex}>{cell}</td>)}</tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Bell, ChevronDown, LogOut, Settings, UserRound } from "lucide-react";
+import { Bell, Bot, ChevronDown, Database, GitFork, LogOut, Settings, UserRound } from "lucide-react";
 import { usePortalData } from "../dashboardModule/PortalDataStore";
 
 const sidebarSections = [
@@ -44,10 +44,11 @@ const sidebarSections = [
     ],
   },
   {
-    label: "AI",
+    label: "AX ASSISTANT",
     items: [
-      { key: "ai-assistant", icon: "🤖", label: "AI 어시스턴트", to: "/ai/assistant" },
-      { key: "ai-runbook", icon: "📘", label: "Runbook", to: "/ai/runbook" },
+      { key: "ai-assistant", icon: Bot, label: "운영 AI Assistant", to: "/ai/assistant" },
+      { key: "ai-rag", icon: Database, label: "RAG 지식 관리", to: "/ai/rag" },
+      { key: "ai-routing", icon: GitFork, label: "라우팅 규칙", to: "/ai/routing" },
     ],
   },
   {
@@ -267,10 +268,15 @@ function Sidebar({ activeMenu = "", isDark = false }) {
       </div>
       {sectionItems.map((section) => (
         <div className="lnb__group" key={section.label}>
-          <div className="lnb__title">{section.label}</div>
+          <div className="lnb__title">
+            <span>{section.label}</span>
+            {section.label === "AX ASSISTANT" ? <ChevronDown size={15} /> : null}
+          </div>
           {section.items.map((item) => (
             <Link className={itemClass(item.key)} data-key={item.key} key={item.key} title={isCollapsed ? item.label : undefined} to={item.to}>
-              <span className="lnb__item-icon" aria-hidden="true">{item.icon}</span>
+              <span className="lnb__item-icon" aria-hidden="true">
+                {typeof item.icon === "function" ? <item.icon size={22} strokeWidth={2.4} /> : item.icon}
+              </span>
               <span className="lnb__item-text">{item.label}</span>
               {item.badge ? <span className="badge">{item.badge}</span> : null}
             </Link>
