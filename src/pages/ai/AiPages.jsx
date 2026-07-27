@@ -938,6 +938,126 @@ function escapeHtml(value) {
 }
 
 export function AiRagKnowledgePage() {
+  const [categories, setCategories] = useState([]);
+  const [category, setCategory] = useState("manuals");
+  const [status, setStatus] = useState(null);
+  const [documents, setDocuments] = useState([]);
+  const [docKeyword, setDocKeyword] = useState("");
+  const [file, setFile] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [chunksModal, setChunksModal] = useState(null);
+  const [loading, setLoading] = useState({ page: true, upload: false, reindex: false, search: false, chunks: false });
+  const [message, setMessage] = useState("");
+
+  const loadRagData = async () => {
+    setLoading((current) => ({ ...current, page: true }));
+    try {
+      const [nextCategories, nextStatus, nextDocuments] = await Promise.all([
+        chainViewApi.assistant.rag.categories(),
+        chainViewApi.assistant.rag.status(),
+        chainViewApi.assistant.rag.documents(),
+      ]);
+      setCategories(nextCategories || []);
+      setCategory((current) => current || nextCategories?.[0] || "manuals");
+      setStatus(nextStatus || null);
+      setDocuments(nextDocuments || []);
+      setMessage("");
+    } catch (error) {
+      setMessage(error?.message || "RAG 정보를 불러오지 못했습니다.");
+    } finally {
+      setLoading((current) => ({ ...current, page: false }));
+    }
+  };
+
+  useEffect(() => {
+    loadRagData();
+  }, []);
+
+  const filteredDocuments = useMemo(() => {
+    const keyword = docKeyword.trim().toLowerCase();
+    if (!keyword) return documents;
+    return documents.filter((doc) =>
+      String(doc.fileName || "").toLowerCase().includes(keyword) ||
+      String(doc.category || "").toLowerCase().includes(keyword)
+    );
+  }, [docKeyword, documents]);
+
+  const uploadDocument = async () => {
+    if (!file) {
+      setMessage("업로드할 파일을 선택하세요.");
+      return;
+    }
+    setLoading((current) => ({ ...current, upload: true }));
+    try {
+      const response = await chainViewApi.assistant.rag.uploadDocument(file, category);
+      setMessage(response?.message || "업로드 완료");
+      setFile(null);
+      await loadRagData();
+    } catch (error) {
+      setMessage(error?.message || "업로드에 실패했습니다.");
+    } finally {
+      setLoading((current) => ({ ...current, upload: false }));
+    }
+  };
+
+  const reindexDocuments = async () => {
+    setLoading((current) => ({ ...current, reindex: true }));
+    try {
+      const response = await chainViewApi.assistant.rag.reindex();
+      setMessage(formatReindexMessage(response));
+      await loadRagData();
+    } catch (error) {
+      setMessage(error?.message || "전체 재적재에 실패했습니다.");
+    } finally {
+      setLoading((current) => ({ ...current, reindex: false }));
+    }
+  };
+
+  const deleteDocument = async (path) => {
+    if (!path || !window.confirm(`"${path}" 문서를 삭제할까요?\n파일과 색인된 벡터가 함께 삭제됩니다.`)) return;
+    try {
+      await chainViewApi.assistant.rag.deleteDocument(path);
+      setMessage("삭제되었습니다.");
+      await loadRagData();
+    } catch (error) {
+      setMessage(error?.message || "삭제에 실패했습니다.");
+    }
+  };
+
+  const viewChunks = async (doc) => {
+    const path = doc.relativePath || doc.path;
+    if (!path) return;
+    setChunksModal({ title: doc.fileName || "청크 상세", path, chunks: [] });
+    setLoading((current) => ({ ...current, chunks: true }));
+    try {
+      const chunks = await chainViewApi.assistant.rag.chunks(path);
+      setChunksModal({ title: doc.fileName || "청크 상세", path, chunks: chunks || [] });
+    } catch (error) {
+      setChunksModal({ title: doc.fileName || "청크 상세", path, error: error?.message || "청크를 불러오지 못했습니다.", chunks: [] });
+    } finally {
+      setLoading((current) => ({ ...current, chunks: false }));
+    }
+  };
+
+  const searchRag = async () => {
+    const query = searchQuery.trim();
+    if (!query) {
+      setMessage("검색할 질문을 입력하세요.");
+      return;
+    }
+    setLoading((current) => ({ ...current, search: true }));
+    try {
+      const hits = await chainViewApi.assistant.rag.search(query);
+      setSearchResults(hits || []);
+      setMessage("");
+    } catch (error) {
+      setMessage(error?.message || "검색에 실패했습니다.");
+    } finally {
+      setLoading((current) => ({ ...current, search: false }));
+    }
+  };
+
   return (
     <AppShell activeMenu="ai-rag">
       <main className="main assistant-admin-page">
@@ -945,25 +1065,32 @@ export function AiRagKnowledgePage() {
           <div>
             <h1 className="page-head__title">
               <span className="page-head__icon" aria-hidden="true">📚</span>
-              <span>RAG 지식 검색</span>
+              <span>RAG 지식 관리</span>
             </h1>
             <p className="page-head__desc assistant-page-desc">운영 매뉴얼, 장애보고서, 서비스 정보를 검색합니다.</p>
           </div>
           <div className="assistant-admin-actions">
-            <button className="btn" type="button">새로고침</button>
-            <button className="btn btn--primary" type="button">전체 재처리</button>
+            <button className="btn" disabled={loading.page} onClick={loadRagData} type="button">새로고침</button>
+            <button className="btn btn--primary" disabled={loading.reindex} onClick={reindexDocuments} type="button">
+              {loading.reindex ? "재적재 중..." : "전체 재적재"}
+            </button>
           </div>
         </div>
 
         <section className="assistant-card assistant-status-card">
           <h2>상태</h2>
           <div className="assistant-status-row">
-            <span>RAG 활성화: <b>예</b></span>
-            <span>응답 모드: <b>HYBRID</b></span>
-            <span>VectorStore: <b>정상</b></span>
-            <span>임베딩: <b>openai / text-embedding-3-small</b></span>
-            <span>테이블: <b>assistant_rag_documents_openai</b></span>
+            {loading.page && !status ? <span>불러오는 중...</span> : (
+              <>
+                <span>RAG 활성화: <b>{status?.ragEnabled ? "예" : "아니오"}</b></span>
+                <span>응답 모드: <b>{status?.answerMode || "-"}</b></span>
+                <span>VectorStore: <b className={status?.vectorStoreHealthy ? "" : "is-danger"}>{status?.vectorStoreHealthy ? "정상" : "미연결"}</b></span>
+                <span>임베딩: <b>{status?.embeddingProvider || "-"} / {status?.embeddingModel || "-"}</b></span>
+                <span>테이블: <b>{status?.vectorTableName || "-"}</b></span>
+              </>
+            )}
           </div>
+          {message ? <pre className="assistant-result-note">{message}</pre> : null}
         </section>
 
         <section className="assistant-card">
@@ -972,74 +1099,115 @@ export function AiRagKnowledgePage() {
           <div className="assistant-upload-grid">
             <label>
               <span>Category</span>
-              <select defaultValue="manuals">
-                <option>manuals</option>
-                <option>guidelines</option>
-                <option>incident-reports</option>
-                <option>summary</option>
+              <select onChange={(event) => setCategory(event.target.value)} value={category}>
+                {(categories.length ? categories : ["manuals", "guidelines", "incident-reports", "summary"]).map((item) => (
+                  <option key={item} value={item}>{item}</option>
+                ))}
               </select>
             </label>
             <label className="assistant-upload-field">
               <span>파일</span>
               <div className="assistant-file-control">
                 <FileUp size={15} />
-                <input type="file" />
+                <input accept=".md,.txt,.docx" onChange={(event) => setFile(event.target.files?.[0] || null)} type="file" />
               </div>
             </label>
           </div>
-          <button className="assistant-wide-primary" type="button">업로드</button>
+          <button className="assistant-wide-primary" disabled={loading.upload} onClick={uploadDocument} type="button">
+            {loading.upload ? "업로드 중..." : "업로드"}
+          </button>
         </section>
 
         <section className="assistant-card">
           <div className="assistant-card-head">
             <h2>문서 목록</h2>
-            <input placeholder="파일명·category 검색" />
+            <input onChange={(event) => setDocKeyword(event.target.value)} placeholder="파일명·category 검색" value={docKeyword} />
           </div>
           <AssistantDataTable
             columns={["Category", "파일명", "크기", "수정일", "색인 상태", "작업"]}
-            rows={ragDocuments.map((row) => [
-              row[0],
-              row[1],
-              row[2],
-              row[3],
-              <span className="assistant-ok" key="status">{row[4]}</span>,
-              <span className="assistant-row-actions" key="actions"><button>정보 보기</button><button>다운로드</button><button className="is-danger">삭제</button></span>,
-            ])}
+            emptyText={loading.page ? "불러오는 중..." : "등록된 문서가 없습니다."}
+            rows={filteredDocuments.map((doc) => {
+              const path = doc.relativePath || doc.path || "";
+              return [
+                doc.category || "-",
+                doc.fileName || "-",
+                formatBytes(doc.sizeBytes),
+                doc.modifiedAt || "-",
+                <span className={doc.indexed ? "assistant-ok" : "assistant-muted-inline"} key="status">
+                  {doc.indexed ? `색인됨 (청크 ${doc.chunkCount || 0}개)` : "미색인"}
+                </span>,
+                <span className="assistant-row-actions" key="actions">
+                  {doc.indexed ? <button onClick={() => viewChunks(doc)} type="button">청크 보기</button> : null}
+                  <button onClick={() => downloadRagDocument(path)} type="button">다운로드</button>
+                  <button className="is-danger" onClick={() => deleteDocument(path)} type="button">삭제</button>
+                </span>,
+              ];
+            })}
           />
         </section>
 
         <section className="assistant-card">
-          <h2>지식 검색</h2>
-          <p>질문을 입력하면 실제 임베딩 기반으로 유사한 문서를 검색합니다.</p>
+          <h2>테스트 검색</h2>
+          <p>질문을 입력하면 실제 임베딩 유사도 검색 결과를 그대로 보여줍니다.</p>
           <div className="assistant-search-row">
-            <input defaultValue="SSO 로그인 장애" placeholder="예) SSO 로그인 장애 발생 시 조치 방법" />
-            <button className="btn btn--primary" type="button">조회</button>
+            <input
+              onChange={(event) => setSearchQuery(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") searchRag();
+              }}
+              placeholder="예) SSO 로그인 실패 시 조치 방법"
+              value={searchQuery}
+            />
+            <button className="btn btn--primary" disabled={loading.search} onClick={searchRag} type="button">
+              {loading.search ? "검색 중..." : "검색"}
+            </button>
           </div>
         </section>
 
-        <section className="assistant-card">
-          <div className="assistant-card-head">
-            <h2>검색 결과</h2>
-            <span>검색 결과 5건</span>
-          </div>
-          <div className="assistant-result-list">
-            {ragResults.map((result) => (
-              <article className="assistant-result-card" key={result[0]}>
-                <div>
-                  <h3>{result[0]}</h3>
-                  <p>{result[1]} <span>|</span> {result[2]} <span>|</span> {result[3]}</p>
-                  <strong>{result[4]}</strong>
-                  <p>{result[5]}</p>
-                </div>
-                <div className="assistant-result-side">
-                  <b>유사도 {result[6]}</b>
-                  <div><button>상세 보기</button><button>다운로드</button></div>
-                  <span>{result[7]}</span>
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
+        {searchResults.length ? (
+          <section className="assistant-card">
+            <div className="assistant-card-head">
+              <h2>검색 결과</h2>
+              <span>검색 결과 {searchResults.length}건</span>
+            </div>
+            <div className="assistant-result-list">
+              {searchResults.map((hit, index) => (
+                <article className="assistant-result-card" key={`${hit.id || hit.relativePath || index}`}>
+                  <div>
+                    <h3>{hit.sourceDocument || hit.fileName || "문서"}</h3>
+                    <p>{hit.section || "-"} {hit.sectionType && hit.sectionType !== "OTHER" ? `(${hit.sectionType})` : ""} <span>|</span> {hit.category || "-"}</p>
+                    {hit.serviceCodes ? <strong>서비스 {hit.serviceCodes}</strong> : null}
+                    <p>{hit.content || hit.excerpt || "-"}</p>
+                  </div>
+                  <div className="assistant-result-side">
+                    <b>유사도 {Number(hit.score || 0).toFixed(3)}</b>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        ) : null}
+        {chunksModal ? (
+          <AssistantModal title={chunksModal.title} onClose={() => setChunksModal(null)}>
+            <p className="assistant-muted">경로: {chunksModal.path}</p>
+            {loading.chunks ? <p className="assistant-muted">불러오는 중...</p> : null}
+            {chunksModal.error ? <p className="assistant-error-text">{chunksModal.error}</p> : null}
+            {chunksModal.chunks?.length ? (
+              <div className="assistant-chunk-list">
+                {chunksModal.chunks.map((chunk, index) => (
+                  <article className="assistant-chunk-card" key={chunk.id || index}>
+                    <div>
+                      <strong>청크 #{Number(chunk.chunkIndex ?? index) + 1}</strong>
+                      <span>{chunk.section || ""}{chunk.sectionType && chunk.sectionType !== "OTHER" ? ` (${chunk.sectionType})` : ""}</span>
+                      <span>{chunk.category || ""}{chunk.serviceCodes ? ` · 서비스 ${chunk.serviceCodes}` : ""} · {chunk.contentLength || String(chunk.content || "").length}자</span>
+                    </div>
+                    <pre>{chunk.content || ""}</pre>
+                  </article>
+                ))}
+              </div>
+            ) : !loading.chunks && !chunksModal.error ? <p className="assistant-muted">적재된 청크가 없습니다.</p> : null}
+          </AssistantModal>
+        ) : null}
       </main>
     </AppShell>
   );
@@ -1047,6 +1215,118 @@ export function AiRagKnowledgePage() {
 
 export function AiRoutingRulesPage() {
   const [previewText, setPreviewText] = useState("전체 서비스 장애는 몇건이지?");
+  const [groups, setGroups] = useState([]);
+  const [rules, setRules] = useState([]);
+  const [meta, setMeta] = useState(null);
+  const [activeGroup, setActiveGroup] = useState("");
+  const [keyword, setKeyword] = useState("");
+  const [page, setPage] = useState(1);
+  const [preview, setPreview] = useState(null);
+  const [modalRule, setModalRule] = useState(null);
+  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState({ page: true, preview: false, reload: false, save: false });
+  const pageSize = 50;
+
+  const loadRoutingData = async () => {
+    setLoading((current) => ({ ...current, page: true }));
+    try {
+      const [nextGroups, nextRules, nextMeta] = await Promise.all([
+        chainViewApi.assistant.routingRules.groups(),
+        chainViewApi.assistant.routingRules.list(),
+        chainViewApi.assistant.routingRules.meta(),
+      ]);
+      setGroups(nextGroups || []);
+      setRules(nextRules || []);
+      setMeta(nextMeta || null);
+      setMessage("");
+    } catch (error) {
+      setMessage(error?.message || "라우팅 규칙을 불러오지 못했습니다.");
+    } finally {
+      setLoading((current) => ({ ...current, page: false }));
+    }
+  };
+
+  useEffect(() => {
+    loadRoutingData();
+  }, []);
+
+  const filteredRules = useMemo(() => {
+    const q = keyword.trim().toLowerCase();
+    return rules.filter((rule) => {
+      if (activeGroup && rule.ruleGroup !== activeGroup) return false;
+      if (!q) return true;
+      return [rule.ruleGroup, rule.targetCode, rule.pattern, rule.description, rule.matchMode]
+        .join(" ")
+        .toLowerCase()
+        .includes(q);
+    });
+  }, [activeGroup, keyword, rules]);
+  const totalPages = Math.max(1, Math.ceil(filteredRules.length / pageSize));
+  const pageRows = filteredRules.slice((Math.min(page, totalPages) - 1) * pageSize, Math.min(page, totalPages) * pageSize);
+
+  useEffect(() => {
+    setPage(1);
+  }, [activeGroup, keyword]);
+
+  const reloadMemory = async () => {
+    setLoading((current) => ({ ...current, reload: true }));
+    try {
+      await chainViewApi.assistant.routingRules.reload();
+      const nextMeta = await chainViewApi.assistant.routingRules.meta();
+      setMeta(nextMeta || null);
+      setMessage("메모리 규칙을 갱신했습니다.");
+    } catch (error) {
+      setMessage(error?.message || "메모리 갱신에 실패했습니다.");
+    } finally {
+      setLoading((current) => ({ ...current, reload: false }));
+    }
+  };
+
+  const runPreview = async () => {
+    const messageText = previewText.trim();
+    if (!messageText) return;
+    setLoading((current) => ({ ...current, preview: true }));
+    try {
+      const data = await chainViewApi.assistant.routingRules.preview({ message: messageText });
+      setPreview(data || {});
+      setMessage("");
+    } catch (error) {
+      setMessage(error?.message || "미리보기에 실패했습니다.");
+    } finally {
+      setLoading((current) => ({ ...current, preview: false }));
+    }
+  };
+
+  const deleteRule = async (ruleId) => {
+    if (!ruleId || !window.confirm("이 규칙을 삭제할까요?")) return;
+    try {
+      await chainViewApi.assistant.routingRules.delete(Number(ruleId));
+      setMessage("삭제되었습니다.");
+      await loadRoutingData();
+    } catch (error) {
+      setMessage(error?.message || "삭제에 실패했습니다.");
+    }
+  };
+
+  const saveRule = async (payload) => {
+    setLoading((current) => ({ ...current, save: true }));
+    try {
+      if (payload.ruleId) {
+        await chainViewApi.assistant.routingRules.update(Number(payload.ruleId), payload);
+        setMessage("수정되었습니다.");
+      } else {
+        await chainViewApi.assistant.routingRules.create(payload);
+        setMessage("등록되었습니다.");
+      }
+      setModalRule(null);
+      await loadRoutingData();
+    } catch (error) {
+      setMessage(error?.message || "저장에 실패했습니다.");
+    } finally {
+      setLoading((current) => ({ ...current, save: false }));
+    }
+  };
+
   return (
     <AppShell activeMenu="ai-routing">
       <main className="main assistant-admin-page">
@@ -1059,35 +1339,46 @@ export function AiRoutingRulesPage() {
             <p className="page-head__desc assistant-page-desc">자연어 질문의 라우팅 키워드·패턴을 관리합니다. 저장 시 메모리 캐시가 자동 갱신됩니다.</p>
           </div>
           <div className="assistant-admin-actions">
-            <button className="btn" type="button"><RefreshCw size={14} /> 메모리 갱신</button>
-            <button className="btn btn--primary" type="button"><Plus size={14} /> 규칙 등록</button>
+            <button className="btn" disabled={loading.reload} onClick={reloadMemory} type="button"><RefreshCw size={14} /> {loading.reload ? "갱신 중..." : "메모리 갱신"}</button>
+            <button className="btn btn--primary" onClick={() => setModalRule({})} type="button"><Plus size={14} /> 규칙 등록</button>
           </div>
         </div>
+        {message ? <div className="assistant-inline-alert">{message}</div> : null}
 
         <section className="assistant-card">
           <h2>규칙 그룹</h2>
           <div className="assistant-rule-chips">
-            <button className="is-active" type="button">전체</button>
-            {routingRuleGroups.map((group) => <button key={group} type="button">{group}</button>)}
+            <button className={!activeGroup ? "is-active" : ""} onClick={() => setActiveGroup("")} type="button">전체</button>
+            {(groups.length ? groups : routingRuleGroups).map((group) => (
+              <button className={activeGroup === group ? "is-active" : ""} key={group} onClick={() => setActiveGroup(group)} type="button">{group}</button>
+            ))}
           </div>
         </section>
 
         <section className="assistant-card">
           <div className="assistant-rule-toolbar">
-            <label><Search size={16} /><input placeholder="그룹, 패턴, target, 설명 검색..." /></label>
-            <div className="assistant-pages"><button disabled>‹</button><button className="is-active">1</button><button>2</button><button>3</button><span>...</span><button>19</button><button>›</button></div>
+            <label><Search size={16} /><input onChange={(event) => setKeyword(event.target.value)} placeholder="그룹, 패턴, target, 설명 검색..." value={keyword} /></label>
+            <div className="assistant-pages">
+              <button disabled={page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))} type="button">이전</button>
+              <span>{Math.min(page, totalPages)} / {totalPages} 페이지</span>
+              <button disabled={page >= totalPages} onClick={() => setPage((current) => Math.min(totalPages, current + 1))} type="button">다음</button>
+            </div>
           </div>
-          <p className="assistant-muted">메모리 적재 <b>930건</b> · 필터 결과 <b>930건</b> | 1 / 19 페이지</p>
+          <p className="assistant-muted">메모리 적재 <b>{meta?.ruleCount ?? rules.length}</b>건 · 필터 결과 <b>{filteredRules.length}</b>건</p>
           <AssistantDataTable
             columns={["그룹", "Target", "모드", "패턴", "우선순위", "사용", "작업"]}
-            rows={routingRules.map((row) => [
-              row[0],
-              row[1],
-              row[2],
-              row[3],
-              row[4],
-              <span className="assistant-yn" key="yn">{row[5]}</span>,
-              <span className="assistant-icon-actions" key="actions"><button>✎</button><button className="is-danger">⌫</button></span>,
+            emptyText={loading.page ? "불러오는 중..." : "규칙이 없습니다."}
+            rows={pageRows.map((rule) => [
+              rule.ruleGroup,
+              rule.targetCode,
+              rule.matchMode,
+              <code key="pattern">{rule.pattern}</code>,
+              rule.priority,
+              <span className="assistant-yn" key="yn">{rule.enabledYn}</span>,
+              <span className="assistant-icon-actions" key="actions">
+                <button onClick={() => setModalRule(rule)} type="button">수정</button>
+                <button className="is-danger" onClick={() => deleteRule(rule.ruleId)} type="button">삭제</button>
+              </span>,
             ])}
           />
         </section>
@@ -1096,43 +1387,196 @@ export function AiRoutingRulesPage() {
           <h2>규칙 매칭 미리보기</h2>
           <p>질문을 입력하면 현재 메모리 규칙 기준 매칭 결과와 추론 액션을 확인합니다.</p>
           <div className="assistant-preview-row">
-            <input onChange={(event) => setPreviewText(event.target.value)} value={previewText} />
-            <button className="btn btn--primary" type="button">▷ 미리보기</button>
+            <input
+              onChange={(event) => setPreviewText(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") runPreview();
+              }}
+              value={previewText}
+            />
+            <button className="btn btn--primary" disabled={loading.preview} onClick={runPreview} type="button">
+              {loading.preview ? "확인 중..." : "▷ 미리보기"}
+            </button>
           </div>
-          <div className="assistant-preview-summary">
-            추론 액션: <b>INCIDENT_HISTORY</b>
-            <span>· 서비스: --</span>
-            <span>· 게이트: PROCEED</span>
-            <span>· 정형 파이프라인: Y</span>
-            <span>· 장애 목록: Y</span>
-            <span>· 영향도: N</span>
-            <span>· 장애 필터: DEFAULT</span>
-            <span>· LLM 서술: N</span>
-            <span>· 매칭 규칙: 12건</span>
-          </div>
+          {preview ? (
+            <div className="assistant-preview-summary">
+              추론 액션: <b>{preview.inferredAction || "—"}</b>
+              <span>· 서비스: {preview.resolvedServiceCode || "—"}</span>
+              <span>· 게이트: {preview.gateDecision || "—"}</span>
+              <span>· 정형 파이프라인: {preview.prefersStructuredPipeline ? "Y" : "N"}</span>
+              <span>· 장애 목록: {preview.incidentListQuery ? "Y" : "N"}</span>
+              <span>· 영향도: {preview.impactQuery ? "Y" : "N"}</span>
+              <span>· 장애 필터: {preview.inferredIncidentStatus || "DEFAULT"}</span>
+              <span>· LLM 서술: {preview.shouldNarrate ? "Y" : "N"}</span>
+              <span>· 매칭 규칙: {preview.totalMatches || 0}건</span>
+            </div>
+          ) : null}
           <AssistantDataTable
             columns={["그룹", "Target", "패턴", "우선순위", "설명"]}
-            rows={previewRules}
+            emptyText="매칭 없음"
+            rows={(preview?.matches || []).map((match) => [
+              match.ruleGroup,
+              match.targetCode,
+              <code key="pattern">{match.pattern}</code>,
+              match.priority,
+              match.description || "",
+            ])}
           />
         </section>
+        {modalRule ? (
+          <RoutingRuleModal
+            groups={groups.length ? groups : routingRuleGroups}
+            loading={loading.save}
+            onClose={() => setModalRule(null)}
+            onSubmit={saveRule}
+            rule={modalRule}
+          />
+        ) : null}
       </main>
     </AppShell>
   );
 }
 
-function AssistantDataTable({ columns, rows }) {
+function AssistantDataTable({ columns, emptyText = "데이터가 없습니다.", rows }) {
   return (
     <div className="assistant-table-wrap">
       <table className="assistant-table">
         <thead><tr>{columns.map((column) => <th key={column}>{column}</th>)}</tr></thead>
         <tbody>
-          {rows.map((row, rowIndex) => (
+          {rows.length ? rows.map((row, rowIndex) => (
             <tr key={rowIndex}>{row.map((cell, cellIndex) => <td key={cellIndex}>{cell}</td>)}</tr>
-          ))}
+          )) : <tr><td colSpan={columns.length} className="assistant-empty-cell">{emptyText}</td></tr>}
         </tbody>
       </table>
     </div>
   );
+}
+
+function AssistantModal({ children, onClose, title }) {
+  return (
+    <div className="assistant-modal" role="dialog" aria-modal="true">
+      <button className="assistant-modal__backdrop" onClick={onClose} type="button" aria-label="닫기" />
+      <section className="assistant-modal__panel">
+        <header className="assistant-modal__head">
+          <h2>{title}</h2>
+          <button onClick={onClose} type="button">×</button>
+        </header>
+        <div className="assistant-modal__body">{children}</div>
+      </section>
+    </div>
+  );
+}
+
+function RoutingRuleModal({ groups, loading, onClose, onSubmit, rule }) {
+  const [form, setForm] = useState({
+    ruleId: rule.ruleId || null,
+    ruleGroup: rule.ruleGroup || groups[0] || "",
+    targetCode: rule.targetCode || "",
+    matchMode: rule.matchMode || "CONTAINS",
+    pattern: rule.pattern || "",
+    excludePattern: rule.excludePattern || "",
+    priority: rule.priority || 100,
+    enabledYn: rule.enabledYn || "Y",
+    description: rule.description || "",
+  });
+  const update = (key, value) => setForm((current) => ({ ...current, [key]: value }));
+  const submit = () => {
+    if (!form.ruleGroup || !form.targetCode || !form.matchMode || !form.pattern) {
+      window.alert("규칙 그룹, Target 코드, 매칭 모드, 패턴을 입력하세요.");
+      return;
+    }
+    onSubmit({
+      ...form,
+      excludePattern: form.excludePattern || null,
+      description: form.description || null,
+      priority: Number(form.priority) || 100,
+    });
+  };
+
+  return (
+    <AssistantModal onClose={onClose} title={form.ruleId ? "규칙 수정" : "규칙 등록"}>
+      <div className="assistant-form-grid">
+        <label>규칙 그룹
+          <select onChange={(event) => update("ruleGroup", event.target.value)} value={form.ruleGroup}>
+            {groups.map((group) => <option key={group} value={group}>{group}</option>)}
+          </select>
+        </label>
+        <label>Target 코드
+          <input maxLength={60} onChange={(event) => update("targetCode", event.target.value)} placeholder="예) INCIDENT_HISTORY, UNRESOLVED" value={form.targetCode} />
+        </label>
+        <label>매칭 모드
+          <select onChange={(event) => update("matchMode", event.target.value)} value={form.matchMode}>
+            <option value="CONTAINS">CONTAINS</option>
+            <option value="REGEX">REGEX</option>
+            <option value="EXACT">EXACT</option>
+          </select>
+        </label>
+        <label>패턴
+          <input maxLength={500} onChange={(event) => update("pattern", event.target.value)} value={form.pattern} />
+        </label>
+        <label>제외 패턴 (쉼표 구분)
+          <input maxLength={500} onChange={(event) => update("excludePattern", event.target.value)} placeholder="예) unresolved" value={form.excludePattern || ""} />
+        </label>
+        <label>우선순위
+          <input onChange={(event) => update("priority", event.target.value)} type="number" value={form.priority} />
+        </label>
+        <label>사용 여부
+          <select onChange={(event) => update("enabledYn", event.target.value)} value={form.enabledYn}>
+            <option value="Y">Y</option>
+            <option value="N">N</option>
+          </select>
+        </label>
+        <label className="assistant-form-grid__full">설명
+          <input maxLength={500} onChange={(event) => update("description", event.target.value)} value={form.description || ""} />
+        </label>
+      </div>
+      <div className="assistant-modal__foot">
+        <button className="btn" onClick={onClose} type="button">취소</button>
+        <button className="btn btn--primary" disabled={loading} onClick={submit} type="button">{loading ? "저장 중..." : "저장"}</button>
+      </div>
+    </AssistantModal>
+  );
+}
+
+function formatBytes(bytes) {
+  const value = Number(bytes) || 0;
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function formatReindexMessage(data) {
+  if (!data || typeof data !== "object") return "전체 재적재가 완료되었습니다.";
+  const lines = [
+    `VectorStore 사용 가능: ${data.vectorStoreAvailable ? "예" : "아니오"}`,
+    `처리 파일: ${data.filesProcessed ?? 0}건`,
+    `색인 청크: ${data.chunksIndexed ?? 0}개`,
+    `소요 시간: ${data.durationMs ?? 0}ms`,
+  ];
+  if (Array.isArray(data.skippedFiles) && data.skippedFiles.length) {
+    lines.push("", "건너뜀:", ...data.skippedFiles);
+  }
+  if (Array.isArray(data.errors) && data.errors.length) {
+    lines.push("", "오류:", ...data.errors);
+  }
+  return lines.join("\n");
+}
+
+async function downloadRagDocument(path) {
+  if (!path) return;
+  try {
+    const blob = await chainViewApi.assistant.rag.download(path);
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = path.split("/").pop() || "rag-document";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    window.alert(error?.message || "다운로드에 실패했습니다.");
+  }
 }
 
 function AiPageHeader({ action, description, eyebrow, icon, title }) {

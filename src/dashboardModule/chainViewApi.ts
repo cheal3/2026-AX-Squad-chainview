@@ -251,6 +251,28 @@ export const chainViewApi = {
         });
       },
     },
+    rag: {
+      categories: () => requestJson<string[]>("/api/assistant/rag/categories", "GET"),
+      status: () => requestJson<unknown>("/api/assistant/rag/status", "GET"),
+      documents: () => requestJson<unknown[]>("/api/assistant/rag/documents", "GET"),
+      uploadDocument: (file: File, category: string) => {
+        const body = new FormData();
+        body.append("file", file);
+        body.append("category", category);
+        return requestJson<unknown>("/api/assistant/rag/documents", "POST", { body });
+      },
+      deleteDocument: (path: string) =>
+        requestJson<void>("/api/assistant/rag/documents", "DELETE", {
+          body: new URLSearchParams({ path }),
+        }),
+      chunks: (path: string) =>
+        requestJson<unknown[]>("/api/assistant/rag/documents/chunks", "GET", { query: { path } }),
+      search: (query: string) =>
+        requestJson<unknown[]>("/api/assistant/rag/search", "GET", { query: { query } }),
+      reindex: () => requestJson<unknown>("/api/assistant/rag/reindex", "POST"),
+      download: (path: string) =>
+        requestBlob("/api/assistant/rag-sources/download", { query: { path } }),
+    },
     routingRules: {
       list: (query?: QueryParams) =>
         requestJson<unknown[]>("/api/assistant/routing-rules", "GET", { query }),
