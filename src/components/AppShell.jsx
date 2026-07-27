@@ -272,15 +272,18 @@ function Sidebar({ activeMenu = "", isDark = false }) {
             <span>{section.label}</span>
             {section.label === "AX ASSISTANT" ? <ChevronDown size={15} /> : null}
           </div>
-          {section.items.map((item) => (
-            <Link className={itemClass(item.key)} data-key={item.key} key={item.key} title={isCollapsed ? item.label : undefined} to={item.to}>
-              <span className="lnb__item-icon" aria-hidden="true">
-                {typeof item.icon === "function" ? <item.icon size={22} strokeWidth={2.4} /> : item.icon}
-              </span>
-              <span className="lnb__item-text">{item.label}</span>
-              {item.badge ? <span className="badge">{item.badge}</span> : null}
-            </Link>
-          ))}
+          {section.items.map((item) => {
+            const Icon = item.icon;
+            return (
+              <Link className={itemClass(item.key)} data-key={item.key} key={item.key} title={isCollapsed ? item.label : undefined} to={item.to}>
+                <span className="lnb__item-icon" aria-hidden="true">
+                  {typeof Icon === "string" ? Icon : <Icon size={22} strokeWidth={2.4} />}
+                </span>
+                <span className="lnb__item-text">{item.label}</span>
+                {item.badge ? <span className="badge">{item.badge}</span> : null}
+              </Link>
+            );
+          })}
         </div>
       ))}
     </aside>
