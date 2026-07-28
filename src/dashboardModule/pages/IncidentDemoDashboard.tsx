@@ -1819,14 +1819,16 @@ function IncidentCommandDashboard({
 
       <div className="mt-3 grid min-h-[240px] min-w-0 grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-3">
         <DarkPanel title="장애 타임라인">
-          {timelineEvents.map(([time, text, actor], index) => (
-            <div key={`${time}-${text}`} className="flex gap-3 py-2 text-sm leading-5">
-              <span className={`mt-1 h-4 w-4 shrink-0 rounded-full ${index === 0 ? "bg-[#ff3344]" : "bg-[#f59e0b]"}`} />
-              <span className="w-14 shrink-0 text-slate-300">{time}</span>
-              <span className="min-w-0 flex-1 break-words text-slate-300">{text}</span>
-              <span className="shrink-0 text-xs font-bold text-slate-500">{actor}</span>
-            </div>
-          ))}
+          <div className="max-h-[184px] overflow-y-auto pr-1">
+            {timelineEvents.map(([time, text, actor], index) => (
+              <div key={`${time}-${text}`} className="flex gap-3 py-2 text-sm leading-5">
+                <span className={`mt-1 h-4 w-4 shrink-0 rounded-full ${index === 0 ? "bg-[#ff3344]" : "bg-[#f59e0b]"}`} />
+                <span className="w-14 shrink-0 text-slate-300">{time}</span>
+                <span className="min-w-0 flex-1 break-words text-slate-300">{text}</span>
+                <span className="shrink-0 text-xs font-bold text-slate-500">{actor}</span>
+              </div>
+            ))}
+          </div>
         </DarkPanel>
         <DarkPanel title="유사 장애 이력 & 권장 조치">
           <div className="grid grid-cols-[minmax(0,1fr)_48px_minmax(0,1fr)_48px] gap-2 text-sm leading-5 text-slate-300">
