@@ -272,6 +272,8 @@ export const chainViewApi = {
       reindex: () => requestJson<unknown>("/api/assistant/rag/reindex", "POST"),
       download: (path: string) =>
         requestBlob("/api/assistant/rag-sources/download", { query: { path } }),
+      sourceContent: (path: string) =>
+        requestJson<unknown>("/api/assistant/rag-sources/content", "GET", { query: { path } }),
     },
     routingRules: {
       list: (query?: QueryParams) =>

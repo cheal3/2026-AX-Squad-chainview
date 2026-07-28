@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Bot, FileUp, Plus, RefreshCw, Search, Send, Sparkles } from "lucide-react";
 import { AppShell } from "../../components/AppShell.jsx";
-import { chainViewApi } from "../../dashboardModule/chainViewApi";
+import { chainViewApi, chainViewApiBaseUrl } from "../../dashboardModule/chainViewApi";
 
 const MAX_CONVERSATION_TURNS = 4;
 const MAX_TURN_CHARS = 280;
@@ -143,6 +143,23 @@ export function AiAssistantPage() {
     }
   }, [messages, loading, showWelcome]);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const serviceId = Number(params.get("serviceId")) || 0;
+    if (!serviceId) {
+      return;
+    }
+    const serviceName = params.get("serviceName") || "서비스";
+    setShowWelcome(false);
+    setState((current) => ({ ...current, serviceId }));
+    setMessages((current) => [
+      ...current,
+      { id: `user-${Date.now()}`, role: "user", text: `${decodeURIComponent(serviceName)} 정보 조회` },
+    ]);
+    sendPayload({ action: "OWNER_LOOKUP", scope: "SINGLE", serviceId, message: "" }, serviceName);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const contextServiceId = conversation.serviceId || state.serviceId;
 
   const recordTurn = (role, text) => {
@@ -205,11 +222,8 @@ export function AiAssistantPage() {
     setShowWelcome(false);
 
     try {
-      const temporaryResponse = buildTemporaryAssistantResponse(payload, userText);
-      const responsePromise = temporaryResponse
-        ? Promise.resolve(temporaryResponse)
-        : chainViewApi.assistant.chat(payload);
-      const [response] = await Promise.all([responsePromise, delay(760)]);
+      const [rawResponse] = await Promise.all([chainViewApi.assistant.chat(payload), delay(760)]);
+      const response = normalizeAssistantResponse(rawResponse);
       if (requestSeqRef.current !== seq) {
         return;
       }
@@ -338,6 +352,15 @@ export function AiAssistantPage() {
     if (mapped) {
       setState({ action: mapped, scope: null, serviceId: null, categoryId: null });
       sendPayload({ action: mapped, message: "" }, text);
+      return;
+    }
+    if (text.includes("보기") && currentAction && contextServiceId) {
+      sendPayload({
+        action: guessSubAction(text) || currentAction,
+        scope: "SINGLE",
+        serviceId: contextServiceId,
+        message: "",
+      }, text);
       return;
     }
     setInput(text);
@@ -622,127 +645,43 @@ function delay(ms) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
-function buildTemporaryAssistantResponse(payload = {}, userText = "") {
-  const text = [
-    payload.message,
-    userText,
-    payload.action,
-    payload.contextServiceCode,
-    payload.contextServiceName,
-  ].filter(Boolean).join(" ").toUpperCase();
-  const shouldUseTemporaryAnswer =
-    text.includes("SSO") ||
-    text.includes("EAM") ||
-    text.includes("영향") ||
-    text.includes("장애") ||
-    text.includes("IMPACT_ANALYSIS");
+function guessSubAction(text) {
+  const value = String(text || "");
+  if (value.includes("담당자")) return "OWNER_LOOKUP";
+  if (value.includes("호스트") || value.includes("장비")) return "HOST_LOOKUP";
+  if (value.includes("인프라") || value.includes("토폴로지")) return "INFRA_IMPACT";
+  if (value.includes("서버")) return "SERVER_LOOKUP";
+  if (value.includes("장애")) return "INCIDENT_HISTORY";
+  if (value.includes("연계") || value.includes("영향")) return "IMPACT_ANALYSIS";
+  return null;
+}
 
-  if (!shouldUseTemporaryAnswer) {
-    return null;
+function normalizeAssistantResponse(response) {
+  const data = response?.data && typeof response.data === "object" ? response.data : response;
+  if (!data || typeof data !== "object") {
+    return data;
   }
 
+  const message =
+    data.message ??
+    data.answer ??
+    data.content ??
+    data.text ??
+    data.response ??
+    "";
+
   return {
-    action: "IMPACT_ANALYSIS",
-    scope: "SINGLE",
-    responseType: "ANSWER",
-    llmUsed: true,
-    resolvedServiceId: 13,
-    resolvedServiceCode: "SSO_EAM",
-    resolvedServiceName: "SSO/EAM 통합 인증",
-    message:
-      "1) **요약** — SSO 서비스 장애 시 영향도 분석 및 대응 절차를 안내합니다.\n\n" +
-      "2) **영향 범위** — `SSO_EAM`을 공통 로그인 경로로 사용하는 임직원 및 업무 시스템의 신규 로그인이 지연되거나 실패할 수 있습니다. 이미 로그인한 사용자는 세션과 토큰 유효 여부에 따라 업무를 계속할 수 있으나, 재인증 시 영향을 받을 수 있으며 로그인 이후 권한 조회가 필요한 메뉴 진입과 사용자 권한 반영도 지연될 수 있습니다.\n\n" +
-      "3) **확인 절차**\n" +
-      "- ChainView에서 `SSO_EAM`의 진행 장애, 상태, 최근 변경 및 배포 이력을 확인합니다.\n" +
-      "- `SSO_EAM`과 연결된 업무 서비스, 인증 허브, DB, 프록시·게이트웨이 상태를 확인합니다.\n" +
-      "- 504 발생 시각과 인증 허브 응답시간, 요청량, 오류율을 같은 시간대로 비교합니다.\n" +
-      "- 활성 스레드, 대기 큐, 스레드 풀 사용률과 DB 커넥션 풀 대기 건수를 확인합니다.\n" +
-      "- 특정 서비스만 느린지 전체 로그인 서비스가 느린지 구분하여 영향 범위를 확정합니다.\n\n" +
-      "4) **대응 방안**\n" +
-      "- 장애 발생 시 관련 시스템의 상태를 점검하고 필요한 경우 서비스 담당자에게 에스컬레이션합니다.\n" +
-      "- 504 오류 발생 시 인증 허브의 응답시간과 요청량을 분석하여 병목 구간을 파악합니다.\n" +
-      "- 스레드 풀 및 DB 커넥션 상태를 모니터링하여 자원 고갈 여부를 확인합니다.\n\n" +
-      "5) **참고** — 진행 중 장애가 발생하고 있습니다. 과거 사례로 SSO/EAM 통합 인증 장애가 있었습니다.",
-    table: {
-      title: "SSO/EAM 통합 인증 영향도 분석 (통합 엔진)",
-      headers: ["단계", "구분", "영향 서비스", "경로"],
-      rows: [
-        ["1", "직접", "ITSM 운영 포털", "ITSM 운영 포털"],
-        ["1", "직접", "공통 API Gateway", "공통 API Gateway"],
-        ["1", "직접", "다이렉트 가입 홈페이지", "다이렉트 가입 홈페이지"],
-        ["1", "직접", "대출 신청/관리 서비스", "대출 신청/관리 서비스"],
-        ["1", "직접", "대표 모바일 앱", "대표 모바일 앱"],
-        ["1", "직접", "대표 홈페이지", "대표 홈페이지"],
-        ["1", "직접", "모바일 전자청약", "모바일 전자청약"],
-        ["1", "직접", "방카 포털", "방카 포털"],
-        ["1", "직접", "위험지위 포털", "위험지위 포털"],
-      ],
-    },
-    ragReferences: [
-      {
-        sourceDocument: "SSO-EAM-통합인증-로그인-응답지연-대응매뉴얼.md",
-        section: "영향 범위 IMPACT",
-        relativePath: "manuals/SSO-EAM-통합인증-로그인-응답지연-대응매뉴얼.md",
-        score: 0.79,
-        downloadable: false,
-        excerpt:
-          "## 영향 범위 IMPACT - `SSO_EAM`을 공통 로그인 경로로 사용하는 임직원·업무 시스템의 신규 로그인이 지연되거나 실패할 수 있다. 로그인 이후 권한 조회가 필요한 메뉴 진입과 권한 반영도 지연될 수 있다.",
-        markdown:
-          "## 영향 범위 IMPACT\n\n" +
-          "- `SSO_EAM`을 공통 로그인 경로로 사용하는 임직원·업무 시스템의 신규 로그인이 지연되거나 실패할 수 있습니다.\n" +
-          "- 이미 로그인한 사용자는 세션과 토큰 유효 여부에 따라 업무를 계속할 수 있으나 재인증 시 영향을 받을 수 있습니다.\n" +
-          "- 로그인 이후 권한 조회가 필요한 메뉴 진입과 사용자 권한 반영도 지연될 수 있습니다.",
-      },
-      {
-        sourceDocument: "SSO-EAM-통합인증-로그인-응답지연-대응매뉴얼.md",
-        section: "개요",
-        relativePath: "manuals/SSO-EAM-통합인증-로그인-응답지연-대응매뉴얼.md",
-        score: 0.76,
-        downloadable: false,
-        excerpt:
-          "검색 키워드: SSO, EAM, 통합 인증, 로그인 지연, 504 Gateway Timeout, 인증 허브, 스레드 풀 고갈, DB 커넥션 대기.",
-      },
-      {
-        sourceDocument: "SSO-EAM-통합인증-로그인-응답지연-대응매뉴얼.md",
-        section: "1차 확인 ACTION",
-        relativePath: "manuals/SSO-EAM-통합인증-로그인-응답지연-대응매뉴얼.md",
-        score: 0.73,
-        downloadable: false,
-        excerpt:
-          "ChainView에서 SSO_EAM의 진행 장애, 상태, 최근 변경 및 배포 이력을 확인하고 인증 허브, DB, 프록시·게이트웨이 상태를 점검한다.",
-      },
-    ],
-    knowledgeSources: [
-      "DB 발췌 — 서비스 요약",
-      "[RAG] SSO-EAM-통합인증-로그인-응답지연-대응매뉴얼.md · 영향 범위 IMPACT (유사도 0.79)",
-      "[RAG] SSO-EAM-통합인증-로그인-응답지연-대응매뉴얼.md · 개요 (유사도 0.76)",
-      "[RAG] SSO-EAM-통합인증-로그인-응답지연-대응매뉴얼.md · 1차 확인 ACTION (유사도 0.73)",
-    ],
-    incidentReportReferences: [
-      {
-        reportId: "CY-INC-20260617-002",
-        title: "SSO/EAM 통합 인증 로그인 지연 및 간헐적 504",
-        sourceFileName: "20260617-sso-eam-login-latency-incident-report.md",
-        matchScore: 72,
-        hasOriginalDownload: false,
-        excerpt:
-          "## 업무 영향 IMPACT - `SSO_EAM`을 사용하는 42개 업무시스템 중 31개 시스템에서 신규 로그인 지연이 확인되었다. HTTP 504를 실패한 로그인은 238건이었다.",
-        summaryMarkdown:
-          "# [장애보고서] SSO/EAM 통합 인증 로그인 지연 및 간헐적 504\n\n" +
-          "## 장애 개요 OVERVIEW\n" +
-          "- 보고서 ID: CY-INC-20260617-002\n" +
-          "- 발생일시: 2026-06-17 08:41 ~ 10:06\n" +
-          "- 후속 영향 확인 완료: 2026-06-17 10:35\n" +
-          "- 대상 업무: 임직원 통합 로그인 및 업무시스템 권한 조회\n" +
-          "- 대상 서비스: SSO_EAM\n" +
-          "- 장애 요약: 권한 조회 지연으로 인증 허브 처리 스레드가 고갈되어 로그인 지연과 HTTP 504가 발생했습니다.\n\n" +
-          "## 발생 배경 OVERVIEW\n" +
-          "- 조직권한 동기화 후 캐시 갱신 범위를 변경하는 배포가 진행되었습니다.\n" +
-          "- 변경 전에는 수정된 사용자 권한만 갱신했으나 변경 후 전체 권한 캐시를 초기화하도록 적용되었습니다.\n" +
-          "- 출근 시간대 로그인 요청 증가와 DB 권한 조회가 동시에 집중되었습니다.",
-      },
-    ],
-    suggestedReplies: ["담당자 조회", "배포 서버 조회", "영향도 분석", "장애 이력"],
+    ...data,
+    message: String(message || ""),
+    choices: Array.isArray(data.choices) ? data.choices : [],
+    categoryOptions: Array.isArray(data.categoryOptions) ? data.categoryOptions : [],
+    serviceOptions: Array.isArray(data.serviceOptions) ? data.serviceOptions : [],
+    knowledgeSources: Array.isArray(data.knowledgeSources) ? data.knowledgeSources : [],
+    ragReferences: Array.isArray(data.ragReferences) ? data.ragReferences : [],
+    incidentReportReferences: Array.isArray(data.incidentReportReferences)
+      ? data.incidentReportReferences
+      : [],
+    suggestedReplies: Array.isArray(data.suggestedReplies) ? data.suggestedReplies : [],
   };
 }
 
@@ -818,9 +757,31 @@ function RagSources({ refs }) {
 
 function RagSourceCard({ refData }) {
   const [open, setOpen] = useState(false);
+  const [fullMarkdown, setFullMarkdown] = useState(refData.markdown || "");
+  const [loading, setLoading] = useState(false);
   const scorePct = Math.round(Number(refData.score || 0) * 100);
   const path = refData.relativePath || refData.relative_path || "";
   const title = refData.sourceDocument || refData.source_document || path || "문서";
+  const toggleOpen = async () => {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+    setOpen(true);
+    if (fullMarkdown || !path || loading) {
+      return;
+    }
+    setLoading(true);
+    try {
+      const response = await chainViewApi.assistant.rag.sourceContent(path);
+      setFullMarkdown(response?.markdown || response?.content || response?.text || "");
+    } catch {
+      setFullMarkdown("RAG 문서를 불러오지 못했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="ax-rag-card">
       <div className="ax-rag-card__head">
@@ -834,13 +795,15 @@ function RagSourceCard({ refData }) {
       {refData.excerpt && <div className="ax-rag-card__excerpt">{refData.excerpt}</div>}
       {path && (
         <div className="ax-rag-card__actions">
-          <button className="ax-rag-card__btn" onClick={() => setOpen((value) => !value)} type="button">{open ? "접기" : "전문 보기"}</button>
+          <button className="ax-rag-card__btn" disabled={loading} onClick={toggleOpen} type="button">
+            {loading ? "불러오는 중..." : open ? "접기" : "전문 보기"}
+          </button>
           {refData.downloadable === true && (
-            <a className="ax-rag-card__btn ax-rag-card__btn--link" href={`/api/assistant/rag-sources/download?path=${encodeURIComponent(path)}`}>원본 다운로드</a>
+            <a className="ax-rag-card__btn ax-rag-card__btn--link" href={assistantApiHref("/api/assistant/rag-sources/download", { path })}>원본 다운로드</a>
           )}
         </div>
       )}
-      {open && <div className="ax-rag-card__full" dangerouslySetInnerHTML={{ __html: formatMd(refData.markdown || refData.excerpt || "전문 조회는 서버 RAG 원문 API 연결 후 제공됩니다.") }} />}
+      {open && <div className="ax-rag-card__full" dangerouslySetInnerHTML={{ __html: formatMd(fullMarkdown || refData.excerpt || "") }} />}
     </div>
   );
 }
@@ -898,7 +861,7 @@ function IncidentReportCard({ report }) {
           {detail ? "접기" : loading ? "불러오는 중..." : "상세 보기"}
         </button>
         {report.hasOriginalDownload === true && reportId && (
-          <a className="ax-incident-report-card__btn ax-incident-report-card__btn--link" href={`/api/assistant/incident-reports/${encodeURIComponent(reportId)}/download`}>
+          <a className="ax-incident-report-card__btn ax-incident-report-card__btn--link" href={assistantApiHref(`/api/assistant/incident-reports/${encodeURIComponent(reportId)}/download`)}>
             원본 다운로드
           </a>
         )}
@@ -935,6 +898,17 @@ function escapeHtml(value) {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+function assistantApiHref(path, query = {}) {
+  const base = chainViewApiBaseUrl || window.location.origin;
+  const url = new URL(path, base.replace(/\/$/, ""));
+  Object.entries(query).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== "") {
+      url.searchParams.set(key, String(value));
+    }
+  });
+  return url.toString();
 }
 
 export function AiRagKnowledgePage() {
