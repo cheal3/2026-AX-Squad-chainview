@@ -186,6 +186,8 @@ export interface ServiceOwnerRecord {
   userId?: number | null;
   ownerName: string;
   responsibilityCode: "MAIN" | "SUB" | "ALERT";
+  startDate?: string;
+  endDate?: string;
 }
 
 export interface IncidentRecord {

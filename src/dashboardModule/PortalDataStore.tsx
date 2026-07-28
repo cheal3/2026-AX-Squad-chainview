@@ -1316,8 +1316,12 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
           serviceId,
           serviceCode: service?.serviceCode,
           ownerTypeCode,
+          groupId: asRemoteNumber(input.groupId) || null,
+          userId: asRemoteNumber(input.userId) || null,
           ownerName,
           responsibilityCode: asRemoteString(input.responsibilityCode) || "MAIN",
+          startDate: asRemoteString(input.startDate),
+          endDate: asRemoteString(input.endDate),
         };
         setOwners((current) => [nextOwner, ...current]);
         if (REMOTE_API_ENABLED) {
@@ -1354,6 +1358,8 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
                       ? asRemoteString(input.userName) || owner.ownerName
                       : asRemoteString(input.groupName) || owner.ownerName,
                   responsibilityCode: asRemoteString(input.responsibilityCode) || owner.responsibilityCode,
+                  startDate: asRemoteString(input.startDate),
+                  endDate: asRemoteString(input.endDate),
                 }
               : owner
           )
@@ -2126,11 +2132,17 @@ function mapOwnerFromRemote(row: RemoteListRecord): ServiceOwnerRecord {
   return {
     serviceOwnerId: asRemoteNumber(row.serviceOwnerId ?? row.id),
     serviceId: asRemoteNumber(row.serviceId),
+    serviceCode: asRemoteString(row.serviceCode),
     ownerTypeCode: knownRemoteCode(row.ownerTypeCode, codeLabels.ownerType, "GROUP"),
     ownerId: asRemoteNumber(row.ownerId),
-    ownerName: asRemoteString(row.ownerName ?? row.name),
+    groupId: asRemoteNumber(row.groupId) || null,
+    userId: asRemoteNumber(row.userId) || null,
+    ownerName: asRemoteString(row.ownerName ?? row.assigneeDisplay ?? row.userName ?? row.groupName ?? row.name),
     roleName: asRemoteString(row.roleName),
+    responsibilityCode: knownRemoteCode(row.responsibilityCode, codeLabels.responsibilityType, "MAIN"),
     primaryYn: asRemoteString(row.primaryYn) === "N" ? "N" : "Y",
+    startDate: asRemoteString(row.startDate ?? row.validFrom ?? row.startedAt),
+    endDate: asRemoteString(row.endDate ?? row.expireDate ?? row.expiredAt ?? row.validTo),
     createdAt: asRemoteString(row.createdAt),
     updatedAt: asRemoteString(row.updatedAt),
   };
@@ -2226,12 +2238,7 @@ function toServiceOwnerCreatePayload(input: RemoteListRecord) {
 }
 
 function toServiceOwnerUpdatePayload(input: RemoteListRecord) {
-  const ownerTypeCode = asRemoteString(input.ownerTypeCode) || "GROUP";
   return {
-    serviceId: asRemoteNumber(input.serviceId),
-    ownerTypeCode,
-    groupId: ownerTypeCode === "GROUP" ? asRemoteNumber(input.groupId) : null,
-    userId: ownerTypeCode === "USER" ? asRemoteNumber(input.userId) : null,
     responsibilityCode: asRemoteString(input.responsibilityCode) || "MAIN",
   };
 }

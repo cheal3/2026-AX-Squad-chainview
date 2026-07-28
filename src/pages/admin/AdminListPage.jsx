@@ -15,6 +15,7 @@ const adminMenuMetaByKey = {
   servers: { section: "인프라", label: "서버 조회", icon: "🖥️" },
   deployments: { section: "인프라", label: "배포 현황", icon: "🚀" },
   owners: { section: "담당자", label: "담당자 조회", icon: "👨‍💼" },
+  "owner-management": { section: "시스템 관리", label: "서비스 담당자 관리", icon: "👨‍💼" },
   groups: { section: "담당자", label: "그룹 조회", icon: "📁" },
   users: { section: "시스템 관리", label: "사용자 관리", icon: "👥" },
   categories: { section: "시스템 관리", label: "서비스 분류 관리", icon: "🗂️" },
@@ -272,7 +273,7 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
     },
     owners: {
       actionLabel: "＋ 담당자 지정",
-      columns: ["serviceOwnerId", "서비스", "담당 유형", "담당자/그룹", "책임"],
+      columns: ["serviceOwnerId", "서비스", "담당 유형", "담당자/그룹", "책임", "시작일", "만료일"],
       rows: portalData.owners.map((owner) => ({
         key: owner.serviceOwnerId,
         owner,
@@ -291,6 +292,8 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
           codeLabels.ownerType[owner.ownerTypeCode] || owner.ownerTypeCode,
           <b>{owner.ownerName}</b>,
           codeLabels.responsibilityType[owner.responsibilityCode] || owner.responsibilityCode,
+          owner.startDate || "-",
+          owner.endDate || "-",
         ],
       })),
     },
@@ -719,8 +722,7 @@ function serviceDeploymentServerIds(service, deployments, servers) {
   const deploymentServerIds = serviceDeploymentRows(service, deployments)
     .map((deployment) => Number(deployment.serverId))
     .filter(Boolean);
-  const fallbackServerId =
-    Number(service?.serverId) || Number(servers[0]?.serverId) || 0;
+  const fallbackServerId = Number(service?.serverId) || 0;
   return Array.from(new Set([
     ...deploymentServerIds,
     ...(fallbackServerId ? [fallbackServerId] : []),
@@ -732,7 +734,7 @@ function normalizeSelectedServerIds(serverIds, fallbackServerId, servers) {
   const normalized = selectedIds
     .map((serverId) => Number(serverId))
     .filter(Boolean);
-  const fallback = Number(fallbackServerId) || Number(servers[0]?.serverId) || 0;
+  const fallback = Number(fallbackServerId) || 0;
   return Array.from(new Set([
     ...normalized,
     ...(fallback && !normalized.length ? [fallback] : []),
@@ -2922,6 +2924,8 @@ function OwnerManagementModals({ modal, onClose, owner, portalData, services }) 
     groupId: String(matchedGroupId ?? portalData.groups[0]?.groupId ?? ""),
     userId: String(matchedUserId ?? portalData.users[0]?.userId ?? ""),
     responsibilityCode: owner?.responsibilityCode ?? "MAIN",
+    startDate: owner?.startDate ?? "",
+    endDate: owner?.endDate ?? "",
   }));
   const updateField = (field, value) => {
     setForm((current) => {
@@ -2955,6 +2959,8 @@ function OwnerManagementModals({ modal, onClose, owner, portalData, services }) 
       userId: Number(form.userId) || null,
       userName: user?.userName,
       responsibilityCode: form.responsibilityCode,
+      startDate: form.startDate,
+      endDate: form.endDate,
     };
 
     if (!payload.serviceId) {
@@ -3060,8 +3066,8 @@ function OwnerManagementModals({ modal, onClose, owner, portalData, services }) 
           <div className="form-section">
             <h4 className="form-section__title">적용 기간</h4>
             <div className="form-grid">
-              <div className="form-row"><label>시작일</label><input type="date" defaultValue="2024-01-02" /></div>
-              <div className="form-row"><label>종료일</label><input type="date" /></div>
+              <div className="form-row"><label>시작일</label><input type="date" value={form.startDate} onChange={(event) => updateField("startDate", event.target.value)} /></div>
+              <div className="form-row"><label>만료일</label><input type="date" value={form.endDate} onChange={(event) => updateField("endDate", event.target.value)} /></div>
             </div>
           </div>
         </div>
