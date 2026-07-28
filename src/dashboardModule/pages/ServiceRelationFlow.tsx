@@ -1193,7 +1193,7 @@ export function ServiceRelationFlow({
     if (infraIncident) {
       return incidentInfraNodeIds ?? new Set<number>();
     }
-    if (graphViewMode === "all" || graphViewMode === "infra") {
+    if (graphViewMode === "service") {
       return null;
     }
     if (!incidentMode && !serviceFilter) {
@@ -1207,6 +1207,10 @@ export function ServiceRelationFlow({
     });
 
     if (incidentMode) {
+      return directNodeIds;
+    }
+
+    if (graphViewMode === "all") {
       return directNodeIds;
     }
 
