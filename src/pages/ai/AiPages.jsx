@@ -7,8 +7,8 @@ const MAX_CONVERSATION_TURNS = 4;
 const MAX_TURN_CHARS = 280;
 
 const quickQuestions = [
-  { label: "SSO/EAM 담당자 알려줘", prompt: "SSO/EAM 담당자 알려줘" },
-  { label: "SSO 영향 범위 분석", prompt: "SSO 서비스 중단시 영향 범위 분석" },
+  { label: "SSO 장애 영향도/대응", prompt: "SSO 서비스 장애 시 영향도 분석 및 대응 절차 알려줘" },
+  { label: "SSO 영향 범위 분석", prompt: "SSO 서비스 중단 시 영향 범위와 대응 절차 알려줘" },
   { label: "최근 장애 이력 조회", prompt: "해결되지 않은 장애 이력 조회" },
   { label: "P770 인프라 영향도", prompt: "P770 장애 시 영향 범위" },
   { label: "배포 서버 정보 확인", prompt: "전체 배포 서버 목록" },
@@ -150,13 +150,15 @@ export function AiAssistantPage() {
       return;
     }
     const serviceName = params.get("serviceName") || "서비스";
+    const decodedServiceName = decodeURIComponent(serviceName);
+    const prompt = buildImpactNarrativePrompt(decodedServiceName);
     setShowWelcome(false);
     setState((current) => ({ ...current, serviceId }));
     setMessages((current) => [
       ...current,
-      { id: `user-${Date.now()}`, role: "user", text: `${decodeURIComponent(serviceName)} 정보 조회` },
+      { id: `user-${Date.now()}`, role: "user", text: prompt },
     ]);
-    sendPayload({ action: "OWNER_LOOKUP", scope: "SINGLE", serviceId, message: "" }, serviceName);
+    sendPayload({ action: null, scope: "SINGLE", serviceId, message: prompt }, prompt);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -279,6 +281,11 @@ export function AiAssistantPage() {
     }
     const label = actionLabels[action] || action;
     setMessages((current) => [...current, { id: `user-${Date.now()}`, role: "user", text: label }]);
+    if (action === "IMPACT_ANALYSIS" && contextServiceId) {
+      const prompt = buildImpactNarrativePrompt(conversation.serviceName || "선택 서비스");
+      sendPayload({ action: null, scope: "SINGLE", serviceId: contextServiceId, message: prompt }, label);
+      return;
+    }
     sendPayload({ action, message: "" }, label);
   };
 
@@ -339,6 +346,11 @@ export function AiAssistantPage() {
     }
     if (mapped && typeof mapped === "object") {
       if (mapped.preferServiceId && contextServiceId) {
+        if (mapped.action === "IMPACT_ANALYSIS") {
+          const prompt = buildImpactNarrativePrompt(conversation.serviceName || "선택 서비스");
+          sendPayload({ action: null, scope: "SINGLE", serviceId: contextServiceId, message: prompt }, text);
+          return;
+        }
         sendPayload({ action: mapped.action, scope: mapped.scope || "SINGLE", serviceId: contextServiceId, message: "" }, text);
         return;
       }
@@ -643,6 +655,11 @@ function formatChatTime() {
 
 function delay(ms) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function buildImpactNarrativePrompt(serviceName) {
+  const name = String(serviceName || "선택 서비스").replace(/\s+/g, " ").trim();
+  return `${name} 서비스 장애 시 영향도 분석 및 대응 절차 알려줘`;
 }
 
 function guessSubAction(text) {
