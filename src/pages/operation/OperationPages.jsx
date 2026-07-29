@@ -518,7 +518,7 @@ function ServiceCheckModal({ onClose, row }) {
               </div>
               <div className="operation-radio-setting">
                 <span>실행 방법</span>
-                <div className="radio-row"><label><input defaultChecked name="runModeYn" type="radio" /> Y</label><label><input name="runModeYn" type="radio" /> N</label></div>
+                <select defaultValue="Y"><option>Y</option><option>N</option></select>
               </div>
             </div>
           </div>
