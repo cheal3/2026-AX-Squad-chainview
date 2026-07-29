@@ -506,10 +506,21 @@ function ServiceCheckModal({ onClose, row }) {
             <OperationFormRow label="Timeout (ms)"><input defaultValue="5000" type="number" /></OperationFormRow>
             <OperationFormRow label="Cron" required><input defaultValue={row?.cron ?? "0 */5 * * * *"} type="text" /></OperationFormRow>
             <OperationFormRow label="실패 임계값" required><input defaultValue="1" type="number" /></OperationFormRow>
-            <OperationFormRow label="활성 여부"><div className="radio-row"><label><input defaultChecked name="activeYn" type="radio" /> 활성</label><label><input name="activeYn" type="radio" /> 비활성</label></div></OperationFormRow>
-            <OperationFormRow label="실행 상태"><div className="radio-row"><label><input defaultChecked name="runYn" type="radio" /> Y</label><label><input name="runYn" type="radio" /> N</label></div></OperationFormRow>
             <OperationFormRow label="알림 담당"><input placeholder="알림 담당 또는 설명을 입력하세요" type="text" /></OperationFormRow>
-            <OperationFormRow label="실행 방법"><select defaultValue="Y"><option>Y</option><option>N</option></select></OperationFormRow>
+            <div className="operation-radio-settings">
+              <div className="operation-radio-setting">
+                <span>활성 여부</span>
+                <div className="radio-row"><label><input defaultChecked name="activeYn" type="radio" /> 활성</label><label><input name="activeYn" type="radio" /> 비활성</label></div>
+              </div>
+              <div className="operation-radio-setting">
+                <span>실행 상태</span>
+                <div className="radio-row"><label><input defaultChecked name="runYn" type="radio" /> Y</label><label><input name="runYn" type="radio" /> N</label></div>
+              </div>
+              <div className="operation-radio-setting">
+                <span>실행 방법</span>
+                <div className="radio-row"><label><input defaultChecked name="runModeYn" type="radio" /> Y</label><label><input name="runModeYn" type="radio" /> N</label></div>
+              </div>
+            </div>
           </div>
         </div>
         <div className="modal__foot"><button className="btn" onClick={onClose} type="button">취소</button><button className="btn btn--primary op-btn-dark" onClick={onClose} type="button">저장</button></div>

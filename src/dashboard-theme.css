@@ -7010,8 +7010,42 @@
   line-height: 1.45;
 }
 
+.operation-radio-settings {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  border-top: 1px solid #eef2f7;
+  padding-top: 2px;
+}
+
+.operation-radio-setting {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.operation-radio-setting > span {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.operation-radio-setting .radio-row {
+  min-height: 38px;
+  align-items: center;
+  border: 1px solid #e5e7eb;
+  border-radius: 7px;
+  background: #fff;
+  padding: 0 12px;
+}
+
 @media (max-width: 760px) {
   .operation-target-control-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .operation-radio-settings {
     grid-template-columns: minmax(0, 1fr);
   }
 }
