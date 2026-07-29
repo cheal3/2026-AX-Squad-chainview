@@ -15,7 +15,7 @@ function serviceLabel(service) {
 }
 export function StatisticsPage({ activeMenu = "analysis-statistics", sectionLabel = "분석" }) {
   const portalData = usePortalData();
-  const [activeStatsTab, setActiveStatsTab] = useState("service");
+  const [activeStatsTab, setActiveStatsTab] = useState("tech");
   const [techSearch, setTechSearch] = useState("");
   const [techTypeFilter, setTechTypeFilter] = useState("all");
   const serviceById = useMemo(
@@ -152,10 +152,10 @@ export function StatisticsPage({ activeMenu = "analysis-statistics", sectionLabe
     })),
   ].slice(0, 8);
   const graphTabs = [
-    { key: "service", label: "서비스" },
+    { key: "tech", label: "기술스택" },
     { key: "incident", label: "인시던트" },
     { key: "relation", label: "관계·인프라" },
-    { key: "tech", label: "기술스택" },
+    { key: "service", label: "서비스" },
     { key: "quality", label: "품질 점검" },
   ];
 

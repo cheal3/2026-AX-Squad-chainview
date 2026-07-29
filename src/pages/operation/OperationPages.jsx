@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { History, List, Pencil, Play, Plus, Power, RotateCcw, Search, Trash2, X } from "lucide-react";
 
@@ -326,6 +326,48 @@ function OperationIconButton({ children, danger = false, label, onClick, primary
   );
 }
 
+function labelServiceTarget(service) {
+  return service ? `${service.serviceName} (${service.serviceCode})` : "";
+}
+
+function labelServerTarget(server) {
+  const host = server?.hostName ? ` · ${server.hostName}` : "";
+  return server ? `${server.serverName}${host}` : "";
+}
+
+function serviceTargetMeta(service, servers) {
+  if (!service) {
+    return "";
+  }
+  const linkedServers = servers.filter((server) =>
+    Number(server.serverId) === Number(service.serverId) ||
+    (Array.isArray(server.serviceIds) && server.serviceIds.map(Number).includes(Number(service.serviceId))) ||
+    (Array.isArray(server.serviceCodes) && server.serviceCodes.includes(service.serviceCode))
+  );
+  const hosts = linkedServers
+    .map((server) => server.hostName || server.serverName)
+    .filter(Boolean)
+    .slice(0, 5);
+  const category = Array.isArray(service.categoryPath) ? service.categoryPath.filter(Boolean).join("/") : "";
+  return [
+    hosts.length ? `배포 호스트: ${hosts.join(", ")}` : "",
+    category ? `분류: ${category}` : "",
+    service.endpointUrl ? `엔드포인트: ${service.endpointUrl}` : "",
+  ].filter(Boolean).join(" · ");
+}
+
+function serverTargetMeta(server) {
+  if (!server) {
+    return "";
+  }
+  return [
+    server.hostName ? `호스트: ${server.hostName}` : "",
+    server.ipAddress ? `IP: ${server.ipAddress}` : "",
+    server.serverRoleName || server.serverRoleCode ? `역할: ${server.serverRoleName || server.serverRoleCode}` : "",
+    server.envCode ? `환경: ${server.envCode}` : "",
+  ].filter(Boolean).join(" · ");
+}
+
 export function ServiceCheckPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -385,6 +427,47 @@ export function ServiceCheckPage() {
 }
 
 function ServiceCheckModal({ onClose, row }) {
+  const portalData = usePortalData();
+  const sortedServices = useMemo(
+    () => [...portalData.services].sort((left, right) =>
+      String(left.serviceName || "").localeCompare(String(right.serviceName || ""), "ko")
+    ),
+    [portalData.services]
+  );
+  const sortedServers = useMemo(
+    () => [...portalData.servers].sort((left, right) =>
+      String(left.serverName || left.hostName || "").localeCompare(String(right.serverName || right.hostName || ""), "ko")
+    ),
+    [portalData.servers]
+  );
+  const matchedService = sortedServices.find((service) =>
+    row?.target === service.serviceName || row?.target === service.serviceCode
+  );
+  const matchedServer = sortedServers.find((server) =>
+    row?.target === server.serverName || row?.target === server.hostName
+  );
+  const [targetType, setTargetType] = useState(matchedServer ? "SERVER" : "SERVICE");
+  const [targetId, setTargetId] = useState(
+    matchedServer
+      ? String(matchedServer.serverId)
+      : matchedService
+        ? String(matchedService.serviceId)
+        : ""
+  );
+  const targetOptions = targetType === "SERVER" ? sortedServers : sortedServices;
+  const selectedTarget =
+    targetType === "SERVER"
+      ? sortedServers.find((server) => String(server.serverId) === targetId)
+      : sortedServices.find((service) => String(service.serviceId) === targetId);
+  const selectedTargetMeta =
+    targetType === "SERVER"
+      ? serverTargetMeta(selectedTarget)
+      : serviceTargetMeta(selectedTarget, sortedServers);
+  const switchTargetType = (nextType) => {
+    setTargetType(nextType);
+    setTargetId("");
+  };
+
   return (
     <ModalBackdrop onClose={onClose}>
       <div className="modal operation-modal" onClick={(event) => event.stopPropagation()}>
@@ -394,7 +477,24 @@ function ServiceCheckModal({ onClose, row }) {
           <div className="operation-form-grid">
             <OperationFormRow label="점검 코드" required><input defaultValue={row?.code ?? ""} placeholder="예: SSO-HEALTH-01" type="text" /></OperationFormRow>
             <OperationFormRow label="점검명" required><input defaultValue={row?.name ?? ""} placeholder="점검명을 입력하세요" type="text" /></OperationFormRow>
-            <OperationFormRow label="대상" required><select defaultValue={row?.target ?? ""}><option value="">대상 선택</option><option>대표 모바일 앱</option><option>SSO/EAM 통합 인증</option><option>공통 API Gateway</option></select></OperationFormRow>
+            <div className="form-row operation-target-field">
+              <span>점검 대상<i className="req">*</i></span>
+              <div className="operation-target-control-row">
+                <div className="operation-target-tabs" role="tablist" aria-label="점검 대상 유형">
+                  <button aria-selected={targetType === "SERVICE"} className={targetType === "SERVICE" ? "is-active" : ""} onClick={() => switchTargetType("SERVICE")} role="tab" type="button">서비스</button>
+                  <button aria-selected={targetType === "SERVER"} className={targetType === "SERVER" ? "is-active" : ""} onClick={() => switchTargetType("SERVER")} role="tab" type="button">서버</button>
+                </div>
+                <select value={targetId} onChange={(event) => setTargetId(event.target.value)}>
+                  <option value="">{targetType === "SERVER" ? "서버 선택" : "서비스 선택"}</option>
+                  {targetOptions.map((target) => (
+                    <option key={targetType === "SERVER" ? target.serverId : target.serviceId} value={targetType === "SERVER" ? target.serverId : target.serviceId}>
+                      {targetType === "SERVER" ? labelServerTarget(target) : labelServiceTarget(target)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {selectedTargetMeta ? <small className="operation-target-meta">{selectedTargetMeta}</small> : null}
+            </div>
             <OperationFormRow label="유형" required><select defaultValue={row?.type ?? "HTTP GET"}><option>HTTP GET</option><option>TCP CHECK</option><option>PROCESS</option></select></OperationFormRow>
             <OperationFormRow label="URL" required><input placeholder="https://host/path 또는 http://..." type="text" /></OperationFormRow>
             <OperationFormRow label="Timeout (ms)"><input defaultValue="5000" type="number" /></OperationFormRow>
