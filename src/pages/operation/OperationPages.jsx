@@ -644,12 +644,21 @@ function ServiceCheckModal({ onClose, onSave, row }) {
     targetType === "SERVER"
       ? sortedServers.find((server) => String(server.serverId) === targetId)
       : sortedServices.find((service) => String(service.serviceId) === targetId);
+  const selectedServerAddress = targetType === "SERVER"
+    ? String(selectedTarget?.ipAddress ?? selectedTarget?.serverIp ?? selectedTarget?.privateIp ?? selectedTarget?.hostName ?? selectedTarget?.hostname ?? "")
+    : "";
   const selectedTargetMeta =
     targetType === "SERVER"
       ? serverTargetMeta(selectedTarget)
       : serviceTargetMeta(selectedTarget, sortedServers);
   const switchTargetType = (nextType) => {
-    setForm((current) => ({ ...current, targetType: nextType, targetId: "" }));
+    setForm((current) => ({
+      ...current,
+      targetType: nextType,
+      targetId: "",
+      checkTypeCode: nextType === "SERVER" ? "TCP_CHECK" : "HTTP_GET",
+      url: nextType === "SERVER" ? "" : current.url,
+    }));
   };
   const updateForm = (key, value) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -680,14 +689,14 @@ function ServiceCheckModal({ onClose, onSave, row }) {
       cronExpression: form.cron.trim(),
       enabledYn: form.activeYn,
       jobStatusCode: form.runYn === "Y" ? "RUNNING" : "STOPPED",
-      httpMethod: form.httpMethod,
-      checkUrl: form.url.trim(),
-      queryParamsJson: serializeKeyValueRows(form.queryParams),
-      headersJson: serializeKeyValueRows(form.headers),
-      bodyJson: form.bodyJson.trim() || null,
-      expectedStatusCode: form.expectedStatusCode ? Number(form.expectedStatusCode) : null,
+      httpMethod: form.targetType === "SERVER" ? null : form.httpMethod,
+      checkUrl: form.targetType === "SERVER" ? (form.url.trim() || selectedServerAddress || null) : form.url.trim(),
+      queryParamsJson: form.targetType === "SERVER" ? null : serializeKeyValueRows(form.queryParams),
+      headersJson: form.targetType === "SERVER" ? null : serializeKeyValueRows(form.headers),
+      bodyJson: form.targetType === "SERVER" ? null : form.bodyJson.trim() || null,
+      expectedStatusCode: form.targetType === "SERVER" ? null : form.expectedStatusCode ? Number(form.expectedStatusCode) : null,
       timeoutMs: Number(form.timeoutMs) || 5000,
-      successMatchText: form.successMatchText.trim() || null,
+      successMatchText: form.targetType === "SERVER" ? null : form.successMatchText.trim() || null,
       failureThreshold: Number(form.failureThreshold) || 1,
       notifyOnFailureYn: form.notifyOnFailureYn,
       notificationOwner: form.notificationOwner.trim(),
@@ -707,9 +716,9 @@ function ServiceCheckModal({ onClose, onSave, row }) {
     const missing = [
       ["jobCode", "점검 코드"],
       ["jobName", "점검명"],
-      ["checkUrl", "URL"],
       ["cronExpression", "Cron"],
     ].filter(([key]) => !String(payload[key] ?? "").trim()).map(([, label]) => label);
+    if (form.targetType !== "SERVER" && !String(payload.checkUrl ?? "").trim()) missing.push("URL");
     if (!form.targetId) missing.push("점검 대상");
     if (missing.length) {
       setError(`${missing.join(", ")} 항목을 입력해 주세요.`);
@@ -757,52 +766,62 @@ function ServiceCheckModal({ onClose, onSave, row }) {
                   ))}
                 </select>
               </div>
-              {selectedTargetMeta ? <small className="operation-target-meta">{selectedTargetMeta}</small> : null}
+              {targetType === "SERVICE" && selectedTargetMeta ? <small className="operation-target-meta">{selectedTargetMeta}</small> : null}
             </div>
             <OperationFormRow label="유형" required><select value={form.checkTypeCode} onChange={(event) => updateForm("checkTypeCode", event.target.value)}>{healthCheckTypeOptions.map((option) => <option key={option.code} value={option.code}>{option.label}</option>)}</select></OperationFormRow>
-            <div className="operation-request-section">
-              <h4 className="form-section__title">HTTP 요청</h4>
-              <div className="operation-request-url">
-                <select value={form.httpMethod} onChange={(event) => updateForm("httpMethod", event.target.value)} aria-label="HTTP Method">
-                  {healthCheckHttpMethods.map((method) => <option key={method} value={method}>{method}</option>)}
-                </select>
-                <input value={form.url} onChange={(event) => updateForm("url", event.target.value)} placeholder="https://host/path 또는 http://..." type="text" />
-              </div>
-              <div className="operation-request-grid">
-                <OperationFormRow label="Expected Status"><input value={form.expectedStatusCode} onChange={(event) => updateForm("expectedStatusCode", event.target.value)} placeholder="비우면 통신 OK, 4xx/5xx 아니면 성공" type="number" /></OperationFormRow>
-                <OperationFormRow label="Response Contains"><input value={form.successMatchText} onChange={(event) => updateForm("successMatchText", event.target.value)} placeholder={'비우면 본문 검사 안 함, 예: "status":"UP"'} type="text" /></OperationFormRow>
-              </div>
-              <small className="operation-target-meta">입력 시 해당 HTTP 상태 코드와 응답 본문 조건이 일치해야 성공으로 판단합니다.</small>
-              <div className="operation-request-tabs" role="tablist" aria-label="HTTP 요청 상세">
-                {[
-                  ["params", "Params"],
-                  ["headers", "Headers"],
-                  ["body", "Body"],
-                ].map(([key, label]) => (
-                  <button key={key} className={requestTab === key ? "is-active" : ""} onClick={() => setRequestTab(key)} type="button" role="tab" aria-selected={requestTab === key}>{label}</button>
-                ))}
-              </div>
-              {requestTab === "body" ? (
-                <textarea className="operation-request-body" value={form.bodyJson} onChange={(event) => updateForm("bodyJson", event.target.value)} placeholder='JSON 본문을 입력하세요. 예: {"status":"UP"}' rows={5} />
-              ) : (
-                <div className="operation-kv-editor">
-                  <div className="operation-kv-editor__head">
-                    <button className="btn" onClick={() => addKeyValueRow(requestTab === "params" ? "queryParams" : "headers")} type="button">+ 행 추가</button>
-                    <span>JSON 편집</span>
-                  </div>
-                  {(requestTab === "params" ? form.queryParams : form.headers).map((item, index) => {
-                    const field = requestTab === "params" ? "queryParams" : "headers";
-                    return (
-                      <div className="operation-kv-row" key={`${field}-${index}`}>
-                        <input value={item.key} onChange={(event) => updateKeyValueRow(field, index, "key", event.target.value)} placeholder="key" type="text" />
-                        <input value={item.value} onChange={(event) => updateKeyValueRow(field, index, "value", event.target.value)} placeholder="value" type="text" />
-                        <button className="btn" onClick={() => removeKeyValueRow(field, index)} type="button">×</button>
-                      </div>
-                    );
-                  })}
+            {targetType === "SERVER" ? (
+              <div className="operation-host-check-section">
+                <h4 className="form-section__title">호스트 통신 확인</h4>
+                <p>선택한 서버 IP로 네트워크 reachability를 확인합니다. ICMP echo 우선, OS/방화벽 정책에 따라 동작 방식이 달라질 수 있습니다.</p>
+                <div className="operation-host-check-box">
+                  {selectedServerAddress ? `${selectedServerAddress} 가 점검 대상으로 사용됩니다.` : "서버를 선택하면 등록 IP가 점검 대상으로 사용됩니다."}
                 </div>
-              )}
-            </div>
+              </div>
+            ) : (
+              <div className="operation-request-section">
+                <h4 className="form-section__title">HTTP 요청</h4>
+                <div className="operation-request-url">
+                  <select value={form.httpMethod} onChange={(event) => updateForm("httpMethod", event.target.value)} aria-label="HTTP Method">
+                    {healthCheckHttpMethods.map((method) => <option key={method} value={method}>{method}</option>)}
+                  </select>
+                  <input value={form.url} onChange={(event) => updateForm("url", event.target.value)} placeholder="https://host/path 또는 http://..." type="text" />
+                </div>
+                <div className="operation-request-grid">
+                  <OperationFormRow label="Expected Status"><input value={form.expectedStatusCode} onChange={(event) => updateForm("expectedStatusCode", event.target.value)} placeholder="비우면 통신 OK, 4xx/5xx 아니면 성공" type="number" /></OperationFormRow>
+                  <OperationFormRow label="Response Contains"><input value={form.successMatchText} onChange={(event) => updateForm("successMatchText", event.target.value)} placeholder={'비우면 본문 검사 안 함, 예: "status":"UP"'} type="text" /></OperationFormRow>
+                </div>
+                <small className="operation-target-meta">입력 시 해당 HTTP 상태 코드와 응답 본문 조건이 일치해야 성공으로 판단합니다.</small>
+                <div className="operation-request-tabs" role="tablist" aria-label="HTTP 요청 상세">
+                  {[
+                    ["params", "Params"],
+                    ["headers", "Headers"],
+                    ["body", "Body"],
+                  ].map(([key, label]) => (
+                    <button key={key} className={requestTab === key ? "is-active" : ""} onClick={() => setRequestTab(key)} type="button" role="tab" aria-selected={requestTab === key}>{label}</button>
+                  ))}
+                </div>
+                {requestTab === "body" ? (
+                  <textarea className="operation-request-body" value={form.bodyJson} onChange={(event) => updateForm("bodyJson", event.target.value)} placeholder='JSON 본문을 입력하세요. 예: {"status":"UP"}' rows={5} />
+                ) : (
+                  <div className="operation-kv-editor">
+                    <div className="operation-kv-editor__head">
+                      <button className="btn" onClick={() => addKeyValueRow(requestTab === "params" ? "queryParams" : "headers")} type="button">+ 행 추가</button>
+                      <span>JSON 편집</span>
+                    </div>
+                    {(requestTab === "params" ? form.queryParams : form.headers).map((item, index) => {
+                      const field = requestTab === "params" ? "queryParams" : "headers";
+                      return (
+                        <div className="operation-kv-row" key={`${field}-${index}`}>
+                          <input value={item.key} onChange={(event) => updateKeyValueRow(field, index, "key", event.target.value)} placeholder="key" type="text" />
+                          <input value={item.value} onChange={(event) => updateKeyValueRow(field, index, "value", event.target.value)} placeholder="value" type="text" />
+                          <button className="btn" onClick={() => removeKeyValueRow(field, index)} type="button">×</button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
             <OperationFormRow label="Timeout (ms)"><input value={form.timeoutMs} onChange={(event) => updateForm("timeoutMs", event.target.value)} type="number" /></OperationFormRow>
             <OperationFormRow label="Cron" required><input value={form.cron} onChange={(event) => updateForm("cron", event.target.value)} type="text" /></OperationFormRow>
             <OperationFormRow label="실패 임계값" required><input value={form.failureThreshold} onChange={(event) => updateForm("failureThreshold", event.target.value)} type="number" /></OperationFormRow>
