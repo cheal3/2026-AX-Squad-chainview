@@ -32,11 +32,13 @@ const serviceCheckRowsSeed = [
 
 const healthCheckTypeOptions = [
   { code: "HTTP_GET", label: "HTTP GET" },
+  { code: "HTTP_POST", label: "HTTP POST" },
+  { code: "PING", label: "PING" },
   { code: "TCP_CHECK", label: "TCP CHECK" },
   { code: "PROCESS", label: "PROCESS" },
 ];
 
-const healthCheckHttpMethods = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"];
+const healthCheckHttpMethods = ["GET", "POST"];
 
 function normalizeServiceCheckRow(row, index = 0) {
   const targetType = String(row?.targetTypeCode ?? row?.targetType ?? "SERVICE").toUpperCase();
@@ -528,6 +530,23 @@ export function ServiceCheckPage() {
     await loadRows();
     setModal(null);
   };
+  const openEditRow = async (row) => {
+    if (!row?.jobId) {
+      setModal({ type: "form", row });
+      return;
+    }
+    setLoading(true);
+    try {
+      const detail = await chainViewApi.healthCheckJobs.detail(row.jobId);
+      setModal({ type: "form", row: normalizeServiceCheckRow({ ...row.raw, ...detail }) });
+      setMessage("");
+    } catch (error) {
+      setModal({ type: "form", row });
+      setMessage(error?.message || "점검 상세 정보를 불러오지 못해 목록 정보로 수정 화면을 열었습니다.");
+    } finally {
+      setLoading(false);
+    }
+  };
   const deleteRow = async (row) => {
     if (!row?.jobId) return;
     if (!window.confirm(`${row.name} 점검을 삭제할까요?`)) return;
@@ -574,7 +593,7 @@ export function ServiceCheckPage() {
                   <div className="row-actions op-row-actions">
                     <OperationIconButton label="점검 시작" onClick={() => startRow(row)} primary><Play size={16} /></OperationIconButton>
                     <OperationIconButton label="점검 이력" onClick={() => setModal({ type: "history", row })}><History size={16} /></OperationIconButton>
-                    <OperationIconButton label="점검 수정" onClick={() => setModal({ type: "form", row })}><Pencil size={16} /></OperationIconButton>
+                    <OperationIconButton label="점검 수정" onClick={() => openEditRow(row)}><Pencil size={16} /></OperationIconButton>
                     <OperationIconButton danger label="점검 삭제" onClick={() => deleteRow(row)}><Trash2 size={16} /></OperationIconButton>
                   </div>
                 </td>
@@ -618,8 +637,8 @@ function ServiceCheckModal({ onClose, onSave, row }) {
     targetId: row?.targetType === "SERVER"
       ? String(row?.serverId ?? matchedServer?.serverId ?? "")
       : String(row?.serviceId ?? matchedService?.serviceId ?? ""),
-    checkTypeCode: row?.checkTypeCode ?? optionCode(healthCheckTypeOptions, row?.type, "HTTP_GET"),
-    httpMethod: row?.httpMethod ?? "GET",
+    checkTypeCode: row?.targetType === "SERVER" ? "PING" : row?.checkTypeCode ?? optionCode(healthCheckTypeOptions, row?.type, "HTTP_GET"),
+    httpMethod: row?.checkTypeCode === "HTTP_POST" || String(row?.httpMethod ?? "").toUpperCase() === "POST" ? "POST" : "GET",
     url: row?.url ?? "",
     expectedStatusCode: row?.expectedStatusCode ?? "",
     successMatchText: row?.successMatchText ?? "",
@@ -645,7 +664,7 @@ function ServiceCheckModal({ onClose, onSave, row }) {
       ? sortedServers.find((server) => String(server.serverId) === targetId)
       : sortedServices.find((service) => String(service.serviceId) === targetId);
   const selectedServerAddress = targetType === "SERVER"
-    ? String(selectedTarget?.ipAddress ?? selectedTarget?.serverIp ?? selectedTarget?.privateIp ?? selectedTarget?.hostName ?? selectedTarget?.hostname ?? "")
+    ? String(selectedTarget?.ipAddress ?? "")
     : "";
   const selectedTargetMeta =
     targetType === "SERVER"
@@ -656,7 +675,7 @@ function ServiceCheckModal({ onClose, onSave, row }) {
       ...current,
       targetType: nextType,
       targetId: "",
-      checkTypeCode: nextType === "SERVER" ? "TCP_CHECK" : "HTTP_GET",
+      checkTypeCode: nextType === "SERVER" ? "PING" : "HTTP_GET",
       url: nextType === "SERVER" ? "" : current.url,
     }));
   };
@@ -681,16 +700,18 @@ function ServiceCheckModal({ onClose, onSave, row }) {
     });
   };
   const buildPayload = () => {
+    const resolvedCheckTypeCode = form.targetType === "SERVER"
+      ? "PING"
+      : form.httpMethod === "POST" ? "HTTP_POST" : "HTTP_GET";
     const payload = {
       jobCode: form.code.trim().toUpperCase(),
       jobName: form.name.trim(),
       targetTypeCode: form.targetType,
-      checkTypeCode: form.checkTypeCode,
+      checkTypeCode: resolvedCheckTypeCode,
       cronExpression: form.cron.trim(),
       enabledYn: form.activeYn,
-      jobStatusCode: form.runYn === "Y" ? "RUNNING" : "STOPPED",
       httpMethod: form.targetType === "SERVER" ? null : form.httpMethod,
-      checkUrl: form.targetType === "SERVER" ? (form.url.trim() || selectedServerAddress || null) : form.url.trim(),
+      checkUrl: form.targetType === "SERVER" ? selectedServerAddress || null : form.url.trim() || null,
       queryParamsJson: form.targetType === "SERVER" ? null : serializeKeyValueRows(form.queryParams),
       headersJson: form.targetType === "SERVER" ? null : serializeKeyValueRows(form.headers),
       bodyJson: form.targetType === "SERVER" ? null : form.bodyJson.trim() || null,
@@ -699,8 +720,9 @@ function ServiceCheckModal({ onClose, onSave, row }) {
       successMatchText: form.targetType === "SERVER" ? null : form.successMatchText.trim() || null,
       failureThreshold: Number(form.failureThreshold) || 1,
       notifyOnFailureYn: form.notifyOnFailureYn,
-      notificationOwner: form.notificationOwner.trim(),
+      templateCode: null,
       notifyResponsibilityCodes: form.notificationOwner.trim() || null,
+      description: null,
     };
     if (form.targetType === "SERVER") {
       payload.serverId = Number(form.targetId) || null;
@@ -720,6 +742,7 @@ function ServiceCheckModal({ onClose, onSave, row }) {
     ].filter(([key]) => !String(payload[key] ?? "").trim()).map(([, label]) => label);
     if (form.targetType !== "SERVER" && !String(payload.checkUrl ?? "").trim()) missing.push("URL");
     if (!form.targetId) missing.push("점검 대상");
+    if (form.targetType === "SERVER" && !String(payload.checkUrl ?? "").trim()) missing.push("서버 IP");
     if (missing.length) {
       setError(`${missing.join(", ")} 항목을 입력해 주세요.`);
       return;
@@ -742,7 +765,7 @@ function ServiceCheckModal({ onClose, onSave, row }) {
         <div className="modal__body">
           <h4 className="form-section__title">기본 정보</h4>
           <div className="operation-form-grid">
-            <OperationFormRow label="점검 코드" required><input value={form.code} onChange={(event) => updateForm("code", event.target.value.toUpperCase())} placeholder="예: SSO-HEALTH-01" type="text" /></OperationFormRow>
+            <OperationFormRow label="점검 코드" required><input disabled={Boolean(row?.jobId)} value={form.code} onChange={(event) => updateForm("code", event.target.value.toUpperCase())} placeholder="예: SSO-HEALTH-01" type="text" /></OperationFormRow>
             <OperationFormRow label="점검명" required><input value={form.name} onChange={(event) => updateForm("name", event.target.value)} placeholder="점검명을 입력하세요" type="text" /></OperationFormRow>
             <div className="form-row operation-target-field">
               <span>점검 대상<i className="req">*</i></span>
@@ -766,9 +789,8 @@ function ServiceCheckModal({ onClose, onSave, row }) {
                   ))}
                 </select>
               </div>
-              {targetType === "SERVICE" && selectedTargetMeta ? <small className="operation-target-meta">{selectedTargetMeta}</small> : null}
+              {selectedTargetMeta ? <small className="operation-target-meta">{selectedTargetMeta}</small> : null}
             </div>
-            <OperationFormRow label="유형" required><select value={form.checkTypeCode} onChange={(event) => updateForm("checkTypeCode", event.target.value)}>{healthCheckTypeOptions.map((option) => <option key={option.code} value={option.code}>{option.label}</option>)}</select></OperationFormRow>
             {targetType === "SERVER" ? (
               <div className="operation-host-check-section">
                 <h4 className="form-section__title">호스트 통신 확인</h4>

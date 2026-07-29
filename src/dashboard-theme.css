@@ -7129,6 +7129,32 @@
   border-radius: 8px;
 }
 
+.operation-modal .operation-request-section .operation-request-url select,
+.operation-modal .operation-request-section .operation-request-url input,
+.operation-modal .operation-request-section .operation-kv-row input,
+.operation-modal .operation-request-section .operation-request-body {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #d9dee7;
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.operation-modal .operation-request-section .operation-request-url select,
+.operation-modal .operation-request-section .operation-request-url input,
+.operation-modal .operation-request-section .operation-kv-row input {
+  min-height: 44px;
+  padding: 0 14px;
+}
+
+.operation-modal .operation-request-section .operation-request-body {
+  min-height: 150px;
+  padding: 14px;
+}
+
 .operation-request-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
