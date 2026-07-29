@@ -36,6 +36,8 @@ const healthCheckTypeOptions = [
   { code: "PROCESS", label: "PROCESS" },
 ];
 
+const healthCheckHttpMethods = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"];
+
 function normalizeServiceCheckRow(row, index = 0) {
   const targetType = String(row?.targetTypeCode ?? row?.targetType ?? "SERVICE").toUpperCase();
   const target =
@@ -66,16 +68,48 @@ function normalizeServiceCheckRow(row, index = 0) {
     statusCode: String(row?.jobStatusCode ?? row?.statusCode ?? "STOPPED"),
     activeYn: String(row?.enabledYn ?? row?.activeYn ?? "Y").toUpperCase() === "N" ? "N" : "Y",
     runYn: String(row?.jobStatusCode ?? row?.runYn ?? "").toUpperCase() === "RUNNING" ? "Y" : "N",
+    httpMethod: String(row?.httpMethod ?? "GET").toUpperCase(),
     url: String(row?.checkUrl ?? row?.url ?? ""),
+    expectedStatusCode: row?.expectedStatusCode ?? "",
+    successMatchText: String(row?.successMatchText ?? row?.responseContains ?? ""),
+    queryParamsJson: row?.queryParamsJson ?? row?.paramsJson ?? "",
+    headersJson: row?.headersJson ?? "",
+    bodyJson: row?.bodyJson ?? "",
     timeoutMs: Number(row?.timeoutMs ?? row?.timeoutMillis) || 5000,
     failureThreshold: Number(row?.failureThreshold) || 1,
     notifyOnFailureYn: String(row?.notifyOnFailureYn ?? "Y").toUpperCase() === "N" ? "N" : "Y",
-    notificationOwner: String(row?.notificationOwner ?? row?.notifyTarget ?? ""),
+    notificationOwner: String(row?.notificationOwner ?? row?.notifyResponsibilityCodes ?? row?.notifyTarget ?? ""),
     lastCheckedAt: formatOperationDate(row?.lastCheckedAt) || row?.lastCheckedAt || "-",
     result,
     rowKey: String(row?.jobId ?? row?.jobCode ?? row?.code ?? index),
     raw: row,
   };
+}
+
+function parseKeyValueJson(value) {
+  if (!value) return [{ key: "", value: "" }];
+  if (Array.isArray(value)) {
+    const rows = value.map((item) => ({ key: String(item?.key ?? ""), value: String(item?.value ?? "") }));
+    return rows.length ? rows : [{ key: "", value: "" }];
+  }
+  if (typeof value === "object") {
+    const rows = Object.entries(value).map(([key, itemValue]) => ({ key, value: String(itemValue ?? "") }));
+    return rows.length ? rows : [{ key: "", value: "" }];
+  }
+  try {
+    const parsed = JSON.parse(String(value));
+    return parseKeyValueJson(parsed);
+  } catch {
+    return [{ key: "", value: "" }];
+  }
+}
+
+function serializeKeyValueRows(rows) {
+  const entries = rows
+    .map((row) => [String(row.key ?? "").trim(), String(row.value ?? "").trim()])
+    .filter(([key]) => key);
+  if (!entries.length) return null;
+  return JSON.stringify(Object.fromEntries(entries));
 }
 
 function normalizeHealthCheckResult(row, index = 0) {
@@ -585,7 +619,13 @@ function ServiceCheckModal({ onClose, onSave, row }) {
       ? String(row?.serverId ?? matchedServer?.serverId ?? "")
       : String(row?.serviceId ?? matchedService?.serviceId ?? ""),
     checkTypeCode: row?.checkTypeCode ?? optionCode(healthCheckTypeOptions, row?.type, "HTTP_GET"),
+    httpMethod: row?.httpMethod ?? "GET",
     url: row?.url ?? "",
+    expectedStatusCode: row?.expectedStatusCode ?? "",
+    successMatchText: row?.successMatchText ?? "",
+    queryParams: parseKeyValueJson(row?.queryParamsJson),
+    headers: parseKeyValueJson(row?.headersJson),
+    bodyJson: row?.bodyJson ? String(row.bodyJson) : "",
     timeoutMs: row?.timeoutMs ?? 5000,
     cron: row?.cron ?? "0 */5 * * * *",
     failureThreshold: row?.failureThreshold ?? 1,
@@ -596,6 +636,7 @@ function ServiceCheckModal({ onClose, onSave, row }) {
   }));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [requestTab, setRequestTab] = useState("params");
   const targetType = form.targetType;
   const targetId = form.targetId;
   const targetOptions = targetType === "SERVER" ? sortedServers : sortedServices;
@@ -613,6 +654,23 @@ function ServiceCheckModal({ onClose, onSave, row }) {
   const updateForm = (key, value) => {
     setForm((current) => ({ ...current, [key]: value }));
   };
+  const updateKeyValueRow = (field, index, key, value) => {
+    setForm((current) => ({
+      ...current,
+      [field]: current[field].map((item, itemIndex) =>
+        itemIndex === index ? { ...item, [key]: value } : item
+      ),
+    }));
+  };
+  const addKeyValueRow = (field) => {
+    setForm((current) => ({ ...current, [field]: [...current[field], { key: "", value: "" }] }));
+  };
+  const removeKeyValueRow = (field, index) => {
+    setForm((current) => {
+      const nextRows = current[field].filter((_, itemIndex) => itemIndex !== index);
+      return { ...current, [field]: nextRows.length ? nextRows : [{ key: "", value: "" }] };
+    });
+  };
   const buildPayload = () => {
     const payload = {
       jobCode: form.code.trim().toUpperCase(),
@@ -622,11 +680,18 @@ function ServiceCheckModal({ onClose, onSave, row }) {
       cronExpression: form.cron.trim(),
       enabledYn: form.activeYn,
       jobStatusCode: form.runYn === "Y" ? "RUNNING" : "STOPPED",
+      httpMethod: form.httpMethod,
       checkUrl: form.url.trim(),
+      queryParamsJson: serializeKeyValueRows(form.queryParams),
+      headersJson: serializeKeyValueRows(form.headers),
+      bodyJson: form.bodyJson.trim() || null,
+      expectedStatusCode: form.expectedStatusCode ? Number(form.expectedStatusCode) : null,
       timeoutMs: Number(form.timeoutMs) || 5000,
+      successMatchText: form.successMatchText.trim() || null,
       failureThreshold: Number(form.failureThreshold) || 1,
       notifyOnFailureYn: form.notifyOnFailureYn,
       notificationOwner: form.notificationOwner.trim(),
+      notifyResponsibilityCodes: form.notificationOwner.trim() || null,
     };
     if (form.targetType === "SERVER") {
       payload.serverId = Number(form.targetId) || null;
@@ -695,7 +760,49 @@ function ServiceCheckModal({ onClose, onSave, row }) {
               {selectedTargetMeta ? <small className="operation-target-meta">{selectedTargetMeta}</small> : null}
             </div>
             <OperationFormRow label="유형" required><select value={form.checkTypeCode} onChange={(event) => updateForm("checkTypeCode", event.target.value)}>{healthCheckTypeOptions.map((option) => <option key={option.code} value={option.code}>{option.label}</option>)}</select></OperationFormRow>
-            <OperationFormRow label="URL" required><input value={form.url} onChange={(event) => updateForm("url", event.target.value)} placeholder="https://host/path 또는 http://..." type="text" /></OperationFormRow>
+            <div className="operation-request-section">
+              <h4 className="form-section__title">HTTP 요청</h4>
+              <div className="operation-request-url">
+                <select value={form.httpMethod} onChange={(event) => updateForm("httpMethod", event.target.value)} aria-label="HTTP Method">
+                  {healthCheckHttpMethods.map((method) => <option key={method} value={method}>{method}</option>)}
+                </select>
+                <input value={form.url} onChange={(event) => updateForm("url", event.target.value)} placeholder="https://host/path 또는 http://..." type="text" />
+              </div>
+              <div className="operation-request-grid">
+                <OperationFormRow label="Expected Status"><input value={form.expectedStatusCode} onChange={(event) => updateForm("expectedStatusCode", event.target.value)} placeholder="비우면 통신 OK, 4xx/5xx 아니면 성공" type="number" /></OperationFormRow>
+                <OperationFormRow label="Response Contains"><input value={form.successMatchText} onChange={(event) => updateForm("successMatchText", event.target.value)} placeholder={'비우면 본문 검사 안 함, 예: "status":"UP"'} type="text" /></OperationFormRow>
+              </div>
+              <small className="operation-target-meta">입력 시 해당 HTTP 상태 코드와 응답 본문 조건이 일치해야 성공으로 판단합니다.</small>
+              <div className="operation-request-tabs" role="tablist" aria-label="HTTP 요청 상세">
+                {[
+                  ["params", "Params"],
+                  ["headers", "Headers"],
+                  ["body", "Body"],
+                ].map(([key, label]) => (
+                  <button key={key} className={requestTab === key ? "is-active" : ""} onClick={() => setRequestTab(key)} type="button" role="tab" aria-selected={requestTab === key}>{label}</button>
+                ))}
+              </div>
+              {requestTab === "body" ? (
+                <textarea className="operation-request-body" value={form.bodyJson} onChange={(event) => updateForm("bodyJson", event.target.value)} placeholder='JSON 본문을 입력하세요. 예: {"status":"UP"}' rows={5} />
+              ) : (
+                <div className="operation-kv-editor">
+                  <div className="operation-kv-editor__head">
+                    <button className="btn" onClick={() => addKeyValueRow(requestTab === "params" ? "queryParams" : "headers")} type="button">+ 행 추가</button>
+                    <span>JSON 편집</span>
+                  </div>
+                  {(requestTab === "params" ? form.queryParams : form.headers).map((item, index) => {
+                    const field = requestTab === "params" ? "queryParams" : "headers";
+                    return (
+                      <div className="operation-kv-row" key={`${field}-${index}`}>
+                        <input value={item.key} onChange={(event) => updateKeyValueRow(field, index, "key", event.target.value)} placeholder="key" type="text" />
+                        <input value={item.value} onChange={(event) => updateKeyValueRow(field, index, "value", event.target.value)} placeholder="value" type="text" />
+                        <button className="btn" onClick={() => removeKeyValueRow(field, index)} type="button">×</button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
             <OperationFormRow label="Timeout (ms)"><input value={form.timeoutMs} onChange={(event) => updateForm("timeoutMs", event.target.value)} type="number" /></OperationFormRow>
             <OperationFormRow label="Cron" required><input value={form.cron} onChange={(event) => updateForm("cron", event.target.value)} type="text" /></OperationFormRow>
             <OperationFormRow label="실패 임계값" required><input value={form.failureThreshold} onChange={(event) => updateForm("failureThreshold", event.target.value)} type="number" /></OperationFormRow>
