@@ -6636,6 +6636,35 @@
   box-shadow: var(--shadow);
 }
 
+.op-inline-alert,
+.op-loading-line {
+  display: flex;
+  align-items: center;
+  min-height: 34px;
+  margin: 10px 0;
+  padding: 8px 12px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.op-inline-alert--danger {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.op-loading-line {
+  margin: 0;
+  border-width: 0 0 1px;
+  border-radius: 0;
+  background: #f8fafc;
+  color: #475569;
+}
+
 .operation-page .pager__nav button.is-on {
   background: var(--brand);
   border-color: var(--brand);

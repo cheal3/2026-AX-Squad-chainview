@@ -30,6 +30,89 @@ const serviceCheckRowsSeed = [
   { code: "HC-SVC-MCI", name: "MCI Gateway 헬스체크", target: "채널통합 MCI 게이트웨이", type: "HTTP GET", cron: "0 */5 * * * *", status: "중지", lastCheckedAt: "2026-07-03 18:59:36", result: "성공" },
 ];
 
+const healthCheckTypeOptions = [
+  { code: "HTTP_GET", label: "HTTP GET" },
+  { code: "TCP_CHECK", label: "TCP CHECK" },
+  { code: "PROCESS", label: "PROCESS" },
+];
+
+function normalizeServiceCheckRow(row, index = 0) {
+  const targetType = String(row?.targetTypeCode ?? row?.targetType ?? "SERVICE").toUpperCase();
+  const target =
+    targetType === "SERVER"
+      ? String(row?.serverName ?? row?.hostName ?? row?.target ?? "")
+      : String(row?.serviceName ?? row?.serviceCode ?? row?.target ?? "");
+  const checkTypeCode = optionCode(healthCheckTypeOptions, row?.checkTypeCode ?? row?.type, "HTTP_GET");
+  const lastSuccess = row?.lastSuccessYn ?? row?.successYn ?? row?.result;
+  const result =
+    lastSuccess === "Y" || lastSuccess === true || lastSuccess === "성공"
+      ? "성공"
+      : lastSuccess === "N" || lastSuccess === false || lastSuccess === "실패"
+        ? "실패"
+        : "-";
+
+  return {
+    jobId: Number(row?.jobId ?? row?.healthCheckJobId) || undefined,
+    code: String(row?.jobCode ?? row?.code ?? ""),
+    name: String(row?.jobName ?? row?.name ?? ""),
+    target,
+    targetType,
+    serviceId: Number(row?.serviceId) || undefined,
+    serverId: Number(row?.serverId) || undefined,
+    type: optionLabel(healthCheckTypeOptions, checkTypeCode, "HTTP GET"),
+    checkTypeCode,
+    cron: String(row?.cronExpression ?? row?.cron ?? "0 */5 * * * *"),
+    status: String(row?.jobStatusName ?? row?.status ?? (row?.jobStatusCode === "RUNNING" ? "실행" : "중지")),
+    statusCode: String(row?.jobStatusCode ?? row?.statusCode ?? "STOPPED"),
+    activeYn: String(row?.enabledYn ?? row?.activeYn ?? "Y").toUpperCase() === "N" ? "N" : "Y",
+    runYn: String(row?.jobStatusCode ?? row?.runYn ?? "").toUpperCase() === "RUNNING" ? "Y" : "N",
+    url: String(row?.checkUrl ?? row?.url ?? ""),
+    timeoutMs: Number(row?.timeoutMs ?? row?.timeoutMillis) || 5000,
+    failureThreshold: Number(row?.failureThreshold) || 1,
+    notifyOnFailureYn: String(row?.notifyOnFailureYn ?? "Y").toUpperCase() === "N" ? "N" : "Y",
+    notificationOwner: String(row?.notificationOwner ?? row?.notifyTarget ?? ""),
+    lastCheckedAt: formatOperationDate(row?.lastCheckedAt) || row?.lastCheckedAt || "-",
+    result,
+    rowKey: String(row?.jobId ?? row?.jobCode ?? row?.code ?? index),
+    raw: row,
+  };
+}
+
+function normalizeHealthCheckResult(row, index = 0) {
+  const success = row?.successYn ?? row?.success ?? row?.result;
+  const result =
+    success === "Y" || success === true || success === "성공"
+      ? "성공"
+      : success === "N" || success === false || success === "실패"
+        ? "실패"
+        : "-";
+  return [
+    formatOperationDate(row?.checkedAt ?? row?.executedAt ?? row?.createdAt) || "-",
+    result,
+    row?.latencyMs != null ? `${row.latencyMs}ms` : row?.latency != null ? `${row.latency}ms` : "-",
+    row?.httpStatusCode ?? row?.httpStatus ?? "-",
+    row?.failureReason ?? row?.errorMessage ?? "-",
+    row?.responseSummary ?? row?.responseBody ?? "-",
+    row?.notificationSentYn === "Y" ? "발송완료" : row?.notificationSentYn === "N" ? "미발송" : "건너뜀",
+    row?.remarks ?? row?.memo ?? "-",
+    String(row?.resultId ?? row?.healthCheckResultId ?? index),
+  ];
+}
+
+function formatOperationDate(value) {
+  if (!value) return "";
+  const text = String(value);
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(text)) {
+    return text.slice(0, 19);
+  }
+  const date = new Date(text);
+  if (Number.isNaN(date.getTime())) {
+    return text;
+  }
+  const pad = (number) => String(number).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
 const notificationTemplateRows = [
   { code: "INCIDENT_CRITICAL_V1", name: "인시던트 긴급 알림톡", channel: "알림톡", purpose: "인시던트", provider: "더미(개발)", variables: "3 / 4 (필수/전체)", active: "Y", title: "[장애] {{serviceName}} 긴급 장애 발생" },
   { code: "SERVICE_DOWN_V1", name: "서비스 장애 알림톡", channel: "알림톡", purpose: "서비스 장애", provider: "더미(개발)", variables: "2 / 2 (필수/전체)", active: "Y", title: "[오류] {{serviceName}} 장애 알림" },
@@ -372,11 +455,56 @@ export function ServiceCheckPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [modal, setModal] = useState(null);
+  const [rowsState, setRowsState] = useState(() => serviceCheckRowsSeed.map(normalizeServiceCheckRow));
+  const [targetFilter, setTargetFilter] = useState("all");
+  const [runFilter, setRunFilter] = useState("all");
+  const [activeFilter, setActiveFilter] = useState("all");
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
   const pageSize = OPERATION_PAGE_SIZE;
-  const rows = serviceCheckRowsSeed.filter((row) =>
-    matchesSearchText(searchableText(row.code, row.name, row.target), search)
+  const loadRows = async () => {
+    setLoading(true);
+    try {
+      const nextRows = await chainViewApi.healthCheckJobs.list();
+      setRowsState((nextRows || []).map(normalizeServiceCheckRow));
+      setMessage("");
+    } catch (error) {
+      setMessage(error?.message || "서비스 점검 목록을 불러오지 못했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  };
+  useEffect(() => {
+    loadRows();
+  }, []);
+
+  const rows = rowsState.filter((row) =>
+    matchesSearchText(searchableText(row.code, row.name, row.target, row.url), search) &&
+    (targetFilter === "all" || row.targetType === targetFilter) &&
+    (runFilter === "all" || row.runYn === runFilter) &&
+    (activeFilter === "all" || row.activeYn === activeFilter)
   );
   const pagedRows = rows.slice((page - 1) * pageSize, page * pageSize);
+  const saveRow = async (payload, row) => {
+    if (row?.jobId) {
+      await chainViewApi.healthCheckJobs.update(row.jobId, payload);
+    } else {
+      await chainViewApi.healthCheckJobs.create(payload);
+    }
+    await loadRows();
+    setModal(null);
+  };
+  const deleteRow = async (row) => {
+    if (!row?.jobId) return;
+    if (!window.confirm(`${row.name} 점검을 삭제할까요?`)) return;
+    await chainViewApi.healthCheckJobs.delete(row.jobId);
+    await loadRows();
+  };
+  const startRow = async (row) => {
+    if (!row?.jobId) return;
+    await chainViewApi.healthCheckJobs.start(row.jobId);
+    await loadRows();
+  };
 
   return (
     <OperationPageShell
@@ -388,19 +516,21 @@ export function ServiceCheckPage() {
     >
       <div className="toolbar operation-toolbar">
         <label className="search"><Search size={15} /><input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="코드, 이름, 서비스/서버 검색..." type="text" /></label>
-        <select defaultValue="all" aria-label="대상"><option value="all">대상 전체</option><option>서비스</option><option>서버</option></select>
-        <select defaultValue="all" aria-label="실행"><option value="all">실행 전체</option><option>실행</option><option>중지</option></select>
-        <select defaultValue="all" aria-label="활성"><option value="all">활성 전체</option><option>Y</option><option>N</option></select>
-        <button className="btn" type="button"><RotateCcw size={14} /> 초기화</button>
+        <select value={targetFilter} onChange={(event) => { setTargetFilter(event.target.value); setPage(1); }} aria-label="대상"><option value="all">대상 전체</option><option value="SERVICE">서비스</option><option value="SERVER">서버</option></select>
+        <select value={runFilter} onChange={(event) => { setRunFilter(event.target.value); setPage(1); }} aria-label="실행"><option value="all">실행 전체</option><option value="Y">실행</option><option value="N">중지</option></select>
+        <select value={activeFilter} onChange={(event) => { setActiveFilter(event.target.value); setPage(1); }} aria-label="활성"><option value="all">활성 전체</option><option value="Y">Y</option><option value="N">N</option></select>
+        <button className="btn" onClick={() => { setSearch(""); setTargetFilter("all"); setRunFilter("all"); setActiveFilter("all"); setPage(1); }} type="button"><RotateCcw size={14} /> 초기화</button>
         <div className="right"><span className="op-period">기간&nbsp;&nbsp;<b>최근 29일</b></span></div>
       </div>
+      {message ? <div className="op-inline-alert">{message}</div> : null}
 
       <div className="card operation-card">
+        {loading ? <div className="op-loading-line">서비스 점검 목록을 불러오는 중...</div> : null}
         <table className="tbl operation-table operation-table--checks">
           <thead><tr><th>점검</th><th>대상</th><th>실행 방식</th><th>상태</th><th>최근 결과</th><th className="col-actions">관리</th></tr></thead>
           <tbody>
             {pagedRows.map((row) => (
-              <tr key={row.code}>
+              <tr key={row.rowKey}>
                 <td title={`${row.name} · ${row.code}`}><span className="operation-inline-cell"><b>{row.name}</b><code>{row.code}</code></span></td>
                 <td title={row.target}>{row.target}</td>
                 <td title={`${row.type} · ${row.cron}`}><span className="operation-inline-cell"><b>{row.type}</b><code>{row.cron}</code></span></td>
@@ -408,25 +538,26 @@ export function ServiceCheckPage() {
                 <td title={`${row.lastCheckedAt} · ${row.result}`}><span className="operation-check-result"><span>{row.lastCheckedAt}</span><small className={`op-result ${row.result === "성공" ? "is-ok" : ""}`}>{row.result}</small></span></td>
                 <td>
                   <div className="row-actions op-row-actions">
-                    <OperationIconButton label="점검 시작" primary><Play size={16} /></OperationIconButton>
+                    <OperationIconButton label="점검 시작" onClick={() => startRow(row)} primary><Play size={16} /></OperationIconButton>
                     <OperationIconButton label="점검 이력" onClick={() => setModal({ type: "history", row })}><History size={16} /></OperationIconButton>
                     <OperationIconButton label="점검 수정" onClick={() => setModal({ type: "form", row })}><Pencil size={16} /></OperationIconButton>
-                    <OperationIconButton danger label="점검 삭제"><Trash2 size={16} /></OperationIconButton>
+                    <OperationIconButton danger label="점검 삭제" onClick={() => deleteRow(row)}><Trash2 size={16} /></OperationIconButton>
                   </div>
                 </td>
               </tr>
             ))}
+            {!pagedRows.length ? <tr><td colSpan={6}>조회된 서비스 점검이 없습니다.</td></tr> : null}
           </tbody>
         </table>
         <OperationPager page={page} pageSize={pageSize} setPage={setPage} total={rows.length} />
       </div>
-      {modal?.type === "form" ? <ServiceCheckModal row={modal.row} onClose={() => setModal(null)} /> : null}
+      {modal?.type === "form" ? <ServiceCheckModal row={modal.row} onClose={() => setModal(null)} onSave={saveRow} /> : null}
       {modal?.type === "history" ? <ServiceCheckHistoryModal row={modal.row} onClose={() => setModal(null)} /> : null}
     </OperationPageShell>
   );
 }
 
-function ServiceCheckModal({ onClose, row }) {
+function ServiceCheckModal({ onClose, onSave, row }) {
   const portalData = usePortalData();
   const sortedServices = useMemo(
     () => [...portalData.services].sort((left, right) =>
@@ -446,14 +577,27 @@ function ServiceCheckModal({ onClose, row }) {
   const matchedServer = sortedServers.find((server) =>
     row?.target === server.serverName || row?.target === server.hostName
   );
-  const [targetType, setTargetType] = useState(matchedServer ? "SERVER" : "SERVICE");
-  const [targetId, setTargetId] = useState(
-    matchedServer
-      ? String(matchedServer.serverId)
-      : matchedService
-        ? String(matchedService.serviceId)
-        : ""
-  );
+  const [form, setForm] = useState(() => ({
+    code: row?.code ?? "",
+    name: row?.name ?? "",
+    targetType: row?.targetType ?? (matchedServer ? "SERVER" : "SERVICE"),
+    targetId: row?.targetType === "SERVER"
+      ? String(row?.serverId ?? matchedServer?.serverId ?? "")
+      : String(row?.serviceId ?? matchedService?.serviceId ?? ""),
+    checkTypeCode: row?.checkTypeCode ?? optionCode(healthCheckTypeOptions, row?.type, "HTTP_GET"),
+    url: row?.url ?? "",
+    timeoutMs: row?.timeoutMs ?? 5000,
+    cron: row?.cron ?? "0 */5 * * * *",
+    failureThreshold: row?.failureThreshold ?? 1,
+    notificationOwner: row?.notificationOwner ?? "",
+    activeYn: row?.activeYn ?? "Y",
+    runYn: row?.runYn ?? "N",
+    notifyOnFailureYn: row?.notifyOnFailureYn ?? "Y",
+  }));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const targetType = form.targetType;
+  const targetId = form.targetId;
   const targetOptions = targetType === "SERVER" ? sortedServers : sortedServices;
   const selectedTarget =
     targetType === "SERVER"
@@ -464,8 +608,57 @@ function ServiceCheckModal({ onClose, row }) {
       ? serverTargetMeta(selectedTarget)
       : serviceTargetMeta(selectedTarget, sortedServers);
   const switchTargetType = (nextType) => {
-    setTargetType(nextType);
-    setTargetId("");
+    setForm((current) => ({ ...current, targetType: nextType, targetId: "" }));
+  };
+  const updateForm = (key, value) => {
+    setForm((current) => ({ ...current, [key]: value }));
+  };
+  const buildPayload = () => {
+    const payload = {
+      jobCode: form.code.trim().toUpperCase(),
+      jobName: form.name.trim(),
+      targetTypeCode: form.targetType,
+      checkTypeCode: form.checkTypeCode,
+      cronExpression: form.cron.trim(),
+      enabledYn: form.activeYn,
+      jobStatusCode: form.runYn === "Y" ? "RUNNING" : "STOPPED",
+      checkUrl: form.url.trim(),
+      timeoutMs: Number(form.timeoutMs) || 5000,
+      failureThreshold: Number(form.failureThreshold) || 1,
+      notifyOnFailureYn: form.notifyOnFailureYn,
+      notificationOwner: form.notificationOwner.trim(),
+    };
+    if (form.targetType === "SERVER") {
+      payload.serverId = Number(form.targetId) || null;
+      payload.serviceId = null;
+    } else {
+      payload.serviceId = Number(form.targetId) || null;
+      payload.serverId = null;
+    }
+    return payload;
+  };
+  const save = async () => {
+    const payload = buildPayload();
+    const missing = [
+      ["jobCode", "점검 코드"],
+      ["jobName", "점검명"],
+      ["checkUrl", "URL"],
+      ["cronExpression", "Cron"],
+    ].filter(([key]) => !String(payload[key] ?? "").trim()).map(([, label]) => label);
+    if (!form.targetId) missing.push("점검 대상");
+    if (missing.length) {
+      setError(`${missing.join(", ")} 항목을 입력해 주세요.`);
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      await onSave(payload, row);
+    } catch (saveError) {
+      setError(saveError?.message || "서비스 점검을 저장하지 못했습니다.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -475,8 +668,8 @@ function ServiceCheckModal({ onClose, row }) {
         <div className="modal__body">
           <h4 className="form-section__title">기본 정보</h4>
           <div className="operation-form-grid">
-            <OperationFormRow label="점검 코드" required><input defaultValue={row?.code ?? ""} placeholder="예: SSO-HEALTH-01" type="text" /></OperationFormRow>
-            <OperationFormRow label="점검명" required><input defaultValue={row?.name ?? ""} placeholder="점검명을 입력하세요" type="text" /></OperationFormRow>
+            <OperationFormRow label="점검 코드" required><input value={form.code} onChange={(event) => updateForm("code", event.target.value.toUpperCase())} placeholder="예: SSO-HEALTH-01" type="text" /></OperationFormRow>
+            <OperationFormRow label="점검명" required><input value={form.name} onChange={(event) => updateForm("name", event.target.value)} placeholder="점검명을 입력하세요" type="text" /></OperationFormRow>
             <div className="form-row operation-target-field">
               <span>점검 대상<i className="req">*</i></span>
               <div className="operation-target-control-row">
@@ -490,7 +683,7 @@ function ServiceCheckModal({ onClose, row }) {
                     서버
                   </label>
                 </div>
-                <select value={targetId} onChange={(event) => setTargetId(event.target.value)}>
+                <select value={targetId} onChange={(event) => updateForm("targetId", event.target.value)}>
                   <option value="">{targetType === "SERVER" ? "서버 선택" : "서비스 선택"}</option>
                   {targetOptions.map((target) => (
                     <option key={targetType === "SERVER" ? target.serverId : target.serviceId} value={targetType === "SERVER" ? target.serverId : target.serviceId}>
@@ -501,47 +694,71 @@ function ServiceCheckModal({ onClose, row }) {
               </div>
               {selectedTargetMeta ? <small className="operation-target-meta">{selectedTargetMeta}</small> : null}
             </div>
-            <OperationFormRow label="유형" required><select defaultValue={row?.type ?? "HTTP GET"}><option>HTTP GET</option><option>TCP CHECK</option><option>PROCESS</option></select></OperationFormRow>
-            <OperationFormRow label="URL" required><input placeholder="https://host/path 또는 http://..." type="text" /></OperationFormRow>
-            <OperationFormRow label="Timeout (ms)"><input defaultValue="5000" type="number" /></OperationFormRow>
-            <OperationFormRow label="Cron" required><input defaultValue={row?.cron ?? "0 */5 * * * *"} type="text" /></OperationFormRow>
-            <OperationFormRow label="실패 임계값" required><input defaultValue="1" type="number" /></OperationFormRow>
-            <OperationFormRow label="알림 담당"><input placeholder="알림 담당 또는 설명을 입력하세요" type="text" /></OperationFormRow>
+            <OperationFormRow label="유형" required><select value={form.checkTypeCode} onChange={(event) => updateForm("checkTypeCode", event.target.value)}>{healthCheckTypeOptions.map((option) => <option key={option.code} value={option.code}>{option.label}</option>)}</select></OperationFormRow>
+            <OperationFormRow label="URL" required><input value={form.url} onChange={(event) => updateForm("url", event.target.value)} placeholder="https://host/path 또는 http://..." type="text" /></OperationFormRow>
+            <OperationFormRow label="Timeout (ms)"><input value={form.timeoutMs} onChange={(event) => updateForm("timeoutMs", event.target.value)} type="number" /></OperationFormRow>
+            <OperationFormRow label="Cron" required><input value={form.cron} onChange={(event) => updateForm("cron", event.target.value)} type="text" /></OperationFormRow>
+            <OperationFormRow label="실패 임계값" required><input value={form.failureThreshold} onChange={(event) => updateForm("failureThreshold", event.target.value)} type="number" /></OperationFormRow>
+            <OperationFormRow label="알림 담당"><input value={form.notificationOwner} onChange={(event) => updateForm("notificationOwner", event.target.value)} placeholder="알림 담당 또는 설명을 입력하세요" type="text" /></OperationFormRow>
             <div className="operation-radio-settings">
               <div className="operation-radio-setting">
                 <span>활성 여부</span>
-                <div className="radio-row"><label><input defaultChecked name="activeYn" type="radio" /> 활성</label><label><input name="activeYn" type="radio" /> 비활성</label></div>
+                <div className="radio-row"><label><input checked={form.activeYn === "Y"} onChange={() => updateForm("activeYn", "Y")} name="activeYn" type="radio" /> 활성</label><label><input checked={form.activeYn === "N"} onChange={() => updateForm("activeYn", "N")} name="activeYn" type="radio" /> 비활성</label></div>
               </div>
               <div className="operation-radio-setting">
                 <span>실행 상태</span>
-                <div className="radio-row"><label><input defaultChecked name="runYn" type="radio" /> Y</label><label><input name="runYn" type="radio" /> N</label></div>
+                <div className="radio-row"><label><input checked={form.runYn === "Y"} onChange={() => updateForm("runYn", "Y")} name="runYn" type="radio" /> Y</label><label><input checked={form.runYn === "N"} onChange={() => updateForm("runYn", "N")} name="runYn" type="radio" /> N</label></div>
               </div>
             </div>
           </div>
+          {error ? <div className="op-inline-alert op-inline-alert--danger">{error}</div> : null}
         </div>
-        <div className="modal__foot"><button className="btn" onClick={onClose} type="button">취소</button><button className="btn btn--primary op-btn-dark" onClick={onClose} type="button">저장</button></div>
+        <div className="modal__foot"><button className="btn" onClick={onClose} type="button">취소</button><button className="btn btn--primary op-btn-dark" disabled={saving} onClick={save} type="button">{saving ? "저장 중..." : "저장"}</button></div>
       </div>
     </ModalBackdrop>
   );
 }
 
 function ServiceCheckHistoryModal({ onClose, row }) {
-  const history = [
+  const fallbackHistory = [
     ["2026-07-03 18:59:36", "성공", "142ms", "200", "-", "{\"status\":\"UP\"}", "건너뜀", "-"],
     ["2026-07-03 17:59:36", "성공", "136ms", "200", "-", "{\"status\":\"UP\"}", "건너뜀", "-"],
     ["2026-07-03 16:59:36", "성공", "146ms", "200", "-", "{\"status\":\"UP\"}", "건너뜀", "-"],
     ["2026-07-03 15:59:36", "실패", "-", "-", "Connection timeout after 5000ms", "-", "발송완료", "-"],
     ["2026-07-03 14:59:36", "성공", "162ms", "200", "-", "{\"status\":\"UP\"}", "건너뜀", "-"],
   ];
+  const [history, setHistory] = useState(fallbackHistory);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+  const loadHistory = async () => {
+    if (!row?.jobId) return;
+    setLoading(true);
+    try {
+      const results = await chainViewApi.healthCheckJobs.results(row.jobId);
+      const normalized = (results || []).map(normalizeHealthCheckResult);
+      setHistory(normalized.length ? normalized : []);
+      setMessage("");
+    } catch (error) {
+      setMessage(error?.message || "점검 이력을 불러오지 못했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  };
+  useEffect(() => {
+    loadHistory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [row?.jobId]);
   return (
     <ModalBackdrop onClose={onClose}>
       <div className="modal modal--lg operation-modal" onClick={(event) => event.stopPropagation()}>
         <div className="modal__head"><h3>점검 이력 - {row?.name}</h3><button className="close" onClick={onClose} type="button"><X size={18} /></button></div>
         <div className="modal__body">
           <p className="op-modal-desc">선택한 서비스 점검의 최근 실행 결과입니다.</p>
-          <table className="tbl operation-table operation-table--history"><thead><tr><th>시간</th><th>결과</th><th>Latency</th><th>HTTP</th><th>실패 사유</th><th>응답 요약</th><th>알림</th><th>비고</th></tr></thead><tbody>{history.map((item) => <tr key={item.join("-")}><td>{item[0]}</td><td><span className={`pill ${item[1] === "성공" ? "pill--ok" : "pill--crit"}`}>{item[1]}</span></td><td>{item[2]}</td><td>{item[3]}</td><td>{item[4]}</td><td><code>{item[5]}</code></td><td>{item[6]}</td><td>{item[7]}</td></tr>)}</tbody></table>
+          {message ? <div className="op-inline-alert op-inline-alert--danger">{message}</div> : null}
+          {loading ? <div className="op-loading-line">점검 이력을 불러오는 중...</div> : null}
+          <table className="tbl operation-table operation-table--history"><thead><tr><th>시간</th><th>결과</th><th>Latency</th><th>HTTP</th><th>실패 사유</th><th>응답 요약</th><th>알림</th><th>비고</th></tr></thead><tbody>{history.length ? history.map((item) => <tr key={item.join("-")}><td>{item[0]}</td><td><span className={`pill ${item[1] === "성공" ? "pill--ok" : "pill--crit"}`}>{item[1]}</span></td><td>{item[2]}</td><td>{item[3]}</td><td>{item[4]}</td><td><code>{item[5]}</code></td><td>{item[6]}</td><td>{item[7]}</td></tr>) : <tr><td colSpan={8}>점검 이력이 없습니다.</td></tr>}</tbody></table>
         </div>
-        <div className="modal__foot"><button className="btn" type="button">새로고침</button><button className="btn" onClick={onClose} type="button">닫기</button></div>
+        <div className="modal__foot"><button className="btn" onClick={loadHistory} type="button">새로고침</button><button className="btn" onClick={onClose} type="button">닫기</button></div>
       </div>
     </ModalBackdrop>
   );
