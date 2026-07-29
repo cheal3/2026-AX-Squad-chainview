@@ -6976,47 +6976,25 @@
 .operation-form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 18px 24px;
 }
 
 .operation-target-field {
   grid-column: 1 / -1;
   align-items: stretch;
-  gap: 8px;
+  gap: 10px;
 }
 
 .operation-target-control-row {
   display: grid;
-  grid-template-columns: 230px minmax(0, 1fr);
+  grid-template-columns: 180px minmax(0, 1fr);
   align-items: center;
-  gap: 12px;
+  gap: 16px;
 }
 
-.operation-target-tabs {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  width: 100%;
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  background: #f3f4f6;
-  padding: 3px;
-}
-
-.operation-target-tabs button {
-  min-height: 34px;
-  border: 0;
-  border-radius: 5px;
-  background: transparent;
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.operation-target-tabs button.is-active {
-  background: #ffffff;
-  color: #111827;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+.operation-target-radios {
+  min-height: 42px;
+  gap: 24px;
 }
 
 .operation-target-meta {
@@ -7026,9 +7004,9 @@
   border-radius: 6px;
   background: #f8fafc;
   color: var(--muted);
-  padding: 9px 11px;
+  padding: 10px 12px;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.45;
 }
 

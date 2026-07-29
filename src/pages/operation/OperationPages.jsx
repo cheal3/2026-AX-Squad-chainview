@@ -480,9 +480,15 @@ function ServiceCheckModal({ onClose, row }) {
             <div className="form-row operation-target-field">
               <span>점검 대상<i className="req">*</i></span>
               <div className="operation-target-control-row">
-                <div className="operation-target-tabs" role="tablist" aria-label="점검 대상 유형">
-                  <button aria-selected={targetType === "SERVICE"} className={targetType === "SERVICE" ? "is-active" : ""} onClick={() => switchTargetType("SERVICE")} role="tab" type="button">서비스</button>
-                  <button aria-selected={targetType === "SERVER"} className={targetType === "SERVER" ? "is-active" : ""} onClick={() => switchTargetType("SERVER")} role="tab" type="button">서버</button>
+                <div className="radio-row operation-target-radios" aria-label="점검 대상 유형">
+                  <label>
+                    <input checked={targetType === "SERVICE"} onChange={() => switchTargetType("SERVICE")} name="targetType" type="radio" />
+                    서비스
+                  </label>
+                  <label>
+                    <input checked={targetType === "SERVER"} onChange={() => switchTargetType("SERVER")} name="targetType" type="radio" />
+                    서버
+                  </label>
                 </div>
                 <select value={targetId} onChange={(event) => setTargetId(event.target.value)}>
                   <option value="">{targetType === "SERVER" ? "서버 선택" : "서비스 선택"}</option>
@@ -502,7 +508,7 @@ function ServiceCheckModal({ onClose, row }) {
             <OperationFormRow label="실패 임계값" required><input defaultValue="1" type="number" /></OperationFormRow>
             <OperationFormRow label="활성 여부"><div className="radio-row"><label><input defaultChecked name="activeYn" type="radio" /> 활성</label><label><input name="activeYn" type="radio" /> 비활성</label></div></OperationFormRow>
             <OperationFormRow label="실행 상태"><div className="radio-row"><label><input defaultChecked name="runYn" type="radio" /> Y</label><label><input name="runYn" type="radio" /> N</label></div></OperationFormRow>
-            <OperationFormRow label="알림 담당"><input placeholder="점검에 대한 설명을 입력하세요" type="text" /></OperationFormRow>
+            <OperationFormRow label="알림 담당"><input placeholder="알림 담당 또는 설명을 입력하세요" type="text" /></OperationFormRow>
             <OperationFormRow label="실행 방법"><select defaultValue="Y"><option>Y</option><option>N</option></select></OperationFormRow>
           </div>
         </div>
