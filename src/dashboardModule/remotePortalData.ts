@@ -405,7 +405,7 @@ function mapService(row: RemoteRecord, detail?: RemoteRecord): ServiceRecord {
   return {
     serviceId: asNumber(row.serviceId),
     categoryId: asNumber(detail?.categoryId ?? row.categoryId) || undefined,
-    categoryPath: parseCategoryPath(detail?.categoryPath ?? row.categoryPath),
+    categoryPath: parseCategoryPath(detail, row),
     serviceCode: asString(detail?.serviceCode ?? row.serviceCode),
     serviceName:
       asString(detail?.serviceName ?? row.serviceName) || "이름 없는 서비스",
@@ -635,8 +635,23 @@ function knownResponsibility(value: unknown): "MAIN" | "SUB" | "ALERT" {
   return "MAIN";
 }
 
-function parseCategoryPath(value: unknown) {
-  const text = asString(value);
+function parseCategoryPath(...values: unknown[]) {
+  const records = values.filter((value): value is RemoteRecord => Boolean(value) && typeof value === "object" && !Array.isArray(value));
+  const steppedPath = records
+    .map((record) => [
+      record.categoryL1 ?? record.category1Name ?? record.largeCategoryName ?? record.parentCategoryName,
+      record.categoryL2 ?? record.category2Name ?? record.middleCategoryName,
+      record.categoryL3 ?? record.category3Name ?? record.smallCategoryName ?? record.categoryName,
+    ])
+    .map((path) => path.map(asString).filter(Boolean))
+    .find((path) => path.length >= 2);
+  if (steppedPath) {
+    return steppedPath;
+  }
+
+  const text = records.map((record) => asString(record.categoryPath)).find(Boolean) ||
+    values.filter((value) => typeof value !== "object").map(asString).find(Boolean) ||
+    "";
   if (!text) {
     return ["미분류"];
   }

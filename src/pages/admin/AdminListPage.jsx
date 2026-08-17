@@ -461,8 +461,8 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
           matchesSearchText(buildRowSearchText(row), cleanedKeyword)
         )
       : config.rows;
-    return sortRowsByCreatedAtDesc(rows.filter((row) => matchesAdminFilters(menu, row.record ?? row.owner, listFilters)));
-  }, [config.rows, keyword, listFilters, menu]);
+    return sortRowsByCreatedAtDesc(rows.filter((row) => matchesAdminFilters(menu, row.record ?? row.owner, listFilters, categoryCatalog)));
+  }, [categoryCatalog, config.rows, keyword, listFilters, menu]);
   const filteredRowKeys = filteredRows.map((row) => String(row.key));
   const isAllChecked =
     filteredRowKeys.length > 0 &&
@@ -547,9 +547,9 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
         ),
         cleanedKeyword
       );
-      return matchesKeyword && matchesCategoryFilters(service, listFilters);
+      return matchesKeyword && matchesCategoryFilters(service, listFilters, categoryCatalog);
     });
-  }, [keyword, listFilters, menu, portalData.services]);
+  }, [categoryCatalog, keyword, listFilters, menu, portalData.services]);
 
   useEffect(() => {
     if (menu !== "owners") return;
@@ -627,6 +627,7 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
       <div className={menu === "services" ? "admin-split-layout" : ""}>
         {menu === "services" ? (
           <ServiceCategorySidebar
+            categoryCatalog={categoryCatalog}
             filters={listFilters}
             onFilterChange={(field, value) => setListFilters((current) => nextListFilters(current, field, value))}
             services={portalData.services}
@@ -888,9 +889,9 @@ function nextListFilters(current, field, value) {
   return next;
 }
 
-function matchesAdminFilters(menu, record, filters = {}) {
+function matchesAdminFilters(menu, record, filters = {}, categoryCatalog = null) {
   if (!record) return true;
-  if (menu === "services") return matchesCategoryFilters(record, filters);
+  if (menu === "services") return matchesCategoryFilters(record, filters, categoryCatalog);
   if (menu === "servers") {
     return matchesExactFilter(record.envCode, filters.envCode) &&
       matchesExactFilter(record.osTypeCode, filters.osTypeCode) &&
@@ -908,15 +909,15 @@ function matchesExactFilter(value, filterValue) {
   return !filterValue || String(value ?? "") === String(filterValue);
 }
 
-function matchesCategoryFilters(service, filters = {}) {
-  const path = service?.categoryPath ?? [];
+function matchesCategoryFilters(service, filters = {}, categoryCatalog = null) {
+  const path = resolveServiceCategoryPath(service, categoryCatalog);
   return (!filters.categoryL1 || path[0] === filters.categoryL1) &&
     (!filters.categoryL2 || path[1] === filters.categoryL2) &&
     (!filters.categoryL3 || path[2] === filters.categoryL3);
 }
 
-function ServiceCategorySidebar({ filters, onFilterChange, services, title }) {
-  const tree = buildServiceCategoryTree(services);
+function ServiceCategorySidebar({ categoryCatalog, filters, onFilterChange, services, title }) {
+  const tree = buildServiceCategoryTree(services, categoryCatalog);
   const selectCategory = (level, value) => {
     onFilterChange(level === 1 ? "categoryL1" : level === 2 ? "categoryL2" : "categoryL3", value);
   };
@@ -1077,10 +1078,10 @@ function OwnerDirectoryView({
   );
 }
 
-function buildServiceCategoryTree(services) {
+function buildServiceCategoryTree(services, categoryCatalog) {
   const root = new Map();
   services.forEach((service) => {
-    const [l1 = "미분류", l2 = "미분류", l3 = "미분류"] = service.categoryPath ?? [];
+    const [l1 = "미분류", l2 = "미분류", l3 = "미분류"] = resolveServiceCategoryPath(service, categoryCatalog);
     if (!root.has(l1)) root.set(l1, { name: l1, count: 0, children: new Map() });
     const node1 = root.get(l1);
     node1.count += 1;
@@ -2101,7 +2102,7 @@ function getCategoryParentCode(category) {
 function uniqueByName(options) {
   const seen = new Set();
   return options.filter((option) => {
-    const key = option.name;
+    const key = [option.grandParentName ?? "", option.parentName ?? "", option.name].join(">");
     if (!key || seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -2199,14 +2200,22 @@ function buildCategoryCatalog(categories = [], services = []) {
         };
       }))
     );
-    return {
+    return mergeCategoryCatalogs({
       level1: optionsByLevel[0],
       level2: optionsByLevel[1],
       level3: optionsByLevel[2],
-    };
+    }, servicePathCatalog);
   }
 
   return servicePathCatalog;
+}
+
+function mergeCategoryCatalogs(primary, fallback) {
+  return {
+    level1: uniqueByName([...(primary.level1 ?? []), ...(fallback.level1 ?? [])]),
+    level2: uniqueByName([...(primary.level2 ?? []), ...(fallback.level2 ?? [])]),
+    level3: uniqueByName([...(primary.level3 ?? []), ...(fallback.level3 ?? [])]),
+  };
 }
 
 function buildNormalizedCategories(categories = []) {
@@ -2338,6 +2347,26 @@ function resolveCategoryPath(categoryPath = [], categories = [], categoryId = ""
   const pathFromName = resolveCategoryPathFromEntry(leafFromName, remoteCategories);
   if (pathFromName.length > cleanedPath.length) return pathFromName;
 
+  const expandedPath = expandCategoryPathFromCatalog(cleanedPath, buildCategoryCatalog(categories));
+  return expandedPath.length > cleanedPath.length ? expandedPath : cleanedPath;
+}
+
+function resolveServiceCategoryPath(service, categoryCatalog) {
+  const cleanedPath = (service?.categoryPath ?? []).map((item) => compactText(item)).filter(Boolean);
+  const expandedPath = categoryCatalog ? expandCategoryPathFromCatalog(cleanedPath, categoryCatalog) : cleanedPath;
+  return (expandedPath.length ? expandedPath : cleanedPath).concat(["미분류", "미분류", "미분류"]).slice(0, 3);
+}
+
+function expandCategoryPathFromCatalog(path, catalog) {
+  const cleanedPath = path.map((item) => compactText(item)).filter(Boolean);
+  if (!cleanedPath.length || cleanedPath.length >= 3) return cleanedPath;
+  const leafName = cleanedPath.at(-1);
+  const level3 = catalog.level3.find((option) =>
+    option.name === leafName && option.parentName && option.grandParentName
+  );
+  if (level3) return [level3.grandParentName, level3.parentName, level3.name].filter(Boolean);
+  const level2 = catalog.level2.find((option) => option.name === leafName && option.parentName);
+  if (level2) return [level2.parentName, level2.name].filter(Boolean);
   return cleanedPath;
 }
 
@@ -2384,7 +2413,7 @@ function selectableChildCategoryOptions(options, parentOption, grandParentOption
     const matchesGrandParentName = !option.grandParentName || option.grandParentName === grandParentOption.name;
     return matchesGrandParentName;
   });
-  return filtered;
+  return filtered.length ? filtered : options;
 }
 
 function getSelectedCategoryPrefix(options, name) {

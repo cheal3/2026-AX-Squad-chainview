@@ -2078,9 +2078,7 @@ function mapServiceFromRemote(row: RemoteListRecord): ServiceRecord {
   const primaryDeployment = deploymentRows[0];
   return {
     serviceId: asRemoteNumber(row.serviceId ?? row.id),
-    categoryPath: asRemoteString(row.categoryPath)
-      ? asRemoteString(row.categoryPath).split(/[>/]/).map((part) => part.trim()).filter(Boolean)
-      : [asRemoteString(row.categoryName)].filter(Boolean),
+    categoryPath: remoteServiceCategoryPath(row),
     serviceCode: asRemoteString(row.serviceCode ?? row.code),
     serviceName: asRemoteString(row.serviceName ?? row.name),
     serviceTypeCode: knownRemoteCode(row.serviceTypeCode, codeLabels.serviceType, "WEB"),
@@ -2098,6 +2096,22 @@ function mapServiceFromRemote(row: RemoteListRecord): ServiceRecord {
     createdAt: asRemoteString(row.createdAt),
     updatedAt: asRemoteString(row.updatedAt),
   };
+}
+
+function remoteServiceCategoryPath(row: RemoteListRecord) {
+  const steppedPath = [
+    row.categoryL1 ?? row.category1Name ?? row.largeCategoryName ?? row.parentCategoryName,
+    row.categoryL2 ?? row.category2Name ?? row.middleCategoryName,
+    row.categoryL3 ?? row.category3Name ?? row.smallCategoryName ?? row.categoryName,
+  ].map(asRemoteString).filter(Boolean);
+  if (steppedPath.length >= 2) {
+    return steppedPath;
+  }
+  const categoryPath = asRemoteString(row.categoryPath);
+  if (categoryPath) {
+    return categoryPath.split(/[>/]/).map((part) => part.trim()).filter(Boolean);
+  }
+  return [asRemoteString(row.categoryName)].filter(Boolean);
 }
 
 function mapRelationFromRemote(row: RemoteListRecord): ServiceRelationRecord {
