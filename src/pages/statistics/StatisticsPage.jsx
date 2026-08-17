@@ -15,7 +15,7 @@ function serviceLabel(service) {
 }
 export function StatisticsPage({ activeMenu = "analysis-statistics", sectionLabel = "분석" }) {
   const portalData = usePortalData();
-  const [activeStatsTab, setActiveStatsTab] = useState("tech");
+  const [activeStatsTab, setActiveStatsTab] = useState("service-assets");
   const [techSearch, setTechSearch] = useState("");
   const [techTypeFilter, setTechTypeFilter] = useState("all");
   const serviceById = useMemo(
@@ -152,11 +152,10 @@ export function StatisticsPage({ activeMenu = "analysis-statistics", sectionLabe
     })),
   ].slice(0, 8);
   const graphTabs = [
-    { key: "tech", label: "기술스택" },
-    { key: "incident", label: "인시던트" },
-    { key: "relation", label: "관계·인프라" },
-    { key: "service", label: "서비스" },
-    { key: "quality", label: "품질 점검" },
+    { key: "service-assets", label: "서비스·자산 현황" },
+    { key: "tech-version", label: "기술스택·버전 현황" },
+    { key: "operation", label: "운영 관리 현황" },
+    { key: "dependency", label: "의존성·집중도 분석" },
   ];
 
   return (
@@ -201,13 +200,10 @@ export function StatisticsPage({ activeMenu = "analysis-statistics", sectionLabe
             ))}
           </div>
 
-          {activeStatsTab === "service" ? (
+          {activeStatsTab === "service-assets" ? (
             <div className="statistics-chart-grid statistics-chart-grid--service">
               <ChartCard title="중요도별 서비스 분포">
                 <DonutChart rows={importanceStats} />
-              </ChartCard>
-              <ChartCard title="대분류별 서비스 수">
-                <HorizontalBarChart rows={categoryStats} />
               </ChartCard>
               <ChartCard title="서비스 유형">
                 <HorizontalBarChart rows={typeStats} />
@@ -215,40 +211,68 @@ export function StatisticsPage({ activeMenu = "analysis-statistics", sectionLabe
               <ChartCard title="서비스 상태">
                 <HorizontalBarChart rows={statusStats} />
               </ChartCard>
-            </div>
-          ) : null}
-
-          {activeStatsTab === "incident" ? (
-            <div className="statistics-chart-grid statistics-chart-grid--single">
-              <ChartCard title="월별 인시던트 발생 추이 (최근 12개월)">
-                <MonthlyBarChart rows={incidentMonthlyStats} />
-              </ChartCard>
-            </div>
-          ) : null}
-
-          {activeStatsTab === "relation" ? (
-            <div className="statistics-chart-grid">
-              <ChartCard title="관계 연결 서비스 TOP 5">
-                <HorizontalBarChart rows={relationHotspots} />
+              <ChartCard title="분류 1단계별 서비스 수">
+                <HorizontalBarChart rows={categoryStats} />
               </ChartCard>
               <ChartCard title="서버별 배포 수">
                 <HorizontalBarChart rows={deploymentStats} />
               </ChartCard>
-              <ChartCard title="담당 유형">
+            </div>
+          ) : null}
+
+          {activeStatsTab === "operation" ? (
+            <div className="statistics-chart-grid statistics-chart-grid--quality">
+              <ChartCard title="월별 인시던트 발생 추이 (최근 12개월)">
+                <MonthlyBarChart rows={incidentMonthlyStats} />
+              </ChartCard>
+              <div className="statistics-panel">
+                <h2>운영 관리 요약</h2>
+                <div className="statistics-checks">
+                  <span><b>{openIncidents.length}</b> 진행 중 장애</span>
+                  <span><b>{servicesWithoutOwner.length}</b> 담당자 미등록 서비스</span>
+                  <span><b>{missingEndpointServices.length}</b> 엔드포인트 미등록 서비스</span>
+                  <span><b>{shallowCategoryServices.length}</b> 분류 보완 필요 서비스</span>
+                </div>
+              </div>
+              <div className="statistics-panel statistics-panel--wide">
+                <h2>조치 필요 항목</h2>
+                {actionItems.length ? (
+                  <div className="statistics-action-list">
+                    {actionItems.map((item, index) => (
+                      <div className={`statistics-action is-${item.tone}`} key={`${item.title}-${index}`}>
+                        <strong>{item.title}</strong>
+                        <span>{item.meta}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="statistics-empty">현재 우선 조치가 필요한 항목이 없습니다.</div>
+                )}
+              </div>
+            </div>
+          ) : null}
+
+          {activeStatsTab === "dependency" ? (
+            <div className="statistics-chart-grid">
+              <ChartCard title="인입·인출 의존 집중 TOP 5">
+                <HorizontalBarChart rows={relationHotspots} />
+              </ChartCard>
+              <ChartCard title="담당 유형 분포">
                 <HorizontalBarChart rows={ownerTypeStats} />
               </ChartCard>
               <div className="statistics-panel">
-                <h2>관계/담당자 요약</h2>
+                <h2>관계·집중도 요약</h2>
                 <div className="statistics-metrics">
                   <span><b>{portalData.owners.length}</b> 담당자 매핑</span>
                   <span><b>{activeRelations}</b> 활성 관계</span>
                   <span><b>{mandatoryRelations}</b> 필수 관계</span>
+                  <span><b>{missingImpactRelations.length}</b> 영향도 설명 누락</span>
                 </div>
               </div>
             </div>
           ) : null}
 
-          {activeStatsTab === "tech" ? (
+          {activeStatsTab === "tech-version" ? (
             <div className="statistics-tech-tab">
               <div className="statistics-chart-grid statistics-chart-grid--tech">
                 <ChartCard title="기술스택 유형 분포">
@@ -335,34 +359,6 @@ export function StatisticsPage({ activeMenu = "analysis-statistics", sectionLabe
             </div>
           ) : null}
 
-          {activeStatsTab === "quality" ? (
-            <div className="statistics-chart-grid statistics-chart-grid--quality">
-              <div className="statistics-panel statistics-panel--wide">
-                <h2>조치 필요 항목</h2>
-                {actionItems.length ? (
-                  <div className="statistics-action-list">
-                    {actionItems.map((item, index) => (
-                      <div className={`statistics-action is-${item.tone}`} key={`${item.title}-${index}`}>
-                        <strong>{item.title}</strong>
-                        <span>{item.meta}</span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="statistics-empty">현재 우선 조치가 필요한 항목이 없습니다.</div>
-                )}
-              </div>
-              <div className="statistics-panel">
-                <h2>데이터 품질</h2>
-                <div className="statistics-checks">
-                  <span><b>{shallowCategoryServices.length}</b> 중/소분류 미지정 서비스</span>
-                  <span><b>{missingEndpointServices.length}</b> 엔드포인트 미등록 서비스</span>
-                  <span><b>{servicesWithoutOwner.length}</b> 담당자 미등록 서비스</span>
-                  <span><b>{missingImpactRelations.length}</b> 영향도 설명 누락 관계</span>
-                </div>
-              </div>
-            </div>
-          ) : null}
         </section>
       </main>
     </AppShell>

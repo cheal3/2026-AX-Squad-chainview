@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronDown, CircleHelp, Search } from "lucide-react";
+import { ChevronDown, CircleHelp, Filter, Search, X } from "lucide-react";
 
 import { ModalBackdrop } from "../../components/ModalBackdrop.jsx";
 import { chainViewApi } from "../../dashboardModule/chainViewApi";
@@ -39,6 +39,9 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
   const [groupMemberModal, setGroupMemberModal] = useState(null);
   const [groupMemberStatsByGroupId, setGroupMemberStatsByGroupId] = useState({});
   const [keyword, setKeyword] = useState("");
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [listFilters, setListFilters] = useState({});
+  const [selectedOwnerServiceId, setSelectedOwnerServiceId] = useState("");
   const [selectedKeys, setSelectedKeys] = useState([]);
   const lastRealtimeQueryRef = useRef("");
   const serviceById = useMemo(
@@ -74,6 +77,10 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
     return map;
   }, [portalData.owners]);
   const meta = getMenuMeta(activeMenu || menu);
+  const categoryCatalog = useMemo(
+    () => buildCategoryCatalog(portalData.categories, portalData.services),
+    [portalData.categories, portalData.services]
+  );
   const remoteQueryKey = getRemoteQueryKey(menu);
   const remoteStatus = portalData.remoteApi.status;
   const isInitialLoading = portalData.remoteApi.initialLoading;
@@ -99,6 +106,8 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
 
   useEffect(() => {
     setKeyword("");
+    setAdvancedOpen(false);
+    setListFilters({});
     setSelectedKeys([]);
   }, [menu]);
 
@@ -184,7 +193,7 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
     },
     servers: {
       actionLabel: "＋ 서버 등록",
-      columns: ["서버명", "호스트", "IP", "환경", "OS", "인프라 노드", "서버 역할", "상태", "설명"],
+      columns: ["서버명", "호스트명", "IP", "환경", "OS", "인프라 노드", "서버 역할", "상태", "설명"],
       rows: portalData.servers.map((server) => ({
         key: server.serverId,
         record: server,
@@ -452,8 +461,8 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
           matchesSearchText(buildRowSearchText(row), cleanedKeyword)
         )
       : config.rows;
-    return sortRowsByCreatedAtDesc(rows);
-  }, [config.rows, keyword]);
+    return sortRowsByCreatedAtDesc(rows.filter((row) => matchesAdminFilters(menu, row.record ?? row.owner, listFilters)));
+  }, [config.rows, keyword, listFilters, menu]);
   const filteredRowKeys = filteredRows.map((row) => String(row.key));
   const isAllChecked =
     filteredRowKeys.length > 0 &&
@@ -477,6 +486,8 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
   };
   const resetList = () => {
     setKeyword("");
+    setListFilters({});
+    setAdvancedOpen(false);
     setSelectedKeys([]);
   };
   const exportCsv = () => {
@@ -523,6 +534,45 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
 
     openOwnerModal("create", { serviceId: row.record.serviceId, lockedService: true });
   };
+  const filteredOwnerServices = useMemo(() => {
+    if (menu !== "owners") return [];
+    const cleanedKeyword = normalizeSearchText(keyword);
+    return portalData.services.filter((service) => {
+      const matchesKeyword = !cleanedKeyword || matchesSearchText(
+        searchableText(
+          service.serviceCode,
+          service.serviceName,
+          service.categoryPath,
+          service.description
+        ),
+        cleanedKeyword
+      );
+      return matchesKeyword && matchesCategoryFilters(service, listFilters);
+    });
+  }, [keyword, listFilters, menu, portalData.services]);
+
+  useEffect(() => {
+    if (menu !== "owners") return;
+    if (filteredOwnerServices.some((service) => String(service.serviceId) === String(selectedOwnerServiceId))) {
+      return;
+    }
+    setSelectedOwnerServiceId(String(filteredOwnerServices[0]?.serviceId ?? ""));
+  }, [filteredOwnerServices, menu, selectedOwnerServiceId]);
+
+  const toolbar = (
+    <AdminToolbar
+      advancedOpen={advancedOpen}
+      categoryCatalog={categoryCatalog}
+      filterMode={getFilterMode(menu)}
+      filters={listFilters}
+      keyword={keyword}
+      meta={meta}
+      onFilterChange={(field, value) => setListFilters((current) => nextListFilters(current, field, value))}
+      onKeywordChange={setKeyword}
+      onReset={resetList}
+      onToggleAdvanced={() => setAdvancedOpen((current) => !current)}
+    />
+  );
 
   return (
     <>
@@ -549,12 +599,43 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
         </div>
       </div>
 
-      <div className="toolbar">
-        <div className="search">🔍<input type="text" value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder={`${meta.label} 검색...`} /></div>
-        <div className="right"><button className="btn btn--ghost btn--sm" onClick={resetList} type="button">초기화</button></div>
-      </div>
+      {menu === "services" || menu === "owners" ? null : toolbar}
 
-      <div className="card">
+      {menu === "owners" ? (
+        <OwnerDirectoryView
+          categoryCatalog={categoryCatalog}
+          filters={listFilters}
+          keyword={keyword}
+          onAddOwner={(service) => void openOwnerModal("create", { serviceId: service.serviceId, lockedService: true })}
+          onDeleteOwner={(owner) => void openOwnerModal("delete", owner)}
+          onEditOwner={(owner) => void openOwnerModal("edit", { ...owner, lockedService: true })}
+          onFilterChange={(field, value) => setListFilters((current) => nextListFilters(current, field, value))}
+          onKeywordChange={setKeyword}
+          onReset={resetList}
+          onServiceDetail={(service) => navigate(`/admin-services/${service.serviceCode}`)}
+          onToggleAdvanced={() => setAdvancedOpen((current) => !current)}
+          advancedOpen={advancedOpen}
+          ownersByServiceCode={ownersByServiceCode}
+          ownersByServiceId={ownersByServiceId}
+          selectedServiceId={selectedOwnerServiceId}
+          services={filteredOwnerServices}
+          sourceServices={portalData.services}
+          portalData={portalData}
+          setSelectedServiceId={setSelectedOwnerServiceId}
+        />
+      ) : (
+      <div className={menu === "services" ? "admin-split-layout" : ""}>
+        {menu === "services" ? (
+          <ServiceCategorySidebar
+            filters={listFilters}
+            onFilterChange={(field, value) => setListFilters((current) => nextListFilters(current, field, value))}
+            services={portalData.services}
+            title="서비스 분류"
+          />
+        ) : null}
+        <div className="admin-list-main">
+          {menu === "services" ? toolbar : null}
+          <div className="card">
         <table className="tbl">
           <thead>
             <tr>
@@ -648,7 +729,10 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
           <div className="pager__info">{isTableLoading ? "데이터 조회 중" : `전체 ${filteredRows.length}건 · 1-${filteredRows.length} / 1 페이지 · 선택 ${selectedKeys.filter((key) => filteredRowKeys.includes(key)).length}건`}</div>
           <div className="pager__nav"><button disabled>‹</button><button className="is-on">1</button><button disabled>›</button></div>
         </div>
+          </div>
+        </div>
       </div>
+      )}
       {ownerModal ? (
         <OwnerManagementModals
           modal={ownerModal}
@@ -676,6 +760,347 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
       ) : null}
     </>
   );
+}
+
+function getFilterMode(menu) {
+  if (menu === "servers") return "servers";
+  if (menu === "relations") return "relations";
+  if (menu === "owners") return "serviceCategory";
+  return null;
+}
+
+function AdminToolbar({
+  advancedOpen,
+  categoryCatalog,
+  filterMode,
+  filters,
+  keyword,
+  meta,
+  onFilterChange,
+  onKeywordChange,
+  onReset,
+  onServiceDetail,
+  onToggleAdvanced,
+}) {
+  return (
+    <div className={`toolbar toolbar--admin${advancedOpen ? " is-expanded" : ""}`}>
+      <div className="search">
+        <Search size={15} aria-hidden="true" />
+        <input
+          type="text"
+          value={keyword}
+          onChange={(event) => onKeywordChange(event.target.value)}
+          placeholder={`${meta.label} 검색...`}
+        />
+      </div>
+      {filterMode ? (
+        <button className="btn btn--dark" onClick={onToggleAdvanced} type="button">
+          <Filter size={15} aria-hidden="true" /> 고급 필터
+        </button>
+      ) : null}
+      <div className="right"><button className="btn btn--ghost btn--sm" onClick={onReset} type="button">초기화</button></div>
+      {filterMode && advancedOpen ? (
+        <div className="advanced-filter-row">
+          {filterMode === "servers" ? (
+            <>
+              <AdminFilterSelect label="환경" value={filters.envCode} labels={codeLabels.envType} onChange={(value) => onFilterChange("envCode", value)} />
+              <AdminFilterSelect label="OS 유형" value={filters.osTypeCode} labels={codeLabels.osType} onChange={(value) => onFilterChange("osTypeCode", value)} />
+              <AdminFilterSelect label="상태" value={filters.statusCode} labels={codeLabels.serverStatus} onChange={(value) => onFilterChange("statusCode", value)} />
+            </>
+          ) : null}
+          {filterMode === "relations" ? (
+            <>
+              <AdminFilterSelect label="전체 관계 유형" value={filters.relationTypeCode} labels={codeLabels.relationType} onChange={(value) => onFilterChange("relationTypeCode", value)} />
+              <AdminFilterSelect label="전체 상태" value={filters.relationStatusCode} labels={codeLabels.relationStatus} onChange={(value) => onFilterChange("relationStatusCode", value)} />
+              <select value={filters.mandatoryYn ?? ""} onChange={(event) => onFilterChange("mandatoryYn", event.target.value)}>
+                <option value="">필수, 선택 관계</option>
+                <option value="Y">필수 관계</option>
+                <option value="N">선택 관계</option>
+              </select>
+            </>
+          ) : null}
+          {filterMode === "serviceCategory" ? (
+            <CategoryFilterControls
+              categoryCatalog={categoryCatalog}
+              filters={filters}
+              onFilterChange={onFilterChange}
+            />
+          ) : null}
+          <button className="btn btn--wide-reset" onClick={onReset} type="button"><X size={15} aria-hidden="true" /> 필터 초기화</button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function AdminFilterSelect({ label, labels, onChange, value }) {
+  return (
+    <select value={value ?? ""} onChange={(event) => onChange(event.target.value)}>
+      <option value="">{label}</option>
+      {Object.entries(labels ?? {}).map(([code, text]) => (
+        <option key={code} value={code}>{text}</option>
+      ))}
+    </select>
+  );
+}
+
+function CategoryFilterControls({ categoryCatalog, filters, onFilterChange }) {
+  const selectedL1 = findCategoryOptionByName(categoryCatalog.level1, filters.categoryL1);
+  const selectedL2 = findCategoryOptionByName(categoryCatalog.level2, filters.categoryL2, selectedL1?.name);
+  const level2Options = selectedL1 ? selectableChildCategoryOptions(categoryCatalog.level2, selectedL1) : [];
+  const level3Options = selectedL2 ? selectableChildCategoryOptions(categoryCatalog.level3, selectedL2, selectedL1) : [];
+
+  return (
+    <>
+      <select value={filters.categoryL1 ?? ""} onChange={(event) => onFilterChange("categoryL1", event.target.value)}>
+        <option value="">전체</option>
+        {categoryCatalog.level1.map((option) => <option key={getCategoryOptionValue(option)} value={option.name}>{option.name}</option>)}
+      </select>
+      <select
+        disabled={!filters.categoryL1}
+        value={filters.categoryL2 ?? ""}
+        onChange={(event) => onFilterChange("categoryL2", event.target.value)}
+      >
+        <option value="">{filters.categoryL1 ? "분류 2단계 전체" : "1단계 선택 후"}</option>
+        {level2Options.map((option) => <option key={getCategoryOptionValue(option)} value={option.name}>{option.name}</option>)}
+      </select>
+      <select
+        disabled={!filters.categoryL2}
+        value={filters.categoryL3 ?? ""}
+        onChange={(event) => onFilterChange("categoryL3", event.target.value)}
+      >
+        <option value="">{filters.categoryL2 ? "분류 3단계 전체" : "2단계 선택 후"}</option>
+        {level3Options.map((option) => <option key={getCategoryOptionValue(option)} value={option.name}>{option.name}</option>)}
+      </select>
+    </>
+  );
+}
+
+function nextListFilters(current, field, value) {
+  const next = { ...current, [field]: value };
+  if (field === "categoryL1") {
+    next.categoryL2 = "";
+    next.categoryL3 = "";
+  }
+  if (field === "categoryL2") {
+    next.categoryL3 = "";
+  }
+  return next;
+}
+
+function matchesAdminFilters(menu, record, filters = {}) {
+  if (!record) return true;
+  if (menu === "services") return matchesCategoryFilters(record, filters);
+  if (menu === "servers") {
+    return matchesExactFilter(record.envCode, filters.envCode) &&
+      matchesExactFilter(record.osTypeCode, filters.osTypeCode) &&
+      matchesExactFilter(record.statusCode, filters.statusCode);
+  }
+  if (menu === "relations") {
+    return matchesExactFilter(record.relationTypeCode, filters.relationTypeCode) &&
+      matchesExactFilter(record.relationStatusCode, filters.relationStatusCode) &&
+      matchesExactFilter(record.mandatoryYn, filters.mandatoryYn);
+  }
+  return true;
+}
+
+function matchesExactFilter(value, filterValue) {
+  return !filterValue || String(value ?? "") === String(filterValue);
+}
+
+function matchesCategoryFilters(service, filters = {}) {
+  const path = service?.categoryPath ?? [];
+  return (!filters.categoryL1 || path[0] === filters.categoryL1) &&
+    (!filters.categoryL2 || path[1] === filters.categoryL2) &&
+    (!filters.categoryL3 || path[2] === filters.categoryL3);
+}
+
+function ServiceCategorySidebar({ filters, onFilterChange, services, title }) {
+  const tree = buildServiceCategoryTree(services);
+  const selectCategory = (level, value) => {
+    onFilterChange(level === 1 ? "categoryL1" : level === 2 ? "categoryL2" : "categoryL3", value);
+  };
+
+  return (
+    <aside className="service-filter-panel">
+      <h2>{title}</h2>
+      <button
+        className={`service-filter-panel__item is-root${!filters.categoryL1 ? " is-active" : ""}`}
+        onClick={() => onFilterChange("categoryL1", "")}
+        type="button"
+      >
+        <span>전체</span><b>{services.length}</b>
+      </button>
+      <div className="service-filter-tree">
+        {tree.map((l1) => (
+          <div className="service-filter-tree__group" key={l1.name}>
+            <button className={`service-filter-panel__item${filters.categoryL1 === l1.name ? " is-active" : ""}`} onClick={() => selectCategory(1, l1.name)} type="button">
+              <span>{l1.name}</span><b>{l1.count}</b>
+            </button>
+            {filters.categoryL1 === l1.name ? (
+              <div className="service-filter-tree__children">
+                {l1.children.map((l2) => (
+                  <div key={l2.name}>
+                    <button className={`service-filter-panel__item${filters.categoryL2 === l2.name ? " is-active" : ""}`} onClick={() => selectCategory(2, l2.name)} type="button">
+                      <span>{l2.name}</span><b>{l2.count}</b>
+                    </button>
+                    {filters.categoryL2 === l2.name ? (
+                      <div className="service-filter-tree__children is-leaf">
+                        {l2.children.map((l3) => (
+                          <button className={`service-filter-panel__item${filters.categoryL3 === l3.name ? " is-active" : ""}`} key={l3.name} onClick={() => selectCategory(3, l3.name)} type="button">
+                            <span>{l3.name}</span><b>{l3.count}</b>
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    </aside>
+  );
+}
+
+function OwnerDirectoryView({
+  advancedOpen,
+  categoryCatalog,
+  filters,
+  keyword,
+  onAddOwner,
+  onDeleteOwner,
+  onEditOwner,
+  onFilterChange,
+  onKeywordChange,
+  onReset,
+  onToggleAdvanced,
+  ownersByServiceCode,
+  ownersByServiceId,
+  portalData,
+  selectedServiceId,
+  services,
+  setSelectedServiceId,
+  sourceServices,
+}) {
+  const selectedService = services.find((service) => String(service.serviceId) === String(selectedServiceId)) ?? services[0] ?? null;
+  const selectedOwners = selectedService
+    ? ownersByServiceId.get(String(selectedService.serviceId)) ??
+      ownersByServiceCode.get(String(selectedService.serviceCode)) ??
+      []
+    : [];
+  const ownerCount = (service) => (
+    ownersByServiceId.get(String(service.serviceId)) ??
+    ownersByServiceCode.get(String(service.serviceCode)) ??
+    []
+  ).length;
+
+  return (
+    <div className="owner-directory">
+      <AdminToolbar
+        advancedOpen={advancedOpen}
+        categoryCatalog={categoryCatalog}
+        filterMode="serviceCategory"
+        filters={filters}
+        keyword={keyword}
+        meta={{ label: "서비스" }}
+        onFilterChange={onFilterChange}
+        onKeywordChange={onKeywordChange}
+        onReset={onReset}
+        onToggleAdvanced={onToggleAdvanced}
+      />
+      <div className="owner-directory__layout">
+        <aside className="owner-service-list">
+          <h2>서비스 목록</h2>
+          <div className="owner-service-list__scroll">
+            {services.map((service) => (
+              <button
+                className={String(service.serviceId) === String(selectedService?.serviceId) ? "is-active" : ""}
+                key={service.serviceId}
+                onClick={() => setSelectedServiceId(String(service.serviceId))}
+                type="button"
+              >
+                <strong>{service.serviceName}</strong>
+                <code>{service.serviceCode}</code>
+                <span>{service.categoryPath?.at(-1) || "미분류"}</span>
+                <b>{ownerCount(service) ? `${ownerCount(service)}명` : "미배정"}</b>
+              </button>
+            ))}
+            {!services.length ? <div className="empty">조건에 맞는 서비스가 없습니다.</div> : null}
+          </div>
+        </aside>
+        <section className="owner-service-detail">
+          {selectedService ? (
+            <>
+              <div className="owner-service-detail__head">
+                <div>
+                  <code>{selectedService.serviceCode}</code>
+                  <h2>{selectedService.serviceName}</h2>
+                  <span>{selectedService.categoryPath?.join(" > ") || "미분류"}</span>
+                </div>
+                <div>
+                  <button className="btn" onClick={() => onServiceDetail(selectedService)} type="button">서비스 상세</button>
+                  <button className="btn btn--primary" onClick={() => onAddOwner(selectedService)} type="button">＋ 담당 추가</button>
+                </div>
+              </div>
+              <table className="tbl owner-detail-table">
+                <thead>
+                  <tr><th>유형</th><th>담당</th><th>책임</th><th>액션</th></tr>
+                </thead>
+                <tbody>
+                  {selectedOwners.map((owner) => (
+                    <tr key={owner.serviceOwnerId}>
+                      <td>{codeLabels.ownerType[owner.ownerTypeCode] || owner.ownerTypeCode}</td>
+                      <td><b>{owner.ownerName}</b></td>
+                      <td>{codeLabels.responsibilityType[owner.responsibilityCode] || owner.responsibilityCode}</td>
+                      <td>
+                        <div className="row-actions">
+                          <button className="ibtn" onClick={() => onEditOwner(owner)} title="수정" type="button">✏️</button>
+                          <button className="ibtn ibtn--danger" onClick={() => onDeleteOwner(owner)} title="삭제" type="button">🗑</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {!selectedOwners.length ? (
+                    <tr><td colSpan={4}><div className="empty">등록된 담당자가 없습니다.</div></td></tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </>
+          ) : (
+            <div className="empty">서비스를 선택해주세요.</div>
+          )}
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function buildServiceCategoryTree(services) {
+  const root = new Map();
+  services.forEach((service) => {
+    const [l1 = "미분류", l2 = "미분류", l3 = "미분류"] = service.categoryPath ?? [];
+    if (!root.has(l1)) root.set(l1, { name: l1, count: 0, children: new Map() });
+    const node1 = root.get(l1);
+    node1.count += 1;
+    if (!node1.children.has(l2)) node1.children.set(l2, { name: l2, count: 0, children: new Map() });
+    const node2 = node1.children.get(l2);
+    node2.count += 1;
+    if (!node2.children.has(l3)) node2.children.set(l3, { name: l3, count: 0 });
+    node2.children.get(l3).count += 1;
+  });
+  return [...root.values()]
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "ko"))
+    .map((l1) => ({
+      ...l1,
+      children: [...l1.children.values()]
+        .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "ko"))
+        .map((l2) => ({
+          ...l2,
+          children: [...l2.children.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "ko")),
+        })),
+    }));
 }
 
 function buildRowSearchText(row) {
@@ -1257,10 +1682,10 @@ function AdminRecordModal({ modal, onClose, portalData, serverById, serviceById 
 
     if (menu === "services") {
       setSaving(true);
-      const serviceCode = requireValue((form.serviceCode || "").toUpperCase(), "serviceCode")?.toUpperCase();
+      const serviceCode = requireValue((form.serviceCode || "").toUpperCase(), "서비스 코드")?.toUpperCase();
       const serviceName = requireValue(form.serviceName, "서비스명");
       const categoryPath = buildSelectedCategoryPath(form, portalData.categories);
-      const categoryL1 = requireValue(categoryPath[0], "대분류");
+      const categoryL1 = requireValue(categoryPath[0], "분류 1단계");
       if (!serviceCode || !serviceName || !categoryL1) {
         setSaving(false);
         return;
@@ -1322,8 +1747,8 @@ function AdminRecordModal({ modal, onClose, portalData, serverById, serviceById 
       onClose();
       return;
     } else if (menu === "servers") {
-      const serverName = requireValue(form.serverName, "serverName");
-      const hostName = requireValue(form.hostName, "hostname");
+      const serverName = requireValue(form.serverName, "서버명");
+      const hostName = requireValue(form.hostName, "호스트명");
       const ipAddress = requireValue(form.ipAddress, "IP 주소");
       if (!serverName || !hostName || !ipAddress) return;
       const infraNode = findInfraNodeOption(portalData.servers, form.infraNodeId);
@@ -1352,11 +1777,7 @@ function AdminRecordModal({ modal, onClose, portalData, serverById, serviceById 
       const sourceServiceId = Number(form.sourceServiceId);
       const targetServiceId = Number(form.targetServiceId);
       if (!sourceServiceId || !targetServiceId) {
-        window.alert("source/target 서비스를 선택해주세요.");
-        return;
-      }
-      if (sourceServiceId === targetServiceId) {
-        window.alert("source와 target 서비스는 서로 달라야 합니다.");
+        window.alert("출발/대상 서비스를 선택해주세요.");
         return;
       }
       const payload = {
@@ -1557,7 +1978,7 @@ function AdminRecordModal({ modal, onClose, portalData, serverById, serviceById 
             <ServerAdminForm form={form} onChange={updateField} isEdit={isEdit} servers={portalData.servers} />
           ) : null}
           {menu === "relations" ? (
-            <RelationAdminForm form={form} onChange={updateField} services={portalData.services} serviceById={serviceById} isEdit={isEdit} />
+            <RelationAdminForm form={form} onChange={updateField} services={portalData.services} serviceById={serviceById} isEdit={isEdit} portalData={portalData} />
           ) : null}
           {menu === "techstacks" ? (
             <TechStackAdminForm form={form} onChange={updateField} services={portalData.services} isEdit={isEdit} />
@@ -2119,6 +2540,73 @@ function SearchableServiceSelect({ disabled = false, onChange, placeholder = "�
   );
 }
 
+function CategorizedServicePicker({ categoryCatalog, disabled = false, label, onChange, services, value }) {
+  const selectedService = services.find((service) => String(service.serviceId) === String(value));
+  const [filters, setFilters] = useState(() => ({
+    categoryL1: selectedService?.categoryPath?.[0] ?? "",
+    categoryL2: selectedService?.categoryPath?.[1] ?? "",
+    categoryL3: selectedService?.categoryPath?.[2] ?? "",
+  }));
+  const selectedL1 = findCategoryOptionByName(categoryCatalog.level1, filters.categoryL1);
+  const selectedL2 = findCategoryOptionByName(categoryCatalog.level2, filters.categoryL2, selectedL1?.name);
+  const level2Options = selectedL1 ? selectableChildCategoryOptions(categoryCatalog.level2, selectedL1) : [];
+  const level3Options = selectedL2 ? selectableChildCategoryOptions(categoryCatalog.level3, selectedL2, selectedL1) : [];
+  const filteredServices = services.filter((service) => matchesCategoryFilters(service, filters));
+
+  useEffect(() => {
+    if (!selectedService) return;
+    setFilters({
+      categoryL1: selectedService.categoryPath?.[0] ?? "",
+      categoryL2: selectedService.categoryPath?.[1] ?? "",
+      categoryL3: selectedService.categoryPath?.[2] ?? "",
+    });
+  }, [selectedService?.serviceId]);
+
+  const updateFilter = (field, nextValue) => {
+    setFilters((current) => nextListFilters(current, field, nextValue));
+    if (field !== "categoryL3") {
+      onChange("");
+    }
+  };
+
+  return (
+    <div className="categorized-service-picker">
+      <h5>{label}</h5>
+      <div className="form-row">
+        <label>분류 1단계<span className="req">*</span></label>
+        <select disabled={disabled} value={filters.categoryL1} onChange={(event) => updateFilter("categoryL1", event.target.value)}>
+          <option value="">1단계 선택</option>
+          {categoryCatalog.level1.map((option) => <option key={getCategoryOptionValue(option)} value={option.name}>{option.name}</option>)}
+        </select>
+      </div>
+      <div className="form-row">
+        <label>분류 2단계</label>
+        <select disabled={disabled || !filters.categoryL1} value={filters.categoryL2} onChange={(event) => updateFilter("categoryL2", event.target.value)}>
+          <option value="">{filters.categoryL1 ? "2단계 선택" : "1단계 선택 후"}</option>
+          {level2Options.map((option) => <option key={getCategoryOptionValue(option)} value={option.name}>{option.name}</option>)}
+        </select>
+      </div>
+      <div className="form-row">
+        <label>분류 3단계</label>
+        <select disabled={disabled || !filters.categoryL2} value={filters.categoryL3} onChange={(event) => updateFilter("categoryL3", event.target.value)}>
+          <option value="">{filters.categoryL2 ? "3단계 선택" : "2단계 선택 후"}</option>
+          {level3Options.map((option) => <option key={getCategoryOptionValue(option)} value={option.name}>{option.name}</option>)}
+        </select>
+      </div>
+      <div className="form-row">
+        <label>서비스<span className="req">*</span></label>
+        <SearchableServiceSelect
+          disabled={disabled || !filters.categoryL3}
+          onChange={onChange}
+          placeholder={filters.categoryL3 ? "분류 내 서비스 선택" : "분류를 선택하세요"}
+          services={filteredServices}
+          value={value}
+        />
+      </div>
+    </div>
+  );
+}
+
 function ServiceAdminForm({ form, onChange, portalData, servers, isEdit }) {
   const [apiCategories, setApiCategories] = useState([]);
   const categoryCatalog = useMemo(
@@ -2201,7 +2689,7 @@ function ServiceAdminForm({ form, onChange, portalData, servers, isEdit }) {
         <h4 className="form-section__title">분류 및 상태</h4>
         <div className="form-grid">
           <div className="form-row">
-            <label>대분류 (categoryL1)<span className="req">*</span></label>
+            <label>분류 1단계<span className="req">*</span></label>
             <select
               value={getCategoryOptionValue(selectedL1)}
               onChange={(event) => changeCategory(1, findCategoryOptionByValue(categoryCatalog.level1, event.target.value))}
@@ -2212,18 +2700,18 @@ function ServiceAdminForm({ form, onChange, portalData, servers, isEdit }) {
               ))}
             </select>
           </div>
-          <div className="form-row"><label>중분류 (categoryL2)</label><SearchableCategorySelect disabled={!selectedL1 || !level2Options.length} options={level2Options} value={selectedL2?.name ?? form.categoryL2} onChange={(_value, option) => changeCategory(2, option)} placeholder={level2Options.length ? "검색 또는 선택하세요" : "등록된 중분류가 없습니다"} /></div>
-          <div className="form-row"><label>소분류 (categoryL3)</label><SearchableCategorySelect disabled={!selectedL2 || !level3Options.length} options={level3Options} value={selectedL3?.name ?? form.categoryL3} onChange={(_value, option) => changeCategory(3, option)} placeholder={level3Options.length ? "검색 또는 선택하세요" : "등록된 소분류가 없습니다"} /></div>
-          <div className="form-row"><label>중요도 (IMPORTANCE)<span className="req">*</span></label><CodeSelect labels={codeLabels.importance} value={form.importanceCode} onChange={(value) => onChange("importanceCode", value)} /></div>
-          <div className="form-row"><label>상태 (STATUS)<span className="req">*</span></label><CodeSelect labels={codeLabels.serviceStatus} value={form.statusCode} onChange={(value) => onChange("statusCode", value)} /></div>
-          <div className="form-row"><label>서비스 유형 (SERVICE_TYPE)<span className="req">*</span></label><CodeSelect labels={codeLabels.serviceType} value={form.serviceTypeCode} onChange={(value) => onChange("serviceTypeCode", value)} /></div>
+          <div className="form-row"><label>분류 2단계</label><SearchableCategorySelect disabled={!selectedL1 || !level2Options.length} options={level2Options} value={selectedL2?.name ?? form.categoryL2} onChange={(_value, option) => changeCategory(2, option)} placeholder={level2Options.length ? "검색 또는 선택하세요" : "등록된 분류 2단계가 없습니다"} /></div>
+          <div className="form-row"><label>분류 3단계</label><SearchableCategorySelect disabled={!selectedL2 || !level3Options.length} options={level3Options} value={selectedL3?.name ?? form.categoryL3} onChange={(_value, option) => changeCategory(3, option)} placeholder={level3Options.length ? "검색 또는 선택하세요" : "등록된 분류 3단계가 없습니다"} /></div>
+          <div className="form-row"><label>중요도<span className="req">*</span></label><CodeSelect labels={codeLabels.importance} value={form.importanceCode} onChange={(value) => onChange("importanceCode", value)} /></div>
+          <div className="form-row"><label>상태<span className="req">*</span></label><CodeSelect labels={codeLabels.serviceStatus} value={form.statusCode} onChange={(value) => onChange("statusCode", value)} /></div>
+          <div className="form-row"><label>서비스 유형<span className="req">*</span></label><CodeSelect labels={codeLabels.serviceType} value={form.serviceTypeCode} onChange={(value) => onChange("serviceTypeCode", value)} /></div>
         </div>
       </div>
       <div className="form-section">
         <h4 className="form-section__title">기본 정보</h4>
         <div className="form-grid">
           <div className="form-row">
-            <label>serviceCode<span className="req">*</span></label>
+            <label>서비스 코드<span className="req">*</span></label>
             <div className="service-code-rule">
               <input type="text" value={isEdit ? form.serviceCode : serviceCodePreview} disabled />
               {!isEdit ? <input className="service-code-rule__suffix" type="text" value={form.serviceCodeSuffix} onChange={(event) => changeSuffix(event.target.value)} placeholder="001" /> : null}
@@ -2417,25 +2905,25 @@ function ServerAdminForm({ form, onChange, isEdit, servers }) {
         <h4 className="form-section__title">기본 정보</h4>
         <div className="form-grid">
           <div className="form-row">
-            <label>serverName<span className="req">*</span></label>
+            <label>서버명<span className="req">*</span></label>
             <input type="text" value={form.serverName} onChange={(event) => onChange("serverName", event.target.value)} disabled={isEdit} placeholder="예: 기간계 WAS #1" />
             {isEdit ? <span className="help">PK · 수정 불가</span> : <span className="help">고유 · 명명규칙 준수</span>}
           </div>
-          <div className="form-row"><label>hostname<span className="req">*</span></label><input type="text" value={form.hostName} onChange={(event) => onChange("hostName", event.target.value)} placeholder="gateone에 등록된 서버 hostname" /></div>
+          <div className="form-row"><label>호스트명<span className="req">*</span></label><input type="text" value={form.hostName} onChange={(event) => onChange("hostName", event.target.value)} placeholder="게이트원에 등록된 서버 호스트명" /></div>
           <div className="form-row"><label>IP 주소<span className="req">*</span></label><input type="text" value={form.ipAddress} onChange={(event) => onChange("ipAddress", event.target.value)} placeholder="예: 10.20.30.14" /></div>
         </div>
       </div>
       <div className="form-section">
         <h4 className="form-section__title">운영 환경</h4>
         <div className="form-grid">
-          <div className="form-row"><label>환경 (ENVIRONMENT)<span className="req">*</span></label><CodeSelect labels={codeLabels.envType} value={form.envCode} onChange={(value) => onChange("envCode", value)} /></div>
+          <div className="form-row"><label>환경<span className="req">*</span></label><CodeSelect labels={codeLabels.envType} value={form.envCode} onChange={(value) => onChange("envCode", value)} /></div>
           <div className="form-row"><label>상태</label><CodeSelect labels={codeLabels.serverStatus} value={form.statusCode} onChange={(value) => onChange("statusCode", value)} /></div>
         </div>
       </div>
       <div className="form-section">
         <h4 className="form-section__title">OS 정보</h4>
         <div className="form-grid">
-          <div className="form-row"><label>OS 유형 (OS_TYPE)<span className="req">*</span></label><CodeSelect labels={codeLabels.osType} value={form.osTypeCode} onChange={(value) => onChange("osTypeCode", value)} /></div>
+          <div className="form-row"><label>OS 유형<span className="req">*</span></label><CodeSelect labels={codeLabels.osType} value={form.osTypeCode} onChange={(value) => onChange("osTypeCode", value)} /></div>
           <div className="form-row"><label>OS 버전</label><input type="text" value={form.osVersion} onChange={(event) => onChange("osVersion", event.target.value)} placeholder="예: RHEL 8.9" /></div>
         </div>
       </div>
@@ -2465,31 +2953,58 @@ function ServerAdminForm({ form, onChange, isEdit, servers }) {
   );
 }
 
-function RelationAdminForm({ form, onChange, services, serviceById, isEdit }) {
+function RelationAdminForm({ form, onChange, services, serviceById, isEdit, portalData }) {
+  const categoryCatalog = useMemo(
+    () => buildCategoryCatalog(portalData.categories, services),
+    [portalData.categories, services]
+  );
   return (
     <>
       <div className="form-section">
         <h4 className="form-section__title">연결 서비스</h4>
-        <div className="form-grid">
-          <div className="form-row">
-            <label>source 서비스<span className="req">*</span></label>
-            <SearchableServiceSelect services={services} value={form.sourceServiceId} onChange={(value) => onChange("sourceServiceId", value)} disabled={isEdit} />
-            <span className="help">호출하는 쪽</span>
-          </div>
-          <div className="form-row">
-            <label>target 서비스<span className="req">*</span></label>
-            <SearchableServiceSelect services={services} value={form.targetServiceId} onChange={(value) => onChange("targetServiceId", value)} disabled={isEdit} />
-            <span className="help">호출받는 쪽</span>
-          </div>
+        <div className="relation-service-grid">
+          <CategorizedServicePicker
+            categoryCatalog={categoryCatalog}
+            disabled={isEdit}
+            label="출발 서비스"
+            onChange={(value) => onChange("sourceServiceId", value)}
+            services={services}
+            value={form.sourceServiceId}
+          />
+          <CategorizedServicePicker
+            categoryCatalog={categoryCatalog}
+            disabled={isEdit}
+            label="대상 서비스"
+            onChange={(value) => onChange("targetServiceId", value)}
+            services={services}
+            value={form.targetServiceId}
+          />
           {isEdit ? <div className="form-row full"><label>연결</label><input type="text" value={`${serviceLabel(serviceById.get(Number(form.sourceServiceId)))} → ${serviceLabel(serviceById.get(Number(form.targetServiceId)))}`} disabled /></div> : null}
         </div>
+        <p className="form-hint">
+          동일 서비스를 출발·대상으로 두어 자기 자신을 호출하는 관계도 등록할 수 있습니다. 서비스 선택 방식은 서비스 관리의 신규 등록과 같이 분류 3단계 후 해당 분류의 서비스를 고릅니다.
+        </p>
       </div>
       <div className="form-section">
         <h4 className="form-section__title">관계 속성</h4>
         <div className="form-grid">
-          <div className="form-row"><label>관계 유형 (RELATION_TYPE)<span className="req">*</span></label><CodeSelect labels={codeLabels.relationType} value={form.relationTypeCode} onChange={(value) => onChange("relationTypeCode", value)} /></div>
-          <div className="form-row"><label>연결 상태</label><CodeSelect labels={codeLabels.relationStatus} value={form.relationStatusCode} onChange={(value) => onChange("relationStatusCode", value)} /></div>
-          <div className="form-row"><label>필수 여부 (isRequired)</label><select value={form.mandatoryYn} onChange={(event) => onChange("mandatoryYn", event.target.value)}><option value="Y">Y (필수)</option><option value="N">N (선택)</option></select></div>
+          <div className="form-row"><label>관계 유형<span className="req">*</span></label><CodeSelect labels={codeLabels.relationType} value={form.relationTypeCode} onChange={(value) => onChange("relationTypeCode", value)} /></div>
+          <div className="form-row"><label>관계 상태</label><CodeSelect labels={codeLabels.relationStatus} value={form.relationStatusCode} onChange={(value) => onChange("relationStatusCode", value)} /></div>
+          <div className="form-row full">
+            <label>필수 여부</label>
+            <label className="toggle-card">
+              <span>
+                <strong>필수 관계</strong>
+                <small>활성 상태인 관계만 장애 전파 분석에 사용됩니다. 필수 여부는 표시·분석 시 참고됩니다.</small>
+              </span>
+              <input
+                checked={String(form.mandatoryYn).toUpperCase() === "Y"}
+                onChange={(event) => onChange("mandatoryYn", event.target.checked ? "Y" : "N")}
+                type="checkbox"
+              />
+              <i aria-hidden="true" />
+            </label>
+          </div>
         </div>
       </div>
       <div className="form-section">
@@ -2612,14 +3127,14 @@ function RemoteAdminForm({ form, isEdit, menu, onChange, portalData }) {
           <h4 className="form-section__title">분류</h4>
           <div className="form-grid">
             <div className="form-row">
-              <label>대분류 (categoryL1)</label>
+              <label>분류 1단계</label>
               <select value={getCategoryOptionValue(selectedL1)} onChange={(event) => changeCategory(1, findCategoryOptionByValue(categoryCatalog.level1, event.target.value))}>
                 <option value="">선택</option>
                 {categoryCatalog.level1.map((option) => <option key={getCategoryOptionValue(option)} value={getCategoryOptionValue(option)}>{option.name}</option>)}
               </select>
             </div>
-            <div className="form-row"><label>중분류 (categoryL2)</label><SearchableCategorySelect disabled={!selectedL1 || !level2Options.length} options={level2Options} value={selectedL2?.name ?? form.categoryL2} onChange={(_value, option) => changeCategory(2, option)} placeholder={level2Options.length ? "검색 또는 선택하세요" : "등록된 중분류가 없습니다"} /></div>
-            <div className="form-row"><label>소분류 (categoryL3)</label><SearchableCategorySelect disabled={!selectedL2 || !level3Options.length} options={level3Options} value={selectedL3?.name ?? form.categoryL3} onChange={(_value, option) => changeCategory(3, option)} placeholder={level3Options.length ? "검색 또는 선택하세요" : "등록된 소분류가 없습니다"} /></div>
+            <div className="form-row"><label>분류 2단계</label><SearchableCategorySelect disabled={!selectedL1 || !level2Options.length} options={level2Options} value={selectedL2?.name ?? form.categoryL2} onChange={(_value, option) => changeCategory(2, option)} placeholder={level2Options.length ? "검색 또는 선택하세요" : "등록된 분류 2단계가 없습니다"} /></div>
+            <div className="form-row"><label>분류 3단계</label><SearchableCategorySelect disabled={!selectedL2 || !level3Options.length} options={level3Options} value={selectedL3?.name ?? form.categoryL3} onChange={(_value, option) => changeCategory(3, option)} placeholder={level3Options.length ? "검색 또는 선택하세요" : "등록된 분류 3단계가 없습니다"} /></div>
           </div>
         </div>
         <div className="form-section">
@@ -2695,7 +3210,7 @@ function CodeSelect({ labels, value, onChange }) {
   return (
     <select value={value} onChange={(event) => onChange(event.target.value)}>
       {Object.entries(labels).map(([code, label]) => (
-        <option key={code} value={code}>{label} ({code})</option>
+        <option key={code} value={code}>{label}</option>
       ))}
     </select>
   );
@@ -3014,7 +3529,7 @@ function OwnerManagementModals({ modal, onClose, owner, portalData, services }) 
           <div className="form-section">
             <h4 className="form-section__title">연결 서비스</h4>
             <div className="form-row">
-              <label>서비스 (serviceCode)<span className="req">*</span></label>
+              <label>서비스<span className="req">*</span></label>
               {serviceLocked ? (
                 <div className="readonly-field">
                   {service ? <><code>{service.serviceCode}</code> {service.serviceName}</> : "서비스 미지정"}
