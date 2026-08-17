@@ -2045,6 +2045,51 @@ const categoryPrefixOverrides = {
   "VOC": "VOC",
 };
 
+const topServiceCategoryNames = [
+  "기간계/업무계",
+  "채널계",
+  "대내외계",
+  "공통플랫폼",
+  "데이터/분석계",
+];
+
+const categoryPathOverrides = {
+  "HSP 포털": ["기간계/업무계", "포털", "HSP 포털"],
+  "대출 신청/관리": ["기간계/업무계", "대출", "대출 신청/관리"],
+  "수납/출납": ["기간계/업무계", "수납/출납", "수납/출납"],
+  "수수료": ["기간계/업무계", "수납/출납", "수수료"],
+  "인사": ["기간계/업무계", "인사", "인사"],
+  "대고객 앱/웹": ["채널계", "대고객 채널", "대고객 앱/웹"],
+  "홈페이지": ["채널계", "대고객 채널", "홈페이지"],
+  "챗봇": ["채널계", "대고객 채널", "챗봇"],
+  "다이렉트 홈페이지": ["채널계", "CM/다이렉트 채널", "다이렉트 홈페이지"],
+  "영업지원 포털": ["채널계", "영업지원 채널", "영업지원 포털"],
+  "모바일 전자청약": ["채널계", "영업지원 채널", "모바일 전자청약"],
+  "방카 포털": ["채널계", "영업지원 채널", "방카 포털"],
+  "Megaware 대내외계": ["대내외계", "대외 연계", "Megaware 대내외계"],
+  "공공기관 연계": ["대내외계", "대외 연계", "공공기관 연계"],
+  "마이데이터": ["대내외계", "대외 연계", "마이데이터"],
+  "파일전송": ["대내외계", "대외 연계", "파일전송"],
+  "공통": ["공통플랫폼", "공통", "공통"],
+  "SSO/EAM": ["공통플랫폼", "인증/권한", "SSO/EAM"],
+  "OAuth 인증 서비스": ["공통플랫폼", "인증/권한", "OAuth 인증 서비스"],
+  "간편인증": ["공통플랫폼", "인증/권한", "간편인증"],
+  "API Gateway": ["공통플랫폼", "채널통합", "API Gateway"],
+  "MCI": ["공통플랫폼", "채널통합", "MCI"],
+  "문서/이미지 솔루션": ["공통플랫폼", "공통 솔루션", "문서/이미지 솔루션"],
+  "메시징/알림 솔루션": ["공통플랫폼", "공통 솔루션", "메시징/알림 솔루션"],
+  "ITSM": ["공통플랫폼", "운영도구", "ITSM"],
+  "APM 모니터링": ["공통플랫폼", "운영도구", "APM 모니터링"],
+  "빌드/배포": ["공통플랫폼", "운영도구", "빌드/배포"],
+  "WEB/WAS": ["공통플랫폼", "인프라 공통", "WEB/WAS"],
+  "정보계 마트": ["데이터/분석계", "정보계", "정보계 마트"],
+  "BI/리포팅": ["데이터/분석계", "정보계", "BI/리포팅"],
+  "IFRS": ["데이터/분석계", "정보계", "IFRS"],
+  "VOC": ["데이터/분석계", "분석/고객", "VOC"],
+  "고객상담센터": ["데이터/분석계", "분석/고객", "고객상담센터"],
+  "NCRM Framework": ["데이터/분석계", "분석/고객", "NCRM Framework"],
+};
+
 function compactText(value) {
   return String(value ?? "").trim();
 }
@@ -2168,7 +2213,9 @@ function sanitizeServiceCodePart(value) {
 }
 
 function buildCategoryCatalog(categories = [], services = []) {
-  const paths = services.map((service) => service.categoryPath ?? []).filter((path) => path.length);
+  const paths = services
+    .map((service) => normalizeCategoryPath(service.categoryPath ?? []))
+    .filter((path) => path.length);
   const servicePathCatalog = {
     level1: uniqueByName(paths.map((path) => ({ name: compactText(path[0]), prefix: fallbackCategoryPrefix(path[0]) }))),
     level2: uniqueByName(paths.map((path) => ({
@@ -2180,6 +2227,21 @@ function buildCategoryCatalog(categories = [], services = []) {
       name: compactText(path[2]),
       parentName: compactText(path[1]),
       grandParentName: compactText(path[0]),
+      prefix: fallbackCategoryPrefix(path[2]),
+    }))),
+  };
+  const overridePaths = Object.values(categoryPathOverrides);
+  const overrideCatalog = {
+    level1: uniqueByName(overridePaths.map((path) => ({ name: path[0], prefix: fallbackCategoryPrefix(path[0]) }))),
+    level2: uniqueByName(overridePaths.map((path) => ({
+      name: path[1],
+      parentName: path[0],
+      prefix: fallbackCategoryPrefix(path[1]),
+    }))),
+    level3: uniqueByName(overridePaths.map((path) => ({
+      name: path[2],
+      parentName: path[1],
+      grandParentName: path[0],
       prefix: fallbackCategoryPrefix(path[2]),
     }))),
   };
@@ -2200,14 +2262,14 @@ function buildCategoryCatalog(categories = [], services = []) {
         };
       }))
     );
-    return mergeCategoryCatalogs({
+    return pruneCategoryCatalog(mergeCategoryCatalogs(mergeCategoryCatalogs({
       level1: optionsByLevel[0],
       level2: optionsByLevel[1],
       level3: optionsByLevel[2],
-    }, servicePathCatalog);
+    }, servicePathCatalog), overrideCatalog));
   }
 
-  return servicePathCatalog;
+  return pruneCategoryCatalog(mergeCategoryCatalogs(servicePathCatalog, overrideCatalog));
 }
 
 function mergeCategoryCatalogs(primary, fallback) {
@@ -2330,7 +2392,7 @@ function resolveCategoryPathFromEntry(entry, categories = []) {
 }
 
 function resolveCategoryPath(categoryPath = [], categories = [], categoryId = "") {
-  const cleanedPath = categoryPath.map((item) => compactText(item)).filter(Boolean);
+  const cleanedPath = normalizeCategoryPath(categoryPath);
   const remoteCategories = buildNormalizedCategories(categories);
   const byId = new Map(remoteCategories.filter((category) => category.id).map((category) => [category.id, category]));
   const numericCategoryId = Number(categoryId);
@@ -2352,9 +2414,29 @@ function resolveCategoryPath(categoryPath = [], categories = [], categoryId = ""
 }
 
 function resolveServiceCategoryPath(service, categoryCatalog) {
-  const cleanedPath = (service?.categoryPath ?? []).map((item) => compactText(item)).filter(Boolean);
+  const cleanedPath = normalizeCategoryPath(service?.categoryPath ?? []);
   const expandedPath = categoryCatalog ? expandCategoryPathFromCatalog(cleanedPath, categoryCatalog) : cleanedPath;
   return (expandedPath.length ? expandedPath : cleanedPath).concat(["미분류", "미분류", "미분류"]).slice(0, 3);
+}
+
+function normalizeCategoryPath(path = []) {
+  const cleanedPath = (Array.isArray(path) ? path : [path]).map((item) => compactText(item)).filter(Boolean);
+  const leafName = cleanedPath.at(-1);
+  if (leafName && categoryPathOverrides[leafName]) {
+    return categoryPathOverrides[leafName];
+  }
+  return cleanedPath;
+}
+
+function pruneCategoryCatalog(catalog) {
+  const knownTopSet = new Set(topServiceCategoryNames);
+  const topLevel = catalog.level1.filter((option) => knownTopSet.has(option.name));
+  if (!topLevel.length) return catalog;
+  return {
+    level1: topLevel,
+    level2: catalog.level2.filter((option) => knownTopSet.has(option.parentName)),
+    level3: catalog.level3.filter((option) => knownTopSet.has(option.grandParentName)),
+  };
 }
 
 function expandCategoryPathFromCatalog(path, catalog) {
