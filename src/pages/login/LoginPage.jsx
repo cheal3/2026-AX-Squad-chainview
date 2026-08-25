@@ -47,7 +47,7 @@ export function LoginPage() {
     <main className="login-page">
       <header className="login-topbar">
         <div className="login-brand-mini">
-          <span className="login-logo-mark" aria-hidden="true"><Link2 size={25} /></span>
+          <img alt="" className="login-brand-mini__icon" src={`${import.meta.env.BASE_URL}chainview-icon.png`} />
           <span>ChainView</span>
         </div>
         <button className="login-theme-button" type="button">
