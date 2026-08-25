@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Bell, Bot, ChevronDown, Database, GitFork, LogOut, Settings, UserRound } from "lucide-react";
+import { useAuth } from "../auth/AuthContext.jsx";
 import { usePortalData } from "../dashboardModule/PortalDataStore";
 
 const sidebarSections = [
@@ -83,6 +84,7 @@ export function AppShell({ activeMenu = "", children, isDark = false }) {
 function TopBar({ isDark = false }) {
   const navigate = useNavigate();
   const { incidents, remoteApi } = usePortalData();
+  const { currentUser, logout } = useAuth();
   const [isAccountOpen, setIsAccountOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const notificationRef = useRef(null);
@@ -122,9 +124,12 @@ function TopBar({ isDark = false }) {
     setIsAccountOpen(false);
   };
   const handleLogout = () => {
-    window.alert("로그아웃 기능은 다음 단계에서 연결 예정입니다.");
+    logout();
     setIsAccountOpen(false);
+    navigate("/login", { replace: true });
   };
+  const userInitial = currentUser?.name?.slice(0, 1) || "C";
+  const roleLabel = currentUser?.isAdmin ? "ADMIN" : "USER";
 
   return (
     <header className={`app-topbar${isDark ? " is-dark" : ""}`}>
@@ -197,16 +202,16 @@ function TopBar({ isDark = false }) {
             }}
             type="button"
           >
-            <span className="app-topbar__avatar" aria-hidden="true">이</span>
+            <span className="app-topbar__avatar" aria-hidden="true">{userInitial}</span>
             <span className="app-topbar__account-text">
-              <strong>이혜림</strong>
-              <small>IT채널업무1팀 · ADMIN</small>
+              <strong>{currentUser?.name || "ChainView"}</strong>
+              <small>{currentUser?.departmentName || "부서 미지정"} · {roleLabel}</small>
             </span>
             <ChevronDown size={16} />
           </button>
           {isAccountOpen ? (
             <div className="app-topbar__menu">
-              <strong>내 계정</strong>
+              <strong>{currentUser?.employeeNo || "내 계정"}</strong>
               <button onClick={handleAccountEdit} type="button"><Settings size={15} />프로필 설정</button>
               <button onClick={handleAccountEdit} type="button"><UserRound size={15} />환경 설정</button>
               <button className="is-logout" onClick={handleLogout} type="button"><LogOut size={15} />로그아웃</button>

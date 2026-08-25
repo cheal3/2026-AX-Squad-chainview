@@ -1,9 +1,11 @@
 import { lazy, Suspense, useEffect, useMemo, useRef } from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { initAdminInteractions } from "./adminInteractions.js";
+import { AuthProvider, useAuth } from "./auth/AuthContext.jsx";
 import { AppShell } from "./components/AppShell.jsx";
 import { pages } from "./pagesData.js";
 import { PortalDataProvider, usePortalData } from "./dashboardModule/PortalDataStore";
+import { LoginPage } from "./pages/login/LoginPage.jsx";
 
 const DynamicAdminListPage = lazy(() => import("./pages/admin/AdminListPage.jsx").then((module) => ({ default: module.DynamicAdminListPage })));
 const InfraRelationsPage = lazy(() => import("./pages/infra/InfraPages.jsx").then((module) => ({ default: module.InfraRelationsPage })));
@@ -304,33 +306,45 @@ function AppRoutes() {
   return (
     <Suspense fallback={<div className="route-loading">화면을 불러오는 중입니다.</div>}>
       <Routes>
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/statistics" element={<StatisticsPage />} />
-        <Route path="/operation/service-checks" element={<ServiceCheckPage />} />
-        <Route path="/operation/notification-history" element={<NotificationHistoryPage />} />
-        <Route path="/operation/notification-templates" element={<NotificationTemplatePage />} />
-        <Route path="/analysis/statistics" element={<StatisticsPage />} />
-        <Route path="/analysis/incidents" element={<RoutePage activeMenuOverride="analysis-incidents" slug="admin-incidents" />} />
-        <Route path="/ai/assistant" element={<AiAssistantPage />} />
-        <Route path="/ai/rag" element={<AiRagKnowledgePage />} />
-        <Route path="/ai/routing" element={<AiRoutingRulesPage />} />
-        <Route path="/ai/runbook" element={<Navigate to="/ai/rag" replace />} />
-        <Route path="/admin-infra-topology" element={<InfraTopologyPage />} />
-        <Route path="/admin-infra-relations" element={<InfraRelationsPage />} />
-        <Route path="/admin-service-infra-mapping" element={<ServiceInfraMappingPage />} />
-        <Route path="/dashboard-proto" element={<Navigate to="/dashboard" replace />} />
-        <Route path="/dashboard-proto-detail" element={<IncidentDetailPage />} />
-        <Route path="/admin-services/:serviceCode" element={<AppShell activeMenu="services"><main className="main"><ServiceAdminPage /></main></AppShell>} />
-        <Route path="/admin-permissions" element={<RoutePage activeMenuOverride="permissions" slug="admin-users" />} />
-        <Route path="/admin-owner-management" element={<RoutePage activeMenuOverride="owner-management" slug="admin-owners" />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/" element={<RequireAuth><Navigate to="/dashboard" replace /></RequireAuth>} />
+        <Route path="/dashboard" element={<RequireAuth><DashboardPage /></RequireAuth>} />
+        <Route path="/statistics" element={<RequireAuth><StatisticsPage /></RequireAuth>} />
+        <Route path="/operation/service-checks" element={<RequireAuth><ServiceCheckPage /></RequireAuth>} />
+        <Route path="/operation/notification-history" element={<RequireAuth><NotificationHistoryPage /></RequireAuth>} />
+        <Route path="/operation/notification-templates" element={<RequireAuth><NotificationTemplatePage /></RequireAuth>} />
+        <Route path="/analysis/statistics" element={<RequireAuth><StatisticsPage /></RequireAuth>} />
+        <Route path="/analysis/incidents" element={<RequireAuth><RoutePage activeMenuOverride="analysis-incidents" slug="admin-incidents" /></RequireAuth>} />
+        <Route path="/ai/assistant" element={<RequireAuth><AiAssistantPage /></RequireAuth>} />
+        <Route path="/ai/rag" element={<RequireAuth><AiRagKnowledgePage /></RequireAuth>} />
+        <Route path="/ai/routing" element={<RequireAuth><AiRoutingRulesPage /></RequireAuth>} />
+        <Route path="/ai/runbook" element={<RequireAuth><Navigate to="/ai/rag" replace /></RequireAuth>} />
+        <Route path="/admin-infra-topology" element={<RequireAuth><InfraTopologyPage /></RequireAuth>} />
+        <Route path="/admin-infra-relations" element={<RequireAuth><InfraRelationsPage /></RequireAuth>} />
+        <Route path="/admin-service-infra-mapping" element={<RequireAuth><ServiceInfraMappingPage /></RequireAuth>} />
+        <Route path="/dashboard-proto" element={<RequireAuth><Navigate to="/dashboard" replace /></RequireAuth>} />
+        <Route path="/dashboard-proto-detail" element={<RequireAuth><IncidentDetailPage /></RequireAuth>} />
+        <Route path="/admin-services/:serviceCode" element={<RequireAuth><AppShell activeMenu="services"><main className="main"><ServiceAdminPage /></main></AppShell></RequireAuth>} />
+        <Route path="/admin-permissions" element={<RequireAuth><RoutePage activeMenuOverride="permissions" slug="admin-users" /></RequireAuth>} />
+        <Route path="/admin-owner-management" element={<RequireAuth><RoutePage activeMenuOverride="owner-management" slug="admin-owners" /></RequireAuth>} />
         {adminPages.map((slug) => (
-          <Route key={slug} path={`/${slug}`} element={<RoutePage slug={slug} />} />
+          <Route key={slug} path={`/${slug}`} element={<RequireAuth><RoutePage slug={slug} /></RequireAuth>} />
         ))}
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        <Route path="*" element={<RequireAuth><Navigate to="/dashboard" replace /></RequireAuth>} />
       </Routes>
     </Suspense>
   );
+}
+
+function RequireAuth({ children }) {
+  const location = useLocation();
+  const { currentUser } = useAuth();
+
+  if (!currentUser) {
+    return <Navigate to="/login" replace state={{ from: location }} />;
+  }
+
+  return children;
 }
 
 function RealtimeRemoteGetRefresh() {
@@ -416,9 +430,11 @@ function remoteQueryKeysForPath(pathname) {
 
 export default function App() {
   return (
-    <PortalDataProvider>
-      <RealtimeRemoteGetRefresh />
-      <AppRoutes />
-    </PortalDataProvider>
+    <AuthProvider>
+      <PortalDataProvider>
+        <RealtimeRemoteGetRefresh />
+        <AppRoutes />
+      </PortalDataProvider>
+    </AuthProvider>
   );
 }
