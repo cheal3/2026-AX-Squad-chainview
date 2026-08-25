@@ -604,6 +604,14 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
         </div>
       </div>
 
+      {menu === "codes" ? (
+        <CodeGroupFilterBar
+          codes={portalData.codes}
+          selectedCodeGroup={listFilters.codeGroup}
+          onSelect={(codeGroup) => setListFilters((current) => nextListFilters(current, "codeGroup", codeGroup))}
+        />
+      ) : null}
+
       {menu === "services" || menu === "owners" ? null : toolbar}
 
       {menu === "owners" ? (
@@ -773,6 +781,8 @@ function getFilterMode(menu) {
   if (menu === "techstacks") return "techstacks";
   if (menu === "servers") return "servers";
   if (menu === "relations") return "relations";
+  if (menu === "users") return "users";
+  if (menu === "codes") return "codes";
   if (menu === "owners") return "serviceCategory";
   return null;
 }
@@ -799,7 +809,7 @@ function AdminToolbar({
           type="text"
           value={keyword}
           onChange={(event) => onKeywordChange(event.target.value)}
-          placeholder={`${meta.label} 검색...`}
+          placeholder={searchPlaceholderFor(meta.label)}
         />
       </div>
       {filterMode ? (
@@ -841,6 +851,26 @@ function AdminToolbar({
               </select>
             </>
           ) : null}
+          {filterMode === "users" ? (
+            <>
+              <AdminFilterSelect label="전체 조직" value={filters.orgName} options={filterOptions.orgNames} onChange={(value) => onFilterChange("orgName", value)} />
+              <AdminFilterSelect label="전체 역할" value={filters.roleName} options={filterOptions.roleNames} onChange={(value) => onFilterChange("roleName", value)} />
+              <select value={filters.activeYn ?? ""} onChange={(event) => onFilterChange("activeYn", event.target.value)}>
+                <option value="">활성여부 전체</option>
+                <option value="Y">활성</option>
+                <option value="N">비활성</option>
+              </select>
+            </>
+          ) : null}
+          {filterMode === "codes" ? (
+            <>
+              <select value={filters.useYn ?? ""} onChange={(event) => onFilterChange("useYn", event.target.value)}>
+                <option value="">사용여부 전체</option>
+                <option value="Y">활성</option>
+                <option value="N">비활성</option>
+              </select>
+            </>
+          ) : null}
           {filterMode === "serviceCategory" ? (
             <CategoryFilterControls
               categoryCatalog={categoryCatalog}
@@ -853,6 +883,16 @@ function AdminToolbar({
       ) : null}
     </div>
   );
+}
+
+function searchPlaceholderFor(label) {
+  if (label === "사용자 관리") return "사번, 이름, 이메일 검색...";
+  if (label === "공통코드 관리") return "코드그룹, 코드, 코드명 검색...";
+  if (label === "서비스 관계조회") return "송신/수신 서비스, 유형, 설명 검색...";
+  if (label === "서비스 조회") return "서비스명, 코드, 엔드포인트 검색...";
+  if (label === "서버 조회") return "서버명, 호스트명, IP 검색...";
+  if (label === "기술 스택") return "기술명, 서비스, 벤더 검색...";
+  return `${label} 검색...`;
 }
 
 function AdminFilterSelect({ label, labels, onChange, options, value }) {
@@ -890,7 +930,50 @@ function buildToolbarFilterOptions(menu, portalData, serviceById) {
     };
   }
 
+  if (menu === "users") {
+    return {
+      orgNames: uniqueOptionsFromRecords(portalData.users, "orgName"),
+      roleNames: uniqueOptionsFromRecords(portalData.users, "roleName"),
+    };
+  }
+
   return {};
+}
+
+function CodeGroupFilterBar({ codes, selectedCodeGroup, onSelect }) {
+  const groups = useMemo(() => {
+    const countByGroup = new Map();
+    codes.forEach((code) => {
+      const codeGroup = field(code, "codeGroup", "").trim();
+      if (!codeGroup) return;
+      countByGroup.set(codeGroup, (countByGroup.get(codeGroup) ?? 0) + 1);
+    });
+    return Array.from(countByGroup.entries())
+      .sort(([left], [right]) => left.localeCompare(right, "ko"))
+      .map(([codeGroup, count]) => ({ codeGroup, count }));
+  }, [codes]);
+
+  return (
+    <div className="code-group-filter-bar" aria-label="코드그룹 필터">
+      <button
+        className={`code-group-filter-chip${!selectedCodeGroup ? " is-active" : ""}`}
+        onClick={() => onSelect("")}
+        type="button"
+      >
+        등록된 전체 코드 <span>({codes.length})</span>
+      </button>
+      {groups.map((group) => (
+        <button
+          className={`code-group-filter-chip${selectedCodeGroup === group.codeGroup ? " is-active" : ""}`}
+          key={group.codeGroup}
+          onClick={() => onSelect(group.codeGroup)}
+          type="button"
+        >
+          {group.codeGroup} <span>({group.count})</span>
+        </button>
+      ))}
+    </div>
+  );
 }
 
 function uniqueOptionsFromRecords(records, fieldName, labels = null) {
@@ -969,6 +1052,15 @@ function matchesAdminFilters(menu, record, filters = {}, categoryCatalog = null,
     return matchesExactFilter(record.relationTypeCode, filters.relationTypeCode) &&
       matchesExactFilter(record.relationStatusCode, filters.relationStatusCode) &&
       matchesExactFilter(record.mandatoryYn, filters.mandatoryYn);
+  }
+  if (menu === "users") {
+    return matchesExactFilter(field(record, "orgName", ""), filters.orgName) &&
+      matchesExactFilter(field(record, "roleName", ""), filters.roleName) &&
+      matchesExactFilter(field(record, "activeYn", ""), filters.activeYn);
+  }
+  if (menu === "codes") {
+    return matchesExactFilter(field(record, "codeGroup", ""), filters.codeGroup) &&
+      matchesExactFilter(field(record, "useYn", ""), filters.useYn);
   }
   return true;
 }

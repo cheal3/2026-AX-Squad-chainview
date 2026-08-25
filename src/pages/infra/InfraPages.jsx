@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Filter, Search, X } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import { AppShell } from "../../components/AppShell.jsx";
 import { ModalBackdrop } from "../../components/ModalBackdrop.jsx";
@@ -163,6 +164,20 @@ function downloadCsv(filename, headers, rows) {
   URL.revokeObjectURL(url);
 }
 
+function uniqueInfraOptions(records, valueField, labelField, fallbackLabels = {}) {
+  const optionByValue = new Map();
+  records.forEach((record) => {
+    const value = String(record?.[valueField] ?? "").trim();
+    if (!value || optionByValue.has(value)) return;
+    optionByValue.set(value, {
+      value,
+      label: String(record?.[labelField] || fallbackLabels[value] || value),
+    });
+  });
+  return Array.from(optionByValue.values())
+    .sort((left, right) => left.label.localeCompare(right.label, "ko"));
+}
+
 export function InfraRelationsPage() {
   const location = useLocation();
   const remoteInfraEnabled = shouldUseRemoteInfraApi();
@@ -170,14 +185,23 @@ export function InfraRelationsPage() {
   const [relations, setRelations] = useState(() => remoteInfraEnabled ? [] : initialInfraRelations);
   const [isLoading, setIsLoading] = useState(remoteInfraEnabled);
   const [keyword, setKeyword] = useState("");
-  const [typeFilter, setTypeFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [nodeTypeFilter, setNodeTypeFilter] = useState("");
+  const [nodeStatusFilter, setNodeStatusFilter] = useState("");
   const [modal, setModal] = useState(null);
   const [graphOpen, setGraphOpen] = useState(false);
   const [graphFocusNodeId, setGraphFocusNodeId] = useState(remoteInfraEnabled ? "" : initialInfraNodes[0]?.infraNodeId ?? "");
   const [dataSourceLabel, setDataSourceLabel] = useState(remoteInfraEnabled ? "운영 API 조회 중" : "스냅샷 기준");
   const nodeById = useMemo(
     () => new Map(nodes.map((node) => [node.infraNodeId, node])),
+    [nodes]
+  );
+  const nodeTypeOptions = useMemo(
+    () => uniqueInfraOptions(nodes, "nodeTypeCode", "nodeTypeName", infraNodeTypeLabels),
+    [nodes]
+  );
+  const nodeStatusOptions = useMemo(
+    () => uniqueInfraOptions(nodes, "statusCode", "statusName", infraStatusLabels),
     [nodes]
   );
   const focusInfraNodeId = new URLSearchParams(location.search).get("focusInfraNodeId");
@@ -223,8 +247,8 @@ export function InfraRelationsPage() {
       relation.description
     );
     if (!matchesSearchText(haystack, keyword)) return false;
-    if (typeFilter && relation.relationTypeCode !== typeFilter) return false;
-    if (statusFilter && relation.relationStatusCode !== statusFilter) return false;
+    if (nodeTypeFilter && sourceNode?.nodeTypeCode !== nodeTypeFilter && targetNode?.nodeTypeCode !== nodeTypeFilter) return false;
+    if (nodeStatusFilter && sourceNode?.statusCode !== nodeStatusFilter && targetNode?.statusCode !== nodeStatusFilter) return false;
     return true;
   });
   const nodeLabel = (nodeId) => {
@@ -343,17 +367,25 @@ export function InfraRelationsPage() {
           </div>
         </div>
 
-        <div className="toolbar">
-          <div className="search">🔍<input type="text" value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="노드 코드, 이름, 설명 검색..." /></div>
-          <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
-            <option value="">관계 유형 전체</option>
-            {Object.entries(infraRelationTypeLabels).map(([code, label]) => <option key={code} value={code}>{label}</option>)}
-          </select>
-          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-            <option value="">상태 전체</option>
-            {Object.entries(infraRelationStatusLabels).map(([code, label]) => <option key={code} value={code}>{label}</option>)}
-          </select>
-          <div className="right"><button className="btn btn--ghost btn--sm" onClick={() => { setKeyword(""); setTypeFilter(""); setStatusFilter(""); }} type="button">초기화</button></div>
+        <div className={`toolbar toolbar--admin${advancedOpen ? " is-expanded" : ""}`}>
+          <div className="search"><Search size={15} aria-hidden="true" /><input type="text" value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="노드 코드, 이름, 설명 검색..." /></div>
+          <button className="btn btn--dark toolbar-filter-button" onClick={() => setAdvancedOpen((current) => !current)} type="button">
+            <Filter size={15} aria-hidden="true" /> 고급 필터
+          </button>
+          <div className="right"><button className="btn toolbar-reset-button" onClick={() => { setKeyword(""); setNodeTypeFilter(""); setNodeStatusFilter(""); setAdvancedOpen(false); }} type="button">초기화</button></div>
+          {advancedOpen ? (
+            <div className="advanced-filter-row advanced-filter-row--compact">
+              <select value={nodeTypeFilter} onChange={(event) => setNodeTypeFilter(event.target.value)}>
+                <option value="">노드유형 전체</option>
+                {nodeTypeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              </select>
+              <select value={nodeStatusFilter} onChange={(event) => setNodeStatusFilter(event.target.value)}>
+                <option value="">상태 전체</option>
+                {nodeStatusOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              </select>
+              <button className="btn btn--wide-reset" onClick={() => { setNodeTypeFilter(""); setNodeStatusFilter(""); }} type="button"><X size={15} aria-hidden="true" /> 필터 초기화</button>
+            </div>
+          ) : null}
         </div>
 
         <div className="card">

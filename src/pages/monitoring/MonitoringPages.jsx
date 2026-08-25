@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Filter, Search, X } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { AppShell } from "../../components/AppShell.jsx";
@@ -81,6 +82,10 @@ export function IncidentAdminPage() {
   const navigate = useNavigate();
   const portalData = usePortalData();
   const [keyword, setKeyword] = useState("");
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [incidentTypeFilter, setIncidentTypeFilter] = useState("");
+  const [severityFilter, setSeverityFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const [editingIncident, setEditingIncident] = useState(null);
   const [deletingIncident, setDeletingIncident] = useState(null);
   const [selectedIncidentRowKeys, setSelectedIncidentRowKeys] = useState([]);
@@ -118,8 +123,23 @@ export function IncidentAdminPage() {
     : dynamicRows.length
       ? dynamicRows
       : staticIncidentRows.map((row) => ({ ...row, source: "static" }));
-  const filteredRows = rows.filter((row) =>
-    matchesSearchText(
+  const incidentTypeOptions = useMemo(
+    () => uniqueIncidentOptions(rows, "incidentTypeLabel"),
+    [rows]
+  );
+  const severityOptions = useMemo(
+    () => uniqueIncidentOptions(rows, "severityCode", "severityLabel"),
+    [rows]
+  );
+  const statusOptions = useMemo(
+    () => uniqueIncidentOptions(rows, "statusCode"),
+    [rows]
+  );
+  const filteredRows = rows.filter((row) => {
+    if (incidentTypeFilter && row.incidentTypeLabel !== incidentTypeFilter) return false;
+    if (severityFilter && row.severityCode !== severityFilter) return false;
+    if (statusFilter && row.statusCode !== statusFilter) return false;
+    return matchesSearchText(
       searchableText(
         row.code,
         row.incidentTypeLabel,
@@ -130,8 +150,8 @@ export function IncidentAdminPage() {
         row.title
       ),
       keyword
-    )
-  );
+    );
+  });
   const filteredRowKeys = useMemo(
     () => filteredRows.map((row) => incidentRowKey(row)),
     [filteredRows]
@@ -241,15 +261,29 @@ export function IncidentAdminPage() {
         </div>
       </div>
 
-      <div className="toolbar">
-        <select><option>상태 · 전체</option><option>OPEN</option><option>IN_PROGRESS</option><option>RESOLVED</option><option>CLOSED</option></select>
-        <select><option>심각도 · 전체</option><option>치명(CRITICAL)</option><option>높음(HIGH)</option><option>중간(MEDIUM)</option><option>낮음(LOW)</option><option>정보(INFO)</option></select>
-        <select><option>유형 · 전체</option><option>장애</option><option>성능저하</option><option>보안</option><option>장애예측</option><option>점검</option></select>
-        <select><option>대상유형 · 전체</option><option>SERVICE</option><option>SERVER</option><option>DEPLOYMENT</option></select>
-        <input type="date" />
-        <input type="date" />
-        <div className="search">🔍<input type="text" value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="ID, 제목, 대상 검색..." /></div>
-        <div className="right"><button className="btn btn--ghost btn--sm">초기화</button></div>
+      <div className={`toolbar toolbar--admin${advancedOpen ? " is-expanded" : ""}`}>
+        <div className="search"><Search size={15} aria-hidden="true" /><input type="text" value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="ID, 제목, 대상 검색..." /></div>
+        <button className="btn btn--dark toolbar-filter-button" onClick={() => setAdvancedOpen((current) => !current)} type="button">
+          <Filter size={15} aria-hidden="true" /> 고급 필터
+        </button>
+        <div className="right"><button className="btn toolbar-reset-button" onClick={() => { setKeyword(""); setIncidentTypeFilter(""); setSeverityFilter(""); setStatusFilter(""); setAdvancedOpen(false); }} type="button">초기화</button></div>
+        {advancedOpen ? (
+          <div className="advanced-filter-row">
+            <select value={incidentTypeFilter} onChange={(event) => setIncidentTypeFilter(event.target.value)}>
+              <option value="">장애 유형 전체</option>
+              {incidentTypeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+            <select value={severityFilter} onChange={(event) => setSeverityFilter(event.target.value)}>
+              <option value="">심각도 전체</option>
+              {severityOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+              <option value="">상태 전체</option>
+              {statusOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+            <button className="btn btn--wide-reset" onClick={() => { setIncidentTypeFilter(""); setSeverityFilter(""); setStatusFilter(""); }} type="button"><X size={15} aria-hidden="true" /> 필터 초기화</button>
+          </div>
+        ) : null}
       </div>
 
       <div className="card">
@@ -476,6 +510,20 @@ function severityLabelFor(severityCode) {
     MINOR: "중간",
     NOTICE: "정보",
   }[severityCode] || codeLabels.severity[severityCode] || severityCode;
+}
+
+function uniqueIncidentOptions(rows, valueField, labelField = valueField) {
+  const optionByValue = new Map();
+  rows.forEach((row) => {
+    const value = String(row?.[valueField] ?? "").trim();
+    if (!value || optionByValue.has(value)) return;
+    optionByValue.set(value, {
+      value,
+      label: String(row?.[labelField] || value),
+    });
+  });
+  return Array.from(optionByValue.values())
+    .sort((left, right) => left.label.localeCompare(right.label, "ko"));
 }
 
 function severityPillClass(severityCode) {
