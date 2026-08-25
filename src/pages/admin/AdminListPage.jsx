@@ -81,6 +81,10 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
     () => buildCategoryCatalog(portalData.categories, portalData.services),
     [portalData.categories, portalData.services]
   );
+  const toolbarFilterOptions = useMemo(
+    () => buildToolbarFilterOptions(menu, portalData, serviceById),
+    [menu, portalData, serviceById]
+  );
   const remoteQueryKey = getRemoteQueryKey(menu);
   const remoteStatus = portalData.remoteApi.status;
   const isInitialLoading = portalData.remoteApi.initialLoading;
@@ -461,8 +465,8 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
           matchesSearchText(buildRowSearchText(row), cleanedKeyword)
         )
       : config.rows;
-    return sortRowsByCreatedAtDesc(rows.filter((row) => matchesAdminFilters(menu, row.record ?? row.owner, listFilters, categoryCatalog)));
-  }, [categoryCatalog, config.rows, keyword, listFilters, menu]);
+    return sortRowsByCreatedAtDesc(rows.filter((row) => matchesAdminFilters(menu, row.record ?? row.owner, listFilters, categoryCatalog, serviceById)));
+  }, [categoryCatalog, config.rows, keyword, listFilters, menu, serviceById]);
   const filteredRowKeys = filteredRows.map((row) => String(row.key));
   const isAllChecked =
     filteredRowKeys.length > 0 &&
@@ -564,6 +568,7 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
       advancedOpen={advancedOpen}
       categoryCatalog={categoryCatalog}
       filterMode={getFilterMode(menu)}
+      filterOptions={toolbarFilterOptions}
       filters={listFilters}
       keyword={keyword}
       meta={meta}
@@ -764,6 +769,8 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
 }
 
 function getFilterMode(menu) {
+  if (menu === "services") return "services";
+  if (menu === "techstacks") return "techstacks";
   if (menu === "servers") return "servers";
   if (menu === "relations") return "relations";
   if (menu === "owners") return "serviceCategory";
@@ -774,6 +781,7 @@ function AdminToolbar({
   advancedOpen,
   categoryCatalog,
   filterMode,
+  filterOptions,
   filters,
   keyword,
   meta,
@@ -795,13 +803,26 @@ function AdminToolbar({
         />
       </div>
       {filterMode ? (
-        <button className="btn btn--dark" onClick={onToggleAdvanced} type="button">
+        <button className="btn btn--dark toolbar-filter-button" onClick={onToggleAdvanced} type="button">
           <Filter size={15} aria-hidden="true" /> 고급 필터
         </button>
       ) : null}
-      <div className="right"><button className="btn btn--ghost btn--sm" onClick={onReset} type="button">초기화</button></div>
+      <div className="right"><button className="btn toolbar-reset-button" onClick={onReset} type="button">초기화</button></div>
       {filterMode && advancedOpen ? (
         <div className="advanced-filter-row">
+          {filterMode === "services" ? (
+            <>
+              <AdminFilterSelect label="전체 서비스 유형" value={filters.serviceTypeCode} options={filterOptions.serviceTypes} onChange={(value) => onFilterChange("serviceTypeCode", value)} />
+              <AdminFilterSelect label="전체 중요도" value={filters.importanceCode} options={filterOptions.importance} onChange={(value) => onFilterChange("importanceCode", value)} />
+              <AdminFilterSelect label="전체 상태" value={filters.statusCode} options={filterOptions.serviceStatuses} onChange={(value) => onFilterChange("statusCode", value)} />
+            </>
+          ) : null}
+          {filterMode === "techstacks" ? (
+            <>
+              <AdminFilterSelect label="전체 기술유형" value={filters.techTypeName} options={filterOptions.techTypes} onChange={(value) => onFilterChange("techTypeName", value)} />
+              <AdminFilterSelect label="전체 사용현황" value={filters.usageStatus} options={filterOptions.techUsageStatuses} onChange={(value) => onFilterChange("usageStatus", value)} />
+            </>
+          ) : null}
           {filterMode === "servers" ? (
             <>
               <AdminFilterSelect label="환경" value={filters.envCode} labels={codeLabels.envType} onChange={(value) => onFilterChange("envCode", value)} />
@@ -834,15 +855,52 @@ function AdminToolbar({
   );
 }
 
-function AdminFilterSelect({ label, labels, onChange, value }) {
+function AdminFilterSelect({ label, labels, onChange, options, value }) {
+  const entries = options ?? Object.entries(labels ?? {}).map(([code, text]) => ({ value: code, label: text }));
+
   return (
     <select value={value ?? ""} onChange={(event) => onChange(event.target.value)}>
       <option value="">{label}</option>
-      {Object.entries(labels ?? {}).map(([code, text]) => (
-        <option key={code} value={code}>{text}</option>
+      {entries.map((option) => (
+        <option key={option.value} value={option.value}>{option.label}</option>
       ))}
     </select>
   );
+}
+
+function buildToolbarFilterOptions(menu, portalData, serviceById) {
+  if (menu === "services") {
+    return {
+      serviceTypes: uniqueOptionsFromRecords(portalData.services, "serviceTypeCode", codeLabels.serviceType),
+      importance: uniqueOptionsFromRecords(portalData.services, "importanceCode", codeLabels.importance),
+      serviceStatuses: uniqueOptionsFromRecords(portalData.services, "statusCode", codeLabels.serviceStatus),
+    };
+  }
+
+  if (menu === "techstacks") {
+    const usageStatuses = Array.from(new Set(portalData.techStacks.map((stack) =>
+      serviceById.has(Number(stack.serviceId)) ? "used" : "unused"
+    )));
+    return {
+      techTypes: uniqueOptionsFromRecords(portalData.techStacks, "techTypeName"),
+      techUsageStatuses: usageStatuses.map((value) => ({
+        value,
+        label: value === "used" ? "사용중" : "미사용",
+      })),
+    };
+  }
+
+  return {};
+}
+
+function uniqueOptionsFromRecords(records, fieldName, labels = null) {
+  return Array.from(new Set(
+    records
+      .map((record) => String(record?.[fieldName] ?? "").trim())
+      .filter(Boolean)
+  ))
+    .sort((left, right) => (labels?.[left] || left).localeCompare(labels?.[right] || right, "ko"))
+    .map((value) => ({ value, label: labels?.[value] || value }));
 }
 
 function CategoryFilterControls({ categoryCatalog, filters, onFilterChange }) {
@@ -889,9 +947,19 @@ function nextListFilters(current, field, value) {
   return next;
 }
 
-function matchesAdminFilters(menu, record, filters = {}, categoryCatalog = null) {
+function matchesAdminFilters(menu, record, filters = {}, categoryCatalog = null, serviceById = new Map()) {
   if (!record) return true;
-  if (menu === "services") return matchesCategoryFilters(record, filters, categoryCatalog);
+  if (menu === "services") {
+    return matchesCategoryFilters(record, filters, categoryCatalog) &&
+      matchesExactFilter(record.serviceTypeCode, filters.serviceTypeCode) &&
+      matchesExactFilter(record.importanceCode, filters.importanceCode) &&
+      matchesExactFilter(record.statusCode, filters.statusCode);
+  }
+  if (menu === "techstacks") {
+    const usageStatus = serviceById.has(Number(record.serviceId)) ? "used" : "unused";
+    return matchesExactFilter(record.techTypeName, filters.techTypeName) &&
+      matchesExactFilter(usageStatus, filters.usageStatus);
+  }
   if (menu === "servers") {
     return matchesExactFilter(record.envCode, filters.envCode) &&
       matchesExactFilter(record.osTypeCode, filters.osTypeCode) &&
