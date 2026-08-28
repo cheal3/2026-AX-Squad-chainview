@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ChevronDown, CircleHelp, Filter, Search, X } from "lucide-react";
 
 import { ModalBackdrop } from "../../components/ModalBackdrop.jsx";
+import { PAGE_SIZE, Pagination } from "../../components/Pagination.jsx";
 import { chainViewApi } from "../../dashboardModule/chainViewApi";
 import { usePortalData } from "../../dashboardModule/PortalDataStore";
 import { codeLabels } from "../../dashboardModule/mockData";
@@ -43,6 +44,7 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
   const [listFilters, setListFilters] = useState({});
   const [selectedOwnerServiceId, setSelectedOwnerServiceId] = useState("");
   const [selectedKeys, setSelectedKeys] = useState([]);
+  const [page, setPage] = useState(1);
   const lastRealtimeQueryRef = useRef("");
   const serviceById = useMemo(
     () => new Map(portalData.services.map((service) => [service.serviceId, service])),
@@ -113,6 +115,7 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
     setAdvancedOpen(false);
     setListFilters({});
     setSelectedKeys([]);
+    setPage(1);
   }, [menu]);
 
   useEffect(() => {
@@ -467,18 +470,22 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
       : config.rows;
     return sortRowsByCreatedAtDesc(rows.filter((row) => matchesAdminFilters(menu, row.record ?? row.owner, listFilters, categoryCatalog, serviceById)));
   }, [categoryCatalog, config.rows, keyword, listFilters, menu, serviceById]);
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pagedRows = filteredRows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const pagedRowKeys = pagedRows.map((row) => String(row.key));
   const filteredRowKeys = filteredRows.map((row) => String(row.key));
   const isAllChecked =
-    filteredRowKeys.length > 0 &&
-    filteredRowKeys.every((key) => selectedKeys.includes(key));
+    pagedRowKeys.length > 0 &&
+    pagedRowKeys.every((key) => selectedKeys.includes(key));
   const toggleAllRows = (checked) => {
     if (!checked) {
       setSelectedKeys((current) =>
-        current.filter((key) => !filteredRowKeys.includes(key))
+        current.filter((key) => !pagedRowKeys.includes(key))
       );
       return;
     }
-    setSelectedKeys((current) => Array.from(new Set([...current, ...filteredRowKeys])));
+    setSelectedKeys((current) => Array.from(new Set([...current, ...pagedRowKeys])));
   };
   const toggleRow = (key, checked) => {
     const normalizedKey = String(key);
@@ -493,6 +500,7 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
     setListFilters({});
     setAdvancedOpen(false);
     setSelectedKeys([]);
+    setPage(1);
   };
   const exportCsv = () => {
     downloadAdminCsv(`${menu}.csv`, config.columns, filteredRows);
@@ -554,6 +562,16 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
       return matchesKeyword && matchesCategoryFilters(service, listFilters, categoryCatalog);
     });
   }, [categoryCatalog, keyword, listFilters, menu, portalData.services]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [keyword, listFilters]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
   useEffect(() => {
     if (menu !== "owners") return;
@@ -669,7 +687,7 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
                 </td>
               </tr>
             ) : null}
-            {!isTableLoading && filteredRows.map((row) => (
+            {!isTableLoading && pagedRows.map((row) => (
               <tr className={row.onClick ? "is-clickable-incident" : undefined} key={row.key} onClick={row.onClick}>
                 <td className="col-check"><input className="chk" checked={selectedKeys.includes(String(row.key))} onChange={(event) => toggleRow(row.key, event.target.checked)} onClick={(event) => event.stopPropagation()} type="checkbox" /></td>
                 {row.cells.map((cell, index) => <td key={index}>{cell}</td>)}
@@ -739,10 +757,13 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
             ))}
           </tbody>
         </table>
-        <div className="pager">
-          <div className="pager__info">{isTableLoading ? "데이터 조회 중" : `전체 ${filteredRows.length}건 · 1-${filteredRows.length} / 1 페이지 · 선택 ${selectedKeys.filter((key) => filteredRowKeys.includes(key)).length}건`}</div>
-          <div className="pager__nav"><button disabled>‹</button><button className="is-on">1</button><button disabled>›</button></div>
-        </div>
+        <Pagination
+          loading={isTableLoading}
+          page={currentPage}
+          selectedCount={selectedKeys.filter((key) => filteredRowKeys.includes(key)).length}
+          setPage={setPage}
+          total={filteredRows.length}
+        />
           </div>
         </div>
       </div>
@@ -1145,6 +1166,10 @@ function OwnerDirectoryView({
   setSelectedServiceId,
   sourceServices,
 }) {
+  const [ownerServicePage, setOwnerServicePage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(services.length / PAGE_SIZE));
+  const currentPage = Math.min(ownerServicePage, totalPages);
+  const pagedServices = services.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
   const selectedService = services.find((service) => String(service.serviceId) === String(selectedServiceId)) ?? services[0] ?? null;
   const selectedOwners = selectedService
     ? ownersByServiceId.get(String(selectedService.serviceId)) ??
@@ -1156,6 +1181,14 @@ function OwnerDirectoryView({
     ownersByServiceCode.get(String(service.serviceCode)) ??
     []
   ).length;
+  useEffect(() => {
+    setOwnerServicePage(1);
+  }, [filters, keyword]);
+  useEffect(() => {
+    if (ownerServicePage > totalPages) {
+      setOwnerServicePage(totalPages);
+    }
+  }, [ownerServicePage, totalPages]);
 
   return (
     <div className="owner-directory">
@@ -1175,7 +1208,7 @@ function OwnerDirectoryView({
         <aside className="owner-service-list">
           <h2>서비스 목록</h2>
           <div className="owner-service-list__scroll">
-            {services.map((service) => (
+            {pagedServices.map((service) => (
               <button
                 className={String(service.serviceId) === String(selectedService?.serviceId) ? "is-active" : ""}
                 key={service.serviceId}
@@ -1190,6 +1223,7 @@ function OwnerDirectoryView({
             ))}
             {!services.length ? <div className="empty">조건에 맞는 서비스가 없습니다.</div> : null}
           </div>
+          <Pagination page={currentPage} setPage={setOwnerServicePage} total={services.length} />
         </aside>
         <section className="owner-service-detail">
           {selectedService ? (

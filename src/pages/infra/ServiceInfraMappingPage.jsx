@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Eye, RotateCcw, Save, Server, X } from "lucide-react";
 import { AppShell } from "../../components/AppShell.jsx";
 import { ModalBackdrop } from "../../components/ModalBackdrop.jsx";
+import { PAGE_SIZE, Pagination } from "../../components/Pagination.jsx";
 import { usePortalData } from "../../dashboardModule/PortalDataStore";
 import { codeLabels } from "../../dashboardModule/mockData";
 import { matchesSearchText, searchableText } from "../../utils/search";
@@ -30,6 +31,7 @@ export function ServiceInfraMappingPage() {
   const [mappingFilter, setMappingFilter] = useState("");
   const [draftServerIds, setDraftServerIds] = useState({});
   const [detailServiceId, setDetailServiceId] = useState(null);
+  const [page, setPage] = useState(1);
   const serverById = useMemo(
     () => new Map(servers.map((server) => [Number(server.serverId), server])),
     [servers]
@@ -69,6 +71,17 @@ export function ServiceInfraMappingPage() {
     if (mappingFilter === "unmapped" && hasInfra) return false;
     return true;
   });
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pagedRows = filteredRows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  useEffect(() => {
+    setPage(1);
+  }, [keyword, mappingFilter, serverFilter]);
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
   const unmappedCount = rows.filter((row) => !row.hasInfra).length;
   const dirtyCount = rows.filter((row) => row.isDirty).length;
   const detailRow = rows.find(
@@ -157,7 +170,7 @@ export function ServiceInfraMappingPage() {
                   </td>
                 </tr>
               ) : null}
-              {!isDataLoading && filteredRows.map((row) => (
+              {!isDataLoading && pagedRows.map((row) => (
                 <tr className={row.isDirty ? "is-dirty" : ""} key={row.service.serviceId}>
                   <td>
                     <button
@@ -195,9 +208,13 @@ export function ServiceInfraMappingPage() {
               {!isDataLoading && !filteredRows.length ? <tr><td colSpan={4}><div className="empty">조회된 서비스 배치 매핑이 없습니다.</div></td></tr> : null}
             </tbody>
           </table>
-          <div className="pager">
-            <div className="pager__info">{isDataLoading ? "데이터 조회 중" : `전체 ${filteredRows.length}건 · 서비스의 배포 서버를 기준으로 인프라 노드를 표시합니다.`}</div>
-          </div>
+          <Pagination
+            loading={isDataLoading}
+            page={currentPage}
+            setPage={setPage}
+            suffix="서비스의 배포 서버를 기준으로 인프라 노드를 표시합니다."
+            total={filteredRows.length}
+          />
         </div>
 
         {detailRow ? (

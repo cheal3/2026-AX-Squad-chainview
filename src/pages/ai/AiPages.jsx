@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Bot, FileUp, Plus, RefreshCw, Search, Send, Sparkles } from "lucide-react";
 import { AppShell } from "../../components/AppShell.jsx";
+import { PAGE_SIZE, Pagination } from "../../components/Pagination.jsx";
 import { chainViewApi, chainViewApiBaseUrl } from "../../dashboardModule/chainViewApi";
 
 const MAX_CONVERSATION_TURNS = 4;
@@ -1216,7 +1217,7 @@ export function AiRoutingRulesPage() {
   const [modalRule, setModalRule] = useState(null);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState({ page: true, preview: false, reload: false, save: false });
-  const pageSize = 50;
+  const pageSize = PAGE_SIZE;
 
   const loadRoutingData = async () => {
     setLoading((current) => ({ ...current, page: true }));
@@ -1258,6 +1259,12 @@ export function AiRoutingRulesPage() {
   useEffect(() => {
     setPage(1);
   }, [activeGroup, keyword]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
   const reloadMemory = async () => {
     setLoading((current) => ({ ...current, reload: true }));
@@ -1349,11 +1356,6 @@ export function AiRoutingRulesPage() {
         <section className="assistant-card">
           <div className="assistant-rule-toolbar">
             <label><Search size={16} /><input onChange={(event) => setKeyword(event.target.value)} placeholder="그룹, 패턴, target, 설명 검색..." value={keyword} /></label>
-            <div className="assistant-pages">
-              <button disabled={page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))} type="button">이전</button>
-              <span>{Math.min(page, totalPages)} / {totalPages} 페이지</span>
-              <button disabled={page >= totalPages} onClick={() => setPage((current) => Math.min(totalPages, current + 1))} type="button">다음</button>
-            </div>
           </div>
           <p className="assistant-muted">메모리 적재 <b>{meta?.ruleCount ?? rules.length}</b>건 · 필터 결과 <b>{filteredRules.length}</b>건</p>
           <AssistantDataTable
@@ -1372,6 +1374,7 @@ export function AiRoutingRulesPage() {
               </span>,
             ])}
           />
+          <Pagination loading={loading.page} page={Math.min(page, totalPages)} setPage={setPage} total={filteredRules.length} />
         </section>
 
         <section className="assistant-card">

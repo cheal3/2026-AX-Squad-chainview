@@ -3,6 +3,7 @@ import { Filter, Search, X } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import { AppShell } from "../../components/AppShell.jsx";
 import { ModalBackdrop } from "../../components/ModalBackdrop.jsx";
+import { PAGE_SIZE, Pagination } from "../../components/Pagination.jsx";
 import { chainViewApi } from "../../dashboardModule/chainViewApi";
 import { infraNodesSnapshot, infraRelationsSnapshot } from "../../dashboardModule/infraSnapshot";
 import { matchesSearchText, searchableText } from "../../utils/search";
@@ -192,6 +193,7 @@ export function InfraRelationsPage() {
   const [graphOpen, setGraphOpen] = useState(false);
   const [graphFocusNodeId, setGraphFocusNodeId] = useState(remoteInfraEnabled ? "" : initialInfraNodes[0]?.infraNodeId ?? "");
   const [dataSourceLabel, setDataSourceLabel] = useState(remoteInfraEnabled ? "운영 API 조회 중" : "스냅샷 기준");
+  const [page, setPage] = useState(1);
   const nodeById = useMemo(
     () => new Map(nodes.map((node) => [node.infraNodeId, node])),
     [nodes]
@@ -251,6 +253,17 @@ export function InfraRelationsPage() {
     if (nodeStatusFilter && sourceNode?.statusCode !== nodeStatusFilter && targetNode?.statusCode !== nodeStatusFilter) return false;
     return true;
   });
+  const totalPages = Math.max(1, Math.ceil(filteredRelations.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pagedRelations = filteredRelations.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  useEffect(() => {
+    setPage(1);
+  }, [keyword, nodeStatusFilter, nodeTypeFilter]);
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
   const nodeLabel = (nodeId) => {
     const node = nodeById.get(Number(nodeId));
     return node ? `${node.nodeCode} ${node.nodeName}` : "노드 미지정";
@@ -397,7 +410,7 @@ export function InfraRelationsPage() {
             </thead>
             <tbody>
               {isLoading ? <tr><td colSpan={7}><InlineDataLoader /></td></tr> : null}
-              {!isLoading && filteredRelations.map((relation) => (
+              {!isLoading && pagedRelations.map((relation) => (
                 <tr key={relation.infraRelationId}>
                   <td>{formatInfraNodeCell(nodeById.get(Number(relation.sourceInfraNodeId)))}</td>
                   <td>{formatInfraNodeCell(nodeById.get(Number(relation.targetInfraNodeId)))}</td>
@@ -416,9 +429,7 @@ export function InfraRelationsPage() {
               {!isLoading && !filteredRelations.length ? <tr><td colSpan={7}><div className="empty">조회된 인프라 관계가 없습니다.</div></td></tr> : null}
             </tbody>
           </table>
-          <div className="pager">
-            <div className="pager__info">전체 {filteredRelations.length}건 · {dataSourceLabel}</div>
-          </div>
+          <Pagination loading={isLoading} page={currentPage} setPage={setPage} suffix={dataSourceLabel} total={filteredRelations.length} />
         </div>
 
         {modal ? (
@@ -677,6 +688,7 @@ export function InfraTopologyPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [modal, setModal] = useState(null);
   const [dataSourceLabel, setDataSourceLabel] = useState(remoteInfraEnabled ? "운영 API 조회 중" : "스냅샷 기준");
+  const [page, setPage] = useState(1);
   useEffect(() => {
     if (!shouldUseRemoteInfraApi()) return;
     let cancelled = false;
@@ -709,6 +721,17 @@ export function InfraTopologyPage() {
     if (statusFilter && node.statusCode !== statusFilter) return false;
     return true;
   });
+  const totalPages = Math.max(1, Math.ceil(filteredNodes.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pagedNodes = filteredNodes.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  useEffect(() => {
+    setPage(1);
+  }, [keyword, statusFilter, typeFilter]);
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
   const exportNodesCsv = () => {
     downloadCsv(
       "infra-nodes.csv",
@@ -833,7 +856,7 @@ export function InfraTopologyPage() {
             </thead>
             <tbody>
               {isLoading ? <tr><td colSpan={8}><InlineDataLoader /></td></tr> : null}
-              {!isLoading && filteredNodes.map((node) => (
+              {!isLoading && pagedNodes.map((node) => (
                 <tr key={node.infraNodeId}>
                   <td><code>{node.nodeCode}</code></td>
                   <td><b>{node.nodeName}</b></td>
@@ -853,9 +876,7 @@ export function InfraTopologyPage() {
               {!isLoading && !filteredNodes.length ? <tr><td colSpan={8}><div className="empty">조회된 인프라 노드가 없습니다.</div></td></tr> : null}
             </tbody>
           </table>
-          <div className="pager">
-            <div className="pager__info">전체 {filteredNodes.length}건 · {dataSourceLabel}</div>
-          </div>
+          <Pagination loading={isLoading} page={currentPage} setPage={setPage} suffix={dataSourceLabel} total={filteredNodes.length} />
         </div>
 
         {modal ? (

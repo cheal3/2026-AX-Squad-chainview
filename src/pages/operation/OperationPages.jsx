@@ -4,6 +4,7 @@ import { History, List, Pencil, Play, Plus, Power, RotateCcw, Search, Trash2, X 
 
 import { AppShell } from "../../components/AppShell.jsx";
 import { ModalBackdrop } from "../../components/ModalBackdrop.jsx";
+import { PAGE_SIZE, Pagination } from "../../components/Pagination.jsx";
 import { chainViewApi } from "../../dashboardModule/chainViewApi";
 import { usePortalData } from "../../dashboardModule/PortalDataStore";
 import { matchesSearchText, searchableText } from "../../utils/search";
@@ -14,7 +15,7 @@ const operationMenuMeta = {
   "notification-templates": { section: "운영", label: "알림 템플릿 관리" },
 };
 
-const OPERATION_PAGE_SIZE = 5;
+const OPERATION_PAGE_SIZE = PAGE_SIZE;
 
 function getOperationMenuMeta(activeMenu) {
   return operationMenuMeta[activeMenu] ?? { section: "운영", label: "운영" };
@@ -401,30 +402,7 @@ function OperationPageShell({ activeMenu, action, children, description, icon, t
 }
 
 function OperationPager({ page, pageSize, setPage, total }) {
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const firstVisiblePage = Math.max(1, Math.min(page - 2, totalPages - 4));
-  const visiblePages = Array.from(
-    { length: Math.min(5, totalPages) },
-    (_, index) => firstVisiblePage + index
-  );
-  const start = total ? (page - 1) * pageSize + 1 : 0;
-  const end = Math.min(page * pageSize, total);
-  const moveToPage = (nextPage) => {
-    setPage(Math.max(1, Math.min(nextPage, totalPages)));
-  };
-
-  return (
-    <div className="pager">
-      <div className="pager__info">전체 {total}건 · {start}-{end} / {page} 페이지</div>
-      <div className="pager__nav">
-        <button aria-label="이전 페이지" disabled={page <= 1} onClick={() => moveToPage(page - 1)} type="button">‹</button>
-        {visiblePages.map((pageNumber) => (
-          <button aria-current={pageNumber === page ? "page" : undefined} className={pageNumber === page ? "is-on" : ""} key={pageNumber} onClick={() => moveToPage(pageNumber)} type="button">{pageNumber}</button>
-        ))}
-        <button aria-label="다음 페이지" disabled={page >= totalPages} onClick={() => moveToPage(page + 1)} type="button">›</button>
-      </div>
-    </div>
-  );
+  return <Pagination page={page} pageSize={pageSize} setPage={setPage} total={total} />;
 }
 
 function OperationFormRow({ children, label, required = false }) {

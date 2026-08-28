@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Bell, Bot, ChevronDown, Database, GitFork, LogOut, Settings, UserRound } from "lucide-react";
+import { Bell, Bot, ChevronDown, Database, GitFork, LogOut, UserRound } from "lucide-react";
 import { useAuth } from "../auth/AuthContext.jsx";
 import { usePortalData } from "../dashboardModule/PortalDataStore";
 
@@ -119,17 +119,14 @@ function TopBar({ isDark = false }) {
     setIsNotificationOpen(false);
     navigate(`/dashboard?incidentId=${incidentId}`);
   };
-  const handleAccountEdit = () => {
-    window.alert("계정정보 수정 기능은 다음 단계에서 연결 예정입니다.");
-    setIsAccountOpen(false);
-  };
   const handleLogout = () => {
     logout();
     setIsAccountOpen(false);
     navigate("/login", { replace: true });
   };
-  const userInitial = currentUser?.name?.slice(0, 1) || "C";
-  const roleLabel = currentUser?.isAdmin ? "ADMIN" : "USER";
+  const accountLabel = currentUser?.name && currentUser?.employeeNo
+    ? `${currentUser.name}(${currentUser.employeeNo})`
+    : currentUser?.name || "ChainView";
 
   return (
     <header className={`app-topbar${isDark ? " is-dark" : ""}`}>
@@ -202,18 +199,16 @@ function TopBar({ isDark = false }) {
             }}
             type="button"
           >
-            <span className="app-topbar__avatar" aria-hidden="true">{userInitial}</span>
+            <span className="app-topbar__avatar" aria-hidden="true">
+              <UserRound size={19} strokeWidth={2.4} />
+            </span>
             <span className="app-topbar__account-text">
-              <strong>{currentUser?.name || "ChainView"}</strong>
-              <small>{currentUser?.departmentName || "부서 미지정"} · {roleLabel}</small>
+              <strong>{accountLabel}</strong>
             </span>
             <ChevronDown size={16} />
           </button>
           {isAccountOpen ? (
             <div className="app-topbar__menu">
-              <strong>{currentUser?.employeeNo || "내 계정"}</strong>
-              <button onClick={handleAccountEdit} type="button"><Settings size={15} />프로필 설정</button>
-              <button onClick={handleAccountEdit} type="button"><UserRound size={15} />환경 설정</button>
               <button className="is-logout" onClick={handleLogout} type="button"><LogOut size={15} />로그아웃</button>
             </div>
           ) : null}

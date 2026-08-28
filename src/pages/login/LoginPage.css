@@ -2,7 +2,7 @@
   min-height: 100vh;
   background: #f8fbff;
   color: #111827;
-  overflow: hidden;
+  overflow-x: hidden;
 }
 
 .login-topbar {
@@ -54,7 +54,7 @@
 }
 
 .login-hero {
-  min-height: calc(100vh - 70px);
+  min-height: max(calc(100vh - 70px), 900px);
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(480px, 0.9fr);
 }
@@ -62,7 +62,7 @@
 .login-visual,
 .login-panel-wrap {
   position: relative;
-  min-height: calc(100vh - 70px);
+  min-height: inherit;
 }
 
 .login-visual {
@@ -114,7 +114,7 @@
 
 .login-brand-center {
   position: absolute;
-  top: 135px;
+  top: 115px;
   left: 50%;
   z-index: 2;
   transform: translateX(-50%);
@@ -149,7 +149,7 @@
   z-index: 1;
   width: 315px;
   height: 260px;
-  margin-top: 220px;
+  margin-top: 340px;
 }
 
 .login-stack i {

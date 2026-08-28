@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { AppShell } from "../../components/AppShell.jsx";
 import { ModalBackdrop } from "../../components/ModalBackdrop.jsx";
+import { PAGE_SIZE, Pagination } from "../../components/Pagination.jsx";
 import { usePortalData } from "../../dashboardModule/PortalDataStore";
 import { IncidentDemoDashboard } from "../../dashboardModule/pages/IncidentDemoDashboard";
 import { ServiceRelationFlow } from "../../dashboardModule/pages/ServiceRelationFlow";
@@ -89,6 +90,7 @@ export function IncidentAdminPage() {
   const [editingIncident, setEditingIncident] = useState(null);
   const [deletingIncident, setDeletingIncident] = useState(null);
   const [selectedIncidentRowKeys, setSelectedIncidentRowKeys] = useState([]);
+  const [page, setPage] = useState(1);
   const isTableLoading =
     portalData.remoteApi.initialLoading ||
     (portalData.remoteApi.status.state === "loading" &&
@@ -152,23 +154,30 @@ export function IncidentAdminPage() {
       keyword
     );
   });
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pagedRows = filteredRows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
   const filteredRowKeys = useMemo(
     () => filteredRows.map((row) => incidentRowKey(row)),
     [filteredRows]
   );
+  const pagedRowKeys = useMemo(
+    () => pagedRows.map((row) => incidentRowKey(row)),
+    [pagedRows]
+  );
   const isAllChecked =
-    filteredRowKeys.length > 0 &&
-    filteredRowKeys.every((key) => selectedIncidentRowKeys.includes(key));
+    pagedRowKeys.length > 0 &&
+    pagedRowKeys.every((key) => selectedIncidentRowKeys.includes(key));
   const toggleAllRows = (checked) => {
     if (!checked) {
       setSelectedIncidentRowKeys((current) =>
-        current.filter((key) => !filteredRowKeys.includes(key))
+        current.filter((key) => !pagedRowKeys.includes(key))
       );
       return;
     }
 
     setSelectedIncidentRowKeys((current) =>
-      Array.from(new Set([...current, ...filteredRowKeys]))
+      Array.from(new Set([...current, ...pagedRowKeys]))
     );
   };
   const toggleRow = (key, checked) => {
@@ -185,6 +194,16 @@ export function IncidentAdminPage() {
       return next.length === current.length ? current : next;
     });
   }, [filteredRowKeys]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [incidentTypeFilter, keyword, severityFilter, statusFilter]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
   const openIncident = (row) => {
     if (row.endedAt) {
@@ -316,7 +335,7 @@ export function IncidentAdminPage() {
                 </td>
               </tr>
             ) : null}
-            {!isTableLoading && filteredRows.map((row) => {
+            {!isTableLoading && pagedRows.map((row) => {
               const isOpen = !row.endedAt;
               const rowKey = incidentRowKey(row);
               return (
@@ -376,10 +395,13 @@ export function IncidentAdminPage() {
             })}
           </tbody>
         </table>
-        <div className="pager">
-          <div className="pager__info">{isTableLoading ? "데이터 조회 중" : `전체 ${filteredRows.length}건 · 1-${filteredRows.length} / 1 페이지 · 선택 ${selectedIncidentRowKeys.length}건`}</div>
-          <div className="pager__nav"><button disabled>‹</button><button className="is-on">1</button><button disabled>›</button></div>
-        </div>
+        <Pagination
+          loading={isTableLoading}
+          page={currentPage}
+          selectedCount={selectedIncidentRowKeys.length}
+          setPage={setPage}
+          total={filteredRows.length}
+        />
       </div>
       {editingIncident ? (
         <IncidentEditModal
