@@ -255,8 +255,8 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
           relation.description
         ),
         cells: [
-          formatServiceCell(serviceById.get(relation.sourceServiceId)),
-          formatServiceCell(serviceById.get(relation.targetServiceId)),
+          formatServiceStackCell(serviceById.get(relation.sourceServiceId)),
+          formatServiceStackCell(serviceById.get(relation.targetServiceId)),
           codeLabels.relationType[relation.relationTypeCode] || relation.relationTypeCode,
           relation.mandatoryYn,
           codeLabels.relationStatus[relation.relationStatusCode] || relation.relationStatusCode,
@@ -266,7 +266,7 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
     },
     techstacks: {
       actionLabel: "＋ 기술스택 등록",
-      columns: ["서비스", "유형", "기술명", "버전", "벤더"],
+      columns: ["기술명", "버전", "벤더", "유형", "서비스", "서비스코드"],
       rows: portalData.techStacks.map((stack) => ({
         key: stack.techStackId,
         record: stack,
@@ -279,11 +279,12 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
           stack.vendorName
         ),
         cells: [
-          formatServiceCell(serviceById.get(stack.serviceId)),
-          stack.techTypeName,
           <b>{stack.techName}</b>,
           stack.versionText,
           stack.vendorName,
+          stack.techTypeName,
+          serviceById.get(stack.serviceId)?.serviceName || "-",
+          <code>{serviceById.get(stack.serviceId)?.serviceCode || "-"}</code>,
         ],
       })),
     },
@@ -315,7 +316,7 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
     },
     users: {
       actionLabel: "＋ 사용자 등록",
-      columns: ["userId", "사번", "이름", "조직", "부서", "역할", "연락처", "이메일", "활성"],
+      columns: ["사번", "이름", "조직", "부서", "역할", "연락처", "이메일", "상태"],
       rows: portalData.users.map((user) => ({
         key: recordKey(user, "userId", "employeeNo"),
         record: user,
@@ -331,7 +332,6 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
           field(user, "activeYn", "")
         ),
         cells: [
-          <code>{field(user, "userId")}</code>,
           <code>{field(user, "employeeNo")}</code>,
           <b>{field(user, "userName")}</b>,
           field(user, "orgName"),
@@ -430,7 +430,7 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
     },
     deployments: {
       actionLabel: "＋ 배포 등록",
-      columns: ["서비스", "서버", "배포 경로", "포트", "상태", "인스턴스"],
+      columns: ["서버", "서비스명", "배포경로", "포트", "상태", "인스턴스"],
       rows: portalData.deployments.map((deployment) => ({
         key: field(deployment, "deploymentKey") || recordKey(deployment, "deploymentId", "serverId"),
         record: deployment,
@@ -450,8 +450,8 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
           field(deployment, "instanceCount", "")
         ),
         cells: [
-          <><code>{field(deployment, "serviceCode")}</code> {field(deployment, "serviceName")}</>,
           field(deployment, "serverName") || field(deployment, "hostName") || field(deployment, "serverId"),
+          <AdminStackedCell primary={field(deployment, "serviceName")} secondary={field(deployment, "serviceCode")} />,
           <code>{field(deployment, "deployPath")}</code>,
           field(deployment, "portInfo") || field(deployment, "port"),
           field(deployment, "deploymentStatusName") || field(deployment, "deploymentStatusCode"),
@@ -3902,6 +3902,22 @@ function formatServiceCell(service) {
     return "-";
   }
   return <><code>{service.serviceCode}</code> {service.serviceName}</>;
+}
+
+function formatServiceStackCell(service) {
+  if (!service) {
+    return "-";
+  }
+  return <AdminStackedCell primary={service.serviceName} secondary={service.serviceCode} />;
+}
+
+function AdminStackedCell({ primary, secondary }) {
+  return (
+    <span className="admin-stacked-cell">
+      <b>{primary || "-"}</b>
+      {secondary ? <code>{secondary}</code> : null}
+    </span>
+  );
 }
 
 function field(record, key, fallback = "-") {

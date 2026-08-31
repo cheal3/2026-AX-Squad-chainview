@@ -551,22 +551,22 @@ export function ServiceCheckPage() {
         <select value={runFilter} onChange={(event) => { setRunFilter(event.target.value); setPage(1); }} aria-label="실행"><option value="all">실행 전체</option><option value="Y">실행</option><option value="N">중지</option></select>
         <select value={activeFilter} onChange={(event) => { setActiveFilter(event.target.value); setPage(1); }} aria-label="활성"><option value="all">활성 전체</option><option value="Y">Y</option><option value="N">N</option></select>
         <button className="btn" onClick={() => { setSearch(""); setTargetFilter("all"); setRunFilter("all"); setActiveFilter("all"); setPage(1); }} type="button"><RotateCcw size={14} /> 초기화</button>
-        <div className="right"><span className="op-period">기간&nbsp;&nbsp;<b>최근 29일</b></span></div>
       </div>
       {message ? <div className="op-inline-alert">{message}</div> : null}
 
       <div className="card operation-card">
         {loading ? <div className="op-loading-line">서비스 점검 목록을 불러오는 중...</div> : null}
         <table className="tbl operation-table operation-table--checks">
-          <thead><tr><th>점검</th><th>대상</th><th>실행 방식</th><th>상태</th><th>최근 결과</th><th className="col-actions">관리</th></tr></thead>
+          <thead><tr><th>점검명</th><th>코드</th><th>대상</th><th>실행 방식</th><th>상태</th><th>최근 점검일</th><th className="col-actions">관리</th></tr></thead>
           <tbody>
             {pagedRows.map((row) => (
               <tr key={row.rowKey}>
-                <td title={`${row.name} · ${row.code}`}><span className="operation-inline-cell"><b>{row.name}</b><code>{row.code}</code></span></td>
+                <td title={row.name}><b>{row.name}</b></td>
+                <td><code>{row.code}</code></td>
                 <td title={row.target}>{row.target}</td>
                 <td title={`${row.type} · ${row.cron}`}><span className="operation-inline-cell"><b>{row.type}</b><code>{row.cron}</code></span></td>
                 <td><span className="pill pill--idle">{row.status}</span></td>
-                <td title={`${row.lastCheckedAt} · ${row.result}`}><span className="operation-check-result"><span>{row.lastCheckedAt}</span><small className={`op-result ${row.result === "성공" ? "is-ok" : ""}`}>{row.result}</small></span></td>
+                <td title={row.lastCheckedAt}>{row.lastCheckedAt}</td>
                 <td>
                   <div className="row-actions op-row-actions">
                     <OperationIconButton label="점검 시작" onClick={() => startRow(row)} primary><Play size={16} /></OperationIconButton>
@@ -577,7 +577,7 @@ export function ServiceCheckPage() {
                 </td>
               </tr>
             ))}
-            {!pagedRows.length ? <tr><td colSpan={6}>조회된 서비스 점검이 없습니다.</td></tr> : null}
+            {!pagedRows.length ? <tr><td colSpan={7}>조회된 서비스 점검이 없습니다.</td></tr> : null}
           </tbody>
         </table>
         <OperationPager page={page} pageSize={pageSize} setPage={setPage} total={rows.length} />
@@ -957,17 +957,19 @@ export function NotificationHistoryPage() {
       <div className="operation-summary"><b>전체 192</b><span>성공 180</span><span>실패 12</span><span>실행 중 0</span><span className="is-danger">(ALERT) 6</span></div>
       <div className="card operation-card">
         <table className="tbl operation-table operation-table--notifications">
-          <thead><tr><th>인시던트</th><th>채널</th><th>수신자</th><th>알림</th><th>발송 시간</th></tr></thead>
+          <thead><tr><th>인시던트</th><th>알림유형</th><th>대상유형</th><th>발송대상</th><th>연락처</th><th>알림제목, 템플릿</th><th>발송시간</th></tr></thead>
           <tbody>
             {pagedRows.map((row) => (
               <tr key={`${row.incidentCode}-${row.recipient}-${row.sentAt}`}>
                 <td title={`${row.incidentCode} ${row.incidentTitle}`}>
                   <button className="op-text-link" onClick={() => navigate(row.incidentId ? `/dashboard?incidentId=${row.incidentId}` : "/admin-incidents")} type="button">
-                    <span>{row.incidentTitle}</span><small>{row.incidentCode}</small>
+                    <span>{row.incidentTitle}</span>
                   </button>
                 </td>
                 <td><span className="op-channel-status"><span>{row.channel}</span><span className={`pill ${row.sendStatus === "성공" ? "pill--ok" : "pill--idle"}`}>{row.sendStatus}</span></span></td>
-                <td title={`${row.targetType} · ${row.recipient} · ${row.contact}`}>{row.recipient}</td>
+                <td>{row.targetType}</td>
+                <td title={row.recipient}>{row.recipient}</td>
+                <td title={row.contact}>{row.contact}</td>
                 <td title={`${row.title} / ${row.template}`}><button className="op-text-link" onClick={() => setDetail(row)} type="button"><span>{row.title}</span><small>{row.template}</small></button></td>
                 <td title={row.sentAt}>{row.sentAt}</td>
               </tr>

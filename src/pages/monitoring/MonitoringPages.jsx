@@ -318,9 +318,9 @@ export function IncidentAdminPage() {
                   onChange={(event) => toggleAllRows(event.target.checked)}
                 />
               </th>
-              <th>ID</th><th>유형</th><th>심각도</th><th>상태</th>
-              <th>대상</th><th>제목</th><th>영향 서비스</th>
-              <th>발생시각</th><th>종료시각</th>
+              <th>인시던트 ID</th><th>유형</th><th>심각도</th><th>상태</th>
+              <th>대상</th><th>인시던트명</th><th>영향서비스</th>
+              <th>발생일시</th><th>종료일시</th>
               <th className="col-actions">관리</th>
             </tr>
           </thead>

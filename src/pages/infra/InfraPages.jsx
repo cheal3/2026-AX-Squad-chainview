@@ -405,7 +405,7 @@ export function InfraRelationsPage() {
           <table className="tbl infra-table">
             <thead>
               <tr>
-                <th>source 인프라</th><th>target 인프라</th><th>관계 유형</th><th>필수</th><th>상태</th><th>설명</th><th className="col-actions">관리</th>
+                <th>출발 인프라</th><th>대상 인프라</th><th>관계유형</th><th>필수</th><th>상태</th><th>설명</th><th className="col-actions">관리</th>
               </tr>
             </thead>
             <tbody>
@@ -932,5 +932,10 @@ function formatInfraNodeCell(node) {
   if (!node) {
     return "-";
   }
-  return <><code>{node.nodeCode}</code> {node.nodeName}</>;
+  return (
+    <span className="admin-stacked-cell">
+      <b>{node.nodeName}</b>
+      <code>{node.nodeCode}</code>
+    </span>
+  );
 }
