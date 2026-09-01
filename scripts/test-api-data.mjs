@@ -59,8 +59,6 @@ async function main() {
 
   await establishSession();
 
-  await required("GET /api/dashboard/overview", "/api/dashboard/overview");
-
   const services = await required("GET /api/services", "/api/services");
   collectIds("serviceIds", services, "serviceId");
   const servers = await required("GET /api/servers", "/api/servers");
@@ -198,7 +196,7 @@ async function establishSession() {
 }
 
 async function hasActiveApiSession() {
-  const response = await requestRaw("/api/dashboard/overview", {
+  const response = await requestRaw("/api/services", {
     headers: { Accept: "application/json" },
   });
   const contentType = response.headers.get("content-type") || "";

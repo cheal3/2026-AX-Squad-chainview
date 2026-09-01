@@ -308,9 +308,6 @@ export const chainViewApi = {
     service: (serviceId: number, depth?: number) =>
       requestJson<unknown>(`/api/impact/services/${serviceId}`, "GET", { query: { depth } }),
   },
-  dashboard: {
-    overview: () => requestJson<unknown>("/api/dashboard/overview", "GET"),
-  },
   healthCheckJobs: {
     list: (query?: QueryParams) => requestJson<unknown[]>("/api/health-check-jobs", "GET", { query }),
     create: (body: unknown) => requestJson<unknown>("/api/health-check-jobs", "POST", { body }),
@@ -578,7 +575,7 @@ async function fetchCsrfTokenFrom(path: string) {
 }
 
 async function hasActiveApiSession() {
-  const response = await fetch(buildUrl("/api/dashboard/overview"), {
+  const response = await fetch(buildUrl("/api/services"), {
     credentials: "include",
     redirect: "manual",
     headers: { Accept: "application/json" },
