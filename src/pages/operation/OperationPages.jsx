@@ -957,7 +957,7 @@ export function NotificationHistoryPage() {
       <div className="operation-summary"><b>전체 192</b><span>성공 180</span><span>실패 12</span><span>실행 중 0</span><span className="is-danger">(ALERT) 6</span></div>
       <div className="card operation-card">
         <table className="tbl operation-table operation-table--notifications">
-          <thead><tr><th>인시던트</th><th>알림유형</th><th>대상유형</th><th>발송대상</th><th>연락처</th><th>알림제목, 템플릿</th><th>발송시간</th></tr></thead>
+          <thead><tr><th>인시던트</th><th>알림 유형</th><th>대상 유형</th><th>발송 대상</th><th>연락처</th><th>알림 제목 ·템플릿</th><th>발송 시간</th></tr></thead>
           <tbody>
             {pagedRows.map((row) => (
               <tr key={`${row.incidentCode}-${row.recipient}-${row.sentAt}`}>

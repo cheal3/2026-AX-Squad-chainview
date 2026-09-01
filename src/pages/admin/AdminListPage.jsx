@@ -158,7 +158,7 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
   const configs = {
     services: {
       actionLabel: "＋ 서비스 등록",
-      columns: ["서비스 코드", "서비스명", "분류", "유형", "중요도", "상태", "엔드포인트", "서버"],
+      columns: ["분류", "서비스명", "서비스코드", "유형", "중요도", "상태", "엔드포인트", "서버"],
       rows: portalData.services.map((service) => {
         const serviceOwners =
           ownersByServiceId.get(String(service.serviceId)) ??
@@ -186,9 +186,9 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
           ),
           onClick: () => navigate(`/admin-services/${service.serviceCode}`),
           cells: [
-            <code>{service.serviceCode}</code>,
-            service.serviceName,
             service.categoryPath?.join(" > ") || "미분류",
+            service.serviceName,
+            <code>{service.serviceCode}</code>,
             codeLabels.serviceType[service.serviceTypeCode] || service.serviceTypeCode,
             codeLabels.importance[service.importanceCode] || service.importanceCode || "-",
             codeLabels.serviceStatus[service.statusCode] || service.statusCode,
@@ -239,7 +239,7 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
     },
     relations: {
       actionLabel: "＋ 관계 등록",
-      columns: ["송신 서비스", "수신 서비스", "유형", "필수", "상태", "설명"],
+      columns: ["송신 서비스", "수신서비스", "유형", "필수", "상태", "설명"],
       rows: portalData.relations.map((relation) => ({
         key: relation.relationId,
         record: relation,
