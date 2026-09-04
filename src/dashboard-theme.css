@@ -8015,6 +8015,17 @@ table.tbl td.col-check {
   min-width: 0;
 }
 
+.operation-table td .empty {
+  display: grid;
+  min-height: 220px;
+  place-items: center;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  white-space: normal;
+}
+
 .operation-table--checks th:nth-child(1),
 .operation-table--checks td:nth-child(1) { width: 23%; }
 .operation-table--checks th:nth-child(2),

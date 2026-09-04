@@ -1166,7 +1166,7 @@ export function NotificationTemplatePage() {
                     <td><div className="row-actions op-row-actions"><OperationIconButton label="템플릿 수정" onClick={() => setModal(row)}><Pencil size={16} /></OperationIconButton><OperationIconButton danger label={row.active === "Y" ? "템플릿 비활성" : "템플릿 활성"} onClick={() => handleToggleTemplate(row)}><Power size={16} /></OperationIconButton></div></td>
                   </tr>
                 ))}
-                {!pagedRows.length ? <tr><td colSpan={6}>조회 가능한 데이터가 없습니다.</td></tr> : null}
+                {!pagedRows.length ? <tr><td colSpan={6}><div className="empty">조회 가능한 데이터가 없습니다.</div></td></tr> : null}
               </tbody>
             </table>
             <OperationPager page={page} pageSize={pageSize} setPage={setPage} total={rows.length} />
