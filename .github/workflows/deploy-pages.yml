@@ -3,7 +3,6 @@ name: Deploy GitHub Pages
 on:
   push:
     branches:
-      - master
       - main
   workflow_dispatch:
 
@@ -39,9 +38,7 @@ jobs:
           VITE_CHAINVIEW_REMOTE_API_ENABLED: "true"
           VITE_CHAINVIEW_REMOTE_ORIGIN: https://chainview.kro.kr
           VITE_CHAINVIEW_API_BASE_URL: https://chainview.kro.kr
-          VITE_CHAINVIEW_EMPLOYEE_NO: ${{ secrets.CHAINVIEW_EMPLOYEE_NO || '8913812' }}
-          VITE_CHAINVIEW_DEV_LOGIN_PATH: /admin/dashboard
-          VITE_CHAINVIEW_MANUAL_API_LOAD: "false"
+          VITE_CHAINVIEW_EMPLOYEE_NO: ${{ secrets.CHAINVIEW_EMPLOYEE_NO }}
         run: npm run build
 
       - name: Add SPA fallback
