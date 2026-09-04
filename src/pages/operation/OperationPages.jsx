@@ -185,6 +185,16 @@ function optionLabel(options, value, fallback = "-") {
   return options.find((option) => option.code === text || option.label === text)?.label ?? (text || fallback);
 }
 
+function renderTemplatePreviewText(pattern, variables = []) {
+  return variables.reduce((result, variable) => {
+    const key = String(variable?.variableKey ?? variable?.key ?? "").trim();
+    if (!key) return result;
+    const label = variable?.variableLabel ?? variable?.variableName ?? variable?.label ?? variable?.name ?? key;
+    const example = variable?.exampleValue ?? variable?.example ?? `[${label}]`;
+    return result.replaceAll(`{{${key}}}`, String(example || `[${label}]`));
+  }, String(pattern ?? ""));
+}
+
 function normalizeTemplateRow(row, index = 0) {
   const variableRows = Array.isArray(row?.variables)
     ? row.variables
@@ -200,19 +210,37 @@ function normalizeTemplateRow(row, index = 0) {
     typeof row?.variables === "string"
       ? row.variables
       : `${requiredCount || variableRows.length} / ${variableRows.length} (필수/전체)`;
+  const titlePattern = String(row?.titleTemplate ?? row?.titlePattern ?? row?.messageTitle ?? row?.title ?? "");
+  const bodyPattern = String(row?.bodyTemplate ?? row?.bodyPattern ?? row?.messageBody ?? row?.body ?? "");
+  const previewPattern = String(
+    row?.previewMessage ??
+    row?.previewBody ??
+    row?.sampleMessage ??
+    row?.sampleBody ??
+    (bodyPattern || titlePattern || "")
+  ).trim();
 
   return {
     templateId: Number(row?.templateId ?? row?.notificationTemplateId) || undefined,
     code: String(row?.templateCode ?? row?.code ?? ""),
     name: String(row?.templateName ?? row?.name ?? ""),
     channel: optionCode(templateChannelOptions, row?.channelCode ?? row?.channel),
-    purpose: optionCode(templatePurposeOptions, row?.purposeCode ?? row?.purpose ?? row?.templatePurposeCode),
+    purpose: optionCode(
+      templatePurposeOptions,
+      row?.purposeCode ??
+      row?.purpose ??
+      row?.templatePurposeCode ??
+      row?.usageTypeCode ??
+      row?.purposeName ??
+      row?.usageTypeName
+    ),
     provider: optionCode(templateProviderOptions, row?.providerCode ?? row?.provider ?? row?.providerName, "DUMMY"),
     variables: variableCountText,
     variableRows,
+    messageSummary: renderTemplatePreviewText(previewPattern, variableRows).trim(),
     active: String(row?.activeYn ?? row?.useYn ?? row?.active ?? "Y").toUpperCase() === "N" ? "N" : "Y",
-    title: String(row?.titleTemplate ?? row?.titlePattern ?? row?.messageTitle ?? row?.title ?? ""),
-    body: String(row?.bodyTemplate ?? row?.bodyPattern ?? row?.messageBody ?? row?.body ?? ""),
+    title: titlePattern,
+    body: bodyPattern,
     description: String(row?.description ?? row?.remarks ?? ""),
     createdAt: row?.createdAt ?? row?.createdDate ?? row?.regDt ?? "",
     rowKey: String(row?.templateId ?? row?.notificationTemplateId ?? row?.templateCode ?? row?.code ?? index),
@@ -340,7 +368,6 @@ function formatTemplateSaveError(error, payload) {
         }
       }
     } catch {
-      lines.push(`서버에서 요청값을 확인해달라고 응답했습니다.`);
     }
   }
 
@@ -1114,7 +1141,21 @@ export function NotificationTemplatePage() {
           : Array.isArray(remoteRows?.items)
             ? remoteRows.items
             : [];
-      setTemplates(list.map(normalizeTemplateRow));
+      const normalizedRows = await Promise.all(
+        list.map(async (remoteRow, index) => {
+          const row = normalizeTemplateRow(remoteRow, index);
+          if (row.messageSummary || !row.templateId) return row;
+          try {
+            const detail = await chainViewApi.notificationTemplates.detail(row.templateId);
+            const detailRow = detail?.data ?? detail?.item ?? detail?.content ?? detail;
+            return normalizeTemplateRow({ ...remoteRow, ...detailRow }, index);
+          } catch (detailError) {
+            console.warn("알림 템플릿 상세 조회 실패", detailError);
+            return row;
+          }
+        })
+      );
+      setTemplates(normalizedRows);
     } catch (error) {
       console.warn("알림 템플릿 목록 조회 실패", error);
       setTemplates([]);
@@ -1133,7 +1174,7 @@ export function NotificationTemplatePage() {
         row.channel,
         row.purpose,
         row.provider,
-        row.variables,
+        row.messageSummary,
         row.active,
         row.title
       ),
@@ -1207,14 +1248,14 @@ export function NotificationTemplatePage() {
         ) : (
           <>
             <table className="tbl operation-table operation-table--templates">
-              <thead><tr><th>템플릿</th><th>채널</th><th>용도</th><th>변수</th><th>상태</th><th className="col-actions">관리</th></tr></thead>
+              <thead><tr><th>템플릿</th><th>채널</th><th>용도</th><th>발송 미리보기</th><th>상태</th><th className="col-actions">관리</th></tr></thead>
               <tbody>
                 {pagedRows.map((row) => (
                   <tr key={row.code}>
                     <td title={`${row.name} · ${row.code}`}><button className="op-text-link" onClick={() => setModal(row)} type="button"><span>{row.name}</span><small>{row.code}</small></button></td>
                     <td>{optionLabel(templateChannelOptions, row.channel)}</td>
                     <td>{optionLabel(templatePurposeOptions, row.purpose)}</td>
-                    <td>{row.variables}</td>
+                    <td title={row.messageSummary || "-"}><span className="op-message-snippet">{row.messageSummary || "-"}</span></td>
                     <td><span className="pill pill--ok">{row.active === "Y" ? "활성" : "비활성"}</span></td>
                     <td><div className="row-actions op-row-actions"><OperationIconButton label="템플릿 수정" onClick={() => setModal(row)}><Pencil size={16} /></OperationIconButton><OperationIconButton danger label={row.active === "Y" ? "템플릿 비활성" : "템플릿 활성"} onClick={() => handleToggleTemplate(row)}><Power size={16} /></OperationIconButton></div></td>
                   </tr>

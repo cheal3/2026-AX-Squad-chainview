@@ -4,6 +4,7 @@ import { Download, Search } from "lucide-react";
 import { AppShell } from "../../components/AppShell.jsx";
 import { usePortalData } from "../../dashboardModule/PortalDataStore";
 import { codeLabels } from "../../dashboardModule/mockData";
+import { downloadXlsx } from "../../utils/excelExport";
 import { matchesSearchText, searchableText } from "../../utils/search";
 
 function compactText(value) {
@@ -305,7 +306,7 @@ export function StatisticsPage({ activeMenu = "analysis-statistics", sectionLabe
                       <option value="all">전체 상태</option>
                       {serviceStatusOptions.map((status) => <option key={status} value={status}>{codeLabels.serviceStatus[status] || status}</option>)}
                     </select>
-                    <button className="btn" type="button" onClick={() => downloadRowsCsv("서비스-목록-상세.csv", serviceDetailExportColumns, filteredServiceDetailRows)}>
+                    <button className="btn" type="button" onClick={() => downloadRowsXlsx("서비스-목록-상세.xlsx", serviceDetailExportColumns, filteredServiceDetailRows)}>
                       <Download size={15} aria-hidden="true" /> Excel 내보내기
                     </button>
                   </>
@@ -361,7 +362,7 @@ export function StatisticsPage({ activeMenu = "analysis-statistics", sectionLabe
                       <option value="all">전체 상태</option>
                       {incidentStatusOptions.map((status) => <option key={status} value={status}>{codeLabels.incidentStatus[status] || status}</option>)}
                     </select>
-                    <button className="btn" type="button" onClick={() => downloadRowsCsv("장애-이력.csv", incidentExportColumns, filteredIncidentDetailRows)}>
+                    <button className="btn" type="button" onClick={() => downloadRowsXlsx("장애-이력.xlsx", incidentExportColumns, filteredIncidentDetailRows)}>
                       <Download size={15} aria-hidden="true" /> Excel 내보내기
                     </button>
                   </>
@@ -420,7 +421,7 @@ export function StatisticsPage({ activeMenu = "analysis-statistics", sectionLabe
                       <option value="outgoing">인출 의존 많은 순</option>
                       <option value="required">필수 인입 많은 순</option>
                     </select>
-                    <button className="btn" type="button" onClick={() => downloadRowsCsv("서비스별-의존성-상세.csv", dependencyExportColumns, filteredDependencyDetailRows)}>
+                    <button className="btn" type="button" onClick={() => downloadRowsXlsx("서비스별-의존성-상세.xlsx", dependencyExportColumns, filteredDependencyDetailRows)}>
                       <Download size={15} aria-hidden="true" /> Excel 내보내기
                     </button>
                   </>
@@ -482,7 +483,7 @@ export function StatisticsPage({ activeMenu = "analysis-statistics", sectionLabe
                       <option value="all">전체 유형</option>
                       {techTypeOptions.map((type) => <option key={type} value={type}>{type}</option>)}
                     </select>
-                    <button className="btn" type="button" onClick={() => downloadTechStackCsv(filteredTechStackExportRows)}>
+                    <button className="btn" type="button" onClick={() => downloadTechStackXlsx(filteredTechStackExportRows)}>
                       <Download size={15} aria-hidden="true" /> Excel 내보내기
                     </button>
                   </div>
@@ -1248,25 +1249,21 @@ function buildMeanRecoveryTime(incidents = []) {
   return `${Math.round(durations.reduce((sum, value) => sum + value, 0) / durations.length)}분`;
 }
 
-function downloadTechStackCsv(rows) {
-  const headers = ["서비스ID", "서비스명", "카테고리", "기술유형", "기술명", "버전", "벤더"];
-  const body = rows.map((row) => [
-    row.serviceId,
-    row.serviceName,
-    row.category,
-    row.typeLabel,
-    row.techName,
-    row.version,
-    row.vendor,
-  ]);
-  const csv = [headers, ...body].map((cells) => cells.map(csvCell).join(",")).join("\n");
-  const blob = new Blob([`\ufeff${csv}`], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = "기술스택-버전-현황.csv";
-  link.click();
-  URL.revokeObjectURL(url);
+function downloadTechStackXlsx(rows) {
+  downloadXlsx(
+    "기술스택-버전-현황.xlsx",
+    [
+      ["서비스ID", "serviceId"],
+      ["서비스명", "serviceName"],
+      ["카테고리", "category"],
+      ["기술유형", "typeLabel"],
+      ["기술명", "techName"],
+      ["버전", "version"],
+      ["벤더", "vendor"],
+    ],
+    rows,
+    "기술스택"
+  );
 }
 
 const serviceDetailExportColumns = [
@@ -1302,19 +1299,6 @@ const dependencyExportColumns = [
   ["담당 그룹", "ownerGroups"],
 ];
 
-function downloadRowsCsv(fileName, columns, rows) {
-  const headers = columns.map(([label]) => label);
-  const body = rows.map((row) => columns.map(([, key]) => row[key]));
-  const csv = [headers, ...body].map((cells) => cells.map(csvCell).join(",")).join("\n");
-  const blob = new Blob([`\ufeff${csv}`], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = fileName;
-  link.click();
-  URL.revokeObjectURL(url);
-}
-
-function csvCell(value) {
-  return `"${String(value ?? "").replaceAll('"', '""')}"`;
+function downloadRowsXlsx(fileName, columns, rows) {
+  downloadXlsx(fileName, columns, rows, "통계");
 }

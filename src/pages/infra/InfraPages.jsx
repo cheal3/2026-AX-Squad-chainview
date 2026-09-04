@@ -6,6 +6,7 @@ import { ModalBackdrop } from "../../components/ModalBackdrop.jsx";
 import { PAGE_SIZE, Pagination } from "../../components/Pagination.jsx";
 import { chainViewApi } from "../../dashboardModule/chainViewApi";
 import { infraNodesSnapshot, infraRelationsSnapshot } from "../../dashboardModule/infraSnapshot";
+import { downloadXlsx } from "../../utils/excelExport";
 import { matchesSearchText, searchableText } from "../../utils/search";
 
 const infraNodeTypeLabels = {
@@ -141,30 +142,6 @@ function buildInfraRelationPayload(form) {
   };
 }
 
-function csvCell(value) {
-  const text = String(value ?? "");
-  if (/[",\n\r]/.test(text)) {
-    return `"${text.replaceAll('"', '""')}"`;
-  }
-  return text;
-}
-
-function downloadCsv(filename, headers, rows) {
-  const csv = [
-    headers.map(csvCell).join(","),
-    ...rows.map((row) => headers.map((header) => csvCell(row[header])).join(",")),
-  ].join("\n");
-  const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
-}
-
 function uniqueInfraOptions(records, valueField, labelField, fallbackLabels = {}) {
   const optionByValue = new Map();
   records.forEach((record) => {
@@ -269,9 +246,19 @@ export function InfraRelationsPage() {
     return node ? `${node.nodeCode} ${node.nodeName}` : "노드 미지정";
   };
   const exportRelationsCsv = () => {
-    downloadCsv(
-      "infra-relations.csv",
-      ["relationId", "sourceCode", "sourceName", "targetCode", "targetName", "relationType", "mandatoryYn", "status", "description"],
+    downloadXlsx(
+      "infra-relations.xlsx",
+      [
+        ["관계ID", "relationId"],
+        ["출발 코드", "sourceCode"],
+        ["출발 서비스", "sourceName"],
+        ["대상 코드", "targetCode"],
+        ["대상 서비스", "targetName"],
+        ["관계유형", "relationType"],
+        ["필수", "mandatoryYn"],
+        ["상태", "status"],
+        ["설명", "description"],
+      ],
       filteredRelations.map((relation) => {
         const sourceNode = nodeById.get(Number(relation.sourceInfraNodeId));
         const targetNode = nodeById.get(Number(relation.targetInfraNodeId));
@@ -286,7 +273,8 @@ export function InfraRelationsPage() {
           status: infraRelationStatusLabels[relation.relationStatusCode] || relation.relationStatusCode,
           description: relation.description,
         };
-      })
+      }),
+      "인프라 관계"
     );
   };
   const openCreateModal = () => {
@@ -733,9 +721,19 @@ export function InfraTopologyPage() {
     }
   }, [page, totalPages]);
   const exportNodesCsv = () => {
-    downloadCsv(
-      "infra-nodes.csv",
-      ["nodeId", "nodeCode", "nodeName", "nodeType", "status", "location", "vendorModel", "serverCount", "updatedAt"],
+    downloadXlsx(
+      "infra-nodes.xlsx",
+      [
+        ["노드ID", "nodeId"],
+        ["노드 코드", "nodeCode"],
+        ["노드명", "nodeName"],
+        ["유형", "nodeType"],
+        ["상태", "status"],
+        ["위치", "location"],
+        ["벤더/모델", "vendorModel"],
+        ["서버 수", "serverCount"],
+        ["수정일", "updatedAt"],
+      ],
       filteredNodes.map((node) => ({
         nodeId: node.infraNodeId,
         nodeCode: node.nodeCode,
@@ -746,7 +744,8 @@ export function InfraTopologyPage() {
         vendorModel: node.vendorModel,
         serverCount: node.serverCount,
         updatedAt: node.updatedAt,
-      }))
+      })),
+      "인프라 노드"
     );
   };
   const openCreateModal = () => {

@@ -7,6 +7,7 @@ import { PAGE_SIZE, Pagination } from "../../components/Pagination.jsx";
 import { chainViewApi } from "../../dashboardModule/chainViewApi";
 import { usePortalData } from "../../dashboardModule/PortalDataStore";
 import { codeLabels } from "../../dashboardModule/mockData";
+import { downloadXlsx } from "../../utils/excelExport";
 import { matchesSearchText, normalizeSearchText, searchableText } from "../../utils/search";
 
 const adminMenuMetaByKey = {
@@ -503,7 +504,7 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
     setPage(1);
   };
   const exportCsv = () => {
-    downloadAdminCsv(`${menu}.csv`, config.columns, filteredRows);
+    downloadAdminXlsx(`${menu}.xlsx`, config.columns, filteredRows);
   };
   const closeOwnerModal = () => {
     setOwnerModal(null);
@@ -1438,25 +1439,13 @@ function extractNodeText(value) {
   return "";
 }
 
-function csvEscape(value) {
-  const text = String(value ?? "");
-  return /[",\n\r]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
-}
-
-function downloadAdminCsv(filename, columns, rows) {
-  const lines = [
-    columns.map(csvEscape).join(","),
-    ...rows.map((row) => (row.cells ?? []).map((cell) => csvEscape(extractNodeText(cell))).join(",")),
-  ];
-  const blob = new Blob([`\uFEFF${lines.join("\n")}`], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
+function downloadAdminXlsx(filename, columns, rows) {
+  downloadXlsx(
+    filename,
+    columns.map((column, index) => [column, (row) => extractNodeText(row.cells?.[index])]),
+    rows,
+    "목록"
+  );
 }
 
 function GroupMemberModal({ group, onClose, portalData }) {

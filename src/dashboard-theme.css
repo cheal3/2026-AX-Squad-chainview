@@ -8059,15 +8059,15 @@ table.tbl td.col-check {
 }
 
 .operation-table--templates th:nth-child(1),
-.operation-table--templates td:nth-child(1) { width: 32%; }
+.operation-table--templates td:nth-child(1) { width: 28%; }
 .operation-table--templates th:nth-child(2),
 .operation-table--templates td:nth-child(2) { width: 10%; }
 .operation-table--templates th:nth-child(3),
-.operation-table--templates td:nth-child(3) { width: 18%; }
+.operation-table--templates td:nth-child(3) { width: 12%; }
 .operation-table--templates th:nth-child(4),
-.operation-table--templates td:nth-child(4) { width: 18%; }
+.operation-table--templates td:nth-child(4) { width: 32%; }
 .operation-table--templates th:nth-child(5),
-.operation-table--templates td:nth-child(5) { width: 12%; }
+.operation-table--templates td:nth-child(5) { width: 10%; }
 .operation-table--templates th:nth-child(6),
 .operation-table--templates td:nth-child(6) { width: 72px; }
 
@@ -8085,6 +8085,14 @@ table.tbl td.col-check {
 .operation-table--templates td:first-child .op-text-link > small {
   display: block;
   width: 100%;
+}
+
+.op-message-snippet {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .operation-table--notifications td:nth-child(6) .op-text-link {

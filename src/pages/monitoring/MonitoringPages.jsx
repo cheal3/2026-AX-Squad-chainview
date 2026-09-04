@@ -9,6 +9,7 @@ import { usePortalData } from "../../dashboardModule/PortalDataStore";
 import { IncidentDemoDashboard } from "../../dashboardModule/pages/IncidentDemoDashboard";
 import { ServiceRelationFlow } from "../../dashboardModule/pages/ServiceRelationFlow";
 import { codeLabels } from "../../dashboardModule/mockData";
+import { downloadXlsx } from "../../utils/excelExport";
 import { matchesSearchText, searchableText } from "../../utils/search";
 
 const staticIncidentRows = [
@@ -260,6 +261,24 @@ export function IncidentAdminPage() {
       registeredBy: "admin",
     });
   };
+  const exportIncidentsXlsx = () => {
+    downloadXlsx(
+      "인시던트-현황.xlsx",
+      [
+        ["인시던트 ID", "code"],
+        ["유형", "incidentTypeLabel"],
+        ["심각도", "severityLabel"],
+        ["상태", "statusCode"],
+        ["대상", "targetLabel"],
+        ["인시던트명", "title"],
+        ["영향서비스", "impactCount"],
+        ["발생 일시", "startedAt"],
+        ["종료 일시", "endedAt"],
+      ],
+      filteredRows,
+      "인시던트"
+    );
+  };
 
   return (
     <>
@@ -273,7 +292,7 @@ export function IncidentAdminPage() {
             <h1 className="page-head__title"><span className="page-head__icon" aria-hidden="true">🚨</span><span>인시던트 현황</span></h1>
           </div>
           <div className="page-head__right">
-            <button className="btn">📥 Excel 내보내기</button>
+            <button className="btn" onClick={exportIncidentsXlsx} type="button">📥 Excel 내보내기</button>
             <button className="btn btn--primary" onClick={handleCreateIncident} type="button">＋ 인시던트 등록</button>
           </div>
         </div>
