@@ -16,8 +16,14 @@ function serviceLabel(service) {
 export function StatisticsPage({ activeMenu = "analysis-statistics", sectionLabel = "분석" }) {
   const portalData = usePortalData();
   const [activeStatsTab, setActiveStatsTab] = useState("service-assets");
+  const [serviceSearch, setServiceSearch] = useState("");
+  const [serviceStatusFilter, setServiceStatusFilter] = useState("all");
   const [techSearch, setTechSearch] = useState("");
   const [techTypeFilter, setTechTypeFilter] = useState("all");
+  const [incidentSearch, setIncidentSearch] = useState("");
+  const [incidentStatusFilter, setIncidentStatusFilter] = useState("all");
+  const [dependencySearch, setDependencySearch] = useState("");
+  const [dependencySort, setDependencySort] = useState("incoming");
   const serviceById = useMemo(
     () => new Map(portalData.services.map((service) => [service.serviceId, service])),
     [portalData.services]
@@ -40,10 +46,6 @@ export function StatisticsPage({ activeMenu = "analysis-statistics", sectionLabe
     countBy(portalData.services, (service) => service.categoryPath?.[0] || "미분류"),
     6
   );
-  const typeStats = topEntries(
-    countBy(portalData.services, (service) => codeLabels.serviceType[service.serviceTypeCode] || service.serviceTypeCode || "미지정"),
-    6
-  );
   const importanceStats = topEntries(
     countBy(portalData.services, (service) => codeLabels.importance[service.importanceCode] || service.importanceCode || "미지정"),
     6
@@ -51,6 +53,25 @@ export function StatisticsPage({ activeMenu = "analysis-statistics", sectionLabe
   const statusStats = topEntries(
     countBy(portalData.services, (service) => codeLabels.serviceStatus[service.statusCode] || service.statusCode || "미지정"),
     6
+  );
+  const serviceStatusOptions = useMemo(
+    () => Array.from(new Set(portalData.services.map((service) => service.statusCode).filter(Boolean))),
+    [portalData.services]
+  );
+  const serviceDetailRows = useMemo(
+    () => buildServiceDetailRows(portalData.services, portalData.deployments, portalData.techStacks, portalData.owners),
+    [portalData.deployments, portalData.owners, portalData.services, portalData.techStacks]
+  );
+  const filteredServiceDetailRows = useMemo(
+    () => serviceDetailRows.filter((row) => {
+      const matchesStatus = serviceStatusFilter === "all" || row.statusCode === serviceStatusFilter;
+      const matchesKeyword = matchesSearchText(
+        searchableText(row.name, row.code, row.category, row.typeLabel, row.importanceLabel, row.statusLabel, row.ownerLabel),
+        serviceSearch
+      );
+      return matchesStatus && matchesKeyword;
+    }),
+    [serviceDetailRows, serviceSearch, serviceStatusFilter]
   );
   const techStackRows = useMemo(
     () => buildTechStackRows(portalData.techStacks, serviceById),
@@ -92,7 +113,8 @@ export function StatisticsPage({ activeMenu = "analysis-statistics", sectionLabe
     .sort((a, b) => b.serviceCount - a.serviceCount || a.name.localeCompare(b.name))
     .slice(0, 10)
     .map((row) => ({ label: row.name, value: row.serviceCount }));
-  const techVersionStats = buildTechVersionStats(techStackRows);
+  const javaVersionStats = buildSingleTechVersionStats(techStackRows, "Java");
+  const versionRiskRows = buildVersionRiskRows(techStackRows);
   const deploymentStats = topEntries(
     countBy(portalData.deployments, (deployment) =>
       deployment.serverName ||
@@ -102,13 +124,11 @@ export function StatisticsPage({ activeMenu = "analysis-statistics", sectionLabe
     ),
     6
   );
-  const ownerTypeStats = topEntries(
-    countBy(portalData.owners, (owner) => codeLabels.ownerType[owner.ownerTypeCode] || owner.ownerTypeCode || "미지정"),
-    4
+  const serverRoleStats = topEntries(
+    countBy(portalData.servers, (server) => codeLabels.serverRole?.[server.serverRoleCode] || server.serverRoleName || server.serverRoleCode || "기타"),
+    6
   );
   const servicesWithoutOwner = portalData.services.filter((service) => !hasOwner(service));
-  const missingEndpointServices = portalData.services.filter((service) => !compactText(service.endpointUrl));
-  const shallowCategoryServices = portalData.services.filter((service) => (service.categoryPath ?? []).length < 2);
   const missingImpactRelations = portalData.relations.filter((relation) => !compactText(relation.description));
   const openIncidents = portalData.incidents.filter((incident) => incident.incidentStatusCode !== "RESOLVED");
   const normalServices = portalData.services.filter((service) =>
@@ -117,40 +137,96 @@ export function StatisticsPage({ activeMenu = "analysis-statistics", sectionLabe
   const activeRelations = portalData.relations.filter((relation) => relation.relationStatusCode === "ACTIVE").length;
   const mandatoryRelations = portalData.relations.filter((relation) => String(relation.mandatoryYn).toUpperCase() === "Y").length;
   const incidentMonthlyStats = buildMonthlyIncidentTrend(portalData.incidents);
-  const criticalWithoutOwner = servicesWithoutOwner.filter((service) =>
-    ["CRITICAL", "HIGH", "IMPORTANT"].includes(String(service.importanceCode || "").toUpperCase())
+  const incidentSeverityStats = topEntries(
+    countBy(portalData.incidents, (incident) => codeLabels.severity[incident.severityCode] || incident.severityCode || "미지정"),
+    5
   );
-  const relationDegree = new Map();
-  portalData.relations.forEach((relation) => {
-    [relation.sourceServiceId, relation.targetServiceId].forEach((serviceId) => {
-      if (!serviceId) return;
-      relationDegree.set(serviceId, (relationDegree.get(serviceId) || 0) + 1);
+  const serviceIncidentTopStats = buildServiceIncidentTopRows(portalData.incidents, serviceById);
+  const healthCheckTrendRows = buildHealthCheckTrendRows(portalData.healthChecks);
+  const incidentDetailRows = useMemo(
+    () => buildIncidentDetailRows(portalData.incidents, portalData.incidentImpacts, serviceById, serverById),
+    [portalData.incidentImpacts, portalData.incidents, serviceById, serverById]
+  );
+  const incidentStatusOptions = useMemo(
+    () => Array.from(new Set(incidentDetailRows.map((row) => row.statusCode).filter(Boolean))),
+    [incidentDetailRows]
+  );
+  const filteredIncidentDetailRows = useMemo(
+    () => incidentDetailRows.filter((row) => {
+      const matchesStatus = incidentStatusFilter === "all" || row.statusCode === incidentStatusFilter;
+      const matchesKeyword = matchesSearchText(
+        searchableText(row.id, row.title, row.typeLabel, row.severityLabel, row.statusLabel, row.target),
+        incidentSearch
+      );
+      return matchesStatus && matchesKeyword;
+    }),
+    [incidentDetailRows, incidentSearch, incidentStatusFilter]
+  );
+  const incomingRelationStats = buildDirectionalRelationStats(portalData.relations, serviceById, "incoming", 10);
+  const outgoingRelationStats = buildDirectionalRelationStats(portalData.relations, serviceById, "outgoing", 10);
+  const serverServiceStats = topEntries(
+    countBy(portalData.deployments, (deployment) =>
+      deployment.serverName ||
+      serverById.get(Number(deployment.serverId))?.serverName ||
+      deployment.hostName ||
+      `서버 ${deployment.serverId ?? "-"}`
+    ),
+    10
+  );
+  const groupServiceStats = topEntries(
+    countBy(portalData.owners, (owner) => owner.groupName || (owner.ownerTypeCode === "GROUP" ? owner.ownerName : "사용자 담당")),
+    10
+  );
+  const dependencyDetailRows = useMemo(
+    () => buildDependencyDetailRows(portalData.services, portalData.relations, portalData.owners),
+    [portalData.owners, portalData.relations, portalData.services]
+  );
+  const filteredDependencyDetailRows = useMemo(() => {
+    const rows = dependencyDetailRows.filter((row) =>
+      matchesSearchText(searchableText(row.name, row.code, row.category, row.ownerGroups), dependencySearch)
+    );
+    return rows.slice().sort((a, b) => {
+      if (dependencySort === "outgoing") return b.outgoing - a.outgoing || a.name.localeCompare(b.name, "ko");
+      if (dependencySort === "required") return b.requiredIncoming - a.requiredIncoming || a.name.localeCompare(b.name, "ko");
+      return b.incoming - a.incoming || a.name.localeCompare(b.name, "ko");
     });
+  }, [dependencyDetailRows, dependencySearch, dependencySort]);
+  const healthSuccessRate = healthCheckTrendRows.length
+    ? Math.round((healthCheckTrendRows.reduce((sum, row) => sum + row.success, 0) /
+      Math.max(1, healthCheckTrendRows.reduce((sum, row) => sum + row.success + row.failure, 0))) * 1000) / 10
+    : 100;
+  const serviceWithRelations = new Set();
+  portalData.relations.forEach((relation) => {
+    if (relation.sourceServiceId) serviceWithRelations.add(relation.sourceServiceId);
+    if (relation.targetServiceId) serviceWithRelations.add(relation.targetServiceId);
   });
-  const relationHotspots = [...relationDegree.entries()]
-    .map(([serviceId, count]) => ({
-      label: serviceLabel(serviceById.get(serviceId)),
-      value: count,
-    }))
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 5);
-  const actionItems = [
-    ...criticalWithoutOwner.slice(0, 4).map((service) => ({
-      tone: "danger",
-      title: "중요 서비스 담당자 미등록",
-      meta: `${service.serviceCode} ${service.serviceName}`,
-    })),
-    ...missingImpactRelations.slice(0, 4).map((relation) => ({
-      tone: "warn",
-      title: "서비스 영향도 설명 누락",
-      meta: `${serviceLabel(serviceById.get(relation.sourceServiceId))} → ${serviceLabel(serviceById.get(relation.targetServiceId))}`,
-    })),
-    ...missingEndpointServices.slice(0, 3).map((service) => ({
-      tone: "info",
-      title: "엔드포인트 URL 미등록",
-      meta: `${service.serviceCode} ${service.serviceName}`,
-    })),
-  ].slice(0, 8);
+  const isolatedServices = portalData.services.filter((service) => !serviceWithRelations.has(service.serviceId));
+  const statsKpis = {
+    "service-assets": [
+      { label: "전체 서비스", value: portalData.services.length, hint: "서비스 카탈로그" },
+      { label: "정상 운영 서비스", value: normalServices.length, hint: "상태 정상 기준", tone: "ok" },
+      { label: "전체 서버", value: portalData.servers.length, hint: "등록 인프라 노드" },
+      { label: "활성 관계", value: activeRelations, hint: "서비스 의존 관계" },
+      { label: "담당자 미등록", value: servicesWithoutOwner.length, hint: "담당자 연결 필요", tone: servicesWithoutOwner.length ? "warn" : "ok" },
+      { label: "영향도 설명 누락", value: missingImpactRelations.length, hint: "토폴로지 노출 품질", tone: missingImpactRelations.length ? "warn" : "ok" },
+    ],
+    "tech-version": [
+      { label: "전체 서비스", value: techStackRows.length, hint: "기술스택 종류 수" },
+      { label: "정상 운영 서비스", value: portalData.services.length - new Set(portalData.techStacks.map((row) => Number(row.serviceId))).size, hint: "기술스택 미등록 서비스", tone: "ok" },
+    ],
+    operation: [
+      { label: "전체 인시던트", value: portalData.incidents.length, hint: "최근 12개월", tone: "danger" },
+      { label: "미종료 장애", value: openIncidents.length, hint: "현재 진행 중", tone: openIncidents.length ? "warn" : "ok" },
+      { label: "서비스 장애", value: portalData.incidents.filter((incident) => incident.incidentTypeCode === "SERVICE").length, hint: "최근 30일" },
+      { label: "헬스체크 성공률", value: `${healthSuccessRate}%`, hint: "최근 24시간", tone: "ok" },
+      { label: "평균 복구 시간", value: buildMeanRecoveryTime(portalData.incidents), hint: "데이터 부족 (MTTR)" },
+    ],
+    dependency: [
+      { label: "전체 의존 관계", value: portalData.relations.length, hint: "서비스 관계" },
+      { label: "필수 의존 관계", value: mandatoryRelations, hint: "mandatory=Y" },
+      { label: "고립 서비스", value: isolatedServices.length, hint: "관계 없음", tone: isolatedServices.length ? "warn" : "ok" },
+    ],
+  };
   const graphTabs = [
     { key: "service-assets", label: "서비스·자산 현황" },
     { key: "tech-version", label: "기술스택·버전 현황" },
@@ -176,12 +252,9 @@ export function StatisticsPage({ activeMenu = "analysis-statistics", sectionLabe
         </div>
 
         <section className="statistics-kpis" aria-label="주요 지표">
-          <StatKpi label="전체 서비스" value={portalData.services.length} hint="서비스 카탈로그" />
-          <StatKpi label="정상 운영 서비스" value={normalServices.length} hint="상태 정상 기준" tone="ok" />
-          <StatKpi label="전체 서버" value={portalData.servers.length} hint="등록 인프라 노드" />
-          <StatKpi label="활성 관계" value={activeRelations} hint="서비스 의존 관계" />
-          <StatKpi label="담당자 미등록" value={servicesWithoutOwner.length} hint="담당자 연결 필요" tone={servicesWithoutOwner.length ? "warn" : "ok"} />
-          <StatKpi label="영향도 설명 누락" value={missingImpactRelations.length} hint="토폴로지 노출 품질" tone={missingImpactRelations.length ? "warn" : "ok"} />
+          {(statsKpis[activeStatsTab] || statsKpis["service-assets"]).map((kpi) => (
+            <StatKpi key={kpi.label} {...kpi} />
+          ))}
         </section>
 
         <section className="statistics-graph-section" aria-label="통계 그래프">
@@ -201,74 +274,174 @@ export function StatisticsPage({ activeMenu = "analysis-statistics", sectionLabe
           </div>
 
           {activeStatsTab === "service-assets" ? (
-            <div className="statistics-chart-grid statistics-chart-grid--service">
-              <ChartCard title="중요도별 서비스 분포">
-                <DonutChart rows={importanceStats} />
-              </ChartCard>
-              <ChartCard title="서비스 유형">
-                <HorizontalBarChart rows={typeStats} />
-              </ChartCard>
-              <ChartCard title="서비스 상태">
-                <HorizontalBarChart rows={statusStats} />
-              </ChartCard>
-              <ChartCard title="분류 1단계별 서비스 수">
-                <HorizontalBarChart rows={categoryStats} />
-              </ChartCard>
-              <ChartCard title="서버별 배포 수">
-                <HorizontalBarChart rows={deploymentStats} />
-              </ChartCard>
+            <div className="statistics-tab-body">
+              <div className="statistics-chart-grid statistics-chart-grid--service-assets">
+                <ChartCard title="서비스 상태 분포">
+                  <DonutChart rows={statusStats} />
+                </ChartCard>
+                <ChartCard title="서비스 중요도 분포">
+                  <HorizontalBarChart rows={importanceStats} />
+                </ChartCard>
+                <ChartCard title="서비스 분류 분포">
+                  <HorizontalBarChart rows={categoryStats} />
+                </ChartCard>
+                <ChartCard title="주요 스택 버전 구성">
+                  <VersionRiskPanel rows={versionRiskRows} />
+                </ChartCard>
+                <ChartCard title="인프라 노드 분포">
+                  <HorizontalBarChart rows={serverRoleStats} />
+                </ChartCard>
+              </div>
+              <StatsDataPanel
+                title="서비스 목록 상세"
+                count={filteredServiceDetailRows.length}
+                tools={(
+                  <>
+                    <label className="statistics-search-field">
+                      <Search size={15} aria-hidden="true" />
+                      <input value={serviceSearch} onChange={(event) => setServiceSearch(event.target.value)} placeholder="서비스명 / 카테고리 검색..." type="text" />
+                    </label>
+                    <select value={serviceStatusFilter} onChange={(event) => setServiceStatusFilter(event.target.value)}>
+                      <option value="all">전체 상태</option>
+                      {serviceStatusOptions.map((status) => <option key={status} value={status}>{codeLabels.serviceStatus[status] || status}</option>)}
+                    </select>
+                    <button className="btn" type="button" onClick={() => downloadRowsCsv("서비스-목록-상세.csv", serviceDetailExportColumns, filteredServiceDetailRows)}>
+                      <Download size={15} aria-hidden="true" /> 엑셀 다운로드
+                    </button>
+                  </>
+                )}
+              >
+                <table className="tbl statistics-data-table statistics-service-table">
+                  <thead><tr><th>서비스명</th><th>카테고리</th><th>유형</th><th>중요도</th><th>상태</th><th>서버 수</th><th>기술스택 수</th><th>담당자</th></tr></thead>
+                  <tbody>
+                    {filteredServiceDetailRows.length ? filteredServiceDetailRows.map((row) => (
+                      <tr key={row.key}>
+                        <td><b>{row.name}</b></td>
+                        <td>{row.category}</td>
+                        <td>{row.typeLabel}</td>
+                        <td>{row.importanceLabel}</td>
+                        <td>{row.statusLabel}</td>
+                        <td>{row.serverCount}</td>
+                        <td>{row.techCount}</td>
+                        <td>{row.ownerLabel}</td>
+                      </tr>
+                    )) : <EmptyTableRow colSpan={8} />}
+                  </tbody>
+                </table>
+              </StatsDataPanel>
             </div>
           ) : null}
 
           {activeStatsTab === "operation" ? (
-            <div className="statistics-chart-grid statistics-chart-grid--quality">
-              <ChartCard title="월별 인시던트 발생 추이 (최근 12개월)">
-                <MonthlyBarChart rows={incidentMonthlyStats} />
-              </ChartCard>
-              <div className="statistics-panel">
-                <h2>운영 관리 요약</h2>
-                <div className="statistics-checks">
-                  <span><b>{openIncidents.length}</b> 진행 중 장애</span>
-                  <span><b>{servicesWithoutOwner.length}</b> 담당자 미등록 서비스</span>
-                  <span><b>{missingEndpointServices.length}</b> 엔드포인트 미등록 서비스</span>
-                  <span><b>{shallowCategoryServices.length}</b> 분류 보완 필요 서비스</span>
-                </div>
+            <div className="statistics-tab-body">
+              <div className="statistics-chart-grid statistics-chart-grid--operation">
+                <ChartCard title="월별 인시던트 추이 (최근 12개월)">
+                  <MonthlyBarChart rows={incidentMonthlyStats} />
+                </ChartCard>
+                <ChartCard title="심각도별 장애 분포">
+                  <DonutChart rows={incidentSeverityStats} />
+                </ChartCard>
+                <ChartCard title="헬스체크 성공/실패 추이 (최근 7일)">
+                  <HealthCheckTrendChart rows={healthCheckTrendRows} />
+                </ChartCard>
+                <ChartCard title="장애 다발 서비스 TOP 10">
+                  <HorizontalBarChart rows={serviceIncidentTopStats} />
+                </ChartCard>
               </div>
-              <div className="statistics-panel statistics-panel--wide">
-                <h2>조치 필요 항목</h2>
-                {actionItems.length ? (
-                  <div className="statistics-action-list">
-                    {actionItems.map((item, index) => (
-                      <div className={`statistics-action is-${item.tone}`} key={`${item.title}-${index}`}>
-                        <strong>{item.title}</strong>
-                        <span>{item.meta}</span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="statistics-empty">현재 우선 조치가 필요한 항목이 없습니다.</div>
+              <StatsDataPanel
+                title="장애 이력"
+                count={filteredIncidentDetailRows.length}
+                tools={(
+                  <>
+                    <label className="statistics-search-field">
+                      <Search size={15} aria-hidden="true" />
+                      <input value={incidentSearch} onChange={(event) => setIncidentSearch(event.target.value)} placeholder="제목 / 대상 검색..." type="text" />
+                    </label>
+                    <select value={incidentStatusFilter} onChange={(event) => setIncidentStatusFilter(event.target.value)}>
+                      <option value="all">전체 상태</option>
+                      {incidentStatusOptions.map((status) => <option key={status} value={status}>{codeLabels.incidentStatus[status] || status}</option>)}
+                    </select>
+                    <button className="btn" type="button" onClick={() => downloadRowsCsv("장애-이력.csv", incidentExportColumns, filteredIncidentDetailRows)}>
+                      <Download size={15} aria-hidden="true" /> 엑셀 다운로드
+                    </button>
+                  </>
                 )}
-              </div>
+              >
+                <table className="tbl statistics-data-table statistics-incident-table">
+                  <thead><tr><th>ID</th><th>제목</th><th>유형</th><th>심각도</th><th>상태</th><th>대상</th><th>발생 일시</th><th>조치 일시</th><th>지속(분)</th><th>영향수</th></tr></thead>
+                  <tbody>
+                    {filteredIncidentDetailRows.length ? filteredIncidentDetailRows.map((row) => (
+                      <tr key={row.key}>
+                        <td>{row.id}</td>
+                        <td><b>{row.title}</b></td>
+                        <td>{row.typeLabel}</td>
+                        <td>{row.severityLabel}</td>
+                        <td>{row.statusLabel}</td>
+                        <td>{row.target}</td>
+                        <td>{row.startedAt}</td>
+                        <td>{row.endedAt}</td>
+                        <td>{row.durationMinutes}</td>
+                        <td>{row.impactCount}</td>
+                      </tr>
+                    )) : <EmptyTableRow colSpan={10} />}
+                  </tbody>
+                </table>
+              </StatsDataPanel>
             </div>
           ) : null}
 
           {activeStatsTab === "dependency" ? (
-            <div className="statistics-chart-grid">
-              <ChartCard title="인입·인출 의존 집중 TOP 5">
-                <HorizontalBarChart rows={relationHotspots} />
-              </ChartCard>
-              <ChartCard title="담당 유형 분포">
-                <HorizontalBarChart rows={ownerTypeStats} />
-              </ChartCard>
-              <div className="statistics-panel">
-                <h2>관계·집중도 요약</h2>
-                <div className="statistics-metrics">
-                  <span><b>{portalData.owners.length}</b> 담당자 매핑</span>
-                  <span><b>{activeRelations}</b> 활성 관계</span>
-                  <span><b>{mandatoryRelations}</b> 필수 관계</span>
-                  <span><b>{missingImpactRelations.length}</b> 영향도 설명 누락</span>
-                </div>
+            <div className="statistics-tab-body">
+              <div className="statistics-chart-grid statistics-chart-grid--dependency">
+                <ChartCard title="인입 의존 집중 TOP 10">
+                  <HorizontalBarChart rows={incomingRelationStats} />
+                </ChartCard>
+                <ChartCard title="인출 의존 집중 TOP 10">
+                  <HorizontalBarChart rows={outgoingRelationStats} />
+                </ChartCard>
+                <ChartCard title="서버별 배포 서비스 수 TOP 10">
+                  <HorizontalBarChart rows={serverServiceStats} />
+                </ChartCard>
+                <ChartCard title="그룹별 담당 서비스 수 TOP 10">
+                  <HorizontalBarChart rows={groupServiceStats} />
+                </ChartCard>
               </div>
+              <StatsDataPanel
+                title="서비스별 의존성 상세"
+                count={filteredDependencyDetailRows.length}
+                tools={(
+                  <>
+                    <label className="statistics-search-field">
+                      <Search size={15} aria-hidden="true" />
+                      <input value={dependencySearch} onChange={(event) => setDependencySearch(event.target.value)} placeholder="서비스명 / 카테고리 검색..." type="text" />
+                    </label>
+                    <select value={dependencySort} onChange={(event) => setDependencySort(event.target.value)}>
+                      <option value="incoming">인입 의존 많은 순</option>
+                      <option value="outgoing">인출 의존 많은 순</option>
+                      <option value="required">필수 인입 많은 순</option>
+                    </select>
+                    <button className="btn" type="button" onClick={() => downloadRowsCsv("서비스별-의존성-상세.csv", dependencyExportColumns, filteredDependencyDetailRows)}>
+                      <Download size={15} aria-hidden="true" /> 엑셀 다운로드
+                    </button>
+                  </>
+                )}
+              >
+                <table className="tbl statistics-data-table statistics-dependency-table">
+                  <thead><tr><th>서비스명</th><th>카테고리</th><th>인입 의존</th><th>필수 인입</th><th>인출 의존</th><th>담당 그룹</th></tr></thead>
+                  <tbody>
+                    {filteredDependencyDetailRows.length ? filteredDependencyDetailRows.map((row) => (
+                      <tr key={row.key}>
+                        <td><b>{row.name}</b></td>
+                        <td>{row.category}</td>
+                        <td><StatProgress value={row.incoming} max={row.maxDependency} /></td>
+                        <td>{row.requiredIncoming}</td>
+                        <td>{row.outgoing}</td>
+                        <td>{row.ownerGroups}</td>
+                      </tr>
+                    )) : <EmptyTableRow colSpan={6} />}
+                  </tbody>
+                </table>
+              </StatsDataPanel>
             </div>
           ) : null}
 
@@ -281,17 +454,12 @@ export function StatisticsPage({ activeMenu = "analysis-statistics", sectionLabe
                 <ChartCard title="많이 사용되는 기술 TOP 10">
                   <HorizontalBarChart rows={topTechStats} />
                 </ChartCard>
-                <div className="statistics-panel statistics-tech-versions">
-                  <h2>주요 기술 버전 분포</h2>
-                  <div className="statistics-tech-versions__grid">
-                    {techVersionStats.length ? techVersionStats.map((group) => (
-                      <div className="statistics-tech-version-card" key={group.name}>
-                        <h3>{group.name} 버전 분포</h3>
-                        <MiniDonutChart rows={group.rows} />
-                      </div>
-                    )) : <div className="statistics-empty">표시할 버전 데이터가 없습니다.</div>}
-                  </div>
-                </div>
+                <ChartCard title="Java 버전 분포">
+                  <DonutChart rows={javaVersionStats} />
+                </ChartCard>
+                <ChartCard title="주요 스택 버전 구성">
+                  <VersionRiskPanel rows={versionRiskRows} />
+                </ChartCard>
               </div>
 
               <div className="statistics-panel statistics-tech-list">
@@ -348,7 +516,7 @@ export function StatisticsPage({ activeMenu = "analysis-statistics", sectionLabe
                       )) : (
                         <tr>
                           <td colSpan={8}>
-                            <div className="statistics-empty">검색 조건에 맞는 기술스택이 없습니다.</div>
+                            <div className="statistics-empty">조회 가능한 데이터가 없습니다.</div>
                           </td>
                         </tr>
                       )}
@@ -534,6 +702,96 @@ function HorizontalBarChart({ rows }) {
   );
 }
 
+function VersionRiskPanel({ rows }) {
+  return (
+    <div className="version-risk">
+      <div className="version-risk__legend">
+        <span><i className="is-eol" /> EOL/구버전</span>
+        <span><i className="is-warn" /> 지원 예정 종료</span>
+        <span><i className="is-ok" /> 최신 지원</span>
+      </div>
+      {rows.length ? rows.map((row) => {
+        const total = Math.max(row.eol + row.warning + row.current, 1);
+        return (
+          <div className="version-risk__row" key={row.label}>
+            <b>{row.label}</b>
+            <div className="version-risk__bar">
+              <span className="is-eol" style={{ width: `${(row.eol / total) * 100}%` }}>{row.eol ? `${row.eol}` : ""}</span>
+              <span className="is-warn" style={{ width: `${(row.warning / total) * 100}%` }}>{row.warning ? `${row.warning}` : ""}</span>
+              <span className="is-ok" style={{ width: `${(row.current / total) * 100}%` }}>{row.current ? `${row.current}` : ""}</span>
+            </div>
+            <small>{row.total}</small>
+          </div>
+        );
+      }) : <div className="statistics-empty">표시할 버전 데이터가 없습니다.</div>}
+    </div>
+  );
+}
+
+function HealthCheckTrendChart({ rows }) {
+  const max = Math.max(...rows.flatMap((row) => [row.success, row.failure]), 1);
+  return (
+    <div className="health-trend">
+      <div className="health-trend__legend"><span><i className="is-ok" />성공</span><span><i className="is-danger" />실패</span></div>
+      <svg viewBox="0 0 520 170" role="img" aria-label="헬스체크 성공 실패 추이">
+        {[0, 1, 2, 3].map((tick) => {
+          const y = 130 - tick * 36;
+          return <line className="chart-grid-line" key={tick} x1="24" x2="500" y1={y} y2={y} />;
+        })}
+        <polyline className="health-trend__line is-ok" points={buildTrendPoints(rows, "success", max)} />
+        <polyline className="health-trend__line is-danger" points={buildTrendPoints(rows, "failure", max)} />
+        {rows.map((row, index) => {
+          const x = rows.length > 1 ? 24 + index * (476 / (rows.length - 1)) : 262;
+          return <text className="chart-axis-text" key={row.label} x={x} y="158" textAnchor="middle">{row.label}</text>;
+        })}
+      </svg>
+    </div>
+  );
+}
+
+function buildTrendPoints(rows, key, max) {
+  if (!rows.length) return "";
+  return rows.map((row, index) => {
+    const x = rows.length > 1 ? 24 + index * (476 / (rows.length - 1)) : 262;
+    const y = 130 - (Number(row[key]) / max) * 108;
+    return `${x},${y}`;
+  }).join(" ");
+}
+
+function StatsDataPanel({ children, count, title, tools }) {
+  return (
+    <div className="statistics-panel statistics-data-panel">
+      <div className="statistics-tech-list__head">
+        <div>
+          <h2>{title}</h2>
+          <span>총 {count}건</span>
+        </div>
+        <div className="statistics-tech-list__tools">{tools}</div>
+      </div>
+      <div className="statistics-table-wrap">{children}</div>
+    </div>
+  );
+}
+
+function EmptyTableRow({ colSpan }) {
+  return (
+    <tr>
+      <td colSpan={colSpan}>
+        <div className="statistics-empty">조회 가능한 데이터가 없습니다.</div>
+      </td>
+    </tr>
+  );
+}
+
+function StatProgress({ max, value }) {
+  return (
+    <span className="stat-progress">
+      <i style={{ width: `${Math.max(value ? 8 : 0, (value / Math.max(max, 1)) * 100)}%` }} />
+      <b>{value}</b>
+    </span>
+  );
+}
+
 function MiniLineChart({ rows, title }) {
   const width = 360;
   const height = 150;
@@ -620,6 +878,154 @@ function topEntries(map, limit) {
     .map(([label, value]) => ({ label, value }))
     .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label))
     .slice(0, limit);
+}
+
+function buildServiceDetailRows(services = [], deployments = [], techStacks = [], owners = []) {
+  const deploymentsByService = new Map();
+  deployments.forEach((deployment) => {
+    const serviceId = Number(deployment.serviceId);
+    if (!serviceId) return;
+    if (!deploymentsByService.has(serviceId)) deploymentsByService.set(serviceId, new Set());
+    deploymentsByService.get(serviceId).add(Number(deployment.serverId) || deployment.serverName || deployment.hostName || deployment.deployPath);
+  });
+  const techCountByService = new Map();
+  techStacks.forEach((techStack) => {
+    const serviceId = Number(techStack.serviceId);
+    if (!serviceId) return;
+    techCountByService.set(serviceId, (techCountByService.get(serviceId) || 0) + 1);
+  });
+  const ownersByService = new Map();
+  owners.forEach((owner) => {
+    const serviceId = Number(owner.serviceId);
+    if (!serviceId) return;
+    if (!ownersByService.has(serviceId)) ownersByService.set(serviceId, new Set());
+    ownersByService.get(serviceId).add(owner.ownerName || owner.groupName || owner.userName);
+  });
+
+  return services.map((service) => ({
+    key: service.serviceId,
+    category: service.categoryPath?.filter(Boolean).join(" > ") || "미분류",
+    code: service.serviceCode,
+    importanceLabel: codeLabels.importance[service.importanceCode] || service.importanceCode || "-",
+    name: service.serviceName || service.serviceCode || "-",
+    ownerLabel: Array.from(ownersByService.get(service.serviceId) || []).filter(Boolean).slice(0, 2).join(", ") || "-",
+    serverCount: deploymentsByService.get(service.serviceId)?.size || (service.serverId ? 1 : 0),
+    statusCode: service.statusCode,
+    statusLabel: codeLabels.serviceStatus[service.statusCode] || service.statusCode || "-",
+    techCount: techCountByService.get(service.serviceId) || 0,
+    typeLabel: codeLabels.serviceType[service.serviceTypeCode] || service.serviceTypeCode || "-",
+  })).sort((a, b) => a.name.localeCompare(b.name, "ko", { numeric: true }));
+}
+
+function buildIncidentDetailRows(incidents = [], impacts = [], serviceById = new Map(), serverById = new Map()) {
+  const impactCountByIncident = new Map();
+  impacts.forEach((impact) => {
+    const incidentId = Number(impact.incidentId);
+    if (!incidentId) return;
+    impactCountByIncident.set(incidentId, (impactCountByIncident.get(incidentId) || 0) + 1);
+  });
+
+  return incidents.map((incident) => {
+    const service = serviceById.get(Number(incident.serviceId));
+    const server = serverById.get(Number(incident.serverId));
+    return {
+      key: incident.incidentId,
+      durationMinutes: formatDurationMinutes(incident.startedAt, incident.endedAt),
+      endedAt: formatDateTimeText(incident.endedAt),
+      id: incident.externalIncidentCode || incident.incidentId,
+      impactCount: impactCountByIncident.get(incident.incidentId) || 0,
+      severityLabel: codeLabels.severity[incident.severityCode] || incident.severityCode || "-",
+      startedAt: formatDateTimeText(incident.startedAt),
+      statusCode: incident.incidentStatusCode,
+      statusLabel: codeLabels.incidentStatus[incident.incidentStatusCode] || incident.incidentStatusCode || "-",
+      target: incident.targetLabel || service?.serviceName || server?.serverName || incident.targetCode || "-",
+      title: incident.title || "-",
+      typeLabel: codeLabels.incidentType[incident.incidentTypeCode] || incident.incidentTypeCode || "-",
+    };
+  }).sort((a, b) => String(b.startedAt).localeCompare(String(a.startedAt)));
+}
+
+function buildDependencyDetailRows(services = [], relations = [], owners = []) {
+  const counts = new Map();
+  const ensure = (serviceId) => {
+    const current = counts.get(serviceId) || { incoming: 0, outgoing: 0, requiredIncoming: 0 };
+    counts.set(serviceId, current);
+    return current;
+  };
+  relations.forEach((relation) => {
+    ensure(relation.sourceServiceId).outgoing += 1;
+    const target = ensure(relation.targetServiceId);
+    target.incoming += 1;
+    if (String(relation.mandatoryYn).toUpperCase() === "Y") target.requiredIncoming += 1;
+  });
+  const groupsByService = new Map();
+  owners.forEach((owner) => {
+    const serviceId = Number(owner.serviceId);
+    if (!serviceId) return;
+    if (!groupsByService.has(serviceId)) groupsByService.set(serviceId, new Set());
+    if (owner.ownerTypeCode === "GROUP") groupsByService.get(serviceId).add(owner.ownerName || owner.groupName);
+  });
+  const maxDependency = Math.max(...services.map((service) => counts.get(service.serviceId)?.incoming || 0), 1);
+
+  return services.map((service) => {
+    const count = counts.get(service.serviceId) || { incoming: 0, outgoing: 0, requiredIncoming: 0 };
+    return {
+      key: service.serviceId,
+      category: service.categoryPath?.filter(Boolean).join(" > ") || "미분류",
+      code: service.serviceCode,
+      incoming: count.incoming,
+      maxDependency,
+      name: service.serviceName || service.serviceCode || "-",
+      outgoing: count.outgoing,
+      ownerGroups: Array.from(groupsByService.get(service.serviceId) || []).filter(Boolean).slice(0, 3).join(", ") || "-",
+      requiredIncoming: count.requiredIncoming,
+    };
+  });
+}
+
+function buildDirectionalRelationStats(relations = [], serviceById = new Map(), direction = "incoming", limit = 10) {
+  const counts = new Map();
+  relations.forEach((relation) => {
+    const serviceId = direction === "incoming" ? relation.targetServiceId : relation.sourceServiceId;
+    if (!serviceId) return;
+    counts.set(serviceId, (counts.get(serviceId) || 0) + 1);
+  });
+  return [...counts.entries()]
+    .map(([serviceId, value]) => ({ label: serviceById.get(Number(serviceId))?.serviceName || `서비스 ${serviceId}`, value }))
+    .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label, "ko"))
+    .slice(0, limit);
+}
+
+function buildServiceIncidentTopRows(incidents = [], serviceById = new Map()) {
+  const rows = topEntries(
+    countBy(incidents, (incident) => {
+      const service = serviceById.get(Number(incident.serviceId));
+      return service?.serviceName || incident.targetLabel || incident.targetCode || "대상 미지정";
+    }),
+    10
+  );
+  return rows.filter((row) => row.label !== "대상 미지정" || row.value > 0);
+}
+
+function buildHealthCheckTrendRows(results = []) {
+  const now = new Date();
+  const days = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6 + index);
+    const key = `${String(date.getMonth() + 1).padStart(2, "0")}/${String(date.getDate()).padStart(2, "0")}`;
+    return { key, label: key, success: 0, failure: 0 };
+  });
+  const byKey = new Map(days.map((day) => [day.key, day]));
+  results.forEach((result) => {
+    const date = new Date(result.checkedAt || result.executedAt || result.createdAt);
+    if (Number.isNaN(date.getTime())) return;
+    const key = `${String(date.getMonth() + 1).padStart(2, "0")}/${String(date.getDate()).padStart(2, "0")}`;
+    const row = byKey.get(key);
+    if (!row) return;
+    const statusText = String(result.successYn ?? result.resultStatusCode ?? result.status ?? "").toUpperCase();
+    if (statusText === "N" || statusText === "FALSE" || statusText.includes("FAIL")) row.failure += 1;
+    else row.success += 1;
+  });
+  return days;
 }
 
 function buildTechStackRows(techStacks = [], serviceById = new Map()) {
@@ -731,6 +1137,62 @@ function buildTechVersionStats(rows = []) {
   }));
 }
 
+function buildSingleTechVersionStats(rows = [], techName) {
+  const versionMap = new Map();
+  rows
+    .filter((row) => row.name.toLowerCase().includes(String(techName).toLowerCase()))
+    .forEach((row) => {
+      const version = row.version && row.version !== "-" ? row.version : "미지정";
+      versionMap.set(version, (versionMap.get(version) || 0) + Math.max(row.serviceCount, row.recordCount, 1));
+    });
+  return topEntries(versionMap, 6);
+}
+
+function buildVersionRiskRows(rows = []) {
+  const targets = ["Java", "Spring Boot", "MySQL", "Oracle DB"];
+  return targets.map((target) => {
+    const matched = rows.filter((row) => {
+      const name = row.name.toLowerCase();
+      if (target === "Oracle DB") return name.includes("oracle");
+      return name.includes(target.toLowerCase());
+    });
+    const risk = { label: target, eol: 0, warning: 0, current: 0, total: 0 };
+    matched.forEach((row) => {
+      const count = Math.max(row.serviceCount, row.recordCount, 1);
+      const bucket = classifyVersionRisk(row.name, row.version);
+      risk[bucket] += count;
+      risk.total += count;
+    });
+    return risk;
+  }).filter((row) => row.total > 0);
+}
+
+function classifyVersionRisk(name, version) {
+  const major = Number(String(version || "").match(/\d+/)?.[0]);
+  const normalizedName = String(name || "").toLowerCase();
+  if (!Number.isFinite(major)) return "warning";
+  if (normalizedName.includes("java")) {
+    if (major <= 8) return "eol";
+    if (major <= 17) return "warning";
+    return "current";
+  }
+  if (normalizedName.includes("spring")) {
+    if (major <= 2) return "eol";
+    return "current";
+  }
+  if (normalizedName.includes("mysql")) {
+    if (major <= 5) return "eol";
+    return "current";
+  }
+  if (normalizedName.includes("oracle")) {
+    if (major <= 11) return "eol";
+    if (major <= 12) return "warning";
+    return "current";
+  }
+  if (major <= 1) return "eol";
+  return "current";
+}
+
 function sumMapValues(map) {
   return [...map.values()].reduce((sum, value) => sum + value, 0);
 }
@@ -766,6 +1228,26 @@ function formatDateText(value) {
   return text ? text.slice(0, 10) : "-";
 }
 
+function formatDateTimeText(value) {
+  const text = compactText(value);
+  return text ? text.slice(0, 16) : "-";
+}
+
+function formatDurationMinutes(startedAt, endedAt) {
+  const start = new Date(startedAt);
+  const end = new Date(endedAt);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return "-";
+  return Math.max(0, Math.round((end.getTime() - start.getTime()) / 60000));
+}
+
+function buildMeanRecoveryTime(incidents = []) {
+  const durations = incidents
+    .map((incident) => formatDurationMinutes(incident.startedAt, incident.endedAt))
+    .filter((duration) => Number.isFinite(duration));
+  if (!durations.length) return "N/A";
+  return `${Math.round(durations.reduce((sum, value) => sum + value, 0) / durations.length)}분`;
+}
+
 function downloadTechStackCsv(rows) {
   const headers = ["서비스ID", "서비스명", "카테고리", "기술유형", "기술명", "버전", "벤더"];
   const body = rows.map((row) => [
@@ -783,6 +1265,52 @@ function downloadTechStackCsv(rows) {
   const link = document.createElement("a");
   link.href = url;
   link.download = "기술스택-버전-현황.csv";
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+const serviceDetailExportColumns = [
+  ["서비스명", "name"],
+  ["카테고리", "category"],
+  ["유형", "typeLabel"],
+  ["중요도", "importanceLabel"],
+  ["상태", "statusLabel"],
+  ["서버 수", "serverCount"],
+  ["기술스택 수", "techCount"],
+  ["담당자", "ownerLabel"],
+];
+
+const incidentExportColumns = [
+  ["ID", "id"],
+  ["제목", "title"],
+  ["유형", "typeLabel"],
+  ["심각도", "severityLabel"],
+  ["상태", "statusLabel"],
+  ["대상", "target"],
+  ["발생 일시", "startedAt"],
+  ["조치 일시", "endedAt"],
+  ["지속(분)", "durationMinutes"],
+  ["영향수", "impactCount"],
+];
+
+const dependencyExportColumns = [
+  ["서비스명", "name"],
+  ["카테고리", "category"],
+  ["인입 의존", "incoming"],
+  ["필수 인입", "requiredIncoming"],
+  ["인출 의존", "outgoing"],
+  ["담당 그룹", "ownerGroups"],
+];
+
+function downloadRowsCsv(fileName, columns, rows) {
+  const headers = columns.map(([label]) => label);
+  const body = rows.map((row) => columns.map(([, key]) => row[key]));
+  const csv = [headers, ...body].map((cells) => cells.map(csvCell).join(",")).join("\n");
+  const blob = new Blob([`\ufeff${csv}`], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
   link.click();
   URL.revokeObjectURL(url);
 }

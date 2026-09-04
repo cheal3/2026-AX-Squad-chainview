@@ -27,7 +27,6 @@ import {
 } from "./ServiceRelationFlow";
 import { usePortalData } from "../PortalDataStore";
 import { codeLabels, type IncidentRecord, type ServiceRecord, type ServiceRelationRecord } from "../mockData";
-import { chainViewEmployeeNo } from "../chainViewApi";
 import { useNavigate } from "react-router-dom";
 
 const DASHBOARD_FILTER_STORAGE_KEY = "chainview.dashboard.service-filter.v1";
@@ -61,7 +60,7 @@ function readDashboardFilter(): DashboardFilterState {
       return DEFAULT_DASHBOARD_FILTER;
     }
     return {
-      scope: saved.scope,
+      scope: "all",
       categoryL1: String(saved.categoryL1 ?? ""),
       categoryL2: String(saved.categoryL2 ?? ""),
       categoryL3: String(saved.categoryL3 ?? ""),
@@ -415,24 +414,10 @@ function DashboardCase({
       ),
     [categoryRecords, services]
   );
-  const currentUser = useMemo(
-    () => users.find((user) => String(user.employeeNo ?? "") === chainViewEmployeeNo),
-    [users]
-  );
-  const currentUserId = Number(currentUser?.userId) || 0;
-  const myServiceIds = useMemo(() => {
-    const userOwners = owners.filter((owner) => owner.ownerTypeCode === "USER");
-    const matched = userOwners.filter((owner) =>
-      currentUserId ? Number(owner.userId) === currentUserId : true
-    );
-    return new Set(matched.map((owner) => owner.serviceId));
-  }, [currentUserId, owners]);
   const scopedServices = useMemo(
     () =>
-      draftFilter.scope === "mine"
-        ? services.filter((service) => myServiceIds.has(service.serviceId))
-        : services,
-    [draftFilter.scope, myServiceIds, services]
+      services,
+    [services]
   );
   const categoryL1Options = useMemo(
     () =>
@@ -471,9 +456,7 @@ function DashboardCase({
   );
   const filteredServices = useMemo(() => {
     const candidates =
-      appliedFilter.scope === "mine"
-        ? services.filter((service) => myServiceIds.has(service.serviceId))
-        : services;
+      services;
 
     return candidates.filter((service) => {
       const path = categoryPathByServiceId.get(service.serviceId) ?? [];
@@ -484,7 +467,7 @@ function DashboardCase({
         (!appliedFilter.categoryL3 || path[2] === appliedFilter.categoryL3)
       );
     });
-  }, [appliedFilter, categoryPathByServiceId, myServiceIds, services]);
+  }, [appliedFilter, categoryPathByServiceId, services]);
   const filteredServiceIds = useMemo(
     () => {
       const seedIds = new Set(filteredServices.map((service) => service.serviceId));
@@ -644,7 +627,7 @@ function DashboardCase({
               return;
             }
 
-            const incident = portalData.createIncident({
+            portalData.createIncident({
               incidentTypeCode: "SERVER",
               serverId: incidentServer.serverId,
               severityCode: "CRITICAL",
@@ -656,14 +639,13 @@ function DashboardCase({
               manualRegisteredYn: "Y",
               registeredBy: "admin",
             });
-            navigate(`/dashboard?incidentId=${incident.incidentId}`);
           }}
           onCreateIncident={() => {
             if (!selectedService) {
               return;
             }
 
-            const incident = portalData.createIncident({
+            portalData.createIncident({
               serviceId: selectedService.serviceId,
               severityCode: "CRITICAL",
               externalIncidentCode: nextIncidentCode(),
@@ -674,7 +656,6 @@ function DashboardCase({
               manualRegisteredYn: "Y",
               registeredBy: "admin",
             });
-            navigate(`/dashboard?incidentId=${incident.incidentId}`);
           }}
           relationCount={
             selectedService
@@ -778,47 +759,11 @@ function DashboardServiceFilter({
     }
   };
 
-  const updateScope = (scope: DashboardFilterScope) => {
-    updateFilter({ scope, categoryL1: "", categoryL2: "", categoryL3: "", serviceId: null });
-  };
-
   return (
     <section className="dashboard-service-filter mt-1 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-[0_1px_3px_rgba(15,23,42,0.05)]">
       <h2 className="mb-2.5 text-sm font-black text-slate-900">조회조건</h2>
 
       <div className="dashboard-service-filter__grid">
-          <div
-            className="relative grid h-10 min-w-0 grid-cols-2 overflow-hidden rounded-full border border-slate-200 bg-white p-1 shadow-md"
-            style={{ borderRadius: 9999 }}
-          >
-            <span
-              className="absolute bottom-1 top-1 w-[calc(50%-4px)] rounded-full bg-[#1f2a44] shadow-sm transition-transform duration-200"
-              style={{
-                left: 4,
-                borderRadius: 9999,
-                transform: `translate3d(${filter.scope === "mine" ? 100 : 0}%, 0, 0)`,
-              }}
-            />
-            {([
-              ["all", "전체 서비스"],
-              ["mine", "내 담당 서비스"],
-            ] as const).map(([scope, label]) => (
-              <button
-                key={scope}
-                className={`relative z-10 h-8 min-w-0 px-2 text-[11px] font-black transition-colors ${
-                  filter.scope === scope
-                    ? "text-white"
-                    : "text-slate-600 hover:text-slate-950"
-                }`}
-                style={{ borderRadius: 9999 }}
-                type="button"
-                onClick={() => updateScope(scope)}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-
         <FilterSelect
           label="대분류"
           options={categoryL1Options}

@@ -40,6 +40,11 @@ const healthCheckTypeOptions = [
 ];
 
 const healthCheckHttpMethods = ["GET", "POST"];
+const notificationResponsibilityOptions = [
+  { code: "MAIN", label: "주담당" },
+  { code: "SUB", label: "부담당" },
+  { code: "ALERT", label: "알림담당" },
+];
 
 function normalizeServiceCheckRow(row, index = 0) {
   const targetType = String(row?.targetTypeCode ?? row?.targetType ?? "SERVICE").toUpperCase();
@@ -406,7 +411,7 @@ function OperationPager({ page, pageSize, setPage, total }) {
 }
 
 function OperationFormRow({ children, label, required = false }) {
-  return <label className="form-row"><span>{label}{required ? <i className="req">*</i> : null}</span>{children}</label>;
+  return <label className="form-row"><span>{label}{required ? <span className="req">*</span> : null}</span>{children}</label>;
 }
 
 function OperationIconButton({ children, danger = false, label, onClick, primary = false }) {
@@ -577,7 +582,7 @@ export function ServiceCheckPage() {
                 </td>
               </tr>
             ))}
-            {!pagedRows.length ? <tr><td colSpan={7}>조회된 서비스 점검이 없습니다.</td></tr> : null}
+            {!pagedRows.length ? <tr><td colSpan={7}>조회 가능한 데이터가 없습니다.</td></tr> : null}
           </tbody>
         </table>
         <OperationPager page={page} pageSize={pageSize} setPage={setPage} total={rows.length} />
@@ -626,7 +631,7 @@ function ServiceCheckModal({ onClose, onSave, row }) {
     timeoutMs: row?.timeoutMs ?? 5000,
     cron: row?.cron ?? "0 */5 * * * *",
     failureThreshold: row?.failureThreshold ?? 1,
-    notificationOwner: row?.notificationOwner ?? "",
+    notificationOwner: row?.notificationOwner ?? "MAIN,SUB,ALERT",
     activeYn: row?.activeYn ?? "Y",
     runYn: row?.runYn ?? "N",
     notifyOnFailureYn: row?.notifyOnFailureYn ?? "Y",
@@ -659,6 +664,14 @@ function ServiceCheckModal({ onClose, onSave, row }) {
   };
   const updateForm = (key, value) => {
     setForm((current) => ({ ...current, [key]: value }));
+  };
+  const toggleNotificationOwner = (code, checked) => {
+    setForm((current) => {
+      const selected = new Set(String(current.notificationOwner || "").split(",").map((item) => item.trim()).filter(Boolean));
+      if (checked) selected.add(code);
+      else selected.delete(code);
+      return { ...current, notificationOwner: Array.from(selected).join(",") };
+    });
   };
   const updateKeyValueRow = (field, index, key, value) => {
     setForm((current) => ({
@@ -746,7 +759,7 @@ function ServiceCheckModal({ onClose, onSave, row }) {
             <OperationFormRow label="점검 코드" required><input disabled={Boolean(row?.jobId)} value={form.code} onChange={(event) => updateForm("code", event.target.value.toUpperCase())} placeholder="예: SSO-HEALTH-01" type="text" /></OperationFormRow>
             <OperationFormRow label="점검명" required><input value={form.name} onChange={(event) => updateForm("name", event.target.value)} placeholder="점검명을 입력하세요" type="text" /></OperationFormRow>
             <div className="form-row operation-target-field">
-              <span>점검 대상<i className="req">*</i></span>
+              <span>점검 대상<span className="req">*</span></span>
               <div className="operation-target-control-row">
                 <div className="radio-row operation-target-radios" aria-label="점검 대상 유형">
                   <label>
@@ -824,8 +837,22 @@ function ServiceCheckModal({ onClose, onSave, row }) {
             )}
             <OperationFormRow label="Timeout (ms)"><input value={form.timeoutMs} onChange={(event) => updateForm("timeoutMs", event.target.value)} type="number" /></OperationFormRow>
             <OperationFormRow label="Cron" required><input value={form.cron} onChange={(event) => updateForm("cron", event.target.value)} type="text" /></OperationFormRow>
-            <OperationFormRow label="실패 임계값" required><input value={form.failureThreshold} onChange={(event) => updateForm("failureThreshold", event.target.value)} type="number" /></OperationFormRow>
-            <OperationFormRow label="알림 담당"><input value={form.notificationOwner} onChange={(event) => updateForm("notificationOwner", event.target.value)} placeholder="알림 담당 또는 설명을 입력하세요" type="text" /></OperationFormRow>
+            <OperationFormRow label="실패 임계값"><input value={form.failureThreshold} onChange={(event) => updateForm("failureThreshold", event.target.value)} type="number" /></OperationFormRow>
+            <div className="form-row operation-checkbox-field">
+              <span>알림 담당</span>
+              <div className="operation-checkbox-row">
+                {notificationResponsibilityOptions.map((option) => (
+                  <label key={option.code}>
+                    <input
+                      checked={String(form.notificationOwner || "").split(",").map((item) => item.trim()).includes(option.code)}
+                      onChange={(event) => toggleNotificationOwner(option.code, event.target.checked)}
+                      type="checkbox"
+                    />
+                    {option.label}
+                  </label>
+                ))}
+              </div>
+            </div>
             <div className="operation-radio-settings">
               <div className="operation-radio-setting">
                 <span>활성 여부</span>
@@ -882,7 +909,7 @@ function ServiceCheckHistoryModal({ onClose, row }) {
           <p className="op-modal-desc">선택한 서비스 점검의 최근 실행 결과입니다.</p>
           {message ? <div className="op-inline-alert op-inline-alert--danger">{message}</div> : null}
           {loading ? <div className="op-loading-line">점검 이력을 불러오는 중...</div> : null}
-          <table className="tbl operation-table operation-table--history"><thead><tr><th>시간</th><th>결과</th><th>Latency</th><th>HTTP</th><th>실패 사유</th><th>응답 요약</th><th>알림</th><th>비고</th></tr></thead><tbody>{history.length ? history.map((item) => <tr key={item.join("-")}><td>{item[0]}</td><td><span className={`pill ${item[1] === "성공" ? "pill--ok" : "pill--crit"}`}>{item[1]}</span></td><td>{item[2]}</td><td>{item[3]}</td><td>{item[4]}</td><td><code>{item[5]}</code></td><td>{item[6]}</td><td>{item[7]}</td></tr>) : <tr><td colSpan={8}>점검 이력이 없습니다.</td></tr>}</tbody></table>
+          <table className="tbl operation-table operation-table--history"><thead><tr><th>시간</th><th>결과</th><th>Latency</th><th>HTTP</th><th>실패 사유</th><th>응답 요약</th><th>알림</th><th>비고</th></tr></thead><tbody>{history.length ? history.map((item) => <tr key={item.join("-")}><td>{item[0]}</td><td><span className={`pill ${item[1] === "성공" ? "pill--ok" : "pill--crit"}`}>{item[1]}</span></td><td>{item[2]}</td><td>{item[3]}</td><td>{item[4]}</td><td><code>{item[5]}</code></td><td>{item[6]}</td><td>{item[7]}</td></tr>) : <tr><td colSpan={8}>조회 가능한 데이터가 없습니다.</td></tr>}</tbody></table>
         </div>
         <div className="modal__foot"><button className="btn" onClick={loadHistory} type="button">새로고침</button><button className="btn" onClick={onClose} type="button">닫기</button></div>
       </div>
@@ -894,6 +921,9 @@ export function NotificationHistoryPage() {
   const navigate = useNavigate();
   const portalData = usePortalData();
   const [search, setSearch] = useState("");
+  const [channelFilter, setChannelFilter] = useState("all");
+  const [targetTypeFilter, setTargetTypeFilter] = useState("all");
+  const [recipientFilter, setRecipientFilter] = useState("all");
   const [page, setPage] = useState(1);
   const [detail, setDetail] = useState(null);
   const pageSize = OPERATION_PAGE_SIZE;
@@ -919,8 +949,19 @@ export function NotificationHistoryPage() {
           : row.recipient,
     };
   });
-  const rows = baseRows.filter((row) =>
-    matchesSearchText(
+  const recipientOptions = [...new Set(baseRows.map((row) => row.recipient).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ko"));
+  const resetFilters = () => {
+    setSearch("");
+    setChannelFilter("all");
+    setTargetTypeFilter("all");
+    setRecipientFilter("all");
+    setPage(1);
+  };
+  const rows = baseRows.filter((row) => {
+    const matchesChannel = channelFilter === "all" || row.channel === channelFilter;
+    const matchesTargetType = targetTypeFilter === "all" || row.targetType === targetTypeFilter;
+    const matchesRecipient = recipientFilter === "all" || row.recipient === recipientFilter;
+    const matchesKeyword = matchesSearchText(
       searchableText(
         row.incidentCode,
         row.incidentTitle,
@@ -933,8 +974,9 @@ export function NotificationHistoryPage() {
         row.sentAt
       ),
       search
-    )
-  );
+    );
+    return matchesChannel && matchesTargetType && matchesRecipient && matchesKeyword;
+  });
   const pagedRows = rows.slice((page - 1) * pageSize, page * pageSize);
 
   return (
@@ -947,14 +989,13 @@ export function NotificationHistoryPage() {
     >
       <div className="toolbar operation-toolbar operation-toolbar--wide">
         <label className="search"><Search size={15} /><input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="장애 제목, 알림 제목, 수신자명, 사번, 그룹명 코드 검색" type="text" /></label>
-        <select defaultValue="all"><option value="all">알림 유형 전체</option><option>이메일</option><option>SMS</option><option>알림톡</option></select>
-        <select defaultValue="all"><option value="all">대상 유형 전체</option><option>사용자</option><option>그룹</option></select>
-        <select defaultValue="all"><option value="all">발송 대상 전체</option></select>
+        <select value={channelFilter} onChange={(event) => { setChannelFilter(event.target.value); setPage(1); }}><option value="all">알림 유형 전체</option><option>이메일</option><option>SMS</option><option>알림톡</option></select>
+        <select value={targetTypeFilter} onChange={(event) => { setTargetTypeFilter(event.target.value); setPage(1); }}><option value="all">대상 유형 전체</option><option>사용자</option><option>그룹</option></select>
+        <select value={recipientFilter} onChange={(event) => { setRecipientFilter(event.target.value); setPage(1); }}><option value="all">발송 대상 전체</option>{recipientOptions.map((recipient) => <option key={recipient} value={recipient}>{recipient}</option>)}</select>
         <span className="op-date-range">2025-06-13 ~ 2025-06-20</span>
-        <button className="btn" type="button"><RotateCcw size={14} /> 초기화</button>
+        <button className="btn" onClick={resetFilters} type="button"><RotateCcw size={14} /> 초기화</button>
         <button className="btn btn--primary op-btn-dark" type="button"><Search size={14} /> 조회</button>
       </div>
-      <div className="operation-summary"><b>전체 192</b><span>성공 180</span><span>실패 12</span><span>실행 중 0</span><span className="is-danger">(ALERT) 6</span></div>
       <div className="card operation-card">
         <table className="tbl operation-table operation-table--notifications">
           <thead><tr><th>인시던트</th><th>알림 유형</th><th>대상 유형</th><th>발송 대상</th><th>연락처</th><th>알림 제목 ·템플릿</th><th>발송 시간</th></tr></thead>
@@ -974,6 +1015,7 @@ export function NotificationHistoryPage() {
                 <td title={row.sentAt}>{row.sentAt}</td>
               </tr>
             ))}
+            {!pagedRows.length ? <tr><td colSpan={7}>조회 가능한 데이터가 없습니다.</td></tr> : null}
           </tbody>
         </table>
         <OperationPager page={page} pageSize={pageSize} setPage={setPage} total={rows.length} />
@@ -1124,9 +1166,7 @@ export function NotificationTemplatePage() {
                     <td><div className="row-actions op-row-actions"><OperationIconButton label="템플릿 수정" onClick={() => setModal(row)}><Pencil size={16} /></OperationIconButton><OperationIconButton danger label={row.active === "Y" ? "템플릿 비활성" : "템플릿 활성"} onClick={() => handleToggleTemplate(row)}><Power size={16} /></OperationIconButton></div></td>
                   </tr>
                 ))}
-                {!pagedRows.length ? (
-                  <tr><td colSpan={6}>등록된 알림 템플릿이 없습니다.</td></tr>
-                ) : null}
+                {!pagedRows.length ? <tr><td colSpan={6}>조회 가능한 데이터가 없습니다.</td></tr> : null}
               </tbody>
             </table>
             <OperationPager page={page} pageSize={pageSize} setPage={setPage} total={rows.length} />

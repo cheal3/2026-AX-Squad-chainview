@@ -1,5 +1,6 @@
-import { lazy, Suspense, useEffect, useMemo, useRef } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { AlertTriangle, ExternalLink, X } from "lucide-react";
 import { initAdminInteractions } from "./adminInteractions.js";
 import { AuthProvider, useAuth } from "./auth/AuthContext.jsx";
 import { AppShell } from "./components/AppShell.jsx";
@@ -256,8 +257,6 @@ function RoutePage({ activeMenuOverride, slug }) {
       manualRegisteredYn: "Y",
       registeredBy: "admin",
     });
-
-    navigate(`/dashboard?incident=${encodeURIComponent(incident.code)}`);
   };
 
   if (page.menu === "incidents") {
@@ -382,6 +381,78 @@ function RealtimeRemoteGetRefresh() {
   return null;
 }
 
+function IncidentAlertBridge() {
+  const navigate = useNavigate();
+  const [incident, setIncident] = useState(null);
+
+  useEffect(() => {
+    const handleIncidentAlert = (event) => {
+      setIncident(event.detail ?? {});
+    };
+
+    window.addEventListener("chainview:incident-alert", handleIncidentAlert);
+    return () => window.removeEventListener("chainview:incident-alert", handleIncidentAlert);
+  }, []);
+
+  useEffect(() => {
+    if (!incident) return undefined;
+
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") {
+        setIncident(null);
+      }
+    };
+
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [incident]);
+
+  if (!incident) {
+    return null;
+  }
+
+  const incidentId = Number(incident.incidentId) || undefined;
+  const incidentCode = incident.externalIncidentCode || incident.code || (incidentId ? `INC-${incidentId}` : "신규 인시던트");
+  const title = incident.title || "신규 인시던트가 발생했습니다.";
+  const description = incident.description || "영향 범위와 상태를 확인하고 후속 조치를 진행해 주세요.";
+
+  const goToIncident = () => {
+    setIncident(null);
+    navigate(incidentId ? `/dashboard?incidentId=${incidentId}` : "/admin-incidents");
+  };
+
+  return (
+    <section className="incident-alert-modal" role="alertdialog" aria-modal="true" aria-labelledby="incident-alert-title">
+      <button className="incident-alert-modal__backdrop" aria-label="인시던트 알림 닫기" onClick={() => setIncident(null)} type="button" />
+      <div className="incident-alert-modal__panel">
+        <div className="incident-alert-modal__head">
+          <span className="incident-alert-modal__icon" aria-hidden="true">
+            <AlertTriangle size={22} />
+          </span>
+          <div>
+            <span>{incidentCode}</span>
+            <h2 id="incident-alert-title">{title}</h2>
+          </div>
+          <button className="incident-alert-modal__close" aria-label="닫기" onClick={() => setIncident(null)} type="button">
+            <X size={20} />
+          </button>
+        </div>
+        <p className="incident-alert-modal__desc">{description}</p>
+        {incident.targetLabel ? (
+          <p className="incident-alert-modal__target">{incident.targetLabel}</p>
+        ) : null}
+        <div className="incident-alert-modal__actions">
+          <button className="btn" onClick={() => setIncident(null)} type="button">취소</button>
+          <button className="btn btn--primary" onClick={goToIncident} type="button">
+            <ExternalLink size={16} />
+            인시던트 확인
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function remoteQueryKeysForPath(pathname) {
   if (pathname === "/dashboard" || pathname === "/dashboard-proto") {
     return ["services", "relations", "owners", "incidents"];
@@ -434,6 +505,7 @@ export default function App() {
       <PortalDataProvider>
         <RealtimeRemoteGetRefresh />
         <AppRoutes />
+        <IncidentAlertBridge />
       </PortalDataProvider>
     </AuthProvider>
   );

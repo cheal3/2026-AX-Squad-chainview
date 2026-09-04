@@ -426,7 +426,7 @@ export function InfraRelationsPage() {
                   </td>
                 </tr>
               ))}
-              {!isLoading && !filteredRelations.length ? <tr><td colSpan={7}><div className="empty">조회된 인프라 관계가 없습니다.</div></td></tr> : null}
+              {!isLoading && !filteredRelations.length ? <tr><td colSpan={7}><div className="empty">조회 가능한 데이터가 없습니다.</div></td></tr> : null}
             </tbody>
           </table>
           <Pagination loading={isLoading} page={currentPage} setPage={setPage} suffix={dataSourceLabel} total={filteredRelations.length} />
@@ -873,7 +873,7 @@ export function InfraTopologyPage() {
                   </td>
                 </tr>
               ))}
-              {!isLoading && !filteredNodes.length ? <tr><td colSpan={8}><div className="empty">조회된 인프라 노드가 없습니다.</div></td></tr> : null}
+              {!isLoading && !filteredNodes.length ? <tr><td colSpan={8}><div className="empty">조회 가능한 데이터가 없습니다.</div></td></tr> : null}
             </tbody>
           </table>
           <Pagination loading={isLoading} page={currentPage} setPage={setPage} suffix={dataSourceLabel} total={filteredNodes.length} />

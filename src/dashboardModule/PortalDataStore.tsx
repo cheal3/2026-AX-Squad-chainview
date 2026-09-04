@@ -743,6 +743,20 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
         });
     }
 
+    window.dispatchEvent(
+      new CustomEvent("chainview:incident-alert", {
+        detail: {
+          code: nextIncident.externalIncidentCode,
+          description: nextIncident.description,
+          externalIncidentCode: nextIncident.externalIncidentCode,
+          incidentId: nextIncident.incidentId,
+          severityCode: nextIncident.severityCode,
+          targetLabel: nextIncident.targetLabel,
+          title: nextIncident.title,
+        },
+      })
+    );
+
     return nextIncident;
   };
 

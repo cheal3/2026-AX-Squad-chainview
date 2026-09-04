@@ -205,7 +205,7 @@ export function ServiceInfraMappingPage() {
                   </td>
                 </tr>
               ))}
-              {!isDataLoading && !filteredRows.length ? <tr><td colSpan={4}><div className="empty">조회된 서비스 배치 매핑이 없습니다.</div></td></tr> : null}
+              {!isDataLoading && !filteredRows.length ? <tr><td colSpan={4}><div className="empty">조회 가능한 데이터가 없습니다.</div></td></tr> : null}
             </tbody>
           </table>
           <Pagination

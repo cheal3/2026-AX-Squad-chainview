@@ -520,7 +520,11 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
     setOwnerModal(modal);
   };
   const openAdminModal = (mode, row) => {
-    setAdminModal({ mode, menu, record: row?.record ?? null });
+    const presetCategoryPath =
+      mode === "create" && menu === "services"
+        ? selectedServiceCategoryPath(listFilters)
+        : [];
+    setAdminModal({ mode, menu, presetCategoryPath, record: row?.record ?? null });
   };
   const handleEditRow = (row) => {
     if (menu === "owners") {
@@ -755,6 +759,9 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
                 </td>
               </tr>
             ))}
+            {!isTableLoading && !pagedRows.length ? (
+              <tr><td colSpan={config.columns.length + 2}><div className="empty">조회 가능한 데이터가 없습니다.</div></td></tr>
+            ) : null}
           </tbody>
         </table>
         <Pagination
@@ -1258,7 +1265,7 @@ function OwnerDirectoryView({
                     </tr>
                   ))}
                   {!selectedOwners.length ? (
-                    <tr><td colSpan={4}><div className="empty">등록된 담당자가 없습니다.</div></td></tr>
+                    <tr><td colSpan={4}><div className="empty">조회 가능한 데이터가 없습니다.</div></td></tr>
                   ) : null}
                 </tbody>
               </table>
@@ -1828,13 +1835,13 @@ function AdminRecordModal({ modal, onClose, portalData, serverById, serviceById 
   const isEdit = mode === "edit";
   const isCreate = mode === "create";
   const isDelete = mode === "delete";
-  const [form, setForm] = useState(() => buildAdminFormState(menu, record, portalData));
+  const [form, setForm] = useState(() => buildAdminFormState(menu, record, portalData, modal));
   const [saving, setSaving] = useState(false);
   const title = getAdminModalTitle(menu, mode, record);
 
   useEffect(() => {
-    setForm(buildAdminFormState(menu, record, portalData));
-  }, [menu, mode, record, portalData]);
+    setForm(buildAdminFormState(menu, record, portalData, modal));
+  }, [menu, mode, record, portalData, modal]);
 
   const updateField = useCallback((field, value) => {
     setForm((current) => ({ ...current, [field]: value }));
@@ -1975,13 +1982,17 @@ function AdminRecordModal({ modal, onClose, portalData, serverById, serviceById 
         window.alert("출발/대상 서비스를 선택해주세요.");
         return;
       }
+      const relationTypeCode = requireValue(form.relationTypeCode, "관계 유형");
+      const relationStatusCode = requireValue(form.relationStatusCode, "관계 상태");
+      const description = requireValue(form.description, "서비스 영향도");
+      if (!relationTypeCode || !relationStatusCode || !description) return;
       const payload = {
         sourceServiceId,
         targetServiceId,
-        relationTypeCode: form.relationTypeCode,
+        relationTypeCode,
         mandatoryYn: form.mandatoryYn,
-        relationStatusCode: form.relationStatusCode,
-        description: form.description.trim(),
+        relationStatusCode,
+        description,
       };
       if (isCreate) {
         const result = portalData.addRelation(payload);
@@ -1993,8 +2004,11 @@ function AdminRecordModal({ modal, onClose, portalData, serverById, serviceById 
         portalData.updateRelation(record.relationId, payload);
       }
     } else if (menu === "techstacks") {
+      const techTypeCode = requireValue(form.techTypeCode, "기술유형");
       const techName = requireValue(form.techName, "기술명");
-      if (!techName) return;
+      const versionText = requireValue(form.versionText, "버전");
+      const vendorName = requireValue(form.vendorName, "벤더");
+      if (!techTypeCode || !techName || !versionText || !vendorName) return;
       const serviceId = Number(form.serviceId) || portalData.services[0]?.serviceId;
       if (!serviceId) {
         window.alert("서비스를 선택해주세요.");
@@ -2002,14 +2016,14 @@ function AdminRecordModal({ modal, onClose, portalData, serverById, serviceById 
       }
       const payload = {
         serviceId,
-        techTypeCode: form.techTypeCode,
+        techTypeCode,
         techTypeName:
-          codeLabels.techType[form.techTypeCode] ||
+          codeLabels.techType[techTypeCode] ||
           form.techTypeName.trim() ||
           "서비스 기술",
         techName,
-        versionText: form.versionText.trim() || "-",
-        vendorName: form.vendorName.trim() || "-",
+        versionText,
+        vendorName,
       };
       if (isCreate) {
         portalData.addTechStack(payload);
@@ -2075,10 +2089,11 @@ function AdminRecordModal({ modal, onClose, portalData, serverById, serviceById 
     } else if (menu === "categories") {
       const categoryCode = requireValue(form.categoryCode, "분류코드");
       const categoryName = requireValue(form.categoryName, "분류명");
-      if (!categoryCode || !categoryName) return;
+      const categoryLevel = requireValue(form.categoryLevel, "레벨");
+      if (!categoryCode || !categoryName || !categoryLevel) return;
       const payload = {
         parentCategoryId: Number(form.parentCategoryId) || null,
-        categoryLevel: Number(form.categoryLevel) || 1,
+        categoryLevel: Number(categoryLevel) || 1,
         categoryCode,
         categoryName,
         sortOrder: Number(form.sortOrder) || 0,
@@ -3294,7 +3309,7 @@ function RelationAdminForm({ form, onChange, services, serviceById, isEdit, port
         <h4 className="form-section__title">관계 속성</h4>
         <div className="form-grid">
           <div className="form-row"><label>관계 유형<span className="req">*</span></label><CodeSelect labels={codeLabels.relationType} value={form.relationTypeCode} onChange={(value) => onChange("relationTypeCode", value)} /></div>
-          <div className="form-row"><label>관계 상태</label><CodeSelect labels={codeLabels.relationStatus} value={form.relationStatusCode} onChange={(value) => onChange("relationStatusCode", value)} /></div>
+          <div className="form-row"><label>관계 상태<span className="req">*</span></label><CodeSelect labels={codeLabels.relationStatus} value={form.relationStatusCode} onChange={(value) => onChange("relationStatusCode", value)} /></div>
           <div className="form-row full">
             <label>필수 여부</label>
             <label className="toggle-card">
@@ -3325,7 +3340,7 @@ function RelationAdminForm({ form, onChange, services, serviceById, isEdit, port
           </span>
         </h4>
         <div className="form-row">
-          <label>서비스 영향도</label>
+          <label>서비스 영향도<span className="req">*</span></label>
           <textarea
             value={form.description}
             onChange={(event) => onChange("description", event.target.value)}
@@ -3354,8 +3369,8 @@ function TechStackAdminForm({ form, onChange, services, isEdit }) {
         <div className="form-grid">
           <div className="form-row"><label>유형 (TECH_TYPE)<span className="req">*</span></label><CodeSelect labels={codeLabels.techType} value={form.techTypeCode} onChange={(value) => onChange("techTypeCode", value)} /></div>
           <div className="form-row"><label>기술명<span className="req">*</span></label><input type="text" value={form.techName} onChange={(event) => onChange("techName", event.target.value)} placeholder="예: Spring Boot" /></div>
-          <div className="form-row"><label>기본버전</label><input type="text" value={form.versionText} onChange={(event) => onChange("versionText", event.target.value)} placeholder="예: 3.2.5" /></div>
-          <div className="form-row"><label>벤더</label><input type="text" value={form.vendorName} onChange={(event) => onChange("vendorName", event.target.value)} placeholder="예: VMware" /></div>
+          <div className="form-row"><label>버전<span className="req">*</span></label><input type="text" value={form.versionText} onChange={(event) => onChange("versionText", event.target.value)} placeholder="예: 3.2.5" /></div>
+          <div className="form-row"><label>벤더<span className="req">*</span></label><input type="text" value={form.vendorName} onChange={(event) => onChange("vendorName", event.target.value)} placeholder="예: VMware" /></div>
         </div>
       </div>
     </>
@@ -3468,7 +3483,7 @@ function RemoteAdminForm({ form, isEdit, menu, onChange, portalData }) {
         <div className="form-grid">
           <div className="form-row"><label>분류코드<span className="req">*</span></label><input type="text" value={form.categoryCode} onChange={(event) => onChange("categoryCode", event.target.value.toUpperCase())} disabled={isEdit} /></div>
           <div className="form-row"><label>분류명<span className="req">*</span></label><input type="text" value={form.categoryName} onChange={(event) => onChange("categoryName", event.target.value)} /></div>
-          <div className="form-row"><label>레벨</label><input type="number" min="1" max="3" value={form.categoryLevel} onChange={(event) => onChange("categoryLevel", event.target.value)} disabled={isEdit} /></div>
+          <div className="form-row"><label>레벨<span className="req">*</span></label><input type="number" min="1" max="3" value={form.categoryLevel} onChange={(event) => onChange("categoryLevel", event.target.value)} disabled={isEdit} /></div>
           <div className="form-row"><label>상위 categoryId</label><input type="number" min="0" value={form.parentCategoryId} onChange={(event) => onChange("parentCategoryId", event.target.value)} disabled={isEdit} /></div>
           <div className="form-row"><label>정렬</label><input type="number" value={form.sortOrder} onChange={(event) => onChange("sortOrder", event.target.value)} /></div>
         </div>
@@ -3534,9 +3549,15 @@ function resolveTechTypeCode(record) {
   return matched?.[0] ?? "FRAMEWORK";
 }
 
-function buildAdminFormState(menu, record, portalData) {
+function selectedServiceCategoryPath(filters = {}) {
+  return [filters.categoryL1, filters.categoryL2, filters.categoryL3].filter(Boolean);
+}
+
+function buildAdminFormState(menu, record, portalData, modal = {}) {
   if (menu === "services") {
-    const categoryPath = record?.categoryPath ?? [];
+    const categoryPath = record?.categoryPath?.length
+      ? record.categoryPath
+      : modal.presetCategoryPath ?? [];
     const categorySelection = resolveCategorySelection(categoryPath, portalData.categories, record?.categoryId);
     const resolvedCategoryPath = categorySelection.categoryPath;
     const categoryId = record?.categoryId ? String(record.categoryId) : categorySelection.categoryId;

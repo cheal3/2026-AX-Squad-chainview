@@ -219,22 +219,23 @@ export function IncidentAdminPage() {
       portalData.services.find((item) => item.serviceCode === row.targetCode) ??
       portalData.services[0];
     const existing = portalData.incidents.find((incident) => incident.externalIncidentCode === row.code);
-    const incident =
-      existing ??
-      portalData.createIncident({
-        serviceId: service?.serviceId ?? 1,
-        severityCode: row.severityCode,
-        externalIncidentCode: row.code,
-        targetCode: row.targetCode,
-        targetLabel: row.targetLabel,
-        title: row.title,
-        description: `${row.code} 관리 화면에서 선택한 인시던트입니다.`,
-        startedAt: row.startedAt,
-        manualRegisteredYn: "Y",
-        registeredBy: "admin",
-      });
+    if (existing) {
+      navigate(`/dashboard?incidentId=${existing.incidentId}`);
+      return;
+    }
 
-    navigate(`/dashboard?incidentId=${incident.incidentId}`);
+    portalData.createIncident({
+      serviceId: service?.serviceId ?? 1,
+      severityCode: row.severityCode,
+      externalIncidentCode: row.code,
+      targetCode: row.targetCode,
+      targetLabel: row.targetLabel,
+      title: row.title,
+      description: `${row.code} 관리 화면에서 선택한 인시던트입니다.`,
+      startedAt: row.startedAt,
+      manualRegisteredYn: "Y",
+      registeredBy: "admin",
+    });
   };
 
   const handleCreateIncident = () => {
@@ -247,7 +248,7 @@ export function IncidentAdminPage() {
         return Number.isFinite(seq) ? Math.max(maxSeq, seq) : maxSeq;
       }, 142) + 1;
 
-    const incident = portalData.createIncident({
+    portalData.createIncident({
       serviceId: service?.serviceId ?? 1,
       severityCode: "MAJOR",
       externalIncidentCode: `INC-2026-${String(nextSeq).padStart(4, "0")}`,
@@ -258,8 +259,6 @@ export function IncidentAdminPage() {
       manualRegisteredYn: "Y",
       registeredBy: "admin",
     });
-
-    navigate(`/dashboard?incidentId=${incident.incidentId}`);
   };
 
   return (
@@ -393,6 +392,9 @@ export function IncidentAdminPage() {
                 </tr>
               );
             })}
+            {!isTableLoading && !pagedRows.length ? (
+              <tr><td colSpan={11}><div className="empty">조회 가능한 데이터가 없습니다.</div></td></tr>
+            ) : null}
           </tbody>
         </table>
         <Pagination

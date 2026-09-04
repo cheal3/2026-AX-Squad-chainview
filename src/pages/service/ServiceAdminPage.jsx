@@ -765,6 +765,7 @@ function ServiceTechStackTab({ detail, onDelete, onEdit, techStacks, service }) 
               </td>
             </tr>
           ))}
+          {!techRows.length ? <tr><td colSpan={6}><div className="empty">조회 가능한 데이터가 없습니다.</div></td></tr> : null}
         </tbody>
       </table>
     </section>
@@ -834,6 +835,7 @@ function ServiceDeploymentTab({ detail, onOpenDetail, onOpenInfraMap, server, se
               </td>
             </tr>
           ))}
+          {!detail.serverRows.length ? <tr><td colSpan={10}><div className="empty">조회 가능한 데이터가 없습니다.</div></td></tr> : null}
         </tbody>
       </table>
     </section>
@@ -889,6 +891,7 @@ function ServiceRelationTab({ detail, relations }) {
               <td className="col-actions"><div className="row-actions"><button className="ibtn" type="button">✏️</button><button className="ibtn ibtn--danger" type="button">🗑</button></div></td>
             </tr>
           ))}
+          {!relationRows.length ? <tr><td colSpan={8}><div className="empty">조회 가능한 데이터가 없습니다.</div></td></tr> : null}
         </tbody>
       </table>
     </section>
@@ -933,7 +936,7 @@ function ServiceChangeTab({ detail, rows, sourceLabel }) {
               <td>{row.after}</td>
             </tr>
           ))}
-          {!changeRows.length ? <tr><td colSpan={6}><div className="empty">변경 이력이 없습니다.</div></td></tr> : null}
+          {!changeRows.length ? <tr><td colSpan={6}><div className="empty">조회 가능한 데이터가 없습니다.</div></td></tr> : null}
         </tbody>
       </table>
     </section>
@@ -997,7 +1000,7 @@ function ServiceIncidentTab({ detail, incidents, onOpenDetail, service }) {
               </td>
             </tr>
           ))}
-          {!incidentRows.length ? <tr><td colSpan={7}><div className="empty">등록된 인시던트 이력이 없습니다.</div></td></tr> : null}
+          {!incidentRows.length ? <tr><td colSpan={7}><div className="empty">조회 가능한 데이터가 없습니다.</div></td></tr> : null}
         </tbody>
       </table>
     </section>

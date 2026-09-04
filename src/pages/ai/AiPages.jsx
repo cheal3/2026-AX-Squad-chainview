@@ -746,9 +746,9 @@ function AssistantTable({ table }) {
         <table className="ax-table">
           <thead><tr>{(table.headers || []).map((header) => <th key={header}>{header}</th>)}</tr></thead>
           <tbody>
-            {(table.rows || []).map((row, rowIndex) => (
+            {(table.rows || []).length ? (table.rows || []).map((row, rowIndex) => (
               <tr key={rowIndex}>{row.map((cell, cellIndex) => <td key={cellIndex}>{cell}</td>)}</tr>
-            ))}
+            )) : <tr><td colSpan={Math.max((table.headers || []).length, 1)}>조회 가능한 데이터가 없습니다.</td></tr>}
           </tbody>
         </table>
       </div>
@@ -1117,7 +1117,7 @@ export function AiRagKnowledgePage() {
           </div>
           <AssistantDataTable
             columns={["Category", "파일명", "크기", "수정일", "색인 상태", "작업"]}
-            emptyText={loading.page ? "불러오는 중..." : "등록된 문서가 없습니다."}
+            emptyText={loading.page ? "불러오는 중..." : "조회 가능한 데이터가 없습니다."}
             rows={filteredDocuments.map((doc) => {
               const path = doc.relativePath || doc.path || "";
               return [
@@ -1360,7 +1360,7 @@ export function AiRoutingRulesPage() {
           <p className="assistant-muted">메모리 적재 <b>{meta?.ruleCount ?? rules.length}</b>건 · 필터 결과 <b>{filteredRules.length}</b>건</p>
           <AssistantDataTable
             columns={["그룹", "Target", "모드", "패턴", "우선순위", "사용", "작업"]}
-            emptyText={loading.page ? "불러오는 중..." : "규칙이 없습니다."}
+            emptyText={loading.page ? "불러오는 중..." : "조회 가능한 데이터가 없습니다."}
             rows={pageRows.map((rule) => [
               rule.ruleGroup,
               rule.targetCode,
@@ -1407,7 +1407,7 @@ export function AiRoutingRulesPage() {
           ) : null}
           <AssistantDataTable
             columns={["그룹", "Target", "패턴", "우선순위", "설명"]}
-            emptyText="매칭 없음"
+            emptyText="조회 가능한 데이터가 없습니다."
             rows={(preview?.matches || []).map((match) => [
               match.ruleGroup,
               match.targetCode,
@@ -1431,7 +1431,7 @@ export function AiRoutingRulesPage() {
   );
 }
 
-function AssistantDataTable({ columns, emptyText = "데이터가 없습니다.", rows }) {
+function AssistantDataTable({ columns, emptyText = "조회 가능한 데이터가 없습니다.", rows }) {
   return (
     <div className="assistant-table-wrap">
       <table className="assistant-table">
