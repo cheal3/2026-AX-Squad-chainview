@@ -273,7 +273,7 @@ export function IncidentAdminPage() {
             <h1 className="page-head__title"><span className="page-head__icon" aria-hidden="true">🚨</span><span>인시던트 현황</span></h1>
           </div>
           <div className="page-head__right">
-            <button className="btn">📥 CSV 내보내기</button>
+            <button className="btn">📥 Excel 내보내기</button>
             <button className="btn btn--primary" onClick={handleCreateIncident} type="button">＋ 인시던트 등록</button>
           </div>
         </div>

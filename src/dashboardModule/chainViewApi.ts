@@ -70,6 +70,7 @@ export class ChainViewApiError extends Error {
 let csrfToken: string | null = null;
 let sessionPromise: Promise<void> | null = null;
 let hasAuthenticatedSession = false;
+let hasShownSessionAlert = false;
 
 export const chainViewApi = {
   auth: {
@@ -485,6 +486,9 @@ async function establishSession(employeeNo = chainViewEmployeeNo) {
   }
 
   if (!chainViewPassword) {
+    alertSessionFailureOnce(
+      "ChainView API 세션 생성에 실패했습니다.\nJSESSIONID 쿠키가 cross-site API 호출에 전송되도록 SameSite=None; Secure 설정을 확인해 주세요."
+    );
     throw new ChainViewApiError({
       authRequired: true,
       message:
@@ -512,6 +516,9 @@ async function establishDevLoginSession(employeeNo: string) {
 async function establishPasswordSession(employeeNo: string) {
   const token = await fetchCsrfTokenFrom("/login");
   if (!token) {
+    alertSessionFailureOnce(
+      "ChainView API 세션 생성에 실패했습니다.\n로그인 CSRF 토큰을 찾지 못했습니다."
+    );
     throw new ChainViewApiError({
       authRequired: true,
       message: "ChainView devLogin 세션 생성에 실패했고, 로그인 CSRF 토큰도 찾지 못했습니다.",
@@ -549,6 +556,15 @@ async function establishPasswordSession(employeeNo: string) {
     });
   }
   hasAuthenticatedSession = true;
+}
+
+function alertSessionFailureOnce(message: string) {
+  if (hasShownSessionAlert || typeof window === "undefined") {
+    return;
+  }
+
+  hasShownSessionAlert = true;
+  window.alert(message);
 }
 
 function buildDevLoginUrl(employeeNo: string) {

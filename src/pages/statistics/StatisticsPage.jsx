@@ -306,7 +306,7 @@ export function StatisticsPage({ activeMenu = "analysis-statistics", sectionLabe
                       {serviceStatusOptions.map((status) => <option key={status} value={status}>{codeLabels.serviceStatus[status] || status}</option>)}
                     </select>
                     <button className="btn" type="button" onClick={() => downloadRowsCsv("서비스-목록-상세.csv", serviceDetailExportColumns, filteredServiceDetailRows)}>
-                      <Download size={15} aria-hidden="true" /> 엑셀 다운로드
+                      <Download size={15} aria-hidden="true" /> Excel 내보내기
                     </button>
                   </>
                 )}
@@ -362,7 +362,7 @@ export function StatisticsPage({ activeMenu = "analysis-statistics", sectionLabe
                       {incidentStatusOptions.map((status) => <option key={status} value={status}>{codeLabels.incidentStatus[status] || status}</option>)}
                     </select>
                     <button className="btn" type="button" onClick={() => downloadRowsCsv("장애-이력.csv", incidentExportColumns, filteredIncidentDetailRows)}>
-                      <Download size={15} aria-hidden="true" /> 엑셀 다운로드
+                      <Download size={15} aria-hidden="true" /> Excel 내보내기
                     </button>
                   </>
                 )}
@@ -421,7 +421,7 @@ export function StatisticsPage({ activeMenu = "analysis-statistics", sectionLabe
                       <option value="required">필수 인입 많은 순</option>
                     </select>
                     <button className="btn" type="button" onClick={() => downloadRowsCsv("서비스별-의존성-상세.csv", dependencyExportColumns, filteredDependencyDetailRows)}>
-                      <Download size={15} aria-hidden="true" /> 엑셀 다운로드
+                      <Download size={15} aria-hidden="true" /> Excel 내보내기
                     </button>
                   </>
                 )}
@@ -483,7 +483,7 @@ export function StatisticsPage({ activeMenu = "analysis-statistics", sectionLabe
                       {techTypeOptions.map((type) => <option key={type} value={type}>{type}</option>)}
                     </select>
                     <button className="btn" type="button" onClick={() => downloadTechStackCsv(filteredTechStackExportRows)}>
-                      <Download size={15} aria-hidden="true" /> 엑셀 다운로드
+                      <Download size={15} aria-hidden="true" /> Excel 내보내기
                     </button>
                   </div>
                 </div>

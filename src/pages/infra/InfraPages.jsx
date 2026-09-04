@@ -374,7 +374,7 @@ export function InfraRelationsPage() {
             </div>
             <div className="page-head__right">
               <button className="btn" onClick={() => setGraphOpen(true)} type="button">🗺️ 관계도 보기</button>
-              <button className="btn" onClick={exportRelationsCsv} type="button">📥 CSV 내보내기</button>
+              <button className="btn" onClick={exportRelationsCsv} type="button">📥 Excel 내보내기</button>
               <button className="btn btn--primary" onClick={openCreateModal} type="button">＋ 관계 등록</button>
             </div>
           </div>
@@ -828,7 +828,7 @@ export function InfraTopologyPage() {
               <h1 className="page-head__title"><span className="page-head__icon" aria-hidden="true">🧱</span><span>인프라 토폴로지</span></h1>
             </div>
             <div className="page-head__right">
-              <button className="btn" onClick={exportNodesCsv} type="button">📥 CSV 내보내기</button>
+              <button className="btn" onClick={exportNodesCsv} type="button">📥 Excel 내보내기</button>
               <button className="btn btn--primary" onClick={openCreateModal} type="button">＋ 노드 등록</button>
             </div>
           </div>

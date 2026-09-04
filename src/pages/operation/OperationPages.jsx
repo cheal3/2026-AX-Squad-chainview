@@ -375,13 +375,60 @@ function toFriendlyTemplateValidationMessage(message) {
     .trim();
 }
 
-const notificationHistorySeed = [
-  { incidentCode: "INC-2506-0142", incidentTitle: "대외계 MCI 2호기 네트워크 간헐 단절", severity: "장애", progress: "진행중", channel: "이메일", sendStatus: "대기", targetType: "사용자", recipient: "오세훈 (CV1007)", contact: "cv1007@chainview.local", title: "[상세] MCI 영향 서비스 점검 요청", template: "INCIDENT_DETAIL_V1", sentAt: "2025-06-20 10:36" },
-  { incidentCode: "INC-2506-0141", incidentTitle: "대외계 MCI 2호기 네트워크 간헐 단절", severity: "주의", progress: "진행중", channel: "SMS", sendStatus: "성공", targetType: "대내외계 온콜그룹", recipient: "강하늘 (CV1008)", contact: "010-3000-1008", title: "[오류] 대외계 장애 알림", template: "INCIDENT_MAJOR_V1", sentAt: "2025-06-20 10:35" },
-  { incidentCode: "INC-2506-0140", incidentTitle: "대외계 MCI 2호기 네트워크 간헐 단절", severity: "주의", progress: "전파중", channel: "SMS", sendStatus: "성공", targetType: "대내외계 온콜그룹", recipient: "오세훈 (CV1007)", contact: "010-3000-1007", title: "[오류] 대외계 장애 알림", template: "INCIDENT_MAJOR_V1", sentAt: "2025-06-20 10:35" },
-  { incidentCode: "INC-2506-0139", incidentTitle: "대외계 MCI 2호기 네트워크 간헐 단절", severity: "주의", progress: "진행중", channel: "SMS", sendStatus: "성공", targetType: "대내외계 온콜그룹", recipient: "은가은 (CV1009)", contact: "010-3000-1009", title: "[오류] 대외계 장애 알림", template: "INCIDENT_MAJOR_V1", sentAt: "2025-06-20 10:35" },
-  { incidentCode: "INC-2506-0138", incidentTitle: "대외계 MCI 2호기 네트워크 간헐 단절", severity: "주의", progress: "진행중", channel: "알림톡", sendStatus: "성공", targetType: "채널통합 담당그룹", recipient: "오세훈 (CV1007)", contact: "010-3000-1007", title: "[장애] 대외계 MCI 2호기 네트워크 단절", template: "INCIDENT_MAJOR_V1", sentAt: "2025-06-20 10:35" },
-];
+function firstTextValue(...values) {
+  const matched = values.find((value) => value !== undefined && value !== null && String(value).trim() !== "");
+  return matched === undefined ? "" : String(matched);
+}
+
+function notificationChannelLabel(value) {
+  const text = String(value ?? "").trim().toUpperCase();
+  if (text === "EMAIL") return "이메일";
+  if (text === "ALIMTALK" || text === "KAKAO" || text === "KAKAOTALK") return "알림톡";
+  return firstTextValue(value, "-");
+}
+
+function notificationStatusLabel(value) {
+  const text = String(value ?? "").trim().toUpperCase();
+  if (["SUCCESS", "SENT", "DONE", "Y"].includes(text)) return "성공";
+  if (["FAILED", "FAIL", "ERROR", "N"].includes(text)) return "실패";
+  if (["WAITING", "PENDING", "READY"].includes(text)) return "대기";
+  return firstTextValue(value, "-");
+}
+
+function notificationTargetTypeLabel(value) {
+  const text = String(value ?? "").trim().toUpperCase();
+  if (text === "USER") return "사용자";
+  if (text === "GROUP") return "그룹";
+  return firstTextValue(value, "-");
+}
+
+function normalizeNotificationHistoryRow(row, index = 0, incidents = []) {
+  const incidentId = Number(row?.incidentId) || undefined;
+  const incident = incidents.find((item) => Number(item.incidentId) === incidentId);
+  const templateCode = firstTextValue(
+    row?.templateCode,
+    row?.notificationTemplateCode,
+    row?.template?.templateCode,
+    row?.template?.code
+  );
+
+  return {
+    incidentCode: firstTextValue(row?.incidentCode, row?.externalIncidentCode, incident?.externalIncidentCode),
+    incidentId,
+    incidentTitle: firstTextValue(row?.incidentTitle, row?.incidentName, row?.incident?.title, incident?.title, "-"),
+    progress: firstTextValue(row?.progress, row?.incidentStatusName, incident?.incidentStatusCode, "-"),
+    severity: firstTextValue(row?.severityName, row?.severityCode, incident?.severityCode, "-"),
+    channel: notificationChannelLabel(row?.channelName ?? row?.channelCode ?? row?.notificationTypeCode ?? row?.channel),
+    sendStatus: notificationStatusLabel(row?.sendStatusName ?? row?.sendStatusCode ?? row?.statusCode ?? row?.status),
+    targetType: notificationTargetTypeLabel(row?.targetTypeName ?? row?.targetTypeCode ?? row?.recipientTypeCode ?? row?.targetType),
+    recipient: firstTextValue(row?.recipientName, row?.receiverName, row?.targetName, row?.recipient, row?.receiver, "-"),
+    contact: firstTextValue(row?.contact, row?.contactValue, row?.recipientContact, row?.phoneNumber, row?.email, "-"),
+    title: firstTextValue(row?.notificationTitle, row?.messageTitle, row?.title, row?.subject, "-"),
+    template: templateCode || "-",
+    sentAt: formatOperationDate(row?.sentAt ?? row?.sendAt ?? row?.createdAt ?? row?.registeredAt) || "-",
+    rowKey: firstTextValue(row?.historyId, row?.notificationHistoryId, row?.notificationId, `${index}`),
+  };
+}
 
 function OperationPageShell({ activeMenu, action, children, description, icon, title }) {
   const meta = getOperationMenuMeta(activeMenu);
@@ -488,7 +535,9 @@ export function ServiceCheckPage() {
       setRowsState((nextRows || []).map(normalizeServiceCheckRow));
       setMessage("");
     } catch (error) {
-      setMessage(error?.message || "서비스 점검 목록을 불러오지 못했습니다.");
+      console.warn("서비스 점검 목록 조회 실패", error);
+      setMessage("");
+      setRowsState([]);
     } finally {
       setLoading(false);
     }
@@ -524,8 +573,9 @@ export function ServiceCheckPage() {
       setModal({ type: "form", row: normalizeServiceCheckRow({ ...row.raw, ...detail }) });
       setMessage("");
     } catch (error) {
+      console.warn("점검 상세 조회 실패", error);
       setModal({ type: "form", row });
-      setMessage(error?.message || "점검 상세 정보를 불러오지 못해 목록 정보로 수정 화면을 열었습니다.");
+      setMessage("");
     } finally {
       setLoading(false);
     }
@@ -557,8 +607,6 @@ export function ServiceCheckPage() {
         <select value={activeFilter} onChange={(event) => { setActiveFilter(event.target.value); setPage(1); }} aria-label="활성"><option value="all">활성 전체</option><option value="Y">Y</option><option value="N">N</option></select>
         <button className="btn" onClick={() => { setSearch(""); setTargetFilter("all"); setRunFilter("all"); setActiveFilter("all"); setPage(1); }} type="button"><RotateCcw size={14} /> 초기화</button>
       </div>
-      {message ? <div className="op-inline-alert">{message}</div> : null}
-
       <div className="card operation-card">
         {loading ? <div className="op-loading-line">서비스 점검 목록을 불러오는 중...</div> : null}
         <table className="tbl operation-table operation-table--checks">
@@ -892,7 +940,9 @@ function ServiceCheckHistoryModal({ onClose, row }) {
       setHistory(normalized.length ? normalized : []);
       setMessage("");
     } catch (error) {
-      setMessage(error?.message || "점검 이력을 불러오지 못했습니다.");
+      console.warn("점검 이력 조회 실패", error);
+      setMessage("");
+      setHistory([]);
     } finally {
       setLoading(false);
     }
@@ -907,7 +957,6 @@ function ServiceCheckHistoryModal({ onClose, row }) {
         <div className="modal__head"><h3>점검 이력 - {row?.name}</h3><button className="close" onClick={onClose} type="button"><X size={18} /></button></div>
         <div className="modal__body">
           <p className="op-modal-desc">선택한 서비스 점검의 최근 실행 결과입니다.</p>
-          {message ? <div className="op-inline-alert op-inline-alert--danger">{message}</div> : null}
           {loading ? <div className="op-loading-line">점검 이력을 불러오는 중...</div> : null}
           <table className="tbl operation-table operation-table--history"><thead><tr><th>시간</th><th>결과</th><th>Latency</th><th>HTTP</th><th>실패 사유</th><th>응답 요약</th><th>알림</th><th>비고</th></tr></thead><tbody>{history.length ? history.map((item) => <tr key={item.join("-")}><td>{item[0]}</td><td><span className={`pill ${item[1] === "성공" ? "pill--ok" : "pill--crit"}`}>{item[1]}</span></td><td>{item[2]}</td><td>{item[3]}</td><td>{item[4]}</td><td><code>{item[5]}</code></td><td>{item[6]}</td><td>{item[7]}</td></tr>) : <tr><td colSpan={8}>조회 가능한 데이터가 없습니다.</td></tr>}</tbody></table>
         </div>
@@ -926,29 +975,35 @@ export function NotificationHistoryPage() {
   const [recipientFilter, setRecipientFilter] = useState("all");
   const [page, setPage] = useState(1);
   const [detail, setDetail] = useState(null);
+  const [historyRows, setHistoryRows] = useState([]);
+  const [loading, setLoading] = useState(false);
   const pageSize = OPERATION_PAGE_SIZE;
   const linkedIncidents = [...portalData.incidents].sort((left, right) =>
     String(right.startedAt || "").localeCompare(String(left.startedAt || ""))
   );
-  const baseRows = Array.from(
-    { length: 20 },
-    (_, index) => notificationHistorySeed[index % notificationHistorySeed.length]
-  ).map((row, index) => {
-    const incident = linkedIncidents[index % Math.max(1, linkedIncidents.length)];
-    return {
-      ...row,
-      incidentCode:
-        incident?.externalIncidentCode ?? `INC-2506-${String(142 - index).padStart(4, "0")}`,
-      incidentId: incident?.incidentId,
-      incidentTitle: incident?.title ?? row.incidentTitle,
-      progress: incident?.incidentStatusCode === "RESOLVED" ? "종료" : "진행중",
-      severity: incident?.severityCode ?? row.severity,
-      recipient:
-        index >= notificationHistorySeed.length
-          ? `${row.recipient.split(" ")[0]} (CV${String(1010 + index)})`
-          : row.recipient,
-    };
-  });
+  const loadNotificationHistories = async () => {
+    setLoading(true);
+    try {
+      const response = await chainViewApi.notificationHistories.list();
+      const list = Array.isArray(response)
+        ? response
+        : Array.isArray(response?.content)
+          ? response.content
+          : Array.isArray(response?.items)
+            ? response.items
+            : [];
+      setHistoryRows(list.map((row, index) => normalizeNotificationHistoryRow(row, index, linkedIncidents)));
+    } catch (error) {
+      console.warn("알림 전송 이력 조회 실패", error);
+      setHistoryRows([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+  useEffect(() => {
+    void loadNotificationHistories();
+  }, []);
+  const baseRows = historyRows;
   const recipientOptions = [...new Set(baseRows.map((row) => row.recipient).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ko"));
   const resetFilters = () => {
     setSearch("");
@@ -1015,10 +1070,11 @@ export function NotificationHistoryPage() {
                 <td title={row.sentAt}>{row.sentAt}</td>
               </tr>
             ))}
-            {!pagedRows.length ? <tr><td colSpan={7}>조회 가능한 데이터가 없습니다.</td></tr> : null}
+            {loading ? <tr><td colSpan={7}><div className="inline-data-loader" role="status" aria-live="polite"><span className="portal-initial-loader__ring" aria-hidden="true" /><strong>알림 전송 이력을 불러오는 중입니다.</strong></div></td></tr> : null}
+            {!loading && !pagedRows.length ? <tr><td colSpan={7}><div className="empty">조회 가능한 데이터가 없습니다.</div></td></tr> : null}
           </tbody>
         </table>
-        <OperationPager page={page} pageSize={pageSize} setPage={setPage} total={rows.length} />
+        <OperationPager loading={loading} page={page} pageSize={pageSize} setPage={setPage} total={rows.length} />
       </div>
       {detail ? <NotificationDetailModal detail={detail} onClose={() => setDetail(null)} /> : null}
     </OperationPageShell>
@@ -1046,11 +1102,9 @@ export function NotificationTemplatePage() {
   const [modal, setModal] = useState(null);
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [loadError, setLoadError] = useState("");
   const pageSize = OPERATION_PAGE_SIZE;
   const loadTemplates = async () => {
     setLoading(true);
-    setLoadError("");
     try {
       const remoteRows = await chainViewApi.notificationTemplates.list();
       const list = Array.isArray(remoteRows)
@@ -1063,7 +1117,6 @@ export function NotificationTemplatePage() {
       setTemplates(list.map(normalizeTemplateRow));
     } catch (error) {
       console.warn("알림 템플릿 목록 조회 실패", error);
-      setLoadError(error?.message || "알림 템플릿 목록 조회에 실패했습니다.");
       setTemplates([]);
     } finally {
       setLoading(false);
@@ -1144,7 +1197,7 @@ export function NotificationTemplatePage() {
         <label className="search"><Search size={15} /><input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="템플릿 코드, 이름, 설명 검색..." type="text" /></label>
         <button className="btn" onClick={loadTemplates} type="button"><RotateCcw size={14} /> 새로고침</button>
       </div>
-      <div className="operation-summary"><b>총 {rows.length}개 템플릿</b>{loading ? <span>조회 중</span> : null}{loadError ? <span className="text-red-600">{loadError}</span> : null}</div>
+      <div className="operation-summary"><b>총 {rows.length}개 템플릿</b>{loading ? <span>조회 중</span> : null}</div>
       <div className="card operation-card">
         {loading && !rows.length ? (
           <div className="inline-data-loader" role="status" aria-live="polite">

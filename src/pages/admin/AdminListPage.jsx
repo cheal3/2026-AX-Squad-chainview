@@ -612,7 +612,7 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
             <h1 className="page-head__title"><span className="page-head__icon" aria-hidden="true">{meta.icon}</span><span>{meta.label}</span></h1>
           </div>
           <div className="page-head__right">
-            <button className="btn" onClick={exportCsv} type="button">📥 CSV 내보내기</button>
+            <button className="btn" onClick={exportCsv} type="button">📥 Excel 내보내기</button>
             {config.actionLabel ? (
               <button
                 className="btn btn--primary"
