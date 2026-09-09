@@ -119,6 +119,14 @@ function notifyInfraMutationFailure(error, fallback) {
   window.alert(remoteErrorMessage(error, fallback));
 }
 
+function infraRequiredNotice(labels) {
+  return `${labels.join(", ")}는 필수 값입니다.`;
+}
+
+function focusInfraNotice(ref) {
+  window.requestAnimationFrame(() => ref.current?.focus());
+}
+
 function buildInfraNodePayload(form) {
   return {
     nodeCode: String(form.nodeCode ?? "").trim(),
@@ -167,6 +175,8 @@ export function InfraRelationsPage() {
   const [nodeTypeFilter, setNodeTypeFilter] = useState("");
   const [nodeStatusFilter, setNodeStatusFilter] = useState("");
   const [modal, setModal] = useState(null);
+  const [validationMessage, setValidationMessage] = useState("");
+  const validationRef = useRef(null);
   const [graphOpen, setGraphOpen] = useState(false);
   const [graphFocusNodeId, setGraphFocusNodeId] = useState(remoteInfraEnabled ? "" : initialInfraNodes[0]?.infraNodeId ?? "");
   const [dataSourceLabel, setDataSourceLabel] = useState(remoteInfraEnabled ? "운영 API 조회 중" : "스냅샷 기준");
@@ -278,6 +288,7 @@ export function InfraRelationsPage() {
     );
   };
   const openCreateModal = () => {
+    setValidationMessage("");
     setModal({
       mode: "create",
       form: {
@@ -290,18 +301,29 @@ export function InfraRelationsPage() {
       },
     });
   };
-  const openEditModal = (relation) => setModal({ mode: "edit", form: { ...relation } });
+  const openEditModal = (relation) => {
+    setValidationMessage("");
+    setModal({ mode: "edit", form: { ...relation } });
+  };
   const updateModalField = (fieldName, value) => {
+    setValidationMessage("");
     setModal((current) => current ? { ...current, form: { ...current.form, [fieldName]: value } } : current);
   };
   const saveModal = async () => {
     const form = modal?.form;
-    if (!form?.sourceInfraNodeId || !form?.targetInfraNodeId) {
-      window.alert("source/target 인프라 노드를 선택해주세요.");
+    const missing = [
+      ...(!form?.sourceInfraNodeId ? ["source 인프라"] : []),
+      ...(!form?.targetInfraNodeId ? ["target 인프라"] : []),
+      ...(!String(form?.relationTypeCode ?? "").trim() ? ["관계 유형"] : []),
+    ];
+    if (missing.length) {
+      setValidationMessage(infraRequiredNotice(missing));
+      focusInfraNotice(validationRef);
       return;
     }
     if (Number(form.sourceInfraNodeId) === Number(form.targetInfraNodeId)) {
-      window.alert("source와 target 인프라 노드는 달라야 합니다.");
+      setValidationMessage("source와 target 인프라 노드는 달라야 합니다.");
+      focusInfraNotice(validationRef);
       return;
     }
     const nextRelation = {
@@ -428,6 +450,11 @@ export function InfraRelationsPage() {
                 <button className="close" onClick={() => setModal(null)} type="button">×</button>
               </div>
               <div className="modal__body">
+                {validationMessage ? (
+                  <div className="form-validation-notice" ref={validationRef} tabIndex={-1} role="alert">
+                    {validationMessage}
+                  </div>
+                ) : null}
                 <div className="form-section">
                   <h4 className="form-section__title">연결 인프라</h4>
                   <div className="form-grid">
@@ -675,6 +702,8 @@ export function InfraTopologyPage() {
   const [typeFilter, setTypeFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [modal, setModal] = useState(null);
+  const [validationMessage, setValidationMessage] = useState("");
+  const validationRef = useRef(null);
   const [dataSourceLabel, setDataSourceLabel] = useState(remoteInfraEnabled ? "운영 API 조회 중" : "스냅샷 기준");
   const [page, setPage] = useState(1);
   useEffect(() => {
@@ -749,6 +778,7 @@ export function InfraTopologyPage() {
     );
   };
   const openCreateModal = () => {
+    setValidationMessage("");
     setModal({
       mode: "create",
       form: {
@@ -763,15 +793,22 @@ export function InfraTopologyPage() {
     });
   };
   const openEditModal = (node) => {
+    setValidationMessage("");
     setModal({ mode: "edit", form: { ...node } });
   };
   const updateModalField = (field, value) => {
+    setValidationMessage("");
     setModal((current) => current ? { ...current, form: { ...current.form, [field]: value } } : current);
   };
   const saveModal = async () => {
     const form = modal?.form;
-    if (!form?.nodeCode?.trim() || !form?.nodeName?.trim()) {
-      window.alert("노드 코드와 노드 이름은 필수입니다.");
+    const missing = [
+      ...(!String(form?.nodeCode ?? "").trim() ? ["노드 코드"] : []),
+      ...(!String(form?.nodeName ?? "").trim() ? ["노드 이름"] : []),
+    ];
+    if (missing.length) {
+      setValidationMessage(infraRequiredNotice(missing));
+      focusInfraNotice(validationRef);
       return;
     }
     const payload = buildInfraNodePayload(form);
@@ -886,6 +923,11 @@ export function InfraTopologyPage() {
                 <button className="close" onClick={() => setModal(null)} type="button">×</button>
               </div>
               <div className="modal__body">
+                {validationMessage ? (
+                  <div className="form-validation-notice" ref={validationRef} tabIndex={-1} role="alert">
+                    {validationMessage}
+                  </div>
+                ) : null}
                 <div className="form-section">
                   <h4 className="form-section__title">노드 정보</h4>
                   <div className="form-grid">

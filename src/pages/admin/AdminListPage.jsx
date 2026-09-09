@@ -1451,6 +1451,8 @@ function downloadAdminXlsx(filename, columns, rows) {
 function GroupMemberModal({ group, onClose, portalData }) {
   const [saving, setSaving] = useState(false);
   const [loadingMembers, setLoadingMembers] = useState(false);
+  const [validationMessage, setValidationMessage] = useState("");
+  const validationRef = useRef(null);
   const [form, setForm] = useState(() => ({
     groupRole: "정담당",
     userIds: groupMembersForGroup(group, portalData.users).map((user) => String(field(user, "userId", ""))).filter(Boolean),
@@ -1505,6 +1507,11 @@ function GroupMemberModal({ group, onClose, portalData }) {
     const selectedUserIds = Array.isArray(form.userIds)
       ? form.userIds.map(String).filter(Boolean)
       : [];
+    if (!selectedUserIds.length) {
+      setValidationMessage(requiredNotice(["구성원"]));
+      focusValidationNotice(validationRef);
+      return;
+    }
     setSaving(true);
     const result = await syncGroupMembers({
       currentGroup: group,
@@ -1531,6 +1538,11 @@ function GroupMemberModal({ group, onClose, portalData }) {
           <button className="close" onClick={onClose} type="button">×</button>
         </div>
         <div className="modal__body">
+          {validationMessage ? (
+            <div className="form-validation-notice" ref={validationRef} tabIndex={-1} role="alert">
+              {validationMessage}
+            </div>
+          ) : null}
           <div className="form-section">
             <h4 className="form-section__title">"{field(group, "groupName", "그룹")}" 구성원을 선택합니다.</h4>
             <div className="form-grid">
@@ -1538,7 +1550,10 @@ function GroupMemberModal({ group, onClose, portalData }) {
                 <label>그룹 내 역할</label>
                 <select
                   value={form.groupRole}
-                  onChange={(event) => setForm((current) => ({ ...current, groupRole: event.target.value }))}
+                  onChange={(event) => {
+                    setValidationMessage("");
+                    setForm((current) => ({ ...current, groupRole: event.target.value }));
+                  }}
                 >
                   {groupRoleOptions.map((role) => <option key={role} value={role}>{role}</option>)}
                 </select>
@@ -1549,7 +1564,10 @@ function GroupMemberModal({ group, onClose, portalData }) {
               <UserMultiSelect
                 users={portalData.users}
                 value={form.userIds}
-                onChange={(value) => setForm((current) => ({ ...current, userIds: value }))}
+                onChange={(value) => {
+                  setValidationMessage("");
+                  setForm((current) => ({ ...current, userIds: value }));
+                }}
               />
               {loadingMembers ? <p className="form-hint">구성원 조회 중...</p> : null}
             </div>
@@ -1819,6 +1837,14 @@ function isValidServiceCode(value) {
   return /^[A-Z0-9_-]+(?:-[A-Z0-9_-]+)*$/.test(String(value ?? ""));
 }
 
+function requiredNotice(labels) {
+  return `${labels.join(", ")}는 필수 값입니다.`;
+}
+
+function focusValidationNotice(ref) {
+  window.requestAnimationFrame(() => ref.current?.focus());
+}
+
 function AdminRecordModal({ modal, onClose, portalData, serverById, serviceById }) {
   const { mode, menu, record } = modal;
   const isEdit = mode === "edit";
@@ -1826,6 +1852,8 @@ function AdminRecordModal({ modal, onClose, portalData, serverById, serviceById 
   const isDelete = mode === "delete";
   const [form, setForm] = useState(() => buildAdminFormState(menu, record, portalData, modal));
   const [saving, setSaving] = useState(false);
+  const [validationMessage, setValidationMessage] = useState("");
+  const validationRef = useRef(null);
   const title = getAdminModalTitle(menu, mode, record);
 
   useEffect(() => {
@@ -1834,14 +1862,22 @@ function AdminRecordModal({ modal, onClose, portalData, serverById, serviceById 
 
   const updateField = useCallback((field, value) => {
     setForm((current) => ({ ...current, [field]: value }));
+    setValidationMessage("");
   }, []);
-  const requireValue = (value, label) => {
-    const cleaned = String(value ?? "").trim();
-    if (!cleaned) {
-      window.alert(`${label} 값을 입력해주세요.`);
-      return null;
+  const showValidation = (message) => {
+    setValidationMessage(message);
+    focusValidationNotice(validationRef);
+  };
+  const cleanedValue = (value) => String(value ?? "").trim();
+  const collectMissing = (items) =>
+    items.filter(([value]) => !cleanedValue(value)).map(([, label]) => label);
+  const validateRequired = (items) => {
+    const missing = collectMissing(items);
+    if (missing.length) {
+      showValidation(requiredNotice(missing));
+      return false;
     }
-    return cleaned;
+    return true;
   };
   const handleSubmit = async () => {
     if (saving) return;
@@ -1873,26 +1909,27 @@ function AdminRecordModal({ modal, onClose, portalData, serverById, serviceById 
 
     if (menu === "services") {
       setSaving(true);
-      const serviceCode = requireValue((form.serviceCode || "").toUpperCase(), "서비스 코드")?.toUpperCase();
-      const serviceName = requireValue(form.serviceName, "서비스명");
+      const serviceCode = cleanedValue(form.serviceCode).toUpperCase();
+      const serviceName = cleanedValue(form.serviceName);
       const categoryPath = buildSelectedCategoryPath(form, portalData.categories);
-      const categoryL1 = requireValue(categoryPath[0], "분류 1단계");
-      if (!serviceCode || !serviceName || !categoryL1) {
-        setSaving(false);
-        return;
-      }
-      if (!isValidServiceCode(serviceCode)) {
-        window.alert("서비스 코드는 대문자, 숫자, _, - 만 사용할 수 있습니다.");
-        setSaving(false);
-        return;
-      }
       const selectedServerIds = normalizeSelectedServerIds(
         form.serverIds,
         form.serverId,
         portalData.servers
       );
-      if (!selectedServerIds.length) {
-        window.alert("배포 서버를 1개 이상 선택해주세요.");
+      const missing = collectMissing([
+        [serviceCode, "서비스 코드"],
+        [serviceName, "서비스명"],
+        [categoryPath[0], "분류 1단계"],
+      ]);
+      if (!selectedServerIds.length) missing.push("배포 서버");
+      if (missing.length) {
+        showValidation(requiredNotice(missing));
+        setSaving(false);
+        return;
+      }
+      if (!isValidServiceCode(serviceCode)) {
+        showValidation("서비스 코드는 대문자, 숫자, _, - 만 사용할 수 있습니다.");
         setSaving(false);
         return;
       }
@@ -1938,10 +1975,10 @@ function AdminRecordModal({ modal, onClose, portalData, serverById, serviceById 
       onClose();
       return;
     } else if (menu === "servers") {
-      const serverName = requireValue(form.serverName, "서버명");
-      const hostName = requireValue(form.hostName, "호스트명");
-      const ipAddress = requireValue(form.ipAddress, "IP 주소");
-      if (!serverName || !hostName || !ipAddress) return;
+      if (!validateRequired([[form.serverName, "서버명"], [form.hostName, "호스트명"], [form.ipAddress, "IP 주소"]])) return;
+      const serverName = cleanedValue(form.serverName);
+      const hostName = cleanedValue(form.hostName);
+      const ipAddress = cleanedValue(form.ipAddress);
       const infraNode = findInfraNodeOption(portalData.servers, form.infraNodeId);
       const serverRoleCode = form.serverRoleCode || "WAS";
       const payload = {
@@ -1967,14 +2004,18 @@ function AdminRecordModal({ modal, onClose, portalData, serverById, serviceById 
     } else if (menu === "relations") {
       const sourceServiceId = Number(form.sourceServiceId);
       const targetServiceId = Number(form.targetServiceId);
-      if (!sourceServiceId || !targetServiceId) {
-        window.alert("출발/대상 서비스를 선택해주세요.");
+      const missing = [
+        ...(!sourceServiceId ? ["출발 서비스"] : []),
+        ...(!targetServiceId ? ["대상 서비스"] : []),
+        ...collectMissing([[form.relationTypeCode, "관계 유형"], [form.relationStatusCode, "관계 상태"], [form.description, "서비스 영향도"]]),
+      ];
+      if (missing.length) {
+        showValidation(requiredNotice(missing));
         return;
       }
-      const relationTypeCode = requireValue(form.relationTypeCode, "관계 유형");
-      const relationStatusCode = requireValue(form.relationStatusCode, "관계 상태");
-      const description = requireValue(form.description, "서비스 영향도");
-      if (!relationTypeCode || !relationStatusCode || !description) return;
+      const relationTypeCode = cleanedValue(form.relationTypeCode);
+      const relationStatusCode = cleanedValue(form.relationStatusCode);
+      const description = cleanedValue(form.description);
       const payload = {
         sourceServiceId,
         targetServiceId,
@@ -1993,16 +2034,17 @@ function AdminRecordModal({ modal, onClose, portalData, serverById, serviceById 
         portalData.updateRelation(record.relationId, payload);
       }
     } else if (menu === "techstacks") {
-      const techTypeCode = requireValue(form.techTypeCode, "기술유형");
-      const techName = requireValue(form.techName, "기술명");
-      const versionText = requireValue(form.versionText, "버전");
-      const vendorName = requireValue(form.vendorName, "벤더");
-      if (!techTypeCode || !techName || !versionText || !vendorName) return;
       const serviceId = Number(form.serviceId) || portalData.services[0]?.serviceId;
-      if (!serviceId) {
-        window.alert("서비스를 선택해주세요.");
+      const missing = collectMissing([[form.techTypeCode, "기술유형"], [form.techName, "기술명"], [form.versionText, "버전"], [form.vendorName, "벤더"]]);
+      if (!serviceId) missing.push("서비스");
+      if (missing.length) {
+        showValidation(requiredNotice(missing));
         return;
       }
+      const techTypeCode = cleanedValue(form.techTypeCode);
+      const techName = cleanedValue(form.techName);
+      const versionText = cleanedValue(form.versionText);
+      const vendorName = cleanedValue(form.vendorName);
       const payload = {
         serviceId,
         techTypeCode,
@@ -2020,9 +2062,9 @@ function AdminRecordModal({ modal, onClose, portalData, serverById, serviceById 
         portalData.updateTechStack(record.techStackId, payload);
       }
     } else if (menu === "users") {
-      const employeeNo = requireValue(form.employeeNo, "사번");
-      const userName = requireValue(form.userName, "이름");
-      if (!employeeNo || !userName) return;
+      if (!validateRequired([[form.employeeNo, "사번"], [form.userName, "이름"]])) return;
+      const employeeNo = cleanedValue(form.employeeNo);
+      const userName = cleanedValue(form.userName);
       const payload = {
         employeeNo,
         userName,
@@ -2039,9 +2081,9 @@ function AdminRecordModal({ modal, onClose, portalData, serverById, serviceById 
         portalData.updateUser(Number(record.userId), payload);
       }
     } else if (menu === "groups") {
-      const groupCode = requireValue(form.groupCode, "groupCode");
-      const groupName = requireValue(form.groupName, "그룹명");
-      if (!groupCode || !groupName) return;
+      if (!validateRequired([[form.groupCode, "groupCode"], [form.groupName, "그룹명"]])) return;
+      const groupCode = cleanedValue(form.groupCode);
+      const groupName = cleanedValue(form.groupName);
       const categoryPath = buildSelectedCategoryPath(form, portalData.categories).filter(Boolean);
       const payload = {
         groupCode,
@@ -2076,10 +2118,10 @@ function AdminRecordModal({ modal, onClose, portalData, serverById, serviceById 
         return;
       }
     } else if (menu === "categories") {
-      const categoryCode = requireValue(form.categoryCode, "분류코드");
-      const categoryName = requireValue(form.categoryName, "분류명");
-      const categoryLevel = requireValue(form.categoryLevel, "레벨");
-      if (!categoryCode || !categoryName || !categoryLevel) return;
+      if (!validateRequired([[form.categoryCode, "분류코드"], [form.categoryName, "분류명"], [form.categoryLevel, "레벨"]])) return;
+      const categoryCode = cleanedValue(form.categoryCode);
+      const categoryName = cleanedValue(form.categoryName);
+      const categoryLevel = cleanedValue(form.categoryLevel);
       const payload = {
         parentCategoryId: Number(form.parentCategoryId) || null,
         categoryLevel: Number(categoryLevel) || 1,
@@ -2093,10 +2135,10 @@ function AdminRecordModal({ modal, onClose, portalData, serverById, serviceById 
         portalData.updateCategory(Number(record.categoryId), payload);
       }
     } else if (menu === "codes") {
-      const codeGroup = requireValue(form.codeGroup, "코드그룹");
-      const code = requireValue(form.code, "코드");
-      const codeName = requireValue(form.codeName, "코드명");
-      if (!codeGroup || !code || !codeName) return;
+      if (!validateRequired([[form.codeGroup, "코드그룹"], [form.code, "코드"], [form.codeName, "코드명"]])) return;
+      const codeGroup = cleanedValue(form.codeGroup);
+      const code = cleanedValue(form.code);
+      const codeName = cleanedValue(form.codeName);
       const payload = {
         codeGroup,
         code,
@@ -2113,8 +2155,16 @@ function AdminRecordModal({ modal, onClose, portalData, serverById, serviceById 
     } else if (menu === "deployments") {
       const serviceId = Number(form.serviceId);
       const serverId = Number(form.serverId);
-      const deployPath = requireValue(form.deployPath, "배포 경로");
-      if (!serviceId || !serverId || !deployPath) return;
+      const missing = [
+        ...(!serviceId ? ["서비스"] : []),
+        ...(!serverId ? ["서버"] : []),
+        ...collectMissing([[form.deployPath, "배포 경로"]]),
+      ];
+      if (missing.length) {
+        showValidation(requiredNotice(missing));
+        return;
+      }
+      const deployPath = cleanedValue(form.deployPath);
       const service = portalData.services.find((item) => item.serviceId === serviceId);
       const server = portalData.servers.find((item) => item.serverId === serverId);
       const payload = {
@@ -2164,6 +2214,11 @@ function AdminRecordModal({ modal, onClose, portalData, serverById, serviceById 
           <button className="close" onClick={onClose} type="button">×</button>
         </div>
         <div className="modal__body">
+          {validationMessage ? (
+            <div className="form-validation-notice" ref={validationRef} tabIndex={-1} role="alert">
+              {validationMessage}
+            </div>
+          ) : null}
           {menu === "services" ? (
             <ServiceAdminForm
               form={form}
@@ -3757,7 +3812,10 @@ function OwnerManagementModals({ modal, onClose, owner, portalData, services }) 
     startDate: owner?.startDate ?? "",
     endDate: owner?.endDate ?? "",
   }));
+  const [validationMessage, setValidationMessage] = useState("");
+  const validationRef = useRef(null);
   const updateField = (field, value) => {
+    setValidationMessage("");
     setForm((current) => {
       if (field === "ownerTypeCode") {
         return {
@@ -3793,16 +3851,14 @@ function OwnerManagementModals({ modal, onClose, owner, portalData, services }) 
       endDate: form.endDate,
     };
 
-    if (!payload.serviceId) {
-      window.alert("서비스를 선택해주세요.");
-      return;
-    }
-    if (ownerTypeCode === "GROUP" && !payload.groupId) {
-      window.alert("그룹을 선택해주세요.");
-      return;
-    }
-    if (ownerTypeCode === "USER" && !payload.userId) {
-      window.alert("사용자를 선택해주세요.");
+    const missing = [
+      ...(!payload.serviceId ? ["서비스"] : []),
+      ...(ownerTypeCode === "GROUP" && !payload.groupId ? ["그룹"] : []),
+      ...(ownerTypeCode === "USER" && !payload.userId ? ["사용자"] : []),
+    ];
+    if (missing.length) {
+      setValidationMessage(requiredNotice(missing));
+      focusValidationNotice(validationRef);
       return;
     }
 
@@ -3841,6 +3897,11 @@ function OwnerManagementModals({ modal, onClose, owner, portalData, services }) 
           <button className="close" onClick={handleClose} type="button">×</button>
         </div>
         <div className="modal__body">
+          {validationMessage ? (
+            <div className="form-validation-notice" ref={validationRef} tabIndex={-1} role="alert">
+              {validationMessage}
+            </div>
+          ) : null}
           <div className="form-section">
             <h4 className="form-section__title">연결 서비스</h4>
             <div className="form-row">

@@ -1462,6 +1462,8 @@ function AssistantModal({ children, onClose, title }) {
 }
 
 function RoutingRuleModal({ groups, loading, onClose, onSubmit, rule }) {
+  const [validationMessage, setValidationMessage] = useState("");
+  const validationRef = useRef(null);
   const [form, setForm] = useState({
     ruleId: rule.ruleId || null,
     ruleGroup: rule.ruleGroup || groups[0] || "",
@@ -1473,10 +1475,20 @@ function RoutingRuleModal({ groups, loading, onClose, onSubmit, rule }) {
     enabledYn: rule.enabledYn || "Y",
     description: rule.description || "",
   });
-  const update = (key, value) => setForm((current) => ({ ...current, [key]: value }));
+  const update = (key, value) => {
+    setValidationMessage("");
+    setForm((current) => ({ ...current, [key]: value }));
+  };
   const submit = () => {
-    if (!form.ruleGroup || !form.targetCode || !form.matchMode || !form.pattern) {
-      window.alert("규칙 그룹, Target 코드, 매칭 모드, 패턴을 입력하세요.");
+    const missing = [
+      ...(!String(form.ruleGroup ?? "").trim() ? ["규칙 그룹"] : []),
+      ...(!String(form.targetCode ?? "").trim() ? ["Target 코드"] : []),
+      ...(!String(form.matchMode ?? "").trim() ? ["매칭 모드"] : []),
+      ...(!String(form.pattern ?? "").trim() ? ["패턴"] : []),
+    ];
+    if (missing.length) {
+      setValidationMessage(`${missing.join(", ")}는 필수 값입니다.`);
+      window.requestAnimationFrame(() => validationRef.current?.focus());
       return;
     }
     onSubmit({
@@ -1489,6 +1501,11 @@ function RoutingRuleModal({ groups, loading, onClose, onSubmit, rule }) {
 
   return (
     <AssistantModal onClose={onClose} title={form.ruleId ? "규칙 수정" : "규칙 등록"}>
+      {validationMessage ? (
+        <div className="form-validation-notice" ref={validationRef} tabIndex={-1} role="alert">
+          {validationMessage}
+        </div>
+      ) : null}
       <div className="assistant-form-grid">
         <label>규칙 그룹
           <select onChange={(event) => update("ruleGroup", event.target.value)} value={form.ruleGroup}>

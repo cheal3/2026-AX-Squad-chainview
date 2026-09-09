@@ -6992,6 +6992,29 @@ table.tbl td.col-check {
   color: #b91c1c;
 }
 
+.form-validation-notice {
+  width: 100%;
+  margin: 0 0 16px;
+  padding: 13px 16px;
+  border: 1px solid rgba(239, 68, 68, 0.32);
+  border-radius: 8px;
+  background: #fff1f2;
+  color: #b91c1c;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.5;
+  white-space: pre-line;
+}
+
+.form-validation-notice:focus {
+  outline: 3px solid rgba(239, 68, 68, 0.22);
+  outline-offset: 2px;
+}
+
+.operation-template-notice {
+  grid-column: 1 / -1;
+}
+
 .op-loading-line {
   margin: 0;
   border-width: 0 0 1px;

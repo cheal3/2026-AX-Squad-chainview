@@ -488,6 +488,14 @@ function OperationFormRow({ children, label, required = false }) {
   return <label className="form-row"><span>{label}{required ? <span className="req">*</span> : null}</span>{children}</label>;
 }
 
+function operationRequiredNotice(labels) {
+  return `${labels.join(", ")}는 필수 값입니다.`;
+}
+
+function focusOperationNotice(ref) {
+  window.requestAnimationFrame(() => ref.current?.focus());
+}
+
 function OperationIconButton({ children, danger = false, label, onClick, primary = false }) {
   return (
     <button
@@ -713,6 +721,7 @@ function ServiceCheckModal({ onClose, onSave, row }) {
   }));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const validationRef = useRef(null);
   const [requestTab, setRequestTab] = useState("params");
   const targetType = form.targetType;
   const targetId = form.targetId;
@@ -738,6 +747,7 @@ function ServiceCheckModal({ onClose, onSave, row }) {
     }));
   };
   const updateForm = (key, value) => {
+    setError("");
     setForm((current) => ({ ...current, [key]: value }));
   };
   const toggleNotificationOwner = (code, checked) => {
@@ -810,7 +820,8 @@ function ServiceCheckModal({ onClose, onSave, row }) {
     if (!form.targetId) missing.push("점검 대상");
     if (form.targetType === "SERVER" && !String(payload.checkUrl ?? "").trim()) missing.push("서버 IP");
     if (missing.length) {
-      setError(`${missing.join(", ")} 항목을 입력해 주세요.`);
+      setError(operationRequiredNotice(missing));
+      focusOperationNotice(validationRef);
       return;
     }
     setSaving(true);
@@ -830,6 +841,7 @@ function ServiceCheckModal({ onClose, onSave, row }) {
         <div className="modal__head"><h3>{row ? "점검 수정" : "점검 등록"}</h3><button className="close" onClick={onClose} type="button"><X size={18} /></button></div>
         <div className="modal__body">
           <h4 className="form-section__title">기본 정보</h4>
+          {error ? <div className="form-validation-notice" ref={validationRef} tabIndex={-1} role="alert">{error}</div> : null}
           <div className="operation-form-grid">
             <OperationFormRow label="점검 코드" required><input disabled={Boolean(row?.jobId)} value={form.code} onChange={(event) => updateForm("code", event.target.value.toUpperCase())} placeholder="예: SSO-HEALTH-01" type="text" /></OperationFormRow>
             <OperationFormRow label="점검명" required><input value={form.name} onChange={(event) => updateForm("name", event.target.value)} placeholder="점검명을 입력하세요" type="text" /></OperationFormRow>
@@ -939,7 +951,6 @@ function ServiceCheckModal({ onClose, onSave, row }) {
               </div>
             </div>
           </div>
-          {error ? <div className="op-inline-alert op-inline-alert--danger">{error}</div> : null}
         </div>
         <div className="modal__foot"><button className="btn" onClick={onClose} type="button">취소</button><button className="btn btn--primary op-btn-dark" disabled={saving} onClick={save} type="button">{saving ? "저장 중..." : "저장"}</button></div>
       </div>
@@ -1189,7 +1200,6 @@ export function NotificationTemplatePage() {
       ...collectInvalidTemplateFields(payload),
     ];
     if (localValidationErrors.length) {
-      window.alert(`알림 템플릿을 저장할 수 없습니다.\n\n확인할 항목:\n${localValidationErrors.map((field) => `- ${field}`).join("\n")}`);
       return false;
     }
 
@@ -1301,6 +1311,8 @@ function TemplateModal({ onClose, onSave, row }) {
         ]
   );
   const [saving, setSaving] = useState(false);
+  const [validationMessage, setValidationMessage] = useState("");
+  const validationRef = useRef(null);
   const recommendedVariables = [
     ["hostName", "호스트명"],
     ["incidentTitle", "인시던트 제목"],
@@ -1309,6 +1321,7 @@ function TemplateModal({ onClose, onSave, row }) {
     ["serviceCode", "서비스 코드"],
   ];
   const updateVariable = (index, field, value) => {
+    setValidationMessage("");
     setVariables((current) =>
       current.map((variable, variableIndex) =>
         variableIndex === index ? { ...variable, [field]: value } : variable
@@ -1316,6 +1329,7 @@ function TemplateModal({ onClose, onSave, row }) {
     );
   };
   const addVariable = (key = "", label = "") => {
+    setValidationMessage("");
     if (key && variables.some((variable) => variable.key === key)) {
       setBodyPattern((current) => `${current}${current ? " " : ""}{{${key}}}`);
       return;
@@ -1337,14 +1351,29 @@ function TemplateModal({ onClose, onSave, row }) {
       pattern
     );
   const updateForm = (field, value) => {
+    setValidationMessage("");
     setForm((current) => ({ ...current, [field]: value }));
   };
   const handleSubmit = async () => {
+    const localPayload = buildTemplatePayload(form, variables, bodyPattern, titlePattern);
+    const missingFields = collectMissingTemplateFields(localPayload);
+    const invalidFields = collectInvalidTemplateFields(localPayload);
+    if (missingFields.length || invalidFields.length) {
+      setValidationMessage([
+        missingFields.length ? operationRequiredNotice(missingFields) : "",
+        ...invalidFields,
+      ].filter(Boolean).join("\n"));
+      focusOperationNotice(validationRef);
+      return;
+    }
     setSaving(true);
     try {
       const saved = await onSave({ bodyPattern, form, row, titlePattern, variables });
       if (saved) {
         onClose();
+      }
+      if (saved === false) {
+        setSaving(false);
       }
     } finally {
       setSaving(false);
@@ -1356,6 +1385,11 @@ function TemplateModal({ onClose, onSave, row }) {
       <div className="modal modal--lg operation-modal operation-modal--template" onClick={(event) => event.stopPropagation()}>
         <div className="modal__head"><h3>{row ? "알림 템플릿 수정" : "알림 템플릿 등록"}</h3><button className="close" onClick={onClose} type="button"><X size={18} /></button></div>
         <div className="modal__body operation-template-body">
+          {validationMessage ? (
+            <div className="form-validation-notice operation-template-notice" ref={validationRef} tabIndex={-1} role="alert">
+              {validationMessage}
+            </div>
+          ) : null}
           <section>
             <h4 className="form-section__title">기본 정보</h4>
             <div className="operation-form-grid">
@@ -1369,8 +1403,8 @@ function TemplateModal({ onClose, onSave, row }) {
             <div className="operation-pattern-guide">
               제목과 본문에 <code>{"{{변수명}}"}</code>을 입력하면 발송 시 실제 값으로 치환됩니다.
             </div>
-            <OperationFormRow label="제목 패턴"><input value={titlePattern} onChange={(event) => setTitlePattern(event.target.value)} type="text" /></OperationFormRow>
-            <OperationFormRow label="본문 패턴" required><textarea value={bodyPattern} onChange={(event) => setBodyPattern(event.target.value)} placeholder="예: {{serviceName}} 장애가 발생했습니다." rows={6} /></OperationFormRow>
+            <OperationFormRow label="제목 패턴"><input value={titlePattern} onChange={(event) => { setValidationMessage(""); setTitlePattern(event.target.value); }} type="text" /></OperationFormRow>
+            <OperationFormRow label="본문 패턴" required><textarea value={bodyPattern} onChange={(event) => { setValidationMessage(""); setBodyPattern(event.target.value); }} placeholder="예: {{serviceName}} 장애가 발생했습니다." rows={6} /></OperationFormRow>
             <OperationFormRow label="설명"><textarea value={form.description} onChange={(event) => updateForm("description", event.target.value)} placeholder="검색·관리를 위한 설명을 입력하세요. (선택)" rows={4} /></OperationFormRow>
           </section>
           <section className="operation-variable-panel">
