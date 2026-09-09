@@ -657,7 +657,7 @@ export function ServiceCheckPage() {
                 </td>
               </tr>
             ))}
-            {!pagedRows.length ? <tr><td colSpan={7}>조회 가능한 데이터가 없습니다.</td></tr> : null}
+            {!pagedRows.length ? <tr><td colSpan={7}><div className="empty">조회 가능한 데이터가 없습니다.</div></td></tr> : null}
           </tbody>
         </table>
         <OperationPager page={page} pageSize={pageSize} setPage={setPage} total={rows.length} />
@@ -985,7 +985,7 @@ function ServiceCheckHistoryModal({ onClose, row }) {
         <div className="modal__body">
           <p className="op-modal-desc">선택한 서비스 점검의 최근 실행 결과입니다.</p>
           {loading ? <div className="op-loading-line">점검 이력을 불러오는 중...</div> : null}
-          <table className="tbl operation-table operation-table--history"><thead><tr><th>시간</th><th>결과</th><th>Latency</th><th>HTTP</th><th>실패 사유</th><th>응답 요약</th><th>알림</th><th>비고</th></tr></thead><tbody>{history.length ? history.map((item) => <tr key={item.join("-")}><td>{item[0]}</td><td><span className={`pill ${item[1] === "성공" ? "pill--ok" : "pill--crit"}`}>{item[1]}</span></td><td>{item[2]}</td><td>{item[3]}</td><td>{item[4]}</td><td><code>{item[5]}</code></td><td>{item[6]}</td><td>{item[7]}</td></tr>) : <tr><td colSpan={8}>조회 가능한 데이터가 없습니다.</td></tr>}</tbody></table>
+          <table className="tbl operation-table operation-table--history"><thead><tr><th>시간</th><th>결과</th><th>Latency</th><th>HTTP</th><th>실패 사유</th><th>응답 요약</th><th>알림</th><th>비고</th></tr></thead><tbody>{history.length ? history.map((item) => <tr key={item.join("-")}><td>{item[0]}</td><td><span className={`pill ${item[1] === "성공" ? "pill--ok" : "pill--crit"}`}>{item[1]}</span></td><td>{item[2]}</td><td>{item[3]}</td><td>{item[4]}</td><td><code>{item[5]}</code></td><td>{item[6]}</td><td>{item[7]}</td></tr>) : <tr><td colSpan={8}><div className="empty">조회 가능한 데이터가 없습니다.</div></td></tr>}</tbody></table>
         </div>
         <div className="modal__foot"><button className="btn" onClick={loadHistory} type="button">새로고침</button><button className="btn" onClick={onClose} type="button">닫기</button></div>
       </div>
