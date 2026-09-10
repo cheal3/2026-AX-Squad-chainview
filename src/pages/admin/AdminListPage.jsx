@@ -2925,10 +2925,11 @@ function SearchableServiceSelect({ disabled = false, onChange, placeholder = "�
 
 function CategorizedServicePicker({ categoryCatalog, disabled = false, label, onChange, services, value }) {
   const selectedService = services.find((service) => String(service.serviceId) === String(value));
+  const selectedServiceCategoryPath = resolveServiceCategoryPath(selectedService, categoryCatalog);
   const [filters, setFilters] = useState(() => ({
-    categoryL1: selectedService?.categoryPath?.[0] ?? "",
-    categoryL2: selectedService?.categoryPath?.[1] ?? "",
-    categoryL3: selectedService?.categoryPath?.[2] ?? "",
+    categoryL1: selectedServiceCategoryPath[0] === "미분류" ? "" : selectedServiceCategoryPath[0] ?? "",
+    categoryL2: selectedServiceCategoryPath[1] === "미분류" ? "" : selectedServiceCategoryPath[1] ?? "",
+    categoryL3: selectedServiceCategoryPath[2] === "미분류" ? "" : selectedServiceCategoryPath[2] ?? "",
   }));
   const selectedL1 = findCategoryOptionByName(categoryCatalog.level1, filters.categoryL1);
   const selectedL2 = findCategoryOptionByName(categoryCatalog.level2, filters.categoryL2, selectedL1?.name);
@@ -2938,12 +2939,13 @@ function CategorizedServicePicker({ categoryCatalog, disabled = false, label, on
 
   useEffect(() => {
     if (!selectedService) return;
+    const path = resolveServiceCategoryPath(selectedService, categoryCatalog);
     setFilters({
-      categoryL1: selectedService.categoryPath?.[0] ?? "",
-      categoryL2: selectedService.categoryPath?.[1] ?? "",
-      categoryL3: selectedService.categoryPath?.[2] ?? "",
+      categoryL1: path[0] === "미분류" ? "" : path[0] ?? "",
+      categoryL2: path[1] === "미분류" ? "" : path[1] ?? "",
+      categoryL3: path[2] === "미분류" ? "" : path[2] ?? "",
     });
-  }, [selectedService?.serviceId]);
+  }, [categoryCatalog, selectedService]);
 
   const updateFilter = (field, nextValue) => {
     setFilters((current) => nextListFilters(current, field, nextValue));
