@@ -3111,7 +3111,7 @@ function ServiceAdminForm({ form, onChange, portalData, servers, isEdit }) {
         <h4 className="form-section__title">배포 정보</h4>
         <div className="form-grid">
           <div className="form-row full">
-            <label>배포 서버</label>
+            <label>배포 서버<span className="req">*</span></label>
             <ServerMultiSelect
               servers={servers}
               value={form.serverIds}
