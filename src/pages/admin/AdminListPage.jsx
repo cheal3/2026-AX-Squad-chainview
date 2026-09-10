@@ -2667,9 +2667,28 @@ function resolveCategoryPath(categoryPath = [], categories = [], categoryId = ""
 }
 
 function resolveServiceCategoryPath(service, categoryCatalog) {
+  const idPath = resolveCategoryPathFromCatalogById(service?.categoryId, categoryCatalog);
+  if (idPath.length) {
+    return idPath.concat(["미분류", "미분류", "미분류"]).slice(0, 3);
+  }
   const cleanedPath = normalizeCategoryPath(service?.categoryPath ?? []);
   const expandedPath = categoryCatalog ? expandCategoryPathFromCatalog(cleanedPath, categoryCatalog) : cleanedPath;
   return (expandedPath.length ? expandedPath : cleanedPath).concat(["미분류", "미분류", "미분류"]).slice(0, 3);
+}
+
+function resolveCategoryPathFromCatalogById(categoryId, catalog) {
+  const numericId = Number(categoryId);
+  if (!numericId || !catalog) return [];
+  const options = [
+    ...(catalog.level1 ?? []).map((option) => ({ ...option, level: 1 })),
+    ...(catalog.level2 ?? []).map((option) => ({ ...option, level: 2 })),
+    ...(catalog.level3 ?? []).map((option) => ({ ...option, level: 3 })),
+  ];
+  const leaf = options.find((option) => Number(option.id) === numericId);
+  if (!leaf) return [];
+  if (leaf.level === 3) return [leaf.grandParentName, leaf.parentName, leaf.name].map(compactText).filter(Boolean);
+  if (leaf.level === 2) return [leaf.parentName, leaf.name].map(compactText).filter(Boolean);
+  return [leaf.name].map(compactText).filter(Boolean);
 }
 
 function normalizeCategoryPath(path = []) {
@@ -2915,7 +2934,7 @@ function CategorizedServicePicker({ categoryCatalog, disabled = false, label, on
   const selectedL2 = findCategoryOptionByName(categoryCatalog.level2, filters.categoryL2, selectedL1?.name);
   const level2Options = selectedL1 ? selectableChildCategoryOptions(categoryCatalog.level2, selectedL1) : [];
   const level3Options = selectedL2 ? selectableChildCategoryOptions(categoryCatalog.level3, selectedL2, selectedL1) : [];
-  const filteredServices = services.filter((service) => matchesCategoryFilters(service, filters));
+  const filteredServices = services.filter((service) => matchesCategoryFilters(service, filters, categoryCatalog));
 
   useEffect(() => {
     if (!selectedService) return;
