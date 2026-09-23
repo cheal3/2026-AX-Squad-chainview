@@ -308,7 +308,7 @@ function AppRoutes() {
     <Suspense fallback={<div className="route-loading">화면을 불러오는 중입니다.</div>}>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/" element={<RequireAuth><Navigate to="/dashboard" replace /></RequireAuth>} />
+        <Route path="/" element={<RequireAuth><RootEntry /></RequireAuth>} />
         <Route path="/dashboard" element={<RequireAuth><DashboardPage /></RequireAuth>} />
         <Route path="/statistics" element={<RequireAuth><StatisticsPage /></RequireAuth>} />
         <Route path="/operation/service-checks" element={<RequireAuth><ServiceCheckPage /></RequireAuth>} />
@@ -346,6 +346,15 @@ function RequireAuth({ children }) {
   }
 
   return children;
+}
+
+function RootEntry() {
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  if (searchParams.get("view") === "detail") {
+    return <IncidentDetailPage />;
+  }
+  return <Navigate to="/dashboard" replace />;
 }
 
 function RealtimeRemoteGetRefresh() {
@@ -420,7 +429,7 @@ function IncidentAlertBridge() {
 
   const goToIncident = () => {
     setIncident(null);
-    navigate(incidentId ? `/dashboard-proto-detail?incidentId=${incidentId}` : "/admin-incidents");
+    navigate(incidentId ? `/?view=detail&incidentId=${incidentId}` : "/admin-incidents");
   };
 
   return (

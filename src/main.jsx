@@ -8,10 +8,15 @@ import "./dashboard-theme.css";
 
 const basePath = import.meta.env.BASE_URL || "/";
 if (window.location.hash.startsWith("#/")) {
+  const hashPath = window.location.hash.slice(2);
+  const [routePath, queryText = ""] = hashPath.split("?");
+  const nextPath = routePath === "dashboard-proto-detail"
+    ? `?view=detail${queryText ? `&${queryText}` : ""}`
+    : hashPath;
   window.history.replaceState(
     null,
     "",
-    `${basePath}${window.location.hash.slice(2)}`
+    `${basePath}${nextPath}`
   );
 }
 

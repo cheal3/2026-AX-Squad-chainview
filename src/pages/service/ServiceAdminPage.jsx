@@ -326,10 +326,10 @@ function ServiceDetailPage({ service }) {
 
   const handleIncidentDetail = (incident) => {
     if (incident?.incidentId) {
-      navigate(`/dashboard-proto-detail?incidentId=${incident.incidentId}`);
+      navigate(`/?view=detail&incidentId=${incident.incidentId}`);
       return;
     }
-    navigate("/dashboard-proto-detail");
+    navigate("/?view=detail");
   };
 
   return (
