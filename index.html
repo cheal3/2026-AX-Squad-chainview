@@ -5,6 +5,17 @@
     <link rel="icon" href="%BASE_URL%favicon.ico?v=2" sizes="256x256" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ChainView</title>
+    <script>
+      (function () {
+        var basePath = "/2026-AX-Squad-chainview/";
+        var path = window.location.pathname;
+        if (path === basePath + "dashboard-proto-detail") {
+          window.location.replace(
+            basePath + "?view=detail&" + window.location.search.slice(1)
+          );
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
