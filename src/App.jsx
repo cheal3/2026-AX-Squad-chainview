@@ -418,7 +418,7 @@ function IncidentAlertBridge() {
 
   const goToIncident = () => {
     setIncident(null);
-    navigate(incidentId ? `/dashboard?incidentId=${incidentId}` : "/admin-incidents");
+    navigate(incidentId ? `/dashboard-proto-detail?incidentId=${incidentId}` : "/admin-incidents");
   };
 
   return (
