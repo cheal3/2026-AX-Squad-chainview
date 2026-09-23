@@ -1508,20 +1508,26 @@ export function ServiceRelationFlow({
       });
 
       const visitQueue = [...roots];
+      const queuedServiceIds = new Set(visitQueue);
       while (visitQueue.length > 0) {
         const currentId = visitQueue.shift();
         if (!currentId) {
           continue;
         }
+        queuedServiceIds.delete(currentId);
 
         const currentLane = laneMap.get(currentId) ?? 0;
         const targets = [...(outgoingBySource.get(currentId) ?? [])].sort(compareServiceIds);
 
         targets.forEach((targetId) => {
           const nextLane = Math.max(laneMap.get(targetId) ?? 0, currentLane + 1);
-          if (nextLane !== laneMap.get(targetId)) {
+          const previousLane = laneMap.get(targetId);
+          if (previousLane === undefined) {
             laneMap.set(targetId, nextLane);
-            visitQueue.push(targetId);
+            if (!queuedServiceIds.has(targetId)) {
+              visitQueue.push(targetId);
+              queuedServiceIds.add(targetId);
+            }
           }
         });
       }
