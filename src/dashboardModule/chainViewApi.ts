@@ -1,6 +1,7 @@
 const REMOTE_ORIGIN = "https://chainview.kro.kr";
 const DEFAULT_EMPLOYEE_NO = "8913812";
 const DEFAULT_DEV_LOGIN_PATH = "/admin/dashboard";
+const DEFAULT_REQUEST_TIMEOUT_MS = 10000;
 
 function envValue(value: unknown, fallback: string) {
   return typeof value === "string" && value.trim() ? value : fallback;
@@ -19,6 +20,9 @@ const chainViewPassword =
   envValue(import.meta.env.VITE_CHAINVIEW_PASSWORD, "");
 const chainViewDevLoginPath =
   envValue(import.meta.env.VITE_CHAINVIEW_DEV_LOGIN_PATH, DEFAULT_DEV_LOGIN_PATH);
+const chainViewRequestTimeoutMs = Number(
+  envValue(import.meta.env.VITE_CHAINVIEW_API_TIMEOUT_MS, String(DEFAULT_REQUEST_TIMEOUT_MS))
+) || DEFAULT_REQUEST_TIMEOUT_MS;
 
 type QueryValue =
   | string
@@ -372,7 +376,7 @@ async function requestJson<T>(
     await ensureSession();
   }
 
-  const response = await fetch(buildUrl(path, options.query), {
+  const response = await fetchWithTimeout(buildUrl(path, options.query), {
     method,
     credentials: "include",
     redirect: "manual",
@@ -438,7 +442,7 @@ async function requestBlob(
     await ensureSession();
   }
 
-  const response = await fetch(buildUrl(path, options.query), {
+  const response = await fetchWithTimeout(buildUrl(path, options.query), {
     credentials: "include",
     redirect: "manual",
     headers: { Accept: "*/*" },
@@ -486,9 +490,6 @@ async function establishSession(employeeNo = chainViewEmployeeNo) {
   }
 
   if (!chainViewPassword) {
-    alertSessionFailureOnce(
-      "ChainView API 세션 생성에 실패했습니다.\nJSESSIONID 쿠키가 cross-site API 호출에 전송되도록 SameSite=None; Secure 설정을 확인해 주세요."
-    );
     throw new ChainViewApiError({
       authRequired: true,
       message:
@@ -502,7 +503,7 @@ async function establishSession(employeeNo = chainViewEmployeeNo) {
 
 async function establishDevLoginSession(employeeNo: string) {
   try {
-    await fetch(buildDevLoginUrl(employeeNo), {
+    await fetchWithTimeout(buildDevLoginUrl(employeeNo), {
       credentials: "include",
       mode: "no-cors",
     });
@@ -516,9 +517,6 @@ async function establishDevLoginSession(employeeNo: string) {
 async function establishPasswordSession(employeeNo: string) {
   const token = await fetchCsrfTokenFrom("/login");
   if (!token) {
-    alertSessionFailureOnce(
-      "ChainView API 세션 생성에 실패했습니다.\n로그인 CSRF 토큰을 찾지 못했습니다."
-    );
     throw new ChainViewApiError({
       authRequired: true,
       message: "ChainView devLogin 세션 생성에 실패했고, 로그인 CSRF 토큰도 찾지 못했습니다.",
@@ -534,7 +532,7 @@ async function establishPasswordSession(employeeNo: string) {
     _csrf: token,
   });
 
-  const response = await fetch(buildUrl("/login"), {
+  const response = await fetchWithTimeout(buildUrl("/login"), {
     method: "POST",
     credentials: "include",
     redirect: "manual",
@@ -558,21 +556,12 @@ async function establishPasswordSession(employeeNo: string) {
   hasAuthenticatedSession = true;
 }
 
-function alertSessionFailureOnce(message: string) {
-  if (hasShownSessionAlert || typeof window === "undefined") {
-    return;
-  }
-
-  hasShownSessionAlert = true;
-  window.alert(message);
-}
-
 function buildDevLoginUrl(employeeNo: string) {
   return buildUrl(chainViewDevLoginPath, { devLogin: employeeNo });
 }
 
 async function fetchCsrfTokenFrom(path: string) {
-  const response = await fetch(buildUrl(path), {
+  const response = await fetchWithTimeout(buildUrl(path), {
     credentials: "include",
     redirect: "manual",
     headers: { Accept: "text/html,application/xhtml+xml" },
@@ -591,7 +580,7 @@ async function fetchCsrfTokenFrom(path: string) {
 }
 
 async function hasActiveApiSession() {
-  const response = await fetch(buildUrl("/api/services"), {
+  const response = await fetchWithTimeout(buildUrl("/api/services"), {
     credentials: "include",
     redirect: "manual",
     headers: { Accept: "application/json" },
@@ -608,6 +597,30 @@ async function hasActiveApiSession() {
   }
 
   return response.ok;
+}
+
+async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}) {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => {
+    controller.abort();
+  }, chainViewRequestTimeoutMs);
+
+  try {
+    return await fetch(input, {
+      ...init,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new ChainViewApiError({
+        message: `ChainView API 응답 시간이 초과되었습니다. (${Math.round(chainViewRequestTimeoutMs / 1000)}초)`,
+        status: 0,
+      });
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
 }
 
 function buildUrl(path: string, query?: QueryParams) {

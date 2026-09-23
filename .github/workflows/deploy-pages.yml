@@ -39,6 +39,8 @@ jobs:
           VITE_CHAINVIEW_REMOTE_ORIGIN: https://chainview.kro.kr
           VITE_CHAINVIEW_API_BASE_URL: https://chainview.kro.kr
           VITE_CHAINVIEW_EMPLOYEE_NO: ${{ secrets.CHAINVIEW_EMPLOYEE_NO }}
+          VITE_CHAINVIEW_PASSWORD: ${{ secrets.CHAINVIEW_PASSWORD }}
+          VITE_CHAINVIEW_API_TIMEOUT_MS: "10000"
         run: npm run build
 
       - name: Add SPA fallback
