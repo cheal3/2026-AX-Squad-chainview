@@ -1544,10 +1544,16 @@ function ensureUniqueProgressTimes(rows, startedAt) {
   const usedTimes = new Set();
   return rows.map(([time, message, actor], index) => {
     let nextTime = time && time !== "-" ? time : formatIncidentProgressTime(startedAt, index * 2);
+    if (nextTime === "-") {
+      return [nextTime, message, actor];
+    }
     let offset = index * 2;
     while (usedTimes.has(nextTime)) {
       offset += 1;
       nextTime = formatIncidentProgressTime(startedAt, offset);
+      if (nextTime === "-") {
+        break;
+      }
     }
     usedTimes.add(nextTime);
     return [nextTime, message, actor];
