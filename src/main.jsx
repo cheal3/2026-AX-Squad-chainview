@@ -11,7 +11,7 @@ if (window.location.hash.startsWith("#/")) {
   const hashPath = window.location.hash.slice(2);
   const [routePath, queryText = ""] = hashPath.split("?");
   const nextPath = routePath === "dashboard-proto-detail"
-    ? `?view=detail${queryText ? `&${queryText}` : ""}`
+    ? ""
     : hashPath;
   window.history.replaceState(
     null,

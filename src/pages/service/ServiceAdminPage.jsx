@@ -326,10 +326,10 @@ function ServiceDetailPage({ service }) {
 
   const handleIncidentDetail = (incident) => {
     if (incident?.incidentId) {
-      navigate(`/?view=detail&incidentId=${incident.incidentId}`);
+      navigate(`/?incidentId=${incident.incidentId}`);
       return;
     }
-    navigate("/?view=detail");
+    navigate("/");
   };
 
   return (

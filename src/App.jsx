@@ -324,7 +324,7 @@ function AppRoutes() {
         <Route path="/admin-infra-relations" element={<RequireAuth><InfraRelationsPage /></RequireAuth>} />
         <Route path="/admin-service-infra-mapping" element={<RequireAuth><ServiceInfraMappingPage /></RequireAuth>} />
         <Route path="/dashboard-proto" element={<RequireAuth><Navigate to="/dashboard" replace /></RequireAuth>} />
-        <Route path="/dashboard-proto-detail" element={<RequireAuth><IncidentDetailPage /></RequireAuth>} />
+        <Route path="/dashboard-proto-detail" element={<RequireAuth><Navigate to="/" replace /></RequireAuth>} />
         <Route path="/admin-services/:serviceCode" element={<RequireAuth><AppShell activeMenu="services"><main className="main"><ServiceAdminPage /></main></AppShell></RequireAuth>} />
         <Route path="/admin-permissions" element={<RequireAuth><RoutePage activeMenuOverride="permissions" slug="admin-users" /></RequireAuth>} />
         <Route path="/admin-owner-management" element={<RequireAuth><RoutePage activeMenuOverride="owner-management" slug="admin-owners" /></RequireAuth>} />
@@ -349,12 +349,7 @@ function RequireAuth({ children }) {
 }
 
 function RootEntry() {
-  const location = useLocation();
-  const searchParams = new URLSearchParams(location.search);
-  if (searchParams.get("view") === "detail") {
-    return <IncidentDetailPage />;
-  }
-  return <Navigate to="/dashboard" replace />;
+  return <DashboardPage />;
 }
 
 function RealtimeRemoteGetRefresh() {
@@ -429,7 +424,7 @@ function IncidentAlertBridge() {
 
   const goToIncident = () => {
     setIncident(null);
-    navigate(incidentId ? `/?view=detail&incidentId=${incidentId}` : "/admin-incidents");
+    navigate(incidentId ? `/?incidentId=${incidentId}` : "/admin-incidents");
   };
 
   return (

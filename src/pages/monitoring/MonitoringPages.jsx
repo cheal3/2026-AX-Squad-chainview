@@ -238,7 +238,7 @@ export function IncidentAdminPage() {
       manualRegisteredYn: "Y",
       registeredBy: "admin",
     });
-    navigate(`/?view=detail&incidentId=${createdIncident.incidentId}`);
+    navigate(`/?incidentId=${createdIncident.incidentId}`);
   };
 
   const handleCreateIncident = () => {
@@ -262,7 +262,7 @@ export function IncidentAdminPage() {
       manualRegisteredYn: "Y",
       registeredBy: "admin",
     });
-    navigate(`/?view=detail&incidentId=${createdIncident.incidentId}`);
+    navigate(`/?incidentId=${createdIncident.incidentId}`);
   };
   const exportIncidentsXlsx = () => {
     downloadXlsx(

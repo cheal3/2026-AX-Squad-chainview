@@ -596,7 +596,7 @@ function DashboardCase({
               manualRegisteredYn: "Y",
               registeredBy: "admin",
             });
-            navigate(`/?view=detail&incidentId=${createdIncident.incidentId}`);
+            navigate(`/?incidentId=${createdIncident.incidentId}`);
           }}
           onCreateIncident={() => {
             if (!selectedService) {
@@ -614,7 +614,7 @@ function DashboardCase({
               manualRegisteredYn: "Y",
               registeredBy: "admin",
             });
-            navigate(`/?view=detail&incidentId=${createdIncident.incidentId}`);
+            navigate(`/?incidentId=${createdIncident.incidentId}`);
           }}
           relationCount={
             selectedService
@@ -1911,7 +1911,7 @@ function IncidentSelectedPanel({
           <button
             className="h-8 rounded border border-[#35506b] bg-[#0b2135] text-xs font-black text-slate-200"
             type="button"
-            onClick={() => navigate(`/?view=detail&incidentId=${incident.incidentId}`)}
+            onClick={() => navigate(`/?incidentId=${incident.incidentId}`)}
           >
             인시던트 상세 <ExternalLink className="inline" size={12} />
           </button>
