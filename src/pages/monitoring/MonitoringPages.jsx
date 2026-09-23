@@ -6,6 +6,7 @@ import { AppShell } from "../../components/AppShell.jsx";
 import { ModalBackdrop } from "../../components/ModalBackdrop.jsx";
 import { PAGE_SIZE, Pagination } from "../../components/Pagination.jsx";
 import { usePortalData } from "../../dashboardModule/PortalDataStore";
+import { chainViewApi } from "../../dashboardModule/chainViewApi";
 import { IncidentDemoDashboard } from "../../dashboardModule/pages/IncidentDemoDashboard";
 import { ServiceRelationFlow } from "../../dashboardModule/pages/ServiceRelationFlow";
 import { codeLabels } from "../../dashboardModule/mockData";
@@ -855,6 +856,8 @@ export function IncidentDetailPage() {
   } = usePortalData();
   const [now, setNow] = useState(() => new Date());
   const [activeTab, setActiveTab] = useState("overview");
+  const [remoteNotificationRows, setRemoteNotificationRows] = useState([]);
+  const [notificationHistoryLoading, setNotificationHistoryLoading] = useState(false);
   const incidentId = Number(new URLSearchParams(location.search).get("incidentId")) || undefined;
   const incident =
     incidents.find((item) => item.incidentId === incidentId) ??
@@ -887,6 +890,10 @@ export function IncidentDetailPage() {
   const timelineRows = incidentEvents
     .filter((event) => event.incidentId === incident?.incidentId)
     .map((event) => [event.createdAt?.slice(11, 16) || "-", event.message, event.actor]);
+  const detectionHistoryRows = incidentEvents
+    .filter((event) => Number(event.incidentId) === Number(incident?.incidentId))
+    .map(normalizeIncidentEventHistoryRow);
+  const realProgressRows = detectionHistoryRows.map((row) => [row.time, row.message, row.actor]);
   const recentDeploymentRows = deployments
     .filter((deployment) => Number(deployment.serviceId) === Number(service?.serviceId))
     .slice(0, 5)
@@ -918,12 +925,7 @@ export function IncidentDetailPage() {
         email: String(user?.email ?? ""),
       };
     });
-  const notificationRows = buildIncidentNotificationRows({
-    impactedServices: displayImpactedServices,
-    incident,
-    owners: incidentOwners,
-    service,
-  });
+  const notificationRows = remoteNotificationRows;
   const generatedProgressRows = buildIncidentProgressRows({
     deployments: recentDeploymentRows,
     impactedServices: displayImpactedServices,
@@ -946,6 +948,44 @@ export function IncidentDetailPage() {
     const timer = window.setInterval(() => setNow(new Date()), 1000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    const nextIncidentId = Number(incident?.incidentId);
+    if (!nextIncidentId) {
+      setRemoteNotificationRows([]);
+      setNotificationHistoryLoading(false);
+      return undefined;
+    }
+
+    setNotificationHistoryLoading(true);
+    chainViewApi.incidents.notifications(nextIncidentId)
+      .then((rows) => {
+        if (!isMounted) {
+          return;
+        }
+        setRemoteNotificationRows(
+          Array.isArray(rows)
+            ? rows.map((row, index) => normalizeIncidentNotificationHistoryRow(row, index))
+            : []
+        );
+      })
+      .catch((error) => {
+        console.warn("인시던트 알림 이력 조회 실패", error);
+        if (isMounted) {
+          setRemoteNotificationRows([]);
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setNotificationHistoryLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [incident?.incidentId]);
 
   if (remoteApi.initialLoading) {
     return (
@@ -1060,13 +1100,13 @@ export function IncidentDetailPage() {
               {incident.description ? <p className="incident-detail__description">{incident.description}</p> : null}
               <div className="incident-detail__progress">
                 <h3>진행상황</h3>
-                {generatedProgressRows.map(([time, message, actor], index) => (
+                {realProgressRows.length ? realProgressRows.map(([time, message, actor]) => (
                   <div className="incident-detail__progress-row" key={`${time}-${message}`}>
                     <span>{time}</span>
                     <p>{message}</p>
                     <em>{actor}</em>
                   </div>
-                ))}
+                )) : <div className="incident-detail__empty">등록된 진행 이력이 없습니다.</div>}
               </div>
             </article>
             <article className="incident-detail__card incident-detail__card--graph">
@@ -1130,12 +1170,12 @@ export function IncidentDetailPage() {
                 <span>인시던트 발생 이후 기록</span>
               </div>
               <div className="incident-detail__timeline incident-detail__scroll-area">
-                {generatedProgressRows.length ? generatedProgressRows.map(([time, message, actor], index) => (
-                  <div className="incident-detail__timeline-row" key={`${time}-${message}`}>
-                    <span>{time}</span>
+                {detectionHistoryRows.length ? detectionHistoryRows.map((row, index) => (
+                  <div className="incident-detail__timeline-row" key={`${row.time}-${row.message}-${row.actor}`}>
+                    <span>{row.time}</span>
                     <i className={index < 2 ? "is-danger" : index < 4 ? "is-warn" : ""} />
-                    <p>{message}</p>
-                    <em>{actor}</em>
+                    <p>{row.message}</p>
+                    <em>{row.actor}</em>
                   </div>
                 )) : <div className="incident-detail__empty">등록된 감지 이력이 없습니다.</div>}
               </div>
@@ -1143,7 +1183,7 @@ export function IncidentDetailPage() {
             <article className="incident-detail__card incident-detail__notification-panel">
               <div className="incident-detail__card-head">
                 <h2>알림 내역</h2>
-                <span>{successfulNotificationCount}/{notificationRows.length}건 전송 성공</span>
+                <span>{notificationHistoryLoading ? "조회 중" : `${successfulNotificationCount}/${notificationRows.length}건 전송 성공`}</span>
               </div>
               <div className="incident-detail__notification-summary">
                 <div>
@@ -1163,7 +1203,8 @@ export function IncidentDetailPage() {
                 </div>
               </div>
               <div className="incident-detail__notification-list incident-detail__scroll-area">
-                {notificationRows.length ? notificationRows.map((row) => (
+                {notificationHistoryLoading ? <div className="incident-detail__empty">알림 내역을 불러오는 중입니다.</div> : null}
+                {!notificationHistoryLoading && notificationRows.length ? notificationRows.map((row) => (
                   <div className="incident-detail__notification-row" key={`${row.sentAt}-${row.recipient}-${row.channel}`}>
                     <time>{row.sentAt}</time>
                     <span className={`incident-detail__notification-channel is-${row.channelTone}`}>{row.channel}</span>
@@ -1177,7 +1218,8 @@ export function IncidentDetailPage() {
                       <em className={row.status === "성공" ? "is-success" : "is-waiting"}>{row.status}</em>
                     </div>
                   </div>
-                )) : <div className="incident-detail__empty">등록된 알림 내역이 없습니다.</div>}
+                )) : null}
+                {!notificationHistoryLoading && !notificationRows.length ? <div className="incident-detail__empty">등록된 알림 내역이 없습니다.</div> : null}
               </div>
             </article>
           </div>
@@ -1274,6 +1316,58 @@ function formatIncidentElapsed(startedAt, now = new Date()) {
   const seconds = elapsed % 60;
   const pad = (value) => String(value).padStart(2, "0");
   return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+}
+
+function firstIncidentTextValue(...values) {
+  for (const value of values) {
+    if (value === null || value === undefined) {
+      continue;
+    }
+    const text = String(value).trim();
+    if (text) {
+      return text;
+    }
+  }
+  return "";
+}
+
+function formatIncidentHistoryTime(value) {
+  const text = firstIncidentTextValue(value);
+  if (!text) {
+    return "-";
+  }
+  const normalized = text.includes("T") ? text : text.replace(" ", "T");
+  const date = new Date(normalized);
+  if (Number.isNaN(date.getTime())) {
+    return text.length >= 16 ? text.slice(11, 16) : text;
+  }
+  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+function normalizeIncidentEventHistoryRow(event) {
+  return {
+    actor: firstIncidentTextValue(event?.actor, event?.createdBy, event?.registeredBy, "SYSTEM"),
+    message: firstIncidentTextValue(event?.message, event?.description, event?.eventMessage, event?.summary, "인시던트 이벤트가 기록되었습니다."),
+    time: formatIncidentHistoryTime(event?.createdAt ?? event?.eventAt ?? event?.occurredAt ?? event?.updatedAt),
+  };
+}
+
+function normalizeIncidentNotificationHistoryRow(row, index = 0) {
+  const channel = firstIncidentTextValue(row?.channelName, row?.channelCode, row?.notificationChannel, row?.channel, "알림");
+  const statusText = firstIncidentTextValue(row?.sendStatusName, row?.sendStatusCode, row?.statusName, row?.status, row?.resultCode, "-");
+  const normalizedStatus = ["SUCCESS", "SENT", "DONE", "성공"].includes(statusText.toUpperCase()) ? "성공" : statusText;
+  return {
+    channel,
+    channelTone: channel.includes("SMS") ? "sms" : channel.includes("메일") || channel.toUpperCase().includes("EMAIL") ? "mail" : "talk",
+    contact: firstIncidentTextValue(row?.contact, row?.contactValue, row?.recipientContact, row?.phoneNumber, row?.email, "-"),
+    message: firstIncidentTextValue(row?.message, row?.messageBody, row?.content, row?.body, row?.notificationMessage, "-"),
+    recipient: firstIncidentTextValue(row?.recipientName, row?.receiverName, row?.targetName, row?.recipient, row?.receiver, "-"),
+    sentAt: formatIncidentHistoryTime(row?.sentAt ?? row?.sendAt ?? row?.createdAt ?? row?.updatedAt),
+    status: normalizedStatus,
+    targetType: firstIncidentTextValue(row?.targetTypeName, row?.targetTypeCode, row?.recipientType, row?.receiverType, "-"),
+    template: firstIncidentTextValue(row?.templateCode, row?.templateName, row?.notificationTemplateCode, row?.template, "-"),
+    title: firstIncidentTextValue(row?.notificationTitle, row?.messageTitle, row?.title, row?.subject, `알림 이력 #${index + 1}`),
+  };
 }
 
 function buildIncidentProgressRows({
