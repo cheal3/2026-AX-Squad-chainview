@@ -11,7 +11,8 @@
         var path = window.location.pathname;
         var searchParams = new URLSearchParams(window.location.search);
         if (path === basePath + "dashboard-proto-detail" || searchParams.get("view") === "detail") {
-          window.location.replace(basePath);
+          var incidentId = searchParams.get("incidentId");
+          window.location.replace(basePath + (incidentId ? "?incidentId=" + encodeURIComponent(incidentId) : ""));
         }
       })();
     </script>

@@ -324,7 +324,7 @@ function AppRoutes() {
         <Route path="/admin-infra-relations" element={<RequireAuth><InfraRelationsPage /></RequireAuth>} />
         <Route path="/admin-service-infra-mapping" element={<RequireAuth><ServiceInfraMappingPage /></RequireAuth>} />
         <Route path="/dashboard-proto" element={<RequireAuth><Navigate to="/dashboard" replace /></RequireAuth>} />
-        <Route path="/dashboard-proto-detail" element={<RequireAuth><Navigate to="/" replace /></RequireAuth>} />
+        <Route path="/dashboard-proto-detail" element={<RequireAuth><LegacyIncidentDetailRedirect /></RequireAuth>} />
         <Route path="/admin-services/:serviceCode" element={<RequireAuth><AppShell activeMenu="services"><main className="main"><ServiceAdminPage /></main></AppShell></RequireAuth>} />
         <Route path="/admin-permissions" element={<RequireAuth><RoutePage activeMenuOverride="permissions" slug="admin-users" /></RequireAuth>} />
         <Route path="/admin-owner-management" element={<RequireAuth><RoutePage activeMenuOverride="owner-management" slug="admin-owners" /></RequireAuth>} />
@@ -350,6 +350,12 @@ function RequireAuth({ children }) {
 
 function RootEntry() {
   return <DashboardPage />;
+}
+
+function LegacyIncidentDetailRedirect() {
+  const location = useLocation();
+  const incidentId = new URLSearchParams(location.search).get("incidentId");
+  return <Navigate to={incidentId ? `/?incidentId=${incidentId}` : "/"} replace />;
 }
 
 function RealtimeRemoteGetRefresh() {
