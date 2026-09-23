@@ -856,7 +856,6 @@ export function IncidentDetailPage() {
     updateIncidentStatus,
     remoteApi,
   } = usePortalData();
-  const [now, setNow] = useState(() => new Date());
   const [activeTab, setActiveTab] = useState("overview");
   const [remoteNotificationRows, setRemoteNotificationRows] = useState([]);
   const [notificationHistoryLoading, setNotificationHistoryLoading] = useState(false);
@@ -887,7 +886,6 @@ export function IncidentDetailPage() {
   const relatedRelations = allRelatedRelations.slice(0, 6);
   const relationServiceName = (serviceId) =>
     services.find((item) => Number(item.serviceId) === Number(serviceId))?.serviceName ?? `SERVICE-${serviceId}`;
-  const elapsedLabel = incident?.startedAt ? formatIncidentElapsed(incident.startedAt, now) : "00:00:00";
   const affectedServiceCount = Math.max(displayImpactedServices.length, allRelatedRelations.length);
   const timelineRows = incidentEvents
     .filter((event) => event.incidentId === incident?.incidentId)
@@ -947,12 +945,8 @@ export function IncidentDetailPage() {
   const successfulNotificationCount = notificationRows.filter((row) => row.status === "성공").length;
 
   useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), 1000);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
     let isMounted = true;
+    let timeoutId;
     const nextIncidentId = Number(incident?.incidentId);
     if (!nextIncidentId) {
       setRemoteNotificationRows([]);
@@ -961,31 +955,34 @@ export function IncidentDetailPage() {
     }
 
     setNotificationHistoryLoading(true);
-    chainViewApi.incidents.notifications(nextIncidentId)
-      .then((rows) => {
-        if (!isMounted) {
-          return;
-        }
-        setRemoteNotificationRows(
-          Array.isArray(rows)
-            ? rows.map((row, index) => normalizeIncidentNotificationHistoryRow(row, index))
-            : []
-        );
-      })
-      .catch((error) => {
-        console.warn("인시던트 알림 이력 조회 실패", error);
-        if (isMounted) {
-          setRemoteNotificationRows([]);
-        }
-      })
-      .finally(() => {
-        if (isMounted) {
-          setNotificationHistoryLoading(false);
-        }
-      });
+    timeoutId = window.setTimeout(() => {
+      chainViewApi.incidents.notifications(nextIncidentId)
+        .then((rows) => {
+          if (!isMounted) {
+            return;
+          }
+          setRemoteNotificationRows(
+            Array.isArray(rows)
+              ? rows.map((row, index) => normalizeIncidentNotificationHistoryRow(row, index))
+              : []
+          );
+        })
+        .catch((error) => {
+          console.warn("인시던트 알림 이력 조회 실패", error);
+          if (isMounted) {
+            setRemoteNotificationRows([]);
+          }
+        })
+        .finally(() => {
+          if (isMounted) {
+            setNotificationHistoryLoading(false);
+          }
+        });
+    }, 250);
 
     return () => {
       isMounted = false;
+      window.clearTimeout(timeoutId);
     };
   }, [incident?.incidentId]);
 
@@ -1058,7 +1055,7 @@ export function IncidentDetailPage() {
           <div className="incident-detail__actions">
             <div className="incident-detail__timer">
               <span>경과시간</span>
-              <strong>{elapsedLabel}</strong>
+              <IncidentElapsedTimer startedAt={incident.startedAt} />
             </div>
             {incident.incidentStatusCode !== "RESOLVED" ? (
               <button type="button" onClick={resolveIncident}>인시던트 종료</button>
@@ -1318,6 +1315,21 @@ function formatIncidentElapsed(startedAt, now = new Date()) {
   const seconds = elapsed % 60;
   const pad = (value) => String(value).padStart(2, "0");
   return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+}
+
+function IncidentElapsedTimer({ startedAt }) {
+  const [label, setLabel] = useState(() => startedAt ? formatIncidentElapsed(startedAt) : "00:00:00");
+
+  useEffect(() => {
+    setLabel(startedAt ? formatIncidentElapsed(startedAt) : "00:00:00");
+    const timer = window.setInterval(() => {
+      setLabel(startedAt ? formatIncidentElapsed(startedAt) : "00:00:00");
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [startedAt]);
+
+  return <strong>{label}</strong>;
 }
 
 function firstIncidentTextValue(...values) {
