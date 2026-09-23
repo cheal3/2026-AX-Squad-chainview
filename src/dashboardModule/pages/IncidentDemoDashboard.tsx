@@ -118,7 +118,6 @@ type DashboardChangeRow = {
   sortAt: string;
   time: string;
 };
-type DashboardDeployRow = [string, string, string];
 type DashboardIncidentRow = [string, string, string, string, string, string];
 
 function parseDashboardCardDate(value: unknown) {
@@ -261,44 +260,6 @@ function formatDashboardIncidentStatus(statusCode: string) {
   );
 }
 
-function buildRecentDeployRows({
-  deployments,
-  serviceByCode,
-  serviceById,
-  services,
-}: {
-  deployments: Record<string, unknown>[];
-  serviceByCode: Map<string, ServiceRecord>;
-  serviceById: Map<number, ServiceRecord>;
-  services: ServiceRecord[];
-}): DashboardDeployRow[] {
-  const rows = deployments.length
-    ? deployments
-    : services.map((service) => ({
-        deploymentStatusCode: service.deploymentStatusCode,
-        serviceId: service.serviceId,
-        serviceName: service.serviceName,
-        updatedAt: service.updatedAt,
-      }));
-
-  return [...rows]
-    .sort((left, right) =>
-      String((right as Record<string, unknown>).updatedAt || (right as Record<string, unknown>).createdAt || "")
-        .localeCompare(String((left as Record<string, unknown>).updatedAt || (left as Record<string, unknown>).createdAt || ""))
-    )
-    .slice(0, 5)
-    .map((row) => {
-      const record = row as Record<string, unknown>;
-      const status = String(record.deploymentStatusCode ?? record.statusCode ?? "");
-      const at = record.updatedAt ?? record.createdAt;
-      return [
-        serviceDisplayName(serviceById, serviceByCode, record),
-        relativeDashboardTime(at),
-        status === "RUNNING" || status === "SUCCESS" ? "up" : "sync",
-      ];
-    });
-}
-
 export function IncidentDemoDashboard({
   activeIncidentId,
 }: {
@@ -335,7 +296,6 @@ function DashboardCase({
     : undefined;
   const {
     categories: categoryRecords,
-    deployments,
     groups,
     incidentEvents,
     incidentImpacts,
@@ -397,10 +357,6 @@ function DashboardCase({
   const recentChangeRows = useMemo(
     () => buildRecentChangeRows(services),
     [services]
-  );
-  const recentDeployRows = useMemo(
-    () => buildRecentDeployRows({ deployments, serviceByCode, serviceById, services }),
-    [deployments, serviceByCode, serviceById, services]
   );
   const [draftFilter, setDraftFilter] = useState<DashboardFilterState>(readDashboardFilter);
   const [appliedFilter, setAppliedFilter] = useState<DashboardFilterState>(readDashboardFilter);
@@ -680,7 +636,6 @@ function DashboardCase({
       </div>
       <BottomPanels
         changeRows={recentChangeRows}
-        deployRows={recentDeployRows}
         incidentRows={recentIncidentRows}
         managementRows={managementRows}
       />
@@ -2028,12 +1983,10 @@ function DarkPanel({ children, title }: { children: ReactNode; title: string }) 
 
 function BottomPanels({
   changeRows,
-  deployRows,
   incidentRows,
   managementRows,
 }: {
   changeRows: DashboardChangeRow[];
-  deployRows: DashboardDeployRow[];
   incidentRows: DashboardIncidentRow[];
   managementRows: DashboardManagementRow[];
 }) {
@@ -2042,7 +1995,6 @@ function BottomPanels({
   const dragStateRef = useRef({ left: 0, startX: 0, active: false });
   const visibleChangeRows = changeRows.slice(0, 5);
   const visibleIncidentRows = incidentRows.slice(0, 5);
-  const visibleDeployRows = deployRows.slice(0, 5);
   const handleBottomPanelsPointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if ((event.target as HTMLElement).closest("button")) {
       return;
@@ -2080,7 +2032,7 @@ function BottomPanels({
       onPointerCancel={handleBottomPanelsPointerEnd}
       onPointerLeave={handleBottomPanelsPointerEnd}
     >
-    <div className="grid h-full min-w-[1280px] grid-cols-[minmax(190px,0.76fr)_minmax(290px,1.06fr)_minmax(560px,1.98fr)_minmax(210px,0.8fr)] items-stretch gap-2 overflow-hidden">
+    <div className="grid h-full min-w-[1040px] grid-cols-[minmax(220px,0.85fr)_minmax(340px,1.15fr)_minmax(560px,2fr)] items-stretch gap-2 overflow-hidden">
       <Panel title="관리 필요 서비스">
         {managementRows.map(([label, value, type]) => (
           <TinyRow
@@ -2134,15 +2086,6 @@ function BottomPanels({
             </div>
           </div>
         ) : <TinyEmpty>등록된 인시던트가 없습니다.</TinyEmpty>}
-      </Panel>
-      <Panel
-        actionLabel="더보기 〉"
-        onAction={() => navigate("/admin-deployments")}
-        title="최근 배포"
-      >
-        {visibleDeployRows.length ? visibleDeployRows.map(([service, time, status]) => (
-          <TinyRow compact key={`${service}-${time}`} icon={status === "up" ? "↑" : "●"} label={service} value={time} tone={status === "up" ? "success" : "muted"} />
-        )) : <TinyEmpty>최근 배포가 없습니다.</TinyEmpty>}
       </Panel>
     </div>
     </div>
