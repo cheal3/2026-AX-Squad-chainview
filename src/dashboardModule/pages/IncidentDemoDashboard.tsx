@@ -1991,48 +1991,11 @@ function BottomPanels({
   managementRows: DashboardManagementRow[];
 }) {
   const navigate = useNavigate();
-  const scrollRef = useRef<HTMLDivElement | null>(null);
-  const dragStateRef = useRef({ left: 0, startX: 0, active: false });
   const visibleChangeRows = changeRows.slice(0, 5);
   const visibleIncidentRows = incidentRows.slice(0, 5);
-  const handleBottomPanelsPointerDown = (event: PointerEvent<HTMLDivElement>) => {
-    if ((event.target as HTMLElement).closest("button")) {
-      return;
-    }
-    const element = scrollRef.current;
-    if (!element) {
-      return;
-    }
-    dragStateRef.current = {
-      active: true,
-      left: element.scrollLeft,
-      startX: event.clientX,
-    };
-    element.setPointerCapture(event.pointerId);
-  };
-  const handleBottomPanelsPointerMove = (event: PointerEvent<HTMLDivElement>) => {
-    const element = scrollRef.current;
-    if (!element || !dragStateRef.current.active) {
-      return;
-    }
-    element.scrollLeft = dragStateRef.current.left - (event.clientX - dragStateRef.current.startX);
-  };
-  const handleBottomPanelsPointerEnd = (event: PointerEvent<HTMLDivElement>) => {
-    dragStateRef.current.active = false;
-    scrollRef.current?.releasePointerCapture(event.pointerId);
-  };
 
   return (
-    <div
-      ref={scrollRef}
-      className="mt-3 h-[236px] min-w-0 flex-none cursor-grab overflow-x-auto overflow-y-hidden active:cursor-grabbing [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-      onPointerDown={handleBottomPanelsPointerDown}
-      onPointerMove={handleBottomPanelsPointerMove}
-      onPointerUp={handleBottomPanelsPointerEnd}
-      onPointerCancel={handleBottomPanelsPointerEnd}
-      onPointerLeave={handleBottomPanelsPointerEnd}
-    >
-    <div className="grid h-full min-w-[1040px] grid-cols-[minmax(220px,0.85fr)_minmax(340px,1.15fr)_minmax(560px,2fr)] items-stretch gap-2 overflow-hidden">
+    <div className="mt-3 grid h-[236px] min-w-0 flex-none grid-cols-[minmax(220px,0.9fr)_minmax(320px,1.1fr)_minmax(480px,1.8fr)] items-stretch gap-2 overflow-hidden">
       <Panel title="관리 필요 서비스">
         {managementRows.map(([label, value, type]) => (
           <TinyRow
@@ -2087,7 +2050,6 @@ function BottomPanels({
           </div>
         ) : <TinyEmpty>등록된 인시던트가 없습니다.</TinyEmpty>}
       </Panel>
-    </div>
     </div>
   );
 }
