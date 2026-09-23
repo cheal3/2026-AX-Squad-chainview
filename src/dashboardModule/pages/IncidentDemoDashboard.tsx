@@ -296,6 +296,7 @@ function DashboardCase({
     : undefined;
   const {
     categories: categoryRecords,
+    deployments,
     groups,
     incidentEvents,
     incidentImpacts,
