@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Filter, Search, X } from "lucide-react";
+import { Filter, Search, Siren, X } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { AppShell } from "../../components/AppShell.jsx";
@@ -226,7 +226,7 @@ export function IncidentAdminPage() {
       return;
     }
 
-    portalData.createIncident({
+    const createdIncident = portalData.createIncident({
       serviceId: service?.serviceId ?? 1,
       severityCode: row.severityCode,
       externalIncidentCode: row.code,
@@ -238,6 +238,7 @@ export function IncidentAdminPage() {
       manualRegisteredYn: "Y",
       registeredBy: "admin",
     });
+    navigate(`/dashboard-proto-detail?incidentId=${createdIncident.incidentId}`);
   };
 
   const handleCreateIncident = () => {
@@ -250,7 +251,7 @@ export function IncidentAdminPage() {
         return Number.isFinite(seq) ? Math.max(maxSeq, seq) : maxSeq;
       }, 142) + 1;
 
-    portalData.createIncident({
+    const createdIncident = portalData.createIncident({
       serviceId: service?.serviceId ?? 1,
       severityCode: "MAJOR",
       externalIncidentCode: `INC-2026-${String(nextSeq).padStart(4, "0")}`,
@@ -261,6 +262,7 @@ export function IncidentAdminPage() {
       manualRegisteredYn: "Y",
       registeredBy: "admin",
     });
+    navigate(`/dashboard-proto-detail?incidentId=${createdIncident.incidentId}`);
   };
   const exportIncidentsXlsx = () => {
     downloadXlsx(
@@ -892,7 +894,7 @@ export function IncidentDetailPage() {
     .map((event) => [event.createdAt?.slice(11, 16) || "-", event.message, event.actor]);
   const detectionHistoryRows = incidentEvents
     .filter((event) => Number(event.incidentId) === Number(incident?.incidentId))
-    .map(normalizeIncidentEventHistoryRow);
+    .map((event) => normalizeIncidentEventHistoryRow(event, affectedServiceCount));
   const realProgressRows = detectionHistoryRows.map((row) => [row.time, row.message, row.actor]);
   const recentDeploymentRows = deployments
     .filter((deployment) => Number(deployment.serviceId) === Number(service?.serviceId))
@@ -1039,7 +1041,7 @@ export function IncidentDetailPage() {
         </div>
 
         <section className="incident-detail__hero">
-          <div className="incident-detail__alarm">🚨</div>
+          <div className="incident-detail__alarm" aria-hidden="true"><Siren size={34} strokeWidth={2.4} /></div>
           <div className="incident-detail__hero-main">
             <div className="incident-detail__title-row">
               <h1>{service?.serviceName ?? incident.title}</h1>
@@ -1344,10 +1346,16 @@ function formatIncidentHistoryTime(value) {
   return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 }
 
-function normalizeIncidentEventHistoryRow(event) {
+function normalizeIncidentEventHistoryRow(event, affectedServiceCount = 0) {
+  const rawMessage = firstIncidentTextValue(event?.message, event?.description, event?.eventMessage, event?.summary, "인시던트 이벤트가 기록되었습니다.");
+  const message = rawMessage.includes("예상 영향") && rawMessage.includes("0건")
+    ? affectedServiceCount > 0
+      ? `서비스 관계 기준 예상 영향 ${affectedServiceCount}건을 조회했습니다.`
+      : "서비스 관계 기준 추가 영향 서비스는 확인되지 않았습니다."
+    : rawMessage;
   return {
     actor: firstIncidentTextValue(event?.actor, event?.createdBy, event?.registeredBy, "SYSTEM"),
-    message: firstIncidentTextValue(event?.message, event?.description, event?.eventMessage, event?.summary, "인시던트 이벤트가 기록되었습니다."),
+    message,
     time: formatIncidentHistoryTime(event?.createdAt ?? event?.eventAt ?? event?.occurredAt ?? event?.updatedAt),
   };
 }

@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
-import { AlertTriangle, ExternalLink, X } from "lucide-react";
+import { ExternalLink, Siren, X } from "lucide-react";
 import { initAdminInteractions } from "./adminInteractions.js";
 import { AuthProvider, useAuth } from "./auth/AuthContext.jsx";
 import { AppShell } from "./components/AppShell.jsx";
@@ -427,7 +427,7 @@ function IncidentAlertBridge() {
       <div className="incident-alert-modal__panel">
         <div className="incident-alert-modal__head">
           <span className="incident-alert-modal__icon" aria-hidden="true">
-            <AlertTriangle size={22} />
+            <Siren size={22} strokeWidth={2.4} />
           </span>
           <div>
             <span>{incidentCode}</span>

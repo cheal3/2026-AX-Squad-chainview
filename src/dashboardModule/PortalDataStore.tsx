@@ -685,7 +685,7 @@ export function PortalDataProvider({ children }: { children: ReactNode }) {
       : [];
     const events = buildInitialIncidentEvents({
       incident: nextIncident,
-      impactCount: impacts.length,
+      impactCount: impacts.length || buildRelatedServiceCount(input.serviceId, relations),
       serviceName:
         services.find((service) => service.serviceId === input.serviceId)
           ?.serviceName ?? input.title,
@@ -2646,17 +2646,10 @@ function buildInitialIncidentEvents({
     },
     {
       eventType: "IMPACT_ANALYZED",
-      message: `서비스 관계 기준으로 예상 영향 서비스 ${impactCount}개를 산출했습니다.`,
-      actor: "SYSTEM",
-    },
-    {
-      eventType: "NOTIFICATION_SENT",
-      message: "Slack, SMS, Email 알림을 담당 그룹에 전파했습니다.",
-      actor: "SYSTEM",
-    },
-    {
-      eventType: "ACK_WAITING",
-      message: "담당자 ACK 및 조치 기록 입력을 대기 중입니다.",
+      message:
+        impactCount > 0
+          ? `서비스 관계 기준 예상 영향 서비스 ${impactCount}개를 산출했습니다.`
+          : "서비스 관계 기준 추가 영향 서비스는 확인되지 않았습니다.",
       actor: "SYSTEM",
     },
   ];
@@ -2667,4 +2660,26 @@ function buildInitialIncidentEvents({
     createdAt: now,
     ...item,
   }));
+}
+
+function buildRelatedServiceCount(
+  serviceId: number | undefined,
+  relations: ServiceRelationRecord[]
+) {
+  if (!serviceId) {
+    return 0;
+  }
+  const relatedIds = new Set<number>();
+  relations.forEach((relation) => {
+    if (relation.relationStatusCode !== "ACTIVE") {
+      return;
+    }
+    if (Number(relation.sourceServiceId) === Number(serviceId) && relation.targetServiceId) {
+      relatedIds.add(Number(relation.targetServiceId));
+    }
+    if (Number(relation.targetServiceId) === Number(serviceId) && relation.sourceServiceId) {
+      relatedIds.add(Number(relation.sourceServiceId));
+    }
+  });
+  return relatedIds.size;
 }

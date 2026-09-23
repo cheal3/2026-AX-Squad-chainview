@@ -627,7 +627,7 @@ function DashboardCase({
               return;
             }
 
-            portalData.createIncident({
+            const createdIncident = portalData.createIncident({
               incidentTypeCode: "SERVER",
               serverId: incidentServer.serverId,
               severityCode: "CRITICAL",
@@ -639,13 +639,14 @@ function DashboardCase({
               manualRegisteredYn: "Y",
               registeredBy: "admin",
             });
+            navigate(`/dashboard-proto-detail?incidentId=${createdIncident.incidentId}`);
           }}
           onCreateIncident={() => {
             if (!selectedService) {
               return;
             }
 
-            portalData.createIncident({
+            const createdIncident = portalData.createIncident({
               serviceId: selectedService.serviceId,
               severityCode: "CRITICAL",
               externalIncidentCode: nextIncidentCode(),
@@ -656,6 +657,7 @@ function DashboardCase({
               manualRegisteredYn: "Y",
               registeredBy: "admin",
             });
+            navigate(`/dashboard-proto-detail?incidentId=${createdIncident.incidentId}`);
           }}
           relationCount={
             selectedService
@@ -1650,18 +1652,11 @@ function IncidentCommandDashboard({
   const timelineEvents = useMemo(
     () =>
       buildDashboardIncidentTimeline({
-        deployments,
-        groups,
-        impactedServices: impact.level1,
+        affectedServiceCount: impactedCount,
         incident,
         incidentEvents,
-        owners,
-        relations,
-        rootService,
-        services,
-        users,
       }),
-    [deployments, groups, impact.level1, incident, incidentEvents, owners, relations, rootService, services, users]
+    [impactedCount, incident, incidentEvents]
   );
 
   useEffect(() => {
@@ -1764,7 +1759,7 @@ function IncidentCommandDashboard({
 
       <div className="mt-3 grid min-h-[240px] min-w-0 grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-3">
         <DarkPanel title="장애 타임라인">
-          <div className="max-h-[184px] overflow-y-auto pr-1">
+          <div className="incident-dark-scroll max-h-[184px] overflow-y-auto pr-1">
             {timelineEvents.map(([time, text, actor], index) => (
               <div key={`${time}-${text}`} className="flex gap-3 py-2 text-sm leading-5">
                 <span className={`mt-1 h-4 w-4 shrink-0 rounded-full ${index === 0 ? "bg-[#ff3344]" : "bg-[#f59e0b]"}`} />
@@ -1863,172 +1858,45 @@ function buildIncidentImpactColumns(
 }
 
 function buildDashboardIncidentTimeline({
-  deployments,
-  groups,
-  impactedServices,
+  affectedServiceCount,
   incident,
   incidentEvents,
-  owners,
-  relations,
-  rootService,
-  services,
-  users,
 }: {
-  deployments: Record<string, unknown>[];
-  groups: Record<string, unknown>[];
-  impactedServices: ServiceRecord[];
+  affectedServiceCount: number;
   incident: IncidentRecord;
   incidentEvents: Record<string, unknown>[];
-  owners: Record<string, unknown>[];
-  relations: ServiceRelationRecord[];
-  rootService?: ServiceRecord;
-  services: ServiceRecord[];
-  users: Record<string, unknown>[];
 }) {
-  const startedAt = String(incident.startedAt || incident.createdAt || "");
-  const serviceId = Number(rootService?.serviceId ?? incident.serviceId);
-  const serviceName = rootService?.serviceName || incident.targetLabel || incident.targetCode || "대상 서비스";
-  const serviceCode = rootService?.serviceCode || incident.targetCode || "-";
-  const relatedRelations = relations.filter(
-    (relation) =>
-      relation.relationStatusCode === "ACTIVE" &&
-      (Number(relation.sourceServiceId) === serviceId ||
-        Number(relation.targetServiceId) === serviceId)
-  );
-  const serviceOwners = owners
-    .filter(
-      (owner) =>
-        Number(owner.serviceId) === serviceId ||
-        (owner.serviceCode && String(owner.serviceCode) === serviceCode)
-    )
-    .map((owner) => {
-      const user = users.find((item) => Number(item.userId) === Number(owner.userId));
-      const group = groups.find((item) => Number(item.groupId) === Number(owner.groupId));
-      const ownerName = String(
-        owner.ownerName ||
-          owner.assigneeDisplay ||
-          user?.userName ||
-          group?.groupName ||
-          "담당자/담당그룹 미등록"
-      );
-      const orgName = String(
-        user?.departmentName ||
-          user?.orgName ||
-          group?.groupName ||
-          (owner.ownerTypeCode === "GROUP" ? "담당 그룹" : "담당자")
-      );
-      return {
-        email: String(user?.email || ""),
-        name: ownerName,
-        organization: orgName,
-      };
-    });
-  const owner = serviceOwners[0];
-  const ownerLabel = owner
-    ? `${owner.name}${owner.organization ? ` (${owner.organization})` : ""}${owner.email ? ` · ${owner.email}` : ""}`
-    : "담당자/담당그룹 미등록";
-  const affectedNames = impactedServices
-    .map((service) => service.serviceName || service.serviceCode)
-    .filter(Boolean)
-    .slice(0, 3);
-  const affectedLabel = affectedNames.length
-    ? `${affectedNames.join(", ")}${impactedServices.length > affectedNames.length ? ` 외 ${impactedServices.length - affectedNames.length}개` : ""}`
-    : "추가 영향 서비스 미확인";
-  const recentDeployment = deployments.find(
-    (deployment) => Number(deployment.serviceId) === serviceId
-  );
-  const remoteRows = incidentEvents
+  const rows = incidentEvents
     .filter((event) => Number(event.incidentId) === Number(incident.incidentId))
-    .slice(0, 2)
-    .map((event, index) => [
-      formatIncidentProgressTime(startedAt, 12 + index * 2),
-      normalizeDashboardTimelineMessage(String(event.message || ""), {
-        affectedLabel,
-        relationCount: Math.max(relatedRelations.length, impactedServices.length),
-        serviceName,
-      }),
-      String(event.actor || "remote"),
+    .sort((a, b) => String(a.createdAt || "").localeCompare(String(b.createdAt || "")))
+    .map((event) => [
+      formatDashboardEventTime(String(event.createdAt || incident.startedAt || incident.createdAt || "")),
+      normalizeDashboardEventMessage(String(event.message || "인시던트 이벤트가 기록되었습니다."), affectedServiceCount),
+      String(event.actor || "SYSTEM"),
     ]);
 
-  const rows = [
-    [
-      formatIncidentProgressTime(startedAt, 0),
-      `${serviceName}(${serviceCode}) ${incident.severityCode} 인시던트가 접수되어 서비스 기준 영향도 산출을 시작했습니다.`,
-      incident.registeredBy || "SYSTEM",
-    ],
-    [
-      formatIncidentProgressTime(startedAt, 2),
-      `담당자 매핑을 조회해 ${ownerLabel}을 1차 대응 대상으로 지정했습니다.`,
-      "담당 조회",
-    ],
-    [
-      formatIncidentProgressTime(startedAt, 4),
-      `서비스 관계 ${Math.max(relatedRelations.length, impactedServices.length)}건을 분석했습니다. 예상 영향: ${affectedLabel}`,
-      "영향도 분석",
-    ],
-    [
-      formatIncidentProgressTime(startedAt, 6),
-      owner
-        ? `알림톡/메일 채널로 ${owner.name}에게 장애 알림을 전송했습니다. 상태: 성공`
-        : "담당자 미등록으로 공통 운영 채널에 장애 알림을 전송했습니다. 상태: 확인 필요",
-      "알림 전송",
-    ],
-    recentDeployment
-      ? [
-          formatIncidentProgressTime(startedAt, 10),
-          `최근 배포 ${String(recentDeployment.versionText ?? recentDeployment.releaseVersion ?? recentDeployment.deployPath ?? "배포 정보")}와 장애 발생 시점을 대조했습니다.`,
-          String(recentDeployment.deployedBy ?? recentDeployment.updatedBy ?? "배포 확인"),
-        ]
-      : [
-          formatIncidentProgressTime(startedAt, 10),
-          `${serviceName}의 최근 배포 이력은 확인되지 않아 관계 서비스와 런타임 상태를 우선 점검 중입니다.`,
-          "운영 확인",
-        ],
-    ...remoteRows,
-  ];
-
-  return ensureDashboardTimelineTimes(rows, startedAt).slice(0, 7);
+  return rows.length
+    ? rows
+    : [[
+        formatDashboardEventTime(String(incident.startedAt || incident.createdAt || "")),
+        "등록된 장애 진행 이벤트가 없습니다.",
+        "SYSTEM",
+      ]];
 }
 
-function formatIncidentProgressTime(startedAt: string, offsetMinutes: number) {
-  const base = parseDashboardDate(startedAt || formatDateTime(new Date()));
-  base.setMinutes(base.getMinutes() + offsetMinutes);
-  return formatTimelineClock(base);
+function formatDashboardEventTime(value: string) {
+  const date = parseDashboardDate(value || formatDateTime(new Date()));
+  return formatTimelineClock(date);
 }
 
-function normalizeDashboardTimelineMessage(
-  message: string,
-  {
-    affectedLabel,
-    relationCount,
-    serviceName,
-  }: { affectedLabel: string; relationCount: number; serviceName: string }
-) {
+function normalizeDashboardEventMessage(message: string, affectedServiceCount: number) {
   const text = String(message || "").trim();
-  if (!text) {
-    return `${serviceName} 관련 원격 이벤트가 수신되어 진행 이력에 반영했습니다.`;
-  }
-  if (text.includes("서비스 관계") && text.includes("0건")) {
-    return `서비스 관계 기준 예상 영향 ${relationCount}건을 재계산했습니다. 대상: ${affectedLabel}`;
-  }
-  if (text.includes("인시던트가 등록")) {
-    return `${serviceName} 장애 이벤트가 원격 API에서 수신되어 상세 진행상황에 반영되었습니다.`;
+  if (text.includes("예상 영향") && text.includes("0건")) {
+    return affectedServiceCount > 0
+      ? `서비스 관계 기준 예상 영향 ${affectedServiceCount}건을 조회했습니다.`
+      : "서비스 관계 기준 추가 영향 서비스는 확인되지 않았습니다.";
   }
   return text;
-}
-
-function ensureDashboardTimelineTimes(rows: string[][], startedAt: string) {
-  const usedTimes = new Set<string>();
-  return rows.map(([time, message, actor], index) => {
-    let nextTime = time && time !== "-" ? time : formatIncidentProgressTime(startedAt, index * 2);
-    let offset = index * 2;
-    while (usedTimes.has(nextTime)) {
-      offset += 1;
-      nextTime = formatIncidentProgressTime(startedAt, offset);
-    }
-    usedTimes.add(nextTime);
-    return [nextTime, message, actor];
-  });
 }
 
 function IncidentSelectedPanel({

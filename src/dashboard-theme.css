@@ -3776,6 +3776,31 @@ table.tbl td.col-check {
   scrollbar-width: thin;
 }
 
+.incident-dark-scroll {
+  scrollbar-color: #486179 #061625;
+  scrollbar-width: thin;
+}
+
+.incident-dark-scroll::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.incident-dark-scroll::-webkit-scrollbar-track {
+  background: #061625;
+  border-radius: 999px;
+}
+
+.incident-dark-scroll::-webkit-scrollbar-thumb {
+  background: #486179;
+  border: 2px solid #061625;
+  border-radius: 999px;
+}
+
+.incident-dark-scroll::-webkit-scrollbar-thumb:hover {
+  background: #5d7894;
+}
+
 .incident-detail-page::-webkit-scrollbar,
 .incident-detail__scroll-area::-webkit-scrollbar {
   width: 10px;
