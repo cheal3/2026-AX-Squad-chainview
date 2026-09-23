@@ -7,14 +7,16 @@ import { AppShell } from "./components/AppShell.jsx";
 import { pages } from "./pagesData.js";
 import { PortalDataProvider, usePortalData } from "./dashboardModule/PortalDataStore";
 import { LoginPage } from "./pages/login/LoginPage.jsx";
+import {
+  DashboardPage,
+  IncidentAdminPage,
+  IncidentDetailPage,
+} from "./pages/monitoring/MonitoringPages.jsx";
 
 const DynamicAdminListPage = lazy(() => import("./pages/admin/AdminListPage.jsx").then((module) => ({ default: module.DynamicAdminListPage })));
 const InfraRelationsPage = lazy(() => import("./pages/infra/InfraPages.jsx").then((module) => ({ default: module.InfraRelationsPage })));
 const InfraTopologyPage = lazy(() => import("./pages/infra/InfraPages.jsx").then((module) => ({ default: module.InfraTopologyPage })));
 const ServiceInfraMappingPage = lazy(() => import("./pages/infra/ServiceInfraMappingPage.jsx").then((module) => ({ default: module.ServiceInfraMappingPage })));
-const DashboardPage = lazy(() => import("./pages/monitoring/MonitoringPages.jsx").then((module) => ({ default: module.DashboardPage })));
-const IncidentAdminPage = lazy(() => import("./pages/monitoring/MonitoringPages.jsx").then((module) => ({ default: module.IncidentAdminPage })));
-const IncidentDetailPage = lazy(() => import("./pages/monitoring/MonitoringPages.jsx").then((module) => ({ default: module.IncidentDetailPage })));
 const NotificationHistoryPage = lazy(() => import("./pages/operation/OperationPages.jsx").then((module) => ({ default: module.NotificationHistoryPage })));
 const NotificationTemplatePage = lazy(() => import("./pages/operation/OperationPages.jsx").then((module) => ({ default: module.NotificationTemplatePage })));
 const ServiceCheckPage = lazy(() => import("./pages/operation/OperationPages.jsx").then((module) => ({ default: module.ServiceCheckPage })));
