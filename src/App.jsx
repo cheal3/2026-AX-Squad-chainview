@@ -350,13 +350,18 @@ function RequireAuth({ children }) {
 }
 
 function RootEntry() {
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  if (searchParams.get("detail") === "1") {
+    return <IncidentDetailPage />;
+  }
   return <DashboardPage />;
 }
 
 function LegacyIncidentDetailRedirect() {
   const location = useLocation();
   const incidentId = new URLSearchParams(location.search).get("incidentId");
-  return <Navigate to={incidentId ? `/?incidentId=${incidentId}` : "/"} replace />;
+  return <Navigate to={incidentId ? `/?detail=1&incidentId=${incidentId}` : "/"} replace />;
 }
 
 function RealtimeRemoteGetRefresh() {
@@ -431,7 +436,7 @@ function IncidentAlertBridge() {
 
   const goToIncident = () => {
     setIncident(null);
-    navigate(incidentId ? `/?incidentId=${incidentId}` : "/admin-incidents");
+    navigate(incidentId ? `/?detail=1&incidentId=${incidentId}` : "/admin-incidents");
   };
 
   return (

@@ -10,9 +10,9 @@
         var basePath = "/2026-AX-Squad-chainview/";
         var path = window.location.pathname;
         var searchParams = new URLSearchParams(window.location.search);
-        if (path === basePath + "dashboard-proto-detail" || searchParams.get("view") === "detail") {
+        if (path === basePath + "dashboard-proto-detail" || path === basePath + "incident-detail" || searchParams.get("view") === "detail") {
           var incidentId = searchParams.get("incidentId");
-          window.location.replace(basePath + (incidentId ? "?incidentId=" + encodeURIComponent(incidentId) : ""));
+          window.location.replace(basePath + (incidentId ? "?detail=1&incidentId=" + encodeURIComponent(incidentId) : ""));
         }
       })();
     </script>

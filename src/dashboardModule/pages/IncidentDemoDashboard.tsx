@@ -1911,7 +1911,7 @@ function IncidentSelectedPanel({
           <button
             className="h-8 rounded border border-[#35506b] bg-[#0b2135] text-xs font-black text-slate-200"
             type="button"
-            onClick={() => navigate(`/incident-detail?incidentId=${incident.incidentId}`)}
+            onClick={() => navigate(`/?detail=1&incidentId=${incident.incidentId}`)}
           >
             인시던트 상세 <ExternalLink className="inline" size={12} />
           </button>
