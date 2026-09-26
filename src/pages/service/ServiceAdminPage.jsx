@@ -7,13 +7,13 @@ import { chainViewApi } from "../../dashboardModule/chainViewApi";
 import { codeLabels } from "../../dashboardModule/mockData";
 
 const serviceDetailTabs = [
-  { key: "overview", label: "개요" },
-  { key: "incidents", label: "인시던트 이력" },
-  { key: "deployments", label: "배포/서버" },
-  { key: "impact", label: "영향도" },
-  { key: "owners", label: "담당자" },
-  { key: "relations", label: "서비스 관계" },
+  { key: "overview", label: "기본정보" },
+  { key: "deployments", label: "서버/배포" },
   { key: "techstack", label: "기술스택" },
+  { key: "relations", label: "서비스 관계" },
+  { key: "owners", label: "담당자/조직" },
+  { key: "checks", label: "서비스 점검" },
+  { key: "incidents", label: "인시던트 이력" },
   { key: "changes", label: "변경 이력" },
 ];
 
@@ -176,11 +176,17 @@ function ServiceDetailPage({ service }) {
   const navigate = useNavigate();
   const location = useLocation();
   const {
+    createIncident,
+    createOwner,
+    deleteOwner,
     deleteTechStack,
     deployments,
     incidents,
     owners,
     relations,
+    updateOwner,
+    updateRelation,
+    removeRelation,
     servers,
     services,
     techStacks,
@@ -189,6 +195,8 @@ function ServiceDetailPage({ service }) {
   const activeTab = new URLSearchParams(location.search).get("tab") || "overview";
   const [changeRows, setChangeRows] = useState([]);
   const [changeSourceLabel, setChangeSourceLabel] = useState("샘플 기준");
+  const [checkRows, setCheckRows] = useState([]);
+  const [checkSourceLabel, setCheckSourceLabel] = useState("운영 API 기준");
   const [impactRows, setImpactRows] = useState([]);
   const [impactSourceLabel, setImpactSourceLabel] = useState("샘플 기준");
   const deploymentInfos = useMemo(
@@ -296,6 +304,29 @@ function ServiceDetailPage({ service }) {
     };
   }, [service.serviceId, services]);
 
+  useEffect(() => {
+    let cancelled = false;
+    setCheckRows([]);
+    chainViewApi.healthCheckJobs
+      .list({ serviceId: service.serviceId })
+      .then((rows) => {
+        if (cancelled) return;
+        const list = Array.isArray(rows) ? rows : [];
+        setCheckRows(list.filter((row) => Number(row.serviceId) === Number(service.serviceId) || String(row.serviceCode || "") === service.serviceCode));
+        setCheckSourceLabel("운영 API 기준");
+      })
+      .catch((error) => {
+        console.warn("서비스 점검 목록 조회 실패", error);
+        if (!cancelled) {
+          setCheckRows([]);
+          setCheckSourceLabel("조회 실패");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [service.serviceCode, service.serviceId]);
+
   const setTab = (tabKey) => {
     navigate(`/admin-services/${service.serviceCode}?tab=${tabKey}`);
   };
@@ -332,6 +363,85 @@ function ServiceDetailPage({ service }) {
     navigate("/");
   };
 
+  const handleCreateIncident = () => {
+    const title = window.prompt("인시던트 제목을 입력하세요.", `${service.serviceName} 장애 발생`);
+    if (!title) return;
+    const createdIncident = createIncident({
+      serviceId: service.serviceId,
+      severityCode: "CRITICAL",
+      targetCode: service.serviceCode,
+      targetLabel: service.serviceName,
+      title,
+      description: "서비스 상세 화면에서 등록한 인시던트입니다.",
+      manualRegisteredYn: "Y",
+      registeredBy: "admin",
+    });
+    navigate(`/?incidentId=${createdIncident.incidentId}`);
+  };
+
+  const handleCreateCheck = async () => {
+    const jobName = window.prompt("점검명을 입력하세요.", `${service.serviceName} 헬스체크`);
+    if (!jobName) return;
+    try {
+      await chainViewApi.healthCheckJobs.create({
+        serviceId: service.serviceId,
+        jobName,
+        checkTypeCode: service.endpointUrl ? "HTTP" : "PING",
+        targetUrl: service.endpointUrl,
+        cronExpression: "0 */3 * * * *",
+        activeYn: "Y",
+      });
+      const rows = await chainViewApi.healthCheckJobs.list({ serviceId: service.serviceId });
+      setCheckRows((Array.isArray(rows) ? rows : []).filter((row) => Number(row.serviceId) === Number(service.serviceId) || String(row.serviceCode || "") === service.serviceCode));
+      setCheckSourceLabel("운영 API 기준");
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "서비스 점검 등록에 실패했습니다.");
+    }
+  };
+
+  const handleEditOwner = (owner) => {
+    const nextResponsibility = window.prompt("책임 유형을 입력하세요. (MAIN/SUB/ALERT)", owner.responsibilityCode || "MAIN");
+    if (!nextResponsibility) return;
+    updateOwner(owner.serviceOwnerId, {
+      ...owner,
+      groupName: owner.ownerTypeCode === "GROUP" ? owner.ownerName : "",
+      userName: owner.ownerTypeCode === "USER" ? owner.ownerName : "",
+      responsibilityCode: nextResponsibility.trim().toUpperCase(),
+    });
+  };
+
+  const handleCreateOwner = () => {
+    const ownerName = window.prompt("담당자 또는 담당그룹명을 입력하세요.");
+    if (!ownerName) return;
+    const ownerTypeCode = window.confirm("개인 담당자로 등록할까요? 취소를 누르면 그룹으로 등록됩니다.") ? "USER" : "GROUP";
+    createOwner({
+      serviceId: service.serviceId,
+      serviceCode: service.serviceCode,
+      ownerTypeCode,
+      userName: ownerTypeCode === "USER" ? ownerName : "",
+      groupName: ownerTypeCode === "GROUP" ? ownerName : "",
+      responsibilityCode: "MAIN",
+    });
+  };
+
+  const handleDeleteOwner = (owner) => {
+    if (window.confirm(`${owner.ownerName} 담당 정보를 삭제할까요?`)) {
+      deleteOwner(owner.serviceOwnerId);
+    }
+  };
+
+  const handleEditRelation = (relation) => {
+    const nextDescription = window.prompt("관계 설명을 입력하세요.", relation.description || "");
+    if (nextDescription === null) return;
+    updateRelation(relation.relationId, { description: nextDescription });
+  };
+
+  const handleDeleteRelation = (relation) => {
+    if (window.confirm("서비스 관계를 삭제할까요?")) {
+      removeRelation(relation.relationId);
+    }
+  };
+
   return (
     <div className="service-detail-page">
       <div className="service-detail__crumb crumb--standardized">
@@ -348,10 +458,10 @@ function ServiceDetailPage({ service }) {
             <span className="service-detail__status-badge">{detail.statusLabel}</span>
           </div>
           <div className="service-detail__meta">
-            <span>serviceCode <b>{service.serviceCode}</b></span>
+            <span>서비스 코드 <b>{service.serviceCode}</b></span>
             <span>분류 <b>{service.categoryPath?.join(" > ")}</b></span>
-            <span>SERVICE_TYPE <b>{service.serviceTypeCode}</b></span>
-            <span>STATUS <b>{detail.statusLabel}</b></span>
+            <span>서비스 유형 <b>{labelFromCode("serviceType", service.serviceTypeCode)}</b></span>
+            <span>상태 <b>{detail.statusLabel}</b></span>
             <span>{detail.ownerSummary}</span>
           </div>
         </div>
@@ -370,14 +480,14 @@ function ServiceDetailPage({ service }) {
         ))}
       </nav>
 
-      {activeTab === "overview" ? <ServiceOverviewTab detail={detail} incidents={serviceIncidents} onOpenDeployments={() => setTab("deployments")} onOpenInfraMap={handleInfraMapOpen} onOpenIncidents={() => setTab("incidents")} server={deploymentServer} service={service} /> : null}
+      {activeTab === "overview" ? <ServiceOverviewTab detail={detail} service={service} /> : null}
       {activeTab === "techstack" ? <ServiceTechStackTab detail={detail} onDelete={handleTechDelete} onEdit={handleTechEdit} techStacks={serviceTechStacks} service={service} /> : null}
       {activeTab === "deployments" ? <ServiceDeploymentTab detail={detail} onOpenDetail={handleServerDetail} onOpenInfraMap={handleInfraMapOpen} server={deploymentServer} service={service} /> : null}
-      {activeTab === "impact" ? <ServiceImpactTab detail={detail} rows={impactRows} service={service} sourceLabel={impactSourceLabel} /> : null}
-      {activeTab === "owners" ? <ServiceOwnersTab detail={detail} owners={serviceOwners} /> : null}
-      {activeTab === "relations" ? <ServiceRelationTab detail={detail} relations={serviceRelations} /> : null}
+      {activeTab === "owners" ? <ServiceOwnersTab detail={detail} onCreate={handleCreateOwner} onDelete={handleDeleteOwner} onEdit={handleEditOwner} owners={serviceOwners} /> : null}
+      {activeTab === "relations" ? <ServiceRelationTab detail={detail} onDelete={handleDeleteRelation} onEdit={handleEditRelation} onCreate={() => navigate("/admin-relations")} relations={serviceRelations} /> : null}
+      {activeTab === "checks" ? <ServiceCheckTab onCreate={handleCreateCheck} rows={checkRows} service={service} sourceLabel={checkSourceLabel} /> : null}
       {activeTab === "changes" ? <ServiceChangeTab detail={detail} rows={changeRows} sourceLabel={changeSourceLabel} /> : null}
-      {activeTab === "incidents" ? <ServiceIncidentTab detail={detail} incidents={serviceIncidents} onOpenDetail={handleIncidentDetail} service={service} /> : null}
+      {activeTab === "incidents" ? <ServiceIncidentTab detail={detail} incidents={serviceIncidents} onCreate={handleCreateIncident} onOpenDetail={handleIncidentDetail} service={service} /> : null}
     </div>
   );
 }
@@ -387,6 +497,18 @@ function formatServiceDetailDate(value) {
     return "-";
   }
   return String(value).replace("T", " ").slice(0, 16);
+}
+
+function labelFromCode(group, code) {
+  return codeLabels[group]?.[code] || code || "-";
+}
+
+function ownerResponsibilityLabel(code) {
+  return codeLabels.responsibilityType?.[code] || code || "-";
+}
+
+function ownerTypeLabel(code) {
+  return codeLabels.ownerType?.[code] || code || "-";
 }
 
 function normalizeServiceChangeRow(row) {
@@ -513,115 +635,23 @@ function serviceIncidentStatusLabel(code) {
   return codeLabels.incidentStatus?.[code] || code || "-";
 }
 
-function ServiceOverviewTab({ detail, incidents, onOpenDeployments, onOpenInfraMap, onOpenIncidents, server, service }) {
-  const infraRelationHref = server?.infraNodeId ? `/admin-infra-relations?focusInfraNodeId=${server.infraNodeId}` : "/admin-service-infra-mapping";
-  const overviewIncidents = incidents.length
-    ? incidents.slice(0, 4).map((incident) => ({
-        key: incident.incidentId,
-        status: serviceIncidentStatusLabel(incident.incidentStatusCode),
-        time: formatServiceDetailDate(incident.startedAt),
-        title: `${incident.externalIncidentCode || `INC-${incident.incidentId}`} · ${incident.title}`,
-        duration: incident.endedAt ? "종료" : "진행중",
-      }))
-    : detail.overviewIncidents.map((item, index) => ({ ...item, key: `${item.time}-${index}` }));
+function ServiceOverviewTab({ detail, service }) {
   return (
-    <div className="service-detail__overview-grid">
+    <div className="service-detail__overview-grid" style={{ gridTemplateColumns: "minmax(0, 1fr)" }}>
       <article className="service-detail__panel">
-        <h2>기본 정보 (SERVICE)</h2>
+        <h2>기본 정보</h2>
         <dl className="service-detail__definition-list">
-          <dt>serviceCode</dt><dd>{service.serviceCode}</dd>
-          <dt>serviceName</dt><dd>{service.serviceName}</dd>
-          <dt>categoryL1/L2/L3</dt><dd>{service.categoryPath?.map((item) => <span className="tag" key={item}>{item}</span>)}</dd>
-          <dt>serviceType</dt><dd>{service.serviceTypeCode}</dd>
-          <dt>importance</dt><dd><span className="pill pill--crit">{detail.importanceLabel}</span></dd>
-          <dt>status</dt><dd><span className="pill pill--ok">{detail.statusLabel}</span></dd>
-          <dt>endpointUrl</dt><dd><code>{service.endpointUrl}</code></dd>
-          <dt>description</dt><dd>{service.description || "-"}</dd>
-          <dt>createdAt</dt><dd>{formatServiceDetailDate(service.createdAt)} / createdBy: {service.createdBy || "-"}</dd>
-          <dt>updatedAt</dt><dd>{formatServiceDetailDate(service.updatedAt)} / updatedBy: {service.updatedBy || "-"}</dd>
+          <dt>서비스 코드</dt><dd>{service.serviceCode}</dd>
+          <dt>서비스명</dt><dd>{service.serviceName}</dd>
+          <dt>대분류/중분류/소분류</dt><dd>{service.categoryPath?.map((item) => <span className="tag" key={item}>{item}</span>)}</dd>
+          <dt>서비스 유형</dt><dd>{labelFromCode("serviceType", service.serviceTypeCode)}</dd>
+          <dt>중요도</dt><dd><span className="pill pill--crit">{detail.importanceLabel}</span></dd>
+          <dt>상태</dt><dd><span className="pill pill--ok">{detail.statusLabel}</span></dd>
+          <dt>엔드포인트 URL</dt><dd><code>{service.endpointUrl || "-"}</code></dd>
+          <dt>설명</dt><dd>{service.description || "-"}</dd>
+          <dt>등록일</dt><dd>{formatServiceDetailDate(service.createdAt)}</dd>
+          <dt>수정일</dt><dd>{formatServiceDetailDate(service.updatedAt)}</dd>
         </dl>
-      </article>
-
-      <article className="service-detail__panel">
-        <div className="service-detail__panel-head">
-          <h2>배포/서버/인프라</h2>
-          <span>DEPLOYMENT ⇄ SERVER ⇄ INFRA</span>
-        </div>
-        <div className="service-detail__infra-card">
-          <div>
-            <strong>{server?.serverName || "배포 서버 미지정"}</strong>
-            <span>{server ? `${server.hostName} · ${server.ipAddress}` : "서비스 배치 매핑에서 서버를 연결해주세요."}</span>
-          </div>
-          <dl>
-            <dt>배포 경로</dt><dd>{service.deployPath || "-"}</dd>
-            <dt>포트</dt><dd>{service.portInfo || "-"}</dd>
-            <dt>인스턴스</dt><dd>{service.instanceCount ?? 0}개</dd>
-            <dt>인프라 노드</dt><dd>{server?.infraNodeName || "인프라 미매핑"}</dd>
-          </dl>
-          <div className="service-detail__infra-actions">
-            <button className="btn btn--ghost btn--sm" onClick={onOpenDeployments} type="button">서버 정보</button>
-            <button className="btn btn--ghost btn--sm" onClick={onOpenInfraMap} type="button">배치 매핑</button>
-            <Link className={`btn btn--primary btn--sm${server?.infraNodeId ? "" : " is-disabled"}`} to={infraRelationHref}>인프라 관계도</Link>
-          </div>
-        </div>
-        <div className="service-detail__stack-list">
-          {detail.deploymentRows.map((row) => (
-            <div className="service-detail__deploy-card" key={row.name}>
-              <div className="service-detail__deploy-head">
-                <div className="service-detail__deploy-title"><i />{row.name}</div>
-                <button className="service-detail__icon-action" onClick={onOpenDeployments} type="button">
-                  <Eye size={14} />
-                  <span>상세</span>
-                </button>
-              </div>
-              <div className="service-detail__deploy-meta">{row.meta}</div>
-              <div className="service-detail__deploy-foot">
-                <span>{row.path}</span>
-                <span className="pill pill--ok">{row.status}</span>
-              </div>
-            </div>
-          ))}
-          {!detail.deploymentRows.length ? <div className="empty">등록된 배포 정보가 없습니다.</div> : null}
-        </div>
-      </article>
-
-      <article className="service-detail__panel">
-        <div className="service-detail__panel-head">
-          <h2>인시던트 이력 (30일)</h2>
-          <button className="service-detail__text-action" onClick={onOpenIncidents} type="button">전체 보기 →</button>
-        </div>
-        <div className="service-detail__compact-list">
-          {overviewIncidents.map((item) => (
-            <div className="service-detail__compact-row" key={item.key}>
-              <span className="pill pill--ok">{item.status}</span>
-              <span>{item.time}</span>
-              <strong>{item.title}</strong>
-              <span>{item.duration}</span>
-            </div>
-          ))}
-        </div>
-      </article>
-
-      <article className="service-detail__panel">
-        <h2>담당자 (SERVICE_OWNER)</h2>
-        <div className="service-detail__owner-list">
-          {detail.owners.map((owner) => (
-            <div className="service-detail__owner-row" key={owner.name + owner.role}>
-              <div className="service-detail__owner-avatar">{owner.name.slice(0, 1)}</div>
-              <div className="service-detail__owner-meta">
-                <strong>{owner.name}</strong>
-                <span>{owner.role}</span>
-                <small>{owner.meta}</small>
-              </div>
-              <div className="service-detail__owner-actions">
-                <button type="button"><MessageCircle size={14} /></button>
-                <button type="button"><Phone size={14} /></button>
-                <button type="button"><Mail size={14} /></button>
-              </div>
-            </div>
-          ))}
-          {!detail.owners.length ? <div className="empty">등록된 담당자 정보가 없습니다.</div> : null}
-        </div>
       </article>
     </div>
   );
@@ -663,45 +693,73 @@ function ServiceImpactTab({ detail, rows, service, sourceLabel }) {
   );
 }
 
-function ServiceOwnersTab({ detail, owners }) {
+function ServiceOwnersTab({ detail, onCreate, onDelete, onEdit, owners }) {
   const ownerRows = owners.length
     ? owners.map((owner) => ({
         key: owner.serviceOwnerId,
-        name: owner.ownerName,
-        role:
-          owner.responsibilityCode === "MAIN"
-            ? "주담당자"
-            : owner.responsibilityCode === "SUB"
-              ? "부담당자"
-              : "알림 담당",
-        meta: `${owner.ownerTypeCode === "GROUP" ? "담당그룹" : "사용자"} · ${owner.serviceCode || ""}`,
+        type: ownerTypeLabel(owner.ownerTypeCode),
+        name: owner.ownerName || "-",
+        department: owner.departmentName || owner.groupName || "-",
+        role: owner.roleName || "-",
+        phone: owner.phoneNo || owner.mobileNo || "-",
+        email: owner.email || "-",
+        responsibility: ownerResponsibilityLabel(owner.responsibilityCode),
+        record: owner,
       }))
-    : detail.owners.map((owner, index) => ({ ...owner, key: `${owner.name}-${index}` }));
+    : detail.owners.map((owner, index) => ({
+        key: `${owner.name}-${index}`,
+        type: owner.meta?.startsWith("담당그룹") ? "그룹" : "사용자",
+        name: owner.name,
+        department: "-",
+        role: owner.role,
+        phone: "-",
+        email: "-",
+        responsibility: owner.role,
+        record: null,
+      }));
   return (
     <section className="service-detail__panel">
       <div className="service-detail__section-head">
         <div>
-          <h2>담당자 정보</h2>
-          <p>주담당/부담당/운영 담당을 분리해 확인</p>
+          <h2>담당자/조직</h2>
+          <p>서비스 담당자 및 담당 그룹</p>
         </div>
+        <button className="btn btn--ghost btn--sm" onClick={onCreate} type="button"><Plus size={14} /> 담당자 추가</button>
       </div>
-      <div className="service-detail__owner-list">
-        {ownerRows.map((owner) => (
-          <div className="service-detail__owner-row" key={owner.key}>
-            <div className="service-detail__owner-avatar">{owner.name.slice(0, 1)}</div>
-            <div className="service-detail__owner-meta">
-              <strong>{owner.name}</strong>
-              <span>{owner.role}</span>
-              <small>{owner.meta}</small>
-            </div>
-            <div className="service-detail__owner-actions">
-              <button type="button"><MessageCircle size={14} /></button>
-              <button type="button"><Phone size={14} /></button>
-              <button type="button"><Mail size={14} /></button>
-            </div>
-          </div>
-        ))}
-      </div>
+      <table className="tbl service-detail__full-table">
+        <thead>
+          <tr>
+            <th>담당 유형</th>
+            <th>담당자/조직</th>
+            <th>부서</th>
+            <th>역할</th>
+            <th>전화</th>
+            <th>메일</th>
+            <th>책임 유형</th>
+            <th className="col-actions">액션</th>
+          </tr>
+        </thead>
+        <tbody>
+          {ownerRows.map((owner) => (
+            <tr key={owner.key}>
+              <td><span className="tag">{owner.type}</span></td>
+              <td><strong>{owner.name}</strong></td>
+              <td>{owner.department}</td>
+              <td>{owner.role}</td>
+              <td>{owner.phone}</td>
+              <td>{owner.email}</td>
+              <td><span className="pill pill--ok">{owner.responsibility}</span></td>
+              <td className="col-actions">
+                <div className="service-detail__text-actions">
+                  <button className="service-detail__text-action-button" disabled={!owner.record} onClick={() => onEdit(owner.record)} type="button"><Pencil size={14} /> 수정</button>
+                  <button className="service-detail__text-action-button is-danger" disabled={!owner.record} onClick={() => onDelete(owner.record)} type="button"><Trash2 size={14} /> 삭제</button>
+                </div>
+              </td>
+            </tr>
+          ))}
+          {!ownerRows.length ? <tr><td colSpan={8}><div className="empty">등록된 담당자 정보가 없습니다.</div></td></tr> : null}
+        </tbody>
+      </table>
     </section>
   );
 }
@@ -773,7 +831,6 @@ function ServiceTechStackTab({ detail, onDelete, onEdit, techStacks, service }) 
 }
 
 function ServiceDeploymentTab({ detail, onOpenDetail, onOpenInfraMap, server, service }) {
-  const infraRelationHref = server?.infraNodeId ? `/admin-infra-relations?focusInfraNodeId=${server.infraNodeId}` : "/admin-service-infra-mapping";
   return (
     <section className="service-detail__panel">
       <div className="service-detail__section-head">
@@ -782,23 +839,6 @@ function ServiceDeploymentTab({ detail, onOpenDetail, onOpenInfraMap, server, se
           <p>이 서비스가 배포된 서버 목록</p>
         </div>
         <button className="btn btn--ghost btn--sm" onClick={onOpenInfraMap} type="button"><Plus size={14} /> 서버 연결</button>
-      </div>
-      <div className="service-detail__infra-card service-detail__infra-card--wide">
-        <div>
-          <strong>{server?.serverName || "배포 서버 미지정"}</strong>
-          <span>{server ? `${server.hostName} · ${server.ipAddress}` : "서비스 배치 매핑에서 서버를 연결해주세요."}</span>
-        </div>
-        <dl>
-          <dt>환경</dt><dd>{server?.envCode || "-"}</dd>
-          <dt>OS</dt><dd>{server ? `${server.osTypeCode} ${server.osVersion}` : "-"}</dd>
-          <dt>배포 경로</dt><dd>{service.deployPath || "-"}</dd>
-          <dt>포트</dt><dd>{service.portInfo || "-"}</dd>
-          <dt>인프라 노드</dt><dd>{server?.infraNodeName || "인프라 미매핑"}</dd>
-        </dl>
-        <div className="service-detail__infra-actions">
-          <button className="btn btn--ghost btn--sm" onClick={onOpenInfraMap} type="button">배치 매핑 수정</button>
-          <Link className={`btn btn--primary btn--sm${server?.infraNodeId ? "" : " is-disabled"}`} to={infraRelationHref}>인프라 관계도</Link>
-        </div>
       </div>
       <table className="tbl service-detail__full-table">
         <thead>
@@ -842,7 +882,7 @@ function ServiceDeploymentTab({ detail, onOpenDetail, onOpenInfraMap, server, se
   );
 }
 
-function ServiceRelationTab({ detail, relations }) {
+function ServiceRelationTab({ detail, onCreate, onDelete, onEdit, relations }) {
   const relationRows = relations.length
     ? relations.map((relation) => ({
         key: relation.relationId,
@@ -854,8 +894,9 @@ function ServiceRelationTab({ detail, relations }) {
         required: relation.mandatoryYn,
         impact: relation.mandatoryYn === "Y" ? "직접" : "간접",
         description: relation.description,
+        record: relation,
       }))
-    : detail.relationRows.map((row, index) => ({ ...row, key: `${row.direction}-${row.service}-${index}` }));
+    : detail.relationRows.map((row, index) => ({ ...row, key: `${row.direction}-${row.service}-${index}`, record: null }));
   return (
     <section className="service-detail__panel">
       <div className="service-detail__section-head">
@@ -863,7 +904,7 @@ function ServiceRelationTab({ detail, relations }) {
           <h2>서비스 관계</h2>
           <p>다른 서비스와의 연관 관계</p>
         </div>
-        <button className="btn btn--ghost btn--sm" type="button">＋ 관계 추가</button>
+        <button className="btn btn--ghost btn--sm" onClick={onCreate} type="button">＋ 관계 추가</button>
       </div>
       <table className="tbl service-detail__full-table">
         <thead>
@@ -888,7 +929,12 @@ function ServiceRelationTab({ detail, relations }) {
               <td>{row.required}</td>
               <td><span className={row.impact === "직접" ? "pill pill--crit" : "tag"}>{row.impact}</span></td>
               <td>{row.description}</td>
-              <td className="col-actions"><div className="row-actions"><button className="ibtn" type="button">✏️</button><button className="ibtn ibtn--danger" type="button">🗑</button></div></td>
+              <td className="col-actions">
+                <div className="row-actions">
+                  <button className="ibtn" disabled={!row.record} onClick={() => onEdit(row.record)} type="button">✏️</button>
+                  <button className="ibtn ibtn--danger" disabled={!row.record} onClick={() => onDelete(row.record)} type="button">🗑</button>
+                </div>
+              </td>
             </tr>
           ))}
           {!relationRows.length ? <tr><td colSpan={8}><div className="empty">조회 가능한 데이터가 없습니다.</div></td></tr> : null}
@@ -943,13 +989,70 @@ function ServiceChangeTab({ detail, rows, sourceLabel }) {
   );
 }
 
-function ServiceIncidentTab({ detail, incidents, onOpenDetail, service }) {
+function ServiceCheckTab({ onCreate, rows, service, sourceLabel }) {
+  const checkRows = rows.map((row, index) => ({
+    key: row.healthCheckJobId || row.jobId || row.id || index,
+    code: row.jobCode || row.healthCheckCode || row.code || "-",
+    name: row.jobName || row.checkName || row.name || `${service.serviceName} 점검`,
+    target: row.targetUrl || row.url || row.targetName || service.endpointUrl || service.serviceName,
+    type: row.checkTypeName || row.checkTypeCode || row.type || "-",
+    cron: row.cronExpression || row.cron || "-",
+    active: row.activeYn === "N" || row.enabled === false ? "중지" : "실행중",
+    lastCheckedAt: formatServiceDetailDate(row.lastCheckedAt || row.checkedAt || row.updatedAt),
+    lastResult: row.lastResultCode || row.resultStatus || row.lastStatus || "-",
+  }));
+  return (
+    <section className="service-detail__panel">
+      <div className="service-detail__section-head">
+        <div>
+          <h2>서비스 점검</h2>
+          <p>이 서비스에 연결된 HTTP 점검 및 서버 PING 점검</p>
+        </div>
+        <div className="service-detail__section-actions">
+          <span className="service-detail__source-label">{sourceLabel}</span>
+          <button className="btn btn--ghost btn--sm" onClick={onCreate} type="button"><Plus size={14} /> 점검 등록</button>
+        </div>
+      </div>
+      <table className="tbl service-detail__full-table">
+        <thead>
+          <tr>
+            <th>코드</th>
+            <th>점검명</th>
+            <th>대상</th>
+            <th>유형</th>
+            <th>Cron</th>
+            <th>실행</th>
+            <th>최근 점검</th>
+            <th>결과</th>
+          </tr>
+        </thead>
+        <tbody>
+          {checkRows.map((row) => (
+            <tr key={row.key}>
+              <td>{row.code}</td>
+              <td><strong>{row.name}</strong></td>
+              <td>{row.target}</td>
+              <td>{row.type}</td>
+              <td>{row.cron}</td>
+              <td>{row.active}</td>
+              <td>{row.lastCheckedAt}</td>
+              <td>{row.lastResult}</td>
+            </tr>
+          ))}
+          {!checkRows.length ? <tr><td colSpan={8}><div className="empty">등록된 서비스 점검이 없습니다. 점검 등록 버튼으로 일일 점검 항목을 추가할 수 있습니다.</div></td></tr> : null}
+        </tbody>
+      </table>
+    </section>
+  );
+}
+
+function ServiceIncidentTab({ detail, incidents, onCreate, onOpenDetail, service }) {
   const incidentRows = incidents.length
     ? incidents.map((incident) => ({
         key: incident.incidentId,
         title: incident.title,
         code: incident.externalIncidentCode || `INC-${incident.incidentId}`,
-        severity: incident.severityCode,
+        severity: labelFromCode("severity", incident.severityCode),
         status: serviceIncidentStatusLabel(incident.incidentStatusCode),
         direct: Number(incident.serviceId) === Number(service.serviceId) ? "직접" : "간접",
         startedAt: formatServiceDetailDate(incident.startedAt),
@@ -969,7 +1072,7 @@ function ServiceIncidentTab({ detail, incidents, onOpenDetail, service }) {
           <h2>인시던트 이력</h2>
           <p>이 서비스와 관련된 장애 및 이슈</p>
         </div>
-        <button className="btn btn--ghost btn--sm" type="button"><Plus size={14} /> 인시던트 등록</button>
+        <button className="btn btn--ghost btn--sm" onClick={onCreate} type="button"><Plus size={14} /> 인시던트 등록</button>
       </div>
       <table className="tbl service-detail__full-table">
         <thead>
@@ -986,8 +1089,8 @@ function ServiceIncidentTab({ detail, incidents, onOpenDetail, service }) {
         <tbody>
           {incidentRows.map((row) => (
             <tr key={row.key}>
-              <td><strong className="service-detail__linkish">{row.title}</strong><code className="service-detail__inline-code">{row.code}</code></td>
-              <td><span className={`pill ${row.severity === "CRITICAL" ? "pill--crit" : "pill--warn"}`}>{row.severity}</span></td>
+              <td><strong className="service-detail__linkish">{row.title}</strong></td>
+              <td><span className={`pill ${row.severity === "심각" ? "pill--crit" : "pill--warn"}`}>{row.severity}</span></td>
               <td><span className="pill pill--ok">{row.status}</span></td>
               <td><span className="tag">{row.direct}</span></td>
               <td>{row.startedAt}</td>

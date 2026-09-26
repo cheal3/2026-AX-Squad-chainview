@@ -1633,6 +1633,12 @@ function IncidentCommandDashboard({
     incident.incidentTypeCode === "SERVER"
       ? impact.affectedServices.length
       : impact.level1.length;
+  const affectedServicesCount = Math.max(impact.affectedServices.length, impactedCount, 1);
+  const channelImpactCount = new Set(
+    impact.affectedServices
+      .map((service) => service.categoryPath?.[0] || service.categoryPath?.[1] || "")
+      .filter(Boolean)
+  ).size;
   const incidentTitle = incident.title || `${rootService?.serviceName ?? "서비스"} 장애 발생`;
   const incidentTargetTypeLabel =
     incident.incidentTypeCode === "SERVER" ? "인프라" : "서비스";
@@ -1679,7 +1685,7 @@ function IncidentCommandDashboard({
 
   return (
     <section className="flex min-h-full min-w-0 flex-1 flex-col overflow-hidden text-slate-100">
-      <header className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(360px,420px)] gap-3">
+      <header className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(520px,600px)] gap-3">
         <div className="rounded-lg border border-[#1f3549] bg-[#081b2d] px-5 py-4">
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#ff3344]/50 bg-[#ff3344]/10 text-[#ff4d5a]">
@@ -1698,7 +1704,7 @@ function IncidentCommandDashboard({
             </div>
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-3 rounded-lg border border-[#1f3549] bg-[#081b2d] px-5 py-4">
+        <div className="grid grid-cols-[1.1fr_1fr_1fr] gap-3 rounded-lg border border-[#1f3549] bg-[#081b2d] px-5 py-4">
           <DarkHeaderStat label="발생 시간" value={formatDateTime(startedAtDate)} />
           <DarkHeaderStat label="경과 시간" value={formatElapsedTime(startedAtDate, now)} />
           <DarkHeaderStat icon={<RefreshCw size={14} />} label="실시간 업데이트" value={formatClock(now)} />
@@ -1707,9 +1713,9 @@ function IncidentCommandDashboard({
 
       <div className="mt-3 grid min-w-0 grid-cols-[repeat(auto-fit,minmax(190px,1fr))] gap-3">
         <DarkMetric icon={<AlertTriangle size={23} />} label={`장애 ${incidentTargetTypeLabel}`} value="1" delta="1" tone="red" />
-        <DarkMetric icon={<Users size={23} />} label="영향 서비스" value={String(Math.max(impactedCount, 1))} delta="3" tone="amber" />
+        <DarkMetric icon={<Users size={23} />} label="영향 서비스" value={String(affectedServicesCount)} delta={String(affectedServicesCount)} tone="amber" />
         <DarkMetric icon={<BriefcaseBusiness size={23} />} label="영향 업무" value={String(impact.businessImpactCount)} delta={String(impact.businessImpactCount)} tone="amber" />
-        <DarkMetric icon={<Globe2 size={23} />} label="영향 채널" value="3" delta="1" tone="purple" />
+        <DarkMetric icon={<Globe2 size={23} />} label="영향 채널" value={String(Math.max(channelImpactCount, 1))} delta={String(Math.max(channelImpactCount, 1))} tone="purple" />
       </div>
 
       <div className="mt-3 grid min-h-[500px] min-w-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(280px,320px)] gap-3">
@@ -1998,9 +2004,9 @@ function DarkHeaderStat({
   value: string;
 }) {
   return (
-    <div>
-      <div className="flex items-center gap-1 text-xs font-bold text-slate-400">{icon}{label}</div>
-      <div className="mt-2 text-base font-black text-white">{value}</div>
+    <div className="min-w-0">
+      <div className="flex items-center gap-1 whitespace-nowrap text-xs font-bold text-slate-400">{icon}{label}</div>
+      <div className="mt-2 whitespace-nowrap text-sm font-black text-white">{value}</div>
     </div>
   );
 }
