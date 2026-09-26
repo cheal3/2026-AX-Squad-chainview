@@ -26,7 +26,7 @@ import {
   type InfraGraphNodeRecord,
 } from "./ServiceRelationFlow";
 import { usePortalData } from "../PortalDataStore";
-import { codeLabels, type IncidentRecord, type ServiceRecord, type ServiceRelationRecord } from "../mockData";
+import { codeLabels, type IncidentRecord, type ServiceOwnerRecord, type ServiceRecord, type ServiceRelationRecord } from "../mockData";
 import { useNavigate } from "react-router-dom";
 
 const DASHBOARD_FILTER_STORAGE_KEY = "chainview.dashboard.service-filter.v1";
@@ -195,7 +195,7 @@ function buildManagementRows({
 function buildRecentChangeRows(services: ServiceRecord[]): DashboardChangeRow[] {
   return [...services]
     .sort((left, right) => String(right.updatedAt || "").localeCompare(String(left.updatedAt || "")))
-    .slice(0, 4)
+    .slice(0, 5)
     .map((service) => {
       const statusLabel = service.statusCode
         ? codeLabels.serviceStatus[service.statusCode] ?? service.statusCode
@@ -236,12 +236,18 @@ function buildRecentIncidentRows({
       const serviceName = serviceDisplayName(serviceById, serviceByCode, incident as unknown as Record<string, unknown>);
       const impactCount = incidentImpacts.filter((impact) => Number(impact.incidentId) === Number(incident.incidentId)).length;
       const resolved = incident.incidentStatusCode === "RESOLVED";
-      const tone = resolved ? "green" : incident.incidentStatusCode === "IN_PROGRESS" ? "orange" : "sky";
+      const tone = resolved
+        ? "green"
+        : incident.incidentStatusCode === "IN_PROGRESS"
+          ? "sky"
+          : incident.incidentStatusCode === "MONITORING"
+            ? "orange"
+            : "purple";
       return [
         serviceName,
         incident.externalIncidentCode ?? `INC-${incident.incidentId}`,
         formatDashboardIncidentStatus(incident.incidentStatusCode),
-        `${impactCount}개`,
+        impactCount ? `${impactCount}개` : "-",
         resolved ? relativeDashboardTime(incident.endedAt) : "미종료",
         tone,
       ];
@@ -559,6 +565,8 @@ function DashboardCase({
         />
         <ServiceInfoPanel
           infraNode={selectedInfraNode}
+          groups={groups}
+          incidents={incidents}
           onCreateInfraIncident={() => {
             if (!selectedInfraNode) {
               return;
@@ -626,7 +634,9 @@ function DashboardCase({
               ? relationDirectionCountsByServiceId.get(selectedService.serviceId) ?? { incoming: 0, outgoing: 0 }
               : { incoming: 0, outgoing: 0 }
           }
+          owners={owners}
           service={selectedService}
+          users={users}
           onBeforeCreateInfraIncident={() =>
             window.confirm(`${selectedInfraNode?.nodeName ?? "선택 인프라"} 인시던트를 생성하시겠습니까?`)
           }
@@ -1075,23 +1085,31 @@ function RelationFlowModal({
 }
 
 function ServiceInfoPanel({
+  groups,
   infraNode,
+  incidents,
   onBeforeCreateInfraIncident,
   onBeforeCreateIncident,
   onCreateInfraIncident,
   onCreateIncident,
+  owners,
   relationCount,
   relationDirectionCounts,
   service,
+  users,
 }: {
+  groups: Record<string, unknown>[];
   infraNode?: InfraGraphNodeRecord;
+  incidents: IncidentRecord[];
   onBeforeCreateInfraIncident: () => boolean;
   onBeforeCreateIncident: () => boolean;
   onCreateInfraIncident: () => void;
   onCreateIncident: () => void;
+  owners: ServiceOwnerRecord[];
   relationCount: number;
   relationDirectionCounts: { incoming: number; outgoing: number };
   service?: ServiceRecord;
+  users: Record<string, unknown>[];
 }) {
   const serviceName = service?.serviceName ?? "-";
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -1117,7 +1135,11 @@ function ServiceInfoPanel({
           <CheckCircle2 size={17} className="text-[#008f72]" />
           <span className="truncate">{serviceName}</span>
         </div>
-        <NormalInfo relationDirectionCounts={relationDirectionCounts} service={service} />
+        <NormalInfo
+          incidents={incidents}
+          relationDirectionCounts={relationDirectionCounts}
+          service={service}
+        />
         <div className="mt-4 grid min-w-0 grid-cols-2 gap-3">
           <button
             className="h-[28px] min-w-0 rounded border border-[#126cf0] px-2 text-sm font-black text-[#126cf0]"
@@ -1144,7 +1166,11 @@ function ServiceInfoPanel({
         <ServiceDetailModal
           relationCount={relationCount}
           relationDirectionCounts={relationDirectionCounts}
+          groups={groups}
+          incidents={incidents}
+          owners={owners}
           service={service}
+          users={users}
           onClose={() => setIsDetailOpen(false)}
         />
       ) : null}
@@ -1317,9 +1343,11 @@ function StatusBadge() {
 }
 
 function NormalInfo({
+  incidents,
   relationDirectionCounts,
   service,
 }: {
+  incidents: IncidentRecord[];
   relationDirectionCounts: { incoming: number; outgoing: number };
   service?: ServiceRecord;
 }) {
@@ -1328,7 +1356,8 @@ function NormalInfo({
   const incomingCount = relationDirectionCounts.incoming;
   const outgoingCount = relationDirectionCounts.outgoing;
   const relationCount = incomingCount + outgoingCount;
-  const createdAt = service?.createdAt ?? "-";
+  const recentIncidentCount = serviceIncidents(incidents, service, 30).length;
+  const createdAt = formatDashboardDate(service?.createdAt);
   const description = service?.description || "-";
 
   return (
@@ -1344,7 +1373,7 @@ function NormalInfo({
       <dt className="font-bold text-slate-700">연관 서비스 수</dt>
       <dd className="truncate">{relationCount}개</dd>
       <dt className="font-bold text-slate-700">인시던트 이력</dt>
-      <dd className="truncate">0건 (최근 30일)</dd>
+      <dd className="truncate">{recentIncidentCount}건 (최근 30일)</dd>
       <dt className="font-bold text-slate-700">등록일</dt>
       <dd className="truncate">{createdAt}</dd>
       <dt className="font-bold text-slate-700">설명</dt>
@@ -1355,21 +1384,33 @@ function NormalInfo({
 
 function ServiceDetailModal({
   dark = false,
+  groups,
+  incidents,
   onClose,
+  owners,
   relationCount,
   relationDirectionCounts,
   service,
+  users,
 }: {
   dark?: boolean;
+  groups: Record<string, unknown>[];
+  incidents: IncidentRecord[];
   onClose: () => void;
+  owners: ServiceOwnerRecord[];
   relationCount: number;
   relationDirectionCounts: { incoming: number; outgoing: number };
   service?: ServiceRecord;
+  users: Record<string, unknown>[];
 }) {
   const backdropHandlers = useSafeBackdropClose(onClose);
   const incomingCount = relationDirectionCounts.incoming;
   const outgoingCount = relationDirectionCounts.outgoing;
   const totalRelationCount = incomingCount + outgoingCount;
+  const ownerRows = resolveOwnerRows({ groups, owners, service, users });
+  const ownerNames = ownerRows.map((owner) => `${owner.name} (${owner.responsibility})`).join(", ");
+  const ownerGroups = [...new Set(ownerRows.map((owner) => owner.groupName).filter(Boolean))].join(", ");
+  const recentIncidentCount = serviceIncidents(incidents, service, 30).length;
   const sections = [
     {
       title: "서비스 정보",
@@ -1377,15 +1418,15 @@ function ServiceDetailModal({
         ["서비스 코드", service?.serviceCode ?? "-"],
         ["서비스명", service?.serviceName ?? "-"],
         ["서비스 분류", service?.categoryPath.join(" > ") ?? "-"],
-        ["서비스 유형", service?.serviceTypeCode ?? "-"],
-        ["중요도", service?.importanceCode ?? "-"],
-        ["상태", service?.statusCode ?? "-"],
+        ["서비스 유형", labeledCode(codeLabels.serviceType, service?.serviceTypeCode)],
+        ["중요도", labeledCode(codeLabels.importance, service?.importanceCode)],
+        ["상태", labeledCode(codeLabels.serviceStatus, service?.statusCode)],
       ],
     },
     {
       title: "배포 정보",
       rows: [
-        ["배포 상태", service?.deploymentStatusCode ?? "-"],
+        ["배포 상태", labeledCode(codeLabels.deploymentStatus, service?.deploymentStatusCode)],
         ["엔드포인트 URL", service?.endpointUrl ?? "-"],
         ["배포 경로", service?.deployPath ?? "-"],
         ["포트", service?.portInfo ?? "-"],
@@ -1398,17 +1439,16 @@ function ServiceDetailModal({
         ["상위 서비스", `${incomingCount}개`],
         ["하위 서비스", `${outgoingCount}개`],
         ["연관 서비스 수", `${totalRelationCount || relationCount}개`],
-        ["직접 영향", "EAM 통합 인증, SSO 통합 인증"],
-        ["간접 영향", "결제/주문/알림 연계 서비스"],
+        ["인시던트 이력", `${recentIncidentCount}건 (최근 30일)`],
       ],
     },
     {
       title: "담당자 정보",
       rows: [
-        ["등록자", service?.createdBy ?? "-"],
-        ["수정자", service?.updatedBy ?? "-"],
-        ["등록일", service?.createdAt ?? "-"],
-        ["수정일", service?.updatedAt ?? "-"],
+        ["담당부서", ownerGroups || "-"],
+        ["담당자", ownerNames || "-"],
+        ["등록일", formatDashboardDate(service?.createdAt)],
+        ["수정일", formatDashboardDate(service?.updatedAt)],
       ],
     },
   ];
@@ -1614,6 +1654,20 @@ function IncidentCommandDashboard({
       }),
     [impactedCount, incident, incidentEvents]
   );
+  const ownerRows = useMemo(
+    () => resolveOwnerRows({ groups, owners: owners as ServiceOwnerRecord[], service: rootService, users }),
+    [groups, owners, rootService, users]
+  );
+  const serviceDeployments = useMemo(
+    () =>
+      deployments.filter((deployment) =>
+        rootService
+          ? Number(deployment.serviceId) === Number(rootService.serviceId) ||
+            String(deployment.serviceCode ?? "") === rootService.serviceCode
+          : false
+      ),
+    [deployments, rootService]
+  );
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -1709,6 +1763,7 @@ function IncidentCommandDashboard({
           incident={incident}
           rootService={rootService}
           impactedCount={impactedCount}
+          deployments={serviceDeployments}
           onResolve={onResolve}
         />
       </div>
@@ -1741,12 +1796,12 @@ function IncidentCommandDashboard({
           </div>
         </DarkPanel>
         <DarkPanel title="담당자 영향도">
-          {["김민수 (결제운영팀)", "이정훈 (결제시스템팀)", "결제운영팀 6명", "모바일서비스팀 5명"].map((item) => (
-            <div key={item} className="flex items-center justify-between gap-3 border-b border-[#1f3549] py-2 text-sm leading-5 text-slate-300">
-              <span className="min-w-0 break-words">{item}</span>
+          {ownerRows.length ? ownerRows.map((owner) => (
+            <div key={`${owner.name}-${owner.responsibility}`} className="flex items-center justify-between gap-3 border-b border-[#1f3549] py-2 text-sm leading-5 text-slate-300">
+              <span className="min-w-0 break-words">{owner.name} ({owner.groupName}) · {owner.responsibility}</span>
               <span className="flex gap-2 text-[#58a6ff]"><Phone size={13} /><Mail size={13} /></span>
             </div>
-          ))}
+          )) : <div className="text-sm text-slate-400">등록된 담당자 정보가 없습니다.</div>}
         </DarkPanel>
         <DarkPanel title="기타 정보">
           <div className="space-y-3 text-sm leading-5 text-slate-300">
@@ -1755,11 +1810,6 @@ function IncidentCommandDashboard({
                 <span className="min-w-0 break-words">{item}</span>
                 <ExternalLink size={13} />
               </div>
-            ))}
-          </div>
-          <div className="mt-5 flex flex-wrap gap-2">
-            {["결제", "기간계", "CRITICAL", "PROD"].map((tag) => (
-              <span key={tag} className="rounded bg-[#112b43] px-3 py-1 text-xs font-black text-slate-200">{tag}</span>
             ))}
           </div>
         </DarkPanel>
@@ -1856,11 +1906,13 @@ function normalizeDashboardEventMessage(message: string, affectedServiceCount: n
 }
 
 function IncidentSelectedPanel({
+  deployments,
   impactedCount,
   incident,
   onResolve,
   rootService,
 }: {
+  deployments: Record<string, unknown>[];
   impactedCount: number;
   incident: IncidentRecord;
   onResolve: () => void;
@@ -1874,6 +1926,9 @@ function IncidentSelectedPanel({
   const serviceDetailPath = rootService?.serviceCode
     ? `/admin-services/${rootService.serviceCode}?tab=overview`
     : "/admin-services";
+  const severityLabel = labeledCode(codeLabels.severity, incident.severityCode);
+  const statusLabel = labeledCode(codeLabels.incidentStatus, incident.incidentStatusCode);
+  const visibleDeployments = deployments.slice(0, 2);
 
   return (
       <aside className="overflow-hidden rounded-lg border border-[#1f3549] bg-[#081b2d] p-3">
@@ -1884,21 +1939,27 @@ function IncidentSelectedPanel({
         <div className="mt-3 flex min-w-0 items-center gap-2">
           <AlertTriangle size={19} className="text-[#ff4d5a]" />
           <span className="truncate text-base font-black text-white">{incident.title}</span>
-          <span className="rounded bg-[#7f1d2d] px-2 py-1 text-[11px] font-black text-white">{incident.severityCode}</span>
+          <span className="rounded bg-[#7f1d2d] px-2 py-1 text-[11px] font-black text-white">{severityLabel}</span>
         </div>
         <dl className="mt-3 grid grid-cols-[82px_minmax(0,1fr)] gap-y-2 text-xs">
-          <dt className="text-slate-400">상태</dt><dd className="font-black text-[#ff4d5a]">장애</dd>
-          <dt className="text-slate-400">심각도</dt><dd className="font-black text-[#ff4d5a]">치명({incident.severityCode})</dd>
+          <dt className="text-slate-400">상태</dt><dd className="font-black text-[#ff4d5a]">{statusLabel}</dd>
+          <dt className="text-slate-400">심각도</dt><dd className="font-black text-[#ff4d5a]">{severityLabel} ({incident.severityCode})</dd>
           <dt className="text-slate-400">인시던트</dt><dd className="truncate text-slate-200">{incident.externalIncidentCode ?? `#${incident.incidentId}`}</dd>
           <dt className="text-slate-400">대상</dt><dd className="truncate text-slate-200">{targetLabel}</dd>
-          <dt className="text-slate-400">발생 시간</dt><dd className="truncate text-slate-200">{incident.startedAt}</dd>
+          <dt className="text-slate-400">발생 시간</dt><dd className="truncate text-slate-200">{formatDashboardDate(incident.startedAt)}</dd>
           <dt className="text-slate-400">서비스 분류</dt><dd className="truncate text-slate-200">{categoryLabel}</dd>
           <dt className="text-slate-400">영향받은 서비스</dt><dd className="font-black text-slate-100">{impactedCount}개</dd>
         </dl>
         <div className="mt-3 rounded border border-[#1f3549] bg-[#0b2135] p-2 text-xs text-slate-300">
-          <div className="mb-2 font-black text-white">관련 서버 (2)</div>
-          <div className="flex justify-between py-1"><span>payment-db-01</span><span>10.10.10.41</span></div>
-          <div className="flex justify-between py-1"><span>payment-app-01</span><span>10.10.10.42</span></div>
+          <div className="mb-2 font-black text-white">배포 정보 ({deployments.length})</div>
+          {visibleDeployments.length ? visibleDeployments.map((deployment, index) => (
+            <div className="flex justify-between gap-2 py-1" key={`${deployment.deploymentKey ?? index}`}>
+              <span className="min-w-0 truncate">{String(deployment.serverName ?? deployment.hostName ?? deployment.serverId ?? "-")}</span>
+              <span className="shrink-0 text-slate-400">{String(deployment.deploymentStatusName ?? deployment.deploymentStatusCode ?? "-")}</span>
+            </div>
+          )) : (
+            <div className="py-1 text-slate-400">등록된 배포 정보가 없습니다.</div>
+          )}
         </div>
         <div className="mt-3 grid grid-cols-2 gap-2">
           <button
@@ -2008,50 +2069,159 @@ function BottomPanels({
           />
         ))}
       </Panel>
-      <Panel title="최근 서비스 변경">
+      <ReferencePanel title="최근 서비스 변경">
         {visibleChangeRows.length ? (
-          <div className="space-y-1">
+          <div className="space-y-[2px]">
             {visibleChangeRows.map((row) => (
-              <div key={row.key} className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)_68px] items-center gap-3 px-1 py-1.5 text-[13px] leading-5">
-                <span className="min-w-0 truncate text-slate-900" title={row.service}>{row.service}</span>
+              <div
+                key={row.key}
+                className="grid min-w-0 grid-cols-[minmax(112px,1fr)_minmax(104px,1.04fr)_66px] items-center gap-2 px-0.5 py-[5px] text-[13px] leading-5"
+              >
+                <span className="min-w-0 truncate font-semibold text-slate-800" title={row.service}>{row.service}</span>
                 <span className="min-w-0 truncate text-slate-500" title={row.detail || row.change}>{row.detail || row.change}</span>
-                <span className="shrink-0 whitespace-nowrap text-right text-slate-500">{row.time}</span>
+                <span className="shrink-0 whitespace-nowrap text-right font-medium text-slate-400">{row.time}</span>
               </div>
             ))}
           </div>
         ) : (
           <TinyEmpty>변경 이력이 없습니다.</TinyEmpty>
         )}
-      </Panel>
-      <Panel
+      </ReferencePanel>
+      <ReferencePanel
         actionLabel="더보기 〉"
         onAction={() => navigate("/admin-incidents")}
         title="최근 인시던트"
       >
         {visibleIncidentRows.length ? (
           <div className="min-w-0">
-            <div className="grid min-w-0 grid-cols-[minmax(150px,1fr)_108px_70px_88px_72px] items-center gap-2 px-1 pb-1.5 text-[11px] font-bold leading-4 text-slate-500">
+            <div className="grid min-w-0 grid-cols-[minmax(132px,1.05fr)_minmax(96px,0.88fr)_72px_82px_76px] items-center gap-2 px-0.5 pb-2 text-[11px] font-black leading-4 text-slate-500">
               <span>서비스</span>
               <span>인시던트</span>
               <span className="text-center">상태</span>
               <span className="text-center">영향 서비스</span>
               <span className="text-right">종료</span>
             </div>
-            <div className="space-y-0.5">
+            <div className="space-y-[2px]">
               {visibleIncidentRows.map(([service, incident, status, impact, end, tone]) => (
-                <div key={incident} className="grid min-w-0 grid-cols-[minmax(150px,1fr)_108px_70px_88px_72px] items-center gap-2 px-1 py-1 text-[12px] font-medium leading-5 text-slate-600">
-                  <span className="min-w-0 truncate text-slate-700" title={service}>{service}</span>
+                <div
+                  key={incident}
+                  className="grid min-w-0 grid-cols-[minmax(132px,1.05fr)_minmax(96px,0.88fr)_72px_82px_76px] items-center gap-2 px-0.5 py-[4px] text-[12px] font-medium leading-5 text-slate-600"
+                >
+                  <span className="min-w-0 truncate font-semibold text-slate-800" title={service}>{service}</span>
                   <span className="truncate text-slate-500" title={incident}>{incident}</span>
                   <span className="flex justify-center"><IncidentStatus tone={tone}>{status}</IncidentStatus></span>
                   <span className="text-center whitespace-nowrap text-slate-500">{impact}</span>
-                  <span className="truncate text-right text-slate-500" title={end}>{end}</span>
+                  <span className="truncate text-right font-medium text-slate-400" title={end}>{end}</span>
                 </div>
               ))}
             </div>
           </div>
         ) : <TinyEmpty>등록된 인시던트가 없습니다.</TinyEmpty>}
-      </Panel>
+      </ReferencePanel>
     </div>
+  );
+}
+
+function formatDashboardDate(value?: string) {
+  return value ? value.replace("T", " ").slice(0, 16) : "-";
+}
+
+function labeledCode<TCode extends string>(
+  labels: Record<TCode, string>,
+  value?: TCode
+) {
+  return value ? labels[value] ?? value : "-";
+}
+
+function serviceIncidents(
+  incidents: IncidentRecord[],
+  service?: ServiceRecord,
+  days?: number
+) {
+  if (!service) return [];
+  const sinceTime = days
+    ? Date.now() - days * 24 * 60 * 60 * 1000
+    : Number.NEGATIVE_INFINITY;
+
+  return incidents.filter((incident) => {
+    const matchesService =
+      incident.serviceId === service.serviceId ||
+      incident.targetCode === service.serviceCode ||
+      incident.targetLabel === service.serviceName;
+    if (!matchesService) return false;
+
+    const date = parseDashboardCardDate(incident.startedAt);
+    return !days || !date || date.getTime() >= sinceTime;
+  });
+}
+
+function resolveOwnerRows({
+  groups,
+  owners,
+  service,
+  users,
+}: {
+  groups: Record<string, unknown>[];
+  owners: ServiceOwnerRecord[];
+  service?: ServiceRecord;
+  users: Record<string, unknown>[];
+}) {
+  if (!service) return [];
+
+  return owners
+    .filter((owner) => Number(owner.serviceId) === Number(service.serviceId))
+    .map((owner) => {
+      const user = users.find((row) => Number(row.userId ?? row.id) === Number(owner.userId));
+      const group = groups.find((row) => Number(row.groupId ?? row.id) === Number(owner.groupId));
+      const ownerName =
+        owner.ownerName ||
+        String(user?.userName ?? user?.name ?? group?.groupName ?? group?.name ?? "담당자 미등록");
+      const groupName = String(
+        group?.groupName ??
+          group?.name ??
+          user?.groupName ??
+          user?.departmentName ??
+          ownerName
+      );
+
+      return {
+        groupName,
+        name: ownerName,
+        responsibility:
+          codeLabels.responsibilityType[owner.responsibilityCode] ??
+          owner.responsibilityCode ??
+          "-",
+      };
+    });
+}
+
+function ReferencePanel({
+  actionLabel,
+  children,
+  onAction,
+  title,
+}: {
+  actionLabel?: string;
+  children: ReactNode;
+  onAction?: () => void;
+  title: string;
+}) {
+  return (
+    <section className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-md border border-slate-200 bg-white px-4 py-3 shadow-[0_1px_3px_rgba(15,23,42,0.08)]">
+      <div className="mb-2.5 flex min-w-0 shrink-0 items-center justify-between gap-3">
+        <h3 className="truncate text-sm font-black leading-5 text-slate-950">{title}</h3>
+        {actionLabel && onAction ? (
+          <button
+            className="shrink-0 whitespace-nowrap text-[11px] font-bold leading-5 text-slate-500 hover:text-slate-800"
+            onClick={onAction}
+            type="button"
+          >
+            {actionLabel}
+          </button>
+        ) : null}
+      </div>
+      <div className="min-h-0 min-w-0 flex-1 overflow-hidden">{children}</div>
+    </section>
   );
 }
 
@@ -2149,5 +2319,5 @@ function IncidentStatus({ children, tone }: { children: ReactNode; tone: string 
         : tone === "sky"
           ? "bg-[#dbf1ff] text-[#008ec9]"
           : "bg-[#ffe8d6] text-[#ff6b00]";
-  return <span className={`inline-flex h-[20px] min-w-[50px] items-center justify-center rounded-full px-2 text-[11px] font-bold leading-none ${className}`}>{children}</span>;
+  return <span className={`inline-flex h-[22px] min-w-[54px] items-center justify-center rounded-full px-3 text-[11px] font-black leading-none ${className}`}>{children}</span>;
 }
