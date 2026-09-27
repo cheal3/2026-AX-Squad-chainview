@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronDown, CircleHelp, Filter, Search, X } from "lucide-react";
+import { CheckCircle2, ChevronDown, CircleHelp, Filter, Search, ShieldCheck, X } from "lucide-react";
 
 import { ModalBackdrop } from "../../components/ModalBackdrop.jsx";
 import { PAGE_SIZE, Pagination } from "../../components/Pagination.jsx";
@@ -17,7 +17,7 @@ const adminMenuMetaByKey = {
   servers: { section: "인프라", label: "서버 조회", icon: "🖥️" },
   deployments: { section: "인프라", label: "배포 현황", icon: "🚀" },
   owners: { section: "담당자", label: "담당자 조회", icon: "👨‍💼" },
-  "owner-management": { section: "시스템 관리", label: "서비스 담당자 관리", icon: "👨‍💼" },
+  permissions: { section: "시스템 관리", label: "관리자 접근 관리", icon: "🔐" },
   groups: { section: "담당자", label: "그룹 조회", icon: "📁" },
   users: { section: "시스템 관리", label: "사용자 관리", icon: "👥" },
   categories: { section: "시스템 관리", label: "서비스 분류 관리", icon: "🗂️" },
@@ -460,6 +460,24 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
         ],
       })),
     },
+    permissions: {
+      actionLabel: null,
+      columns: ["사번", "관리자명", "부서", "허용 IP 1", "허용 IP 2", "등록일", "상태"],
+      rows: buildPermissionRows(portalData.users).map((row) => ({
+        key: row.employeeNo,
+        record: row,
+        searchText: adminSearchText(row.employeeNo, row.name, row.department, row.ip1, row.ip2, row.status),
+        cells: [
+          <code>{row.employeeNo}</code>,
+          <b>{row.name}</b>,
+          row.department,
+          row.ip1,
+          row.ip2,
+          row.registeredAt,
+          <span className={`pill ${row.status === "허용" ? "pill--ok" : "pill--idle"}`}>{row.status}</span>,
+        ],
+      })),
+    },
   };
   const config = configs[menu];
   const filteredRows = useMemo(() => {
@@ -627,7 +645,12 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
         </div>
       </div>
 
-      {menu === "codes" ? (
+      {menu === "permissions" ? (
+        <AdminPermissionView
+          rows={filteredRows}
+          onAdd={() => openAdminModal("create")}
+        />
+      ) : menu === "codes" ? (
         <CodeGroupFilterBar
           codes={portalData.codes}
           selectedCodeGroup={listFilters.codeGroup}
@@ -635,9 +658,9 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
         />
       ) : null}
 
-      {menu === "services" || menu === "owners" ? null : toolbar}
+      {menu === "services" || menu === "owners" || menu === "permissions" ? null : toolbar}
 
-      {menu === "owners" ? (
+      {menu === "permissions" ? null : menu === "owners" ? (
         <OwnerDirectoryView
           categoryCatalog={categoryCatalog}
           filters={listFilters}
@@ -785,7 +808,12 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
           services={portalData.services}
         />
       ) : null}
-      {adminModal ? (
+      {adminModal?.menu === "permissions" ? (
+        <AdminPermissionModal
+          onClose={closeAdminModal}
+          portalData={portalData}
+        />
+      ) : adminModal ? (
         <AdminRecordModal
           modal={adminModal}
           onClose={closeAdminModal}
@@ -805,6 +833,90 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
   );
 }
 
+function AdminPermissionView({ rows, onAdd }) {
+  const allowedCount = rows.filter((row) => row.record.status === "허용").length;
+  const blockedCount = rows.length - allowedCount;
+  const ipCount = rows.reduce((count, row) => count + [row.record.ip1, row.record.ip2].filter((ip) => ip && ip !== "-").length, 0);
+
+  return (
+    <section className="admin-access-page">
+      <div className="admin-access-metrics">
+        <div><ShieldCheck size={22} /><span>등록 관리자</span><strong>{rows.length}명</strong></div>
+        <div><CheckCircle2 size={22} /><span>등록 IP</span><strong>{ipCount}개</strong></div>
+        <div><CircleHelp size={22} /><span>IP 미등록</span><strong>{blockedCount}명</strong></div>
+      </div>
+      <div className="card admin-access-card">
+        <div className="toolbar toolbar--admin">
+          <div className="search">
+            <Search size={15} aria-hidden="true" />
+            <input type="text" placeholder="사번, 이름, 부서 검색" readOnly />
+          </div>
+          <div className="right">
+            <button className="btn btn--primary" onClick={onAdd} type="button">＋ 관리자 추가</button>
+          </div>
+        </div>
+        <table className="tbl">
+          <thead>
+            <tr>
+              <th className="col-check"><input className="chk" type="checkbox" /></th>
+              <th>사번</th><th>관리자명</th><th>부서</th><th>허용 IP 1</th><th>허용 IP 2</th><th>등록일</th><th>상태</th><th className="col-actions">관리</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.key}>
+                <td className="col-check"><input className="chk" type="checkbox" /></td>
+                {row.cells.map((cell, index) => <td key={index}>{cell}</td>)}
+                <td className="col-actions"><div className="row-actions"><button className="ibtn" type="button">수정</button><button className="ibtn" type="button">⋯</button></div></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <div className="pager"><div className="pager__info">총 {rows.length}명의 관리자</div></div>
+      </div>
+    </section>
+  );
+}
+
+function AdminPermissionModal({ onClose, portalData }) {
+  const candidates = buildPermissionRows(portalData.users).slice(0, 4);
+  const selected = candidates[0];
+
+  return (
+    <ModalBackdrop onClose={onClose}>
+      <div className="modal admin-access-modal" onClick={(event) => event.stopPropagation()}>
+        <div className="modal__head"><h3>관리자 추가</h3><button className="close" onClick={onClose} type="button">×</button></div>
+        <div className="modal__body">
+          <div className="admin-access-modal__step">
+            <h4>1. 관리자 검색</h4>
+            <p>사번 또는 이름을 입력하여 관리자를 검색하세요.</p>
+            <div className="admin-access-modal__search">
+              <div className="search"><Search size={15} /><input value="나현준" readOnly /></div>
+              <button className="btn" type="button">검색</button>
+            </div>
+            <div className="admin-access-candidates">
+              {candidates.map((candidate, index) => (
+                <label className={index === 0 ? "is-selected" : ""} key={candidate.employeeNo}>
+                  <input checked={index === 0} readOnly type="radio" />
+                  <span><b>{candidate.name}</b><small>{candidate.employeeNo} / {candidate.department}</small></span>
+                  <em>{index === 0 ? "선택됨" : "선택"}</em>
+                </label>
+              ))}
+            </div>
+          </div>
+          <div className="admin-access-modal__step">
+            <h4>2. 허용 IP 등록</h4>
+            <p>선택한 관리자의 허용 IP를 최대 2개까지 등록할 수 있습니다.</p>
+            <label className="form-row"><span>허용 IP 1 *</span><input value={selected?.ip1 ?? "10.110.173.182"} readOnly /></label>
+            <label className="form-row"><span>허용 IP 2</span><input value={selected?.ip2 ?? "10.110.171.182"} readOnly /></label>
+          </div>
+        </div>
+        <div className="modal__foot"><button className="btn" onClick={onClose} type="button">취소</button><button className="btn btn--primary" onClick={onClose} type="button">등록</button></div>
+      </div>
+    </ModalBackdrop>
+  );
+}
+
 function getFilterMode(menu) {
   if (menu === "services") return "services";
   if (menu === "techstacks") return "techstacks";
@@ -814,6 +926,27 @@ function getFilterMode(menu) {
   if (menu === "codes") return "codes";
   if (menu === "owners") return "serviceCategory";
   return null;
+}
+
+function buildPermissionRows(users = []) {
+  const fallback = [
+    { employeeNo: "8913812", userName: "나현준", departmentName: "IT채널업무1팀" },
+    { employeeNo: "7620491", userName: "김지은", departmentName: "공통플랫폼팀" },
+    { employeeNo: "6843207", userName: "이민지", departmentName: "기간계운영팀" },
+    { employeeNo: "5932841", userName: "박서아", departmentName: "대외채널팀" },
+    { employeeNo: "4827190", userName: "정유진", departmentName: "재무개발팀" },
+    { employeeNo: "3710528", userName: "최민준", departmentName: "기술지원팀" },
+  ];
+  const source = users.length ? users : fallback;
+  return source.slice(0, 12).map((user, index) => ({
+    employeeNo: String(field(user, "employeeNo", fallback[index % fallback.length].employeeNo)),
+    name: String(field(user, "userName", fallback[index % fallback.length].userName)),
+    department: String(field(user, "departmentName", fallback[index % fallback.length].departmentName)),
+    ip1: `10.110.${173 + (index % 4)}.${182 - index}`,
+    ip2: index % 2 === 0 ? `10.110.${171 + (index % 5)}.${182 - index}` : "-",
+    registeredAt: `2026.09.${String(25 - index).padStart(2, "0")} ${index % 2 ? "16:30" : "10:42"}`,
+    status: index % 3 === 1 ? "미등록" : "허용",
+  }));
 }
 
 function AdminToolbar({

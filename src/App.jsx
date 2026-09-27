@@ -77,7 +77,7 @@ const menuMetaByKey = {
   owners: { section: "담당자", label: "담당자 조회", icon: "👨‍💼" },
   groups: { section: "담당자", label: "그룹 조회", icon: "📁" },
   users: { section: "시스템 관리", label: "사용자 관리", icon: "👥" },
-  "owner-management": { section: "시스템 관리", label: "서비스 담당자 관리", icon: "👨‍💼" },
+  permissions: { section: "시스템 관리", label: "관리자 접근 관리", icon: "🔐" },
   categories: { section: "시스템 관리", label: "서비스 분류 관리", icon: "🗂️" },
   codes: { section: "시스템 관리", label: "공통코드 관리", icon: "⚙️" },
 };
@@ -327,7 +327,7 @@ function AppRoutes() {
         <Route path="/incident-detail" element={<RequireAuth><IncidentDetailPage /></RequireAuth>} />
         <Route path="/dashboard-proto-detail" element={<RequireAuth><LegacyIncidentDetailRedirect /></RequireAuth>} />
         <Route path="/admin-services/:serviceCode" element={<RequireAuth><AppShell activeMenu="services"><main className="main"><ServiceAdminPage /></main></AppShell></RequireAuth>} />
-        <Route path="/admin-permissions" element={<RequireAuth><RoutePage activeMenuOverride="permissions" slug="admin-users" /></RequireAuth>} />
+        <Route path="/admin-permissions" element={<RequireAuth><AppShell activeMenu="permissions"><main className="main"><DynamicAdminListPage activeMenu="permissions" menu="permissions" /></main></AppShell></RequireAuth>} />
         <Route path="/admin-owner-management" element={<RequireAuth><RoutePage activeMenuOverride="owner-management" slug="admin-owners" /></RequireAuth>} />
         {adminPages.map((slug) => (
           <Route key={slug} path={`/${slug}`} element={<RequireAuth><RoutePage slug={slug} /></RequireAuth>} />

@@ -893,7 +893,6 @@ export function IncidentDetailPage() {
   const detectionHistoryRows = incidentEvents
     .filter((event) => Number(event.incidentId) === Number(incident?.incidentId))
     .map((event) => normalizeIncidentEventHistoryRow(event, affectedServiceCount));
-  const realProgressRows = detectionHistoryRows.map((row) => [row.time, row.message, row.actor]);
   const recentDeploymentRows = deployments
     .filter((deployment) => Number(deployment.serviceId) === Number(service?.serviceId))
     .slice(0, 5)
@@ -936,6 +935,7 @@ export function IncidentDetailPage() {
     service,
     timelineRows,
   });
+  const realProgressRows = generatedProgressRows;
   const ownerHistoryRows = buildIncidentOwnerHistoryRows({
     incident,
     notificationRows,
@@ -1068,7 +1068,6 @@ export function IncidentDetailPage() {
             ["overview", "개요"],
             ["history", "감지/알림 이력"],
             ["impact", "영향도"],
-            ["deployments", "최근 배포"],
             ["owners", "담당자"],
           ].map(([tabKey, label]) => (
             <button
@@ -1092,20 +1091,20 @@ export function IncidentDetailPage() {
                 <h2>🚨 진행 중 인시던트</h2>
                 <span>id: {incident.externalIncidentCode ?? `#${incident.incidentId}`} · severity: {incident.severityCode} · occurredAt: {incident.startedAt}</span>
               </div>
-              <div className="incident-detail__summary">
-                <b>title</b>
-                <p>{incident.title} · incidentType: 서비스 장애 · affectedServices: {affectedServiceCount}</p>
-              </div>
+	              <div className="incident-detail__summary">
+	                <p>{incident.title}</p>
+	              </div>
               {incident.description ? <p className="incident-detail__description">{incident.description}</p> : null}
               <div className="incident-detail__progress">
                 <h3>진행상황</h3>
-                {realProgressRows.length ? realProgressRows.map(([time, message, actor]) => (
-                  <div className="incident-detail__progress-row" key={`${time}-${message}`}>
-                    <span>{time}</span>
-                    <p>{message}</p>
-                    <em>{actor}</em>
-                  </div>
-                )) : <div className="incident-detail__empty">등록된 진행 이력이 없습니다.</div>}
+	                {realProgressRows.length ? realProgressRows.map(([time, message, actor, status, tone]) => (
+	                  <div className="incident-detail__progress-row" key={`${time}-${message}`}>
+	                    <span>{time}</span>
+	                    <p>{message}</p>
+	                    <em>{actor}</em>
+	                    <strong className={`is-${tone || "info"}`}>{status}</strong>
+	                  </div>
+	                )) : <div className="incident-detail__empty">등록된 진행 이력이 없습니다.</div>}
               </div>
             </article>
             <article className="incident-detail__card incident-detail__card--graph">
@@ -1134,14 +1133,17 @@ export function IncidentDetailPage() {
             <article className="incident-detail__card incident-detail__card--summary incident-detail__card--overview-primary">
               <h2>📦 기본 정보 (SERVICE)</h2>
               <dl className="incident-detail__dl">
-                <dt>serviceCode</dt><dd><code>{service?.serviceCode ?? incident.targetCode}</code></dd>
-                <dt>serviceName</dt><dd>{service?.serviceName ?? incident.title}</dd>
-                <dt>categoryL1/L2/L3</dt><dd>{service?.categoryPath?.join(" > ") ?? "-"}</dd>
-                <dt>serviceType</dt><dd>{service?.serviceTypeCode ?? "-"}</dd>
-                <dt>importance</dt><dd>{service?.importanceCode ?? "-"}</dd>
-                <dt>status</dt><dd>{service?.statusCode ?? "-"}</dd>
-                <dt>endpointUrl</dt><dd>{service?.endpointUrl ?? "-"}</dd>
-                <dt>description</dt><dd>{service?.description ?? incident.description}</dd>
+	                <dt>서비스코드</dt><dd><code>{service?.serviceCode ?? incident.targetCode}</code></dd>
+	                <dt>서비스명</dt><dd>{service?.serviceName ?? incident.title}</dd>
+	                <dt>대분류</dt><dd>{service?.categoryPath?.[0] ?? "-"}</dd>
+	                <dt>중분류</dt><dd>{service?.categoryPath?.[1] ?? "-"}</dd>
+	                <dt>소분류</dt><dd>{service?.categoryPath?.[2] ?? "-"}</dd>
+	                <dt>서비스 유형</dt><dd>{codeLabels.serviceType?.[service?.serviceTypeCode] ?? service?.serviceTypeCode ?? "-"}</dd>
+	                <dt>중요도</dt><dd>{codeLabels.importance?.[service?.importanceCode] ?? service?.importanceCode ?? "-"}</dd>
+	                <dt>상태</dt><dd>{codeLabels.serviceStatus?.[service?.statusCode] ?? service?.statusCode ?? "-"}</dd>
+	                <dt>서비스 점검</dt><dd><Link className="incident-detail__inline-link" to="/operation/service-checks">보기</Link></dd>
+	                <dt>엔드포인트 URL</dt><dd>{service?.endpointUrl ?? "-"}</dd>
+	                <dt>설명</dt><dd>{service?.description ?? incident.description}</dd>
               </dl>
             </article>
 
@@ -1169,13 +1171,14 @@ export function IncidentDetailPage() {
                 <span>인시던트 발생 이후 기록</span>
               </div>
               <div className="incident-detail__timeline incident-detail__scroll-area">
-                {detectionHistoryRows.length ? detectionHistoryRows.map((row, index) => (
-                  <div className="incident-detail__timeline-row" key={`${row.time}-${row.message}-${row.actor}`}>
-                    <span>{row.time}</span>
-                    <i className={index < 2 ? "is-danger" : index < 4 ? "is-warn" : ""} />
-                    <p>{row.message}</p>
-                    <em>{row.actor}</em>
-                  </div>
+	                {detectionHistoryRows.length ? detectionHistoryRows.map((row, index) => (
+	                  <div className="incident-detail__timeline-row" key={`${row.time}-${row.message}-${row.actor}`}>
+	                    <span>{row.time}</span>
+	                    <i className={index < 2 ? "is-danger" : index < 4 ? "is-warn" : ""} />
+	                    <p>{row.message}</p>
+	                    <em>{row.actor}</em>
+	                    <strong className={index < 2 ? "is-danger" : index < 4 ? "is-warn" : "is-success"}>{index < 2 ? "진행중" : "완료"}</strong>
+	                  </div>
                 )) : <div className="incident-detail__empty">등록된 감지 이력이 없습니다.</div>}
               </div>
             </article>
@@ -1225,47 +1228,24 @@ export function IncidentDetailPage() {
         ) : null}
 
         {activeTab === "impact" ? (
-          <article className="incident-detail__card incident-detail__card--graph incident-detail__tab-card" role="tabpanel">
-            <div className="incident-detail__card-head">
-              <h2>영향 범위 (BLAST RADIUS)</h2>
-            </div>
-            <div className="incident-detail__blast">
-              <ServiceRelationFlow
-                embedded
-                embeddedHeightClassName="h-full"
-                frameless
-                hideDepthToggle
-                hideDetailPanel
-                hideNodeActions
-                hideTopControl
-                incident={incident}
-                incidentMode
-                initialRelationDepth={1}
-                initialServiceId={service?.serviceId}
-                showAllServices={incident.incidentTypeCode === "SERVER"}
-              />
-            </div>
-          </article>
-        ) : null}
-
-        {activeTab === "deployments" ? (
-          <article className="incident-detail__card incident-detail__tab-card" role="tabpanel">
-            <div className="incident-detail__card-head">
-              <h2>최근 배포 이력</h2>
-              <span>장애 발생 전후 변경사항</span>
-            </div>
-            <div className="incident-detail__deploy-list incident-detail__scroll-area">
-              {recentDeploymentRows.length ? recentDeploymentRows.map((row) => (
-                <div className="incident-detail__deploy-row" key={row.date + row.title}>
-                  <time>{row.date}</time>
-                  <strong>{row.title}</strong>
-                  <span>{row.owner}</span>
-                  <em>{row.status}</em>
-                </div>
-              )) : <div className="incident-detail__empty">등록된 배포 이력이 없습니다.</div>}
-            </div>
-          </article>
-        ) : null}
+	          <article className="incident-detail__card incident-detail__tab-card" role="tabpanel">
+	            <div className="incident-detail__card-head">
+	              <h2>영향/연계 서비스</h2>
+	            </div>
+	            <div className="incident-detail__impact-table incident-detail__scroll-area">
+	              <table>
+	                <thead><tr><th>서비스명</th><th>코드</th><th>단계</th><th>직접 여부</th><th>연계 경로</th><th>연계 설명</th></tr></thead>
+	                <tbody>
+	                  {buildIncidentImpactListRows({ displayImpactedServices, relatedRelations: allRelatedRelations, service }).map((row) => (
+	                    <tr key={`${row.code}-${row.path}`}>
+	                      <td>{row.name}</td><td><code>{row.code}</code></td><td>{row.depth}</td><td>{row.direct}</td><td>{row.path}</td><td>{row.description}</td>
+	                    </tr>
+	                  ))}
+	                </tbody>
+	              </table>
+	            </div>
+	          </article>
+	        ) : null}
 
         {activeTab === "owners" ? (
           <article className="incident-detail__card incident-detail__tab-card" role="tabpanel">
@@ -1427,66 +1407,89 @@ function buildIncidentProgressRows({
       : "추가 영향 서비스 미확인";
   const deploy = deployments[0];
 
-  const rows = [
-    [
-      formatIncidentProgressTime(startedAt, 0),
-      `${serviceName}(${serviceCode}) ${severity} 인시던트가 접수되어 서비스 기준 영향도 산출을 시작했습니다.`,
-      incident?.registeredBy || "SYSTEM",
-    ],
-    [
-      formatIncidentProgressTime(startedAt, 2),
-      `담당자 매핑을 조회해 ${ownerLabel}${ownerContact}을 1차 대응 대상으로 지정했습니다.`,
-      "담당 조회",
-    ],
-    [
-      formatIncidentProgressTime(startedAt, 4),
-      `서비스 관계 ${relationCount}건${relationTypeSummary ? `(${relationTypeSummary})` : ""}을 분석했습니다. 예상 영향: ${affectedLabel}`,
-      "영향도 분석",
-    ],
-  ];
+	  const rows = [
+	    [
+	      formatIncidentProgressTime(startedAt, 0),
+	      `${serviceName}(${serviceCode}) ${severity} 인시던트가 발생했습니다.`,
+	      incident?.registeredBy || "SYSTEM",
+	      "진행중",
+	      "danger",
+	    ],
+	    [
+	      formatIncidentProgressTime(startedAt, 2),
+	      `서비스 관계 기준 영향 서비스 ${relationCount}건을 조회했습니다. 대상: ${affectedLabel}`,
+	      "SYSTEM",
+	      "완료",
+	      "warn",
+	    ],
+	    [
+	      formatIncidentProgressTime(startedAt, 4),
+	      `각 서비스별 담당자를 조회했습니다. ${ownerLabel}${ownerContact}`,
+	      "담당 조회",
+	      "완료",
+	      "success",
+	    ],
+	    [
+	      formatIncidentProgressTime(startedAt, 6),
+	      `각 서비스 담당자에게 알림을 전송했습니다.${relationTypeSummary ? ` 관계 유형: ${relationTypeSummary}` : ""}`,
+	      "알림 전송",
+	      notificationRows.length ? "완료" : "진행중",
+	      "info",
+	    ],
+	  ];
 
-  if (notificationRows.length) {
-    const notification = notificationRows[0];
-    rows.push([
-      formatIncidentProgressTime(startedAt, 6),
-      `${notification.channel} 채널로 ${notification.recipient}에게 템플릿 ${notification.template} 알림을 전송했습니다. 상태: ${notification.status}`,
-      "알림 전송",
-    ]);
-  }
+	  if (notificationRows.length) {
+	    const notification = notificationRows[0];
+	    rows.push([
+	      formatIncidentProgressTime(startedAt, 8),
+	      `${notification.channel} 채널로 ${notification.recipient}에게 템플릿 ${notification.template} 알림을 전송했습니다. 상태: ${notification.status}`,
+	      "알림 전송",
+	      notification.status,
+	      notification.status === "성공" ? "success" : "warn",
+	    ]);
+	  }
 
   if (backupLabel) {
     rows.push([
-      formatIncidentProgressTime(startedAt, 8),
-      `백업 담당 ${backupLabel}에게 서비스 연계 구간 확인을 요청했습니다.`,
-      "에스컬레이션",
-    ]);
-  }
+	      formatIncidentProgressTime(startedAt, 8),
+	      `백업 담당 ${backupLabel}에게 서비스 연계 구간 확인을 요청했습니다.`,
+	      "에스컬레이션",
+	      "진행중",
+	      "info",
+	    ]);
+	  }
 
   if (deploy) {
     rows.push([
-      formatIncidentProgressTime(startedAt, 10),
-      `최근 배포 ${deploy.title}(${deploy.date}, ${deploy.status})와 장애 발생 시점을 대조했습니다.`,
-      deploy.owner || "배포 확인",
-    ]);
-  } else {
-    rows.push([
-      formatIncidentProgressTime(startedAt, 10),
-      `${serviceName}의 최근 배포 이력은 확인되지 않아 관계 서비스와 런타임 상태를 우선 점검 중입니다.`,
-      "운영 확인",
-    ]);
-  }
+	      formatIncidentProgressTime(startedAt, 10),
+	      `최근 배포 ${deploy.title}(${deploy.date}, ${deploy.status})와 장애 발생 시점을 대조했습니다.`,
+	      deploy.owner || "배포 확인",
+	      "완료",
+	      "success",
+	    ]);
+	  } else {
+	    rows.push([
+	      formatIncidentProgressTime(startedAt, 10),
+	      `${serviceName}의 최근 배포 이력은 확인되지 않아 관계 서비스와 런타임 상태를 우선 점검 중입니다.`,
+	      "운영 확인",
+	      "진행중",
+	      "info",
+	    ]);
+	  }
 
-  timelineRows.slice(0, 3).forEach(([time, message, actor], index) => {
-    rows.push([
+	  timelineRows.slice(0, 3).forEach(([time, message, actor], index) => {
+	    rows.push([
       time && time !== "-" ? time : formatIncidentProgressTime(startedAt, 12 + index * 2),
       normalizeIncidentTimelineMessage(message, {
         affectedLabel,
         relationCount,
         serviceName,
-      }),
-      actor || "remote",
-    ]);
-  });
+	      }),
+	      actor || "remote",
+	      index === 0 ? "진행중" : "완료",
+	      index === 0 ? "danger" : "success",
+	    ]);
+	  });
 
   return ensureUniqueProgressTimes(rows, startedAt);
 }
@@ -1542,10 +1545,10 @@ function normalizeIncidentTimelineMessage(message, { affectedLabel, relationCoun
 
 function ensureUniqueProgressTimes(rows, startedAt) {
   const usedTimes = new Set();
-  return rows.map(([time, message, actor], index) => {
+  return rows.map(([time, message, actor, status = "완료", tone = "success"], index) => {
     let nextTime = time && time !== "-" ? time : formatIncidentProgressTime(startedAt, index * 2);
     if (nextTime === "-") {
-      return [nextTime, message, actor];
+      return [nextTime, message, actor, status, tone];
     }
     let offset = index * 2;
     while (usedTimes.has(nextTime)) {
@@ -1556,8 +1559,37 @@ function ensureUniqueProgressTimes(rows, startedAt) {
       }
     }
     usedTimes.add(nextTime);
-    return [nextTime, message, actor];
+    return [nextTime, message, actor, status, tone];
   });
+}
+
+function buildIncidentImpactListRows({ displayImpactedServices = [], relatedRelations = [], service }) {
+  const baseName = service?.serviceName || service?.serviceCode || "대상 서비스";
+  const serviceRows = displayImpactedServices.map((item, index) => ({
+    code: item.serviceCode || `SERVICE-${item.serviceId ?? index + 1}`,
+    depth: index < 8 ? 1 : 2,
+    description: item.description || "-",
+    direct: index < 8 ? "직접" : "간접",
+    name: item.serviceName || item.serviceCode || `영향 서비스 ${index + 1}`,
+    path: `${baseName} → ${item.serviceName || item.serviceCode || "영향 서비스"}`,
+  }));
+  const relationRows = relatedRelations.map((relation, index) => ({
+    code: relation.targetServiceCode || relation.sourceServiceCode || `REL-${relation.relationId ?? index + 1}`,
+    depth: Number(relation.sourceServiceId) === Number(service?.serviceId) ? 1 : 2,
+    description: relation.description || relation.relationTypeCode || "-",
+    direct: Number(relation.sourceServiceId) === Number(service?.serviceId) ? "직접" : "간접",
+    name: relation.targetServiceName || relation.sourceServiceName || `연계 서비스 ${index + 1}`,
+    path: `${relation.sourceServiceName || baseName} → ${relation.targetServiceName || relation.targetServiceCode || "연계 서비스"}`,
+  }));
+  const rows = [...serviceRows, ...relationRows];
+  return rows.length ? rows.slice(0, 12) : [{
+    code: service?.serviceCode || "-",
+    depth: 1,
+    description: "등록된 영향 서비스가 없습니다.",
+    direct: "직접",
+    name: baseName,
+    path: baseName,
+  }];
 }
 
 function buildIncidentNotificationRows({

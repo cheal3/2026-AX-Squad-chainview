@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Bell, Bot, ChevronDown, Database, GitFork, LogOut, UserRound } from "lucide-react";
+import { Bell, Bot, ChevronDown, ChevronRight, Database, GitFork, LogOut, UserRound } from "lucide-react";
 import { useAuth } from "../auth/AuthContext.jsx";
 import { usePortalData } from "../dashboardModule/PortalDataStore";
 
@@ -9,7 +9,6 @@ const sidebarSections = [
     label: "모니터링",
     items: [
       { key: "dashboard", icon: "📊", label: "대시보드", to: "/dashboard" },
-      { key: "incidents", icon: "🚨", label: "인시던트 현황", to: "/admin-incidents" },
     ],
   },
   {
@@ -62,7 +61,7 @@ const sidebarSections = [
     label: "시스템 관리",
     items: [
       { key: "users", icon: "👥", label: "사용자 관리", to: "/admin-users" },
-      { key: "owner-management", icon: "👨‍💼", label: "서비스 담당자 관리", to: "/admin-owner-management" },
+      { key: "permissions", icon: "🔐", label: "관리자 접근 관리", to: "/admin-permissions" },
       { key: "categories", icon: "🗂️", label: "서비스 분류 관리", to: "/admin-categories" },
       { key: "codes", icon: "⚙️", label: "공통코드 관리", to: "/admin-codes" },
     ],
@@ -226,6 +225,7 @@ function formatTopbarIncidentTime(value) {
 function Sidebar({ activeMenu = "", isDark = false }) {
   const { incidents } = usePortalData();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [openSections, setOpenSections] = useState(() => new Set(["모니터링"]));
   const itemClass = (key) => `lnb__item${activeMenu === key ? " is-active" : ""}`;
   const openIncidentCount = incidents.filter(
     (incident) => incident.incidentStatusCode !== "RESOLVED"
@@ -267,11 +267,26 @@ function Sidebar({ activeMenu = "", isDark = false }) {
       </div>
       {sectionItems.map((section) => (
         <div className="lnb__group" key={section.label}>
-          <div className="lnb__title">
+          <button
+            aria-expanded={openSections.has(section.label)}
+            className="lnb__title lnb__section-toggle"
+            onClick={() => {
+              setOpenSections((current) => {
+                const next = new Set(current);
+                if (next.has(section.label)) {
+                  next.delete(section.label);
+                } else {
+                  next.add(section.label);
+                }
+                return next;
+              });
+            }}
+            type="button"
+          >
             <span>{section.label}</span>
-            {section.label === "AX ASSISTANT" ? <ChevronDown size={15} /> : null}
-          </div>
-          {section.items.map((item) => {
+            {openSections.has(section.label) ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+          </button>
+          {openSections.has(section.label) ? section.items.map((item) => {
             const Icon = item.icon;
             return (
               <Link className={itemClass(item.key)} data-key={item.key} key={item.key} title={isCollapsed ? item.label : undefined} to={item.to}>
@@ -282,7 +297,7 @@ function Sidebar({ activeMenu = "", isDark = false }) {
                 {item.badge ? <span className="badge">{item.badge}</span> : null}
               </Link>
             );
-          })}
+          }) : null}
         </div>
       ))}
     </aside>
