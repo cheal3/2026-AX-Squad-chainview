@@ -5,10 +5,21 @@
     <link rel="icon" href="/2026-AX-Squad-chainview/favicon.ico?v=2" sizes="256x256" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ChainView</title>
-    <script type="module" crossorigin src="/2026-AX-Squad-chainview/assets/index-CHSBsy6Z.js"></script>
-    <link rel="stylesheet" crossorigin href="/2026-AX-Squad-chainview/assets/index-BUQBSVSv.css">
+    <script>
+      (function () {
+        var basePath = "/2026-AX-Squad-chainview/";
+        var path = window.location.pathname;
+        var searchParams = new URLSearchParams(window.location.search);
+        if (path === basePath + "dashboard-proto-detail" || path === basePath + "incident-detail" || searchParams.get("view") === "detail") {
+          var incidentId = searchParams.get("incidentId");
+          window.location.replace(basePath + (incidentId ? "?detail=1&incidentId=" + encodeURIComponent(incidentId) : ""));
+        }
+      })();
+    </script>
+    <script type="module" crossorigin src="/2026-AX-Squad-chainview/assets/index-0ul8MqoR.js"></script>
+    <link rel="stylesheet" crossorigin href="/2026-AX-Squad-chainview/assets/index-Cga19vOB.css">
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"></div>
   </body>
 </html>
