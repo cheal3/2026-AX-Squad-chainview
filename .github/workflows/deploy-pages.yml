@@ -46,6 +46,8 @@ jobs:
       - name: Add SPA fallback
         run: |
           cp dist/index.html dist/404.html
+          mkdir -p dist/dashboard
+          cp dist/index.html dist/dashboard/index.html
           touch dist/.nojekyll
 
       - name: Configure Pages
