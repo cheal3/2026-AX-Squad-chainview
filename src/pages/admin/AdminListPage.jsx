@@ -27,6 +27,35 @@ const adminMenuMetaByKey = {
 const groupRoleOptions = ["정담당", "부담당", "검토자", "승인자", "참조"];
 const groupMemberStatsCache = new Map();
 const groupMemberStatsInFlight = new Map();
+const PERMISSION_STORAGE_KEY = "chainview.admin.permissions.v1";
+const fallbackPermissionUsers = [
+  { employeeNo: "8913812", userName: "나현준", departmentName: "IT채널업무1팀", email: "hyunjun.na@hanwha.com" },
+  { employeeNo: "7620491", userName: "김지은", departmentName: "공통플랫폼팀", email: "jieun.kim@hanwha.com" },
+  { employeeNo: "6843207", userName: "이민지", departmentName: "기간계운영팀", email: "minji.lee@hanwha.com" },
+  { employeeNo: "5932841", userName: "박서아", departmentName: "대외채널팀", email: "seoa.park@hanwha.com" },
+  { employeeNo: "4827190", userName: "정유진", departmentName: "재무개발팀", email: "youjin.jeong@hanwha.com" },
+  { employeeNo: "3710528", userName: "최민준", departmentName: "기술지원팀", email: "minjun.choi@hanwha.com" },
+];
+
+function readStoredPermissionRows(users = []) {
+  try {
+    const storedRows = JSON.parse(window.localStorage.getItem(PERMISSION_STORAGE_KEY) || "null");
+    if (Array.isArray(storedRows)) {
+      return storedRows.map(normalizePermissionRow).filter((row) => row.employeeNo);
+    }
+  } catch {
+    // Use seed rows when browser storage is unavailable or corrupted.
+  }
+  return buildPermissionRows(users);
+}
+
+function saveStoredPermissionRows(rows) {
+  try {
+    window.localStorage.setItem(PERMISSION_STORAGE_KEY, JSON.stringify(rows));
+  } catch {
+    // Keep the in-memory UI state even if storage is not writable.
+  }
+}
 
 function getMenuMeta(menu) {
   return adminMenuMetaByKey[menu] || { section: "서비스", label: "화면", icon: "📄" };
@@ -46,6 +75,8 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
   const [selectedOwnerServiceId, setSelectedOwnerServiceId] = useState("");
   const [selectedKeys, setSelectedKeys] = useState([]);
   const [page, setPage] = useState(1);
+  const [permissionRows, setPermissionRows] = useState(() => readStoredPermissionRows());
+  const [permissionRowsInitialized, setPermissionRowsInitialized] = useState(false);
   const lastRealtimeQueryRef = useRef("");
   const serviceById = useMemo(
     () => new Map(portalData.services.map((service) => [service.serviceId, service])),
@@ -118,6 +149,21 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
     setSelectedKeys([]);
     setPage(1);
   }, [menu]);
+
+  useEffect(() => {
+    if (permissionRowsInitialized || !portalData.users.length) {
+      return;
+    }
+    setPermissionRows((current) => {
+      if (current.length) {
+        return current;
+      }
+      const seededRows = readStoredPermissionRows(portalData.users);
+      saveStoredPermissionRows(seededRows);
+      return seededRows;
+    });
+    setPermissionRowsInitialized(true);
+  }, [permissionRowsInitialized, portalData.users]);
 
   useEffect(() => {
     if (menu !== "groups" || !portalData.remoteApi.enabled) {
@@ -463,10 +509,10 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
     permissions: {
       actionLabel: null,
       columns: ["사번", "관리자명", "부서", "허용 IP 1", "허용 IP 2", "등록일", "상태"],
-      rows: buildPermissionRows(portalData.users).map((row) => ({
+      rows: permissionRows.map((row) => ({
         key: row.employeeNo,
         record: row,
-        searchText: adminSearchText(row.employeeNo, row.name, row.department, row.ip1, row.ip2, row.status),
+        searchText: adminSearchText(row.employeeNo, row.name, row.department, row.email, row.ip1, row.ip2, row.registeredAt, row.status),
         cells: [
           <code>{row.employeeNo}</code>,
           <b>{row.name}</b>,
@@ -544,6 +590,52 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
         ? selectedServiceCategoryPath(listFilters)
         : [];
     setAdminModal({ mode, menu, presetCategoryPath, record: row?.record ?? null });
+  };
+  const savePermissionRows = (updater) => {
+    setPermissionRows((current) => {
+      const next = typeof updater === "function" ? updater(current) : updater;
+      saveStoredPermissionRows(next);
+      return next;
+    });
+  };
+  const handlePermissionSave = (row) => {
+    const nextRow = normalizePermissionRow(row);
+    savePermissionRows((current) => {
+      const exists = current.some((item) => item.employeeNo === nextRow.employeeNo);
+      const nextRows = exists
+        ? current.map((item) => item.employeeNo === nextRow.employeeNo ? nextRow : item)
+        : [nextRow, ...current];
+      return sortPermissionRows(nextRows);
+    });
+    setSelectedKeys([]);
+    closeAdminModal();
+  };
+  const handlePermissionDelete = (employeeNo) => {
+    savePermissionRows((current) => current.filter((row) => row.employeeNo !== employeeNo));
+    setSelectedKeys((current) => current.filter((key) => key !== String(employeeNo)));
+    closeAdminModal();
+  };
+  const handlePermissionBulkDelete = (keys) => {
+    const keySet = new Set(keys.map(String));
+    if (!keySet.size) return;
+    if (!window.confirm(`${keySet.size}명의 관리자 접근 권한을 삭제하시겠습니까?`)) {
+      return;
+    }
+    savePermissionRows((current) => current.filter((row) => !keySet.has(String(row.employeeNo))));
+    setSelectedKeys([]);
+  };
+  const handlePermissionStatusToggle = (row) => {
+    savePermissionRows((current) =>
+      current.map((item) =>
+        item.employeeNo === row.employeeNo
+          ? normalizePermissionRow({
+              ...item,
+              status: item.status === "허용" ? "미등록" : "허용",
+              updatedAt: formatPermissionDateTime(new Date()),
+            })
+          : item
+      )
+    );
   };
   const handleEditRow = (row) => {
     if (menu === "owners") {
@@ -647,8 +739,24 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
 
       {menu === "permissions" ? (
         <AdminPermissionView
-          rows={filteredRows}
+          isAllChecked={isAllChecked}
+          keyword={keyword}
           onAdd={() => openAdminModal("create")}
+          onBulkDelete={() => handlePermissionBulkDelete(selectedKeys.filter((key) => filteredRowKeys.includes(key)))}
+          onDelete={handleDeleteRow}
+          onEdit={handleEditRow}
+          onKeywordChange={setKeyword}
+          onReset={resetList}
+          onStatusToggle={handlePermissionStatusToggle}
+          onToggleAll={toggleAllRows}
+          onToggleRow={toggleRow}
+          page={currentPage}
+          rows={filteredRows}
+          pagedRows={pagedRows}
+          selectedKeys={selectedKeys}
+          selectedCount={selectedKeys.filter((key) => filteredRowKeys.includes(key)).length}
+          setPage={setPage}
+          total={filteredRows.length}
         />
       ) : menu === "codes" ? (
         <CodeGroupFilterBar
@@ -810,8 +918,13 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
       ) : null}
       {adminModal?.menu === "permissions" ? (
         <AdminPermissionModal
+          existingRows={permissionRows}
+          mode={adminModal.mode}
           onClose={closeAdminModal}
+          onDelete={handlePermissionDelete}
+          onSave={handlePermissionSave}
           portalData={portalData}
+          record={adminModal.record}
         />
       ) : adminModal ? (
         <AdminRecordModal
@@ -833,7 +946,26 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
   );
 }
 
-function AdminPermissionView({ rows, onAdd }) {
+function AdminPermissionView({
+  isAllChecked,
+  keyword,
+  onAdd,
+  onBulkDelete,
+  onDelete,
+  onEdit,
+  onKeywordChange,
+  onReset,
+  onStatusToggle,
+  onToggleAll,
+  onToggleRow,
+  page,
+  pagedRows,
+  rows,
+  selectedCount,
+  selectedKeys,
+  setPage,
+  total,
+}) {
   const allowedCount = rows.filter((row) => row.record.status === "허용").length;
   const blockedCount = rows.length - allowedCount;
   const ipCount = rows.reduce((count, row) => count + [row.record.ip1, row.record.ip2].filter((ip) => ip && ip !== "-").length, 0);
@@ -849,69 +981,197 @@ function AdminPermissionView({ rows, onAdd }) {
         <div className="toolbar toolbar--admin">
           <div className="search">
             <Search size={15} aria-hidden="true" />
-            <input type="text" placeholder="사번, 이름, 부서 검색" readOnly />
+            <input
+              onChange={(event) => onKeywordChange(event.target.value)}
+              placeholder="사번, 이름, 부서, IP 검색"
+              type="text"
+              value={keyword}
+            />
           </div>
           <div className="right">
+            {selectedCount ? (
+              <button className="btn btn--danger" onClick={onBulkDelete} type="button">선택 삭제</button>
+            ) : null}
+            <button className="btn toolbar-reset-button" onClick={onReset} type="button">초기화</button>
             <button className="btn btn--primary" onClick={onAdd} type="button">＋ 관리자 추가</button>
           </div>
         </div>
         <table className="tbl">
           <thead>
             <tr>
-              <th className="col-check"><input className="chk" type="checkbox" /></th>
+              <th className="col-check">
+                <input
+                  checked={isAllChecked}
+                  className="chk"
+                  onChange={(event) => onToggleAll(event.target.checked)}
+                  type="checkbox"
+                />
+              </th>
               <th>사번</th><th>관리자명</th><th>부서</th><th>허용 IP 1</th><th>허용 IP 2</th><th>등록일</th><th>상태</th><th className="col-actions">관리</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => (
+            {pagedRows.map((row) => (
               <tr key={row.key}>
-                <td className="col-check"><input className="chk" type="checkbox" /></td>
+                <td className="col-check">
+                  <input
+                    checked={selectedKeys.includes(String(row.key))}
+                    className="chk"
+                    onChange={(event) => onToggleRow(row.key, event.target.checked)}
+                    type="checkbox"
+                  />
+                </td>
                 {row.cells.map((cell, index) => <td key={index}>{cell}</td>)}
-                <td className="col-actions"><div className="row-actions"><button className="ibtn" type="button">수정</button><button className="ibtn" type="button">⋯</button></div></td>
+                <td className="col-actions">
+                  <div className="row-actions">
+                    <button className="ibtn" onClick={() => onEdit(row)} title="수정" type="button">수정</button>
+                    <button className="ibtn" onClick={() => onStatusToggle(row.record)} title="상태 전환" type="button">
+                      {row.record.status === "허용" ? "차단" : "허용"}
+                    </button>
+                    <button className="ibtn ibtn--danger" onClick={() => onDelete(row)} title="삭제" type="button">삭제</button>
+                  </div>
+                </td>
               </tr>
             ))}
+            {!pagedRows.length ? (
+              <tr>
+                <td colSpan={9}><div className="empty">조회 가능한 관리자 접근 권한이 없습니다.</div></td>
+              </tr>
+            ) : null}
           </tbody>
         </table>
-        <div className="pager"><div className="pager__info">총 {rows.length}명의 관리자</div></div>
+        <Pagination
+          page={page}
+          selectedCount={selectedCount}
+          setPage={setPage}
+          total={total}
+        />
       </div>
     </section>
   );
 }
 
-function AdminPermissionModal({ onClose, portalData }) {
-  const candidates = buildPermissionRows(portalData.users).slice(0, 4);
-  const selected = candidates[0];
+function AdminPermissionModal({ existingRows, mode, onClose, onDelete, onSave, portalData, record }) {
+  const isDelete = mode === "delete";
+  const isEdit = mode === "edit";
+  const [query, setQuery] = useState(record?.name ?? "");
+  const [selectedEmployeeNo, setSelectedEmployeeNo] = useState(record?.employeeNo ?? "");
+  const [ip1, setIp1] = useState(record?.ip1 === "-" ? "" : record?.ip1 ?? "");
+  const [ip2, setIp2] = useState(record?.ip2 === "-" ? "" : record?.ip2 ?? "");
+  const [error, setError] = useState("");
+  const candidates = useMemo(
+    () => buildPermissionCandidates(portalData.users, existingRows, query, isEdit ? record?.employeeNo : ""),
+    [existingRows, isEdit, portalData.users, query, record?.employeeNo]
+  );
+  const selected =
+    candidates.find((candidate) => candidate.employeeNo === selectedEmployeeNo) ??
+    (isEdit ? normalizePermissionRow(record) : null);
+
+  useEffect(() => {
+    if (selectedEmployeeNo || !candidates.length) return;
+    setSelectedEmployeeNo(candidates[0].employeeNo);
+  }, [candidates, selectedEmployeeNo]);
+
+  const submit = () => {
+    if (isDelete) {
+      onDelete(record.employeeNo);
+      return;
+    }
+    if (!selected) {
+      setError("관리자를 선택해 주세요.");
+      return;
+    }
+    const cleanedIp1 = ip1.trim();
+    const cleanedIp2 = ip2.trim();
+    if (!cleanedIp1) {
+      setError("허용 IP 1은 필수 값입니다.");
+      return;
+    }
+    if (!isValidIpAddress(cleanedIp1) || (cleanedIp2 && !isValidIpAddress(cleanedIp2))) {
+      setError("IP 형식이 올바르지 않습니다. 예: 10.110.173.182");
+      return;
+    }
+    if (cleanedIp2 && cleanedIp1 === cleanedIp2) {
+      setError("허용 IP 1과 허용 IP 2는 서로 달라야 합니다.");
+      return;
+    }
+    onSave({
+      ...selected,
+      ip1: cleanedIp1,
+      ip2: cleanedIp2 || "-",
+      registeredAt: record?.registeredAt || formatPermissionDateTime(new Date()),
+      status: "허용",
+      updatedAt: formatPermissionDateTime(new Date()),
+    });
+  };
+
+  if (isDelete) {
+    return (
+      <ModalBackdrop onClose={onClose}>
+        <div className="modal confirm admin-access-modal" onClick={(event) => event.stopPropagation()}>
+          <div className="modal__head"><h3>관리자 권한 삭제</h3><button className="close" onClick={onClose} type="button">×</button></div>
+          <div className="modal__body">
+            <div className="confirm__icon">⚠</div>
+            <div className="confirm__msg"><b>{record.name}({record.employeeNo})</b> 관리자 접근 권한을 삭제하시겠습니까?</div>
+            <div className="confirm__note">삭제 후에도 사용자 정보는 유지되며 관리자 접근 허용 IP만 제거됩니다.</div>
+          </div>
+          <div className="modal__foot"><button className="btn" onClick={onClose} type="button">취소</button><button className="btn btn--danger" onClick={submit} type="button">삭제</button></div>
+        </div>
+      </ModalBackdrop>
+    );
+  }
 
   return (
     <ModalBackdrop onClose={onClose}>
       <div className="modal admin-access-modal" onClick={(event) => event.stopPropagation()}>
-        <div className="modal__head"><h3>관리자 추가</h3><button className="close" onClick={onClose} type="button">×</button></div>
+        <div className="modal__head"><h3>{isEdit ? "관리자 수정" : "관리자 추가"}</h3><button className="close" onClick={onClose} type="button">×</button></div>
         <div className="modal__body">
           <div className="admin-access-modal__step">
             <h4>1. 관리자 검색</h4>
             <p>사번 또는 이름을 입력하여 관리자를 검색하세요.</p>
             <div className="admin-access-modal__search">
-              <div className="search"><Search size={15} /><input value="나현준" readOnly /></div>
-              <button className="btn" type="button">검색</button>
+              <div className="search">
+                <Search size={15} aria-hidden="true" />
+                <input
+                  disabled={isEdit}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="사번 또는 이름 검색"
+                  type="text"
+                  value={query}
+                />
+              </div>
+              <button className="btn" disabled={isEdit} onClick={() => setQuery(query.trim())} type="button">검색</button>
             </div>
             <div className="admin-access-candidates">
-              {candidates.map((candidate, index) => (
-                <label className={index === 0 ? "is-selected" : ""} key={candidate.employeeNo}>
-                  <input checked={index === 0} readOnly type="radio" />
-                  <span><b>{candidate.name}</b><small>{candidate.employeeNo} / {candidate.department}</small></span>
-                  <em>{index === 0 ? "선택됨" : "선택"}</em>
+              {candidates.map((candidate) => (
+                <label className={selectedEmployeeNo === candidate.employeeNo ? "is-selected" : ""} key={candidate.employeeNo}>
+                  <input
+                    checked={selectedEmployeeNo === candidate.employeeNo}
+                    disabled={isEdit}
+                    onChange={() => {
+                      setSelectedEmployeeNo(candidate.employeeNo);
+                      setIp1(candidate.ip1 === "-" ? "" : candidate.ip1 ?? "");
+                      setIp2(candidate.ip2 === "-" ? "" : candidate.ip2 ?? "");
+                      setError("");
+                    }}
+                    type="radio"
+                  />
+                  <span><b>{candidate.name}</b><small>{candidate.employeeNo} / {candidate.department}{candidate.email ? ` / ${candidate.email}` : ""}</small></span>
+                  <em>{selectedEmployeeNo === candidate.employeeNo ? "선택됨" : "선택"}</em>
                 </label>
               ))}
+              {!candidates.length ? <div className="admin-access-empty">검색 결과가 없습니다.</div> : null}
             </div>
           </div>
           <div className="admin-access-modal__step">
             <h4>2. 허용 IP 등록</h4>
             <p>선택한 관리자의 허용 IP를 최대 2개까지 등록할 수 있습니다.</p>
-            <label className="form-row"><span>허용 IP 1 *</span><input value={selected?.ip1 ?? "10.110.173.182"} readOnly /></label>
-            <label className="form-row"><span>허용 IP 2</span><input value={selected?.ip2 ?? "10.110.171.182"} readOnly /></label>
+            <label className="form-row"><span>허용 IP 1 *</span><input onChange={(event) => { setIp1(event.target.value); setError(""); }} placeholder="10.110.173.182" value={ip1} /></label>
+            <label className="form-row"><span>허용 IP 2</span><input onChange={(event) => { setIp2(event.target.value); setError(""); }} placeholder="선택 입력" value={ip2} /></label>
+            {error ? <div className="form-alert" role="alert">{error}</div> : null}
           </div>
         </div>
-        <div className="modal__foot"><button className="btn" onClick={onClose} type="button">취소</button><button className="btn btn--primary" onClick={onClose} type="button">등록</button></div>
+        <div className="modal__foot"><button className="btn" onClick={onClose} type="button">취소</button><button className="btn btn--primary" onClick={submit} type="button">{isEdit ? "저장" : "등록"}</button></div>
       </div>
     </ModalBackdrop>
   );
@@ -929,24 +1189,80 @@ function getFilterMode(menu) {
 }
 
 function buildPermissionRows(users = []) {
-  const fallback = [
-    { employeeNo: "8913812", userName: "나현준", departmentName: "IT채널업무1팀" },
-    { employeeNo: "7620491", userName: "김지은", departmentName: "공통플랫폼팀" },
-    { employeeNo: "6843207", userName: "이민지", departmentName: "기간계운영팀" },
-    { employeeNo: "5932841", userName: "박서아", departmentName: "대외채널팀" },
-    { employeeNo: "4827190", userName: "정유진", departmentName: "재무개발팀" },
-    { employeeNo: "3710528", userName: "최민준", departmentName: "기술지원팀" },
-  ];
-  const source = users.length ? users : fallback;
-  return source.slice(0, 12).map((user, index) => ({
-    employeeNo: String(field(user, "employeeNo", fallback[index % fallback.length].employeeNo)),
-    name: String(field(user, "userName", fallback[index % fallback.length].userName)),
-    department: String(field(user, "departmentName", fallback[index % fallback.length].departmentName)),
+  const source = users.length ? users : fallbackPermissionUsers;
+  return sortPermissionRows(source.slice(0, 6).map((user, index) => normalizePermissionRow({
+    employeeNo: field(user, "employeeNo", fallbackPermissionUsers[index % fallbackPermissionUsers.length].employeeNo),
+    name: field(user, "userName", fallbackPermissionUsers[index % fallbackPermissionUsers.length].userName),
+    department: field(user, "departmentName", fallbackPermissionUsers[index % fallbackPermissionUsers.length].departmentName),
+    email: field(user, "email", fallbackPermissionUsers[index % fallbackPermissionUsers.length].email ?? ""),
     ip1: `10.110.${173 + (index % 4)}.${182 - index}`,
     ip2: index % 2 === 0 ? `10.110.${171 + (index % 5)}.${182 - index}` : "-",
     registeredAt: `2026.09.${String(25 - index).padStart(2, "0")} ${index % 2 ? "16:30" : "10:42"}`,
     status: index % 3 === 1 ? "미등록" : "허용",
-  }));
+  })));
+}
+
+function normalizePermissionRow(row = {}) {
+  const employeeNo = String(row.employeeNo ?? "").trim();
+  const ip1 = String(row.ip1 ?? "").trim();
+  const ip2 = String(row.ip2 ?? "").trim();
+  const requestedStatus = String(row.status ?? "").trim();
+  return {
+    employeeNo,
+    name: String(row.name ?? row.userName ?? "").trim(),
+    department: String(row.department ?? row.departmentName ?? row.orgName ?? "").trim() || "-",
+    email: String(row.email ?? "").trim(),
+    ip1: ip1 || "-",
+    ip2: ip2 || "-",
+    registeredAt: String(row.registeredAt ?? row.createdAt ?? formatPermissionDateTime(new Date())).trim(),
+    status: requestedStatus === "허용" && ip1 ? "허용" : "미등록",
+    updatedAt: String(row.updatedAt ?? "").trim(),
+  };
+}
+
+function sortPermissionRows(rows = []) {
+  return [...rows].sort((left, right) => {
+    const dateOrder = String(right.registeredAt).localeCompare(String(left.registeredAt));
+    return dateOrder || String(left.employeeNo).localeCompare(String(right.employeeNo));
+  });
+}
+
+function buildPermissionCandidates(users = [], existingRows = [], keyword = "", includeEmployeeNo = "") {
+  const source = users.length ? users : fallbackPermissionUsers;
+  const registeredEmployeeNos = new Set(
+    existingRows
+      .map((row) => String(row.employeeNo))
+      .filter((employeeNo) => employeeNo && employeeNo !== String(includeEmployeeNo))
+  );
+  const normalizedKeyword = normalizeSearchText(keyword);
+  return source
+    .map((user, index) => normalizePermissionRow({
+      employeeNo: field(user, "employeeNo", fallbackPermissionUsers[index % fallbackPermissionUsers.length].employeeNo),
+      name: field(user, "userName", fallbackPermissionUsers[index % fallbackPermissionUsers.length].userName),
+      department: field(user, "departmentName", fallbackPermissionUsers[index % fallbackPermissionUsers.length].departmentName),
+      email: field(user, "email", fallbackPermissionUsers[index % fallbackPermissionUsers.length].email ?? ""),
+      ip1: "",
+      ip2: "",
+      registeredAt: formatPermissionDateTime(new Date()),
+      status: "미등록",
+    }))
+    .filter((user) => user.employeeNo && !registeredEmployeeNos.has(user.employeeNo))
+    .filter((user) => !normalizedKeyword || matchesSearchText(searchableText(user.employeeNo, user.name, user.department, user.email), normalizedKeyword))
+    .slice(0, 8);
+}
+
+function isValidIpAddress(value) {
+  const parts = String(value).trim().split(".");
+  return parts.length === 4 && parts.every((part) => {
+    if (!/^\d{1,3}$/.test(part)) return false;
+    const number = Number(part);
+    return number >= 0 && number <= 255 && String(number) === String(Number(part));
+  });
+}
+
+function formatPermissionDateTime(date) {
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}.${pad(date.getMonth() + 1)}.${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 function AdminToolbar({
@@ -1573,6 +1889,24 @@ function extractNodeText(value) {
 }
 
 function downloadAdminXlsx(filename, columns, rows) {
+  if (filename === "permissions.xlsx") {
+    downloadXlsx(
+      "관리자-접근-관리.xlsx",
+      [
+        ["사번", (row) => row.record.employeeNo],
+        ["관리자명", (row) => row.record.name],
+        ["부서", (row) => row.record.department],
+        ["이메일", (row) => row.record.email],
+        ["허용 IP 1", (row) => row.record.ip1],
+        ["허용 IP 2", (row) => row.record.ip2],
+        ["등록일", (row) => row.record.registeredAt],
+        ["상태", (row) => row.record.status],
+      ],
+      rows,
+      "관리자 접근"
+    );
+    return;
+  }
   downloadXlsx(
     filename,
     columns.map((column, index) => [column, (row) => extractNodeText(row.cells?.[index])]),

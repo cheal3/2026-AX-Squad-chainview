@@ -8824,8 +8824,43 @@ table.tbl td.col-check {
   margin-bottom: 10px;
 }
 
+.admin-access-card .tbl td,
+.admin-access-card .tbl th {
+  vertical-align: middle;
+}
+
+.admin-access-card .row-actions {
+  justify-content: flex-end;
+}
+
+.admin-access-card .row-actions .ibtn {
+  min-width: 46px;
+  padding-inline: 10px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.btn.btn--danger,
+.ibtn.ibtn--danger {
+  border-color: #fecaca;
+  background: #fff1f2;
+  color: #b91c1c;
+}
+
+.btn.btn--danger:hover,
+.ibtn.ibtn--danger:hover {
+  border-color: #fca5a5;
+  background: #fee2e2;
+  color: #991b1b;
+}
+
 .admin-access-modal {
   width: min(520px, calc(100vw - 32px));
+}
+
+.admin-access-modal .modal__body {
+  max-height: min(72vh, 720px);
+  overflow: auto;
 }
 
 .admin-access-modal__step {
@@ -8870,6 +8905,12 @@ table.tbl td.col-check {
   border-radius: 8px;
   background: #fff;
   padding: 10px;
+}
+
+.admin-access-candidates input[type="radio"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--brand);
 }
 
 .admin-access-candidates label.is-selected {
@@ -8930,4 +8971,31 @@ table.tbl td.col-check {
   font-size: 11px;
   font-style: normal;
   font-weight: 900;
+}
+
+.admin-access-empty {
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+  padding: 16px;
+  text-align: center;
+}
+
+.form-alert {
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: #fff1f2;
+  color: #b91c1c;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 9px 10px;
+}
+
+@media (max-width: 900px) {
+  .admin-access-metrics {
+    grid-template-columns: 1fr;
+    max-width: none;
+  }
 }
