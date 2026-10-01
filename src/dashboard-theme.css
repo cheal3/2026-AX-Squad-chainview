@@ -8842,13 +8842,13 @@ table.tbl td.col-check {
 }
 
 .admin-access-card .toolbar .btn {
-  min-height: 44px;
+  min-height: 36px;
   white-space: nowrap;
 }
 
 .admin-access-table-wrap {
   width: 100%;
-  overflow-x: auto;
+  overflow-x: hidden;
   border: 1px solid var(--line);
   border-top: 0;
   border-radius: 0 0 8px 8px;
@@ -8856,7 +8856,8 @@ table.tbl td.col-check {
 }
 
 .admin-access-table {
-  min-width: 1120px;
+  width: 100%;
+  min-width: 0;
   table-layout: fixed;
 }
 
@@ -8873,7 +8874,7 @@ table.tbl td.col-check {
 
 .admin-access-table th:nth-child(2),
 .admin-access-table td:nth-child(2) {
-  width: 120px;
+  width: 118px;
 }
 
 .admin-access-table th:nth-child(3),
@@ -8883,32 +8884,51 @@ table.tbl td.col-check {
 
 .admin-access-table th:nth-child(4),
 .admin-access-table td:nth-child(4) {
-  width: 160px;
-}
-
-.admin-access-table th:nth-child(5),
-.admin-access-table td:nth-child(5),
-.admin-access-table th:nth-child(6),
-.admin-access-table td:nth-child(6) {
-  width: 150px;
-}
-
-.admin-access-table th:nth-child(7),
-.admin-access-table td:nth-child(7) {
   width: 170px;
 }
 
-.admin-access-table th:nth-child(8),
-.admin-access-table td:nth-child(8) {
+.admin-access-table th:nth-child(5),
+.admin-access-table td:nth-child(5) {
+  width: 240px;
+}
+
+.admin-access-table th:nth-child(6),
+.admin-access-table td:nth-child(6) {
   width: 92px;
 }
 
 .admin-access-table th.col-actions,
 .admin-access-table td.col-actions {
-  width: 210px;
-  min-width: 210px;
+  width: 184px;
+  min-width: 184px;
   padding-left: 8px;
   padding-right: 18px;
+}
+
+.admin-access-ip-stack {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.admin-access-ip-stack span {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.admin-access-ip-stack b {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.admin-access-ip-stack span {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .admin-access-card .row-actions {
@@ -8919,9 +8939,9 @@ table.tbl td.col-check {
 }
 
 .admin-access-card .row-actions .ibtn {
-  height: 34px;
-  min-width: 52px;
-  padding-inline: 10px;
+  height: 30px;
+  min-width: 46px;
+  padding-inline: 8px;
   font-size: 12px;
   font-weight: 800;
   white-space: nowrap;
@@ -8949,26 +8969,29 @@ table.tbl td.col-check {
 }
 
 .admin-access-modal .modal__head {
-  padding: 18px 24px;
+  padding: 14px 20px;
 }
 
 .admin-access-modal .modal__head h3 {
-  font-size: 20px;
+  font-size: 16px;
 }
 
 .admin-access-modal .modal__body {
   max-height: min(72vh, 680px);
   overflow: auto;
-  padding: 22px 24px;
+  padding: 18px 20px;
 }
 
 .admin-access-modal .modal__foot {
-  padding: 16px 24px;
+  padding: 12px 20px;
 }
 
 .admin-access-modal .modal__foot .btn {
-  min-width: 92px;
-  min-height: 44px;
+  justify-content: center;
+  min-width: 74px;
+  min-height: 36px;
+  padding: 7px 14px;
+  font-size: 13px;
   white-space: nowrap;
 }
 
@@ -8986,7 +9009,7 @@ table.tbl td.col-check {
 .admin-access-modal__step h4 {
   margin: 0;
   color: var(--text);
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 900;
   white-space: nowrap;
 }
@@ -8994,14 +9017,14 @@ table.tbl td.col-check {
 .admin-access-modal__step p {
   margin: 0;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 800;
 }
 
 .admin-access-modal__search {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 78px;
-  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) 64px;
+  gap: 8px;
   align-items: center;
 }
 
@@ -9009,8 +9032,8 @@ table.tbl td.col-check {
   display: grid;
   grid-template-columns: 18px minmax(0, 1fr);
   align-items: center;
-  gap: 10px;
-  height: 44px;
+  gap: 8px;
+  height: 36px;
   border: 1px solid var(--line);
   border-radius: 6px;
   background: #fff;
@@ -9037,11 +9060,14 @@ table.tbl td.col-check {
 }
 
 .admin-access-modal__search .btn {
-  height: 44px;
-  min-height: 44px;
+  justify-content: center;
+  height: 36px;
+  min-height: 36px;
+  padding: 7px 14px;
   border-radius: 6px;
   background: #17213a;
   color: #fff;
+  font-size: 13px;
   font-weight: 900;
   white-space: nowrap;
 }
@@ -9158,7 +9184,7 @@ table.tbl td.col-check {
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 42px;
+  height: 36px;
   border: 1px solid var(--line);
   border-radius: 6px;
   background: #fff;

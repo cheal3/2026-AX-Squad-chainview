@@ -508,7 +508,7 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
     },
     permissions: {
       actionLabel: null,
-      columns: ["사번", "관리자명", "부서", "허용 IP 1", "허용 IP 2", "등록일", "상태"],
+      columns: ["사번", "관리자명", "부서", "허용 IP", "상태"],
       rows: permissionRows.map((row) => ({
         key: row.employeeNo,
         record: row,
@@ -517,9 +517,7 @@ export function DynamicAdminListPage({ activeMenu, menu }) {
           <code>{row.employeeNo}</code>,
           <b>{row.name}</b>,
           row.department,
-          row.ip1,
-          row.ip2,
-          row.registeredAt,
+          <PermissionIpStack ip1={row.ip1} ip2={row.ip2} />,
           <span className={`pill ${row.status === "허용" ? "pill--ok" : "pill--idle"}`}>{row.status}</span>,
         ],
       })),
@@ -1008,7 +1006,7 @@ function AdminPermissionView({
                     type="checkbox"
                   />
                 </th>
-                <th>사번</th><th>관리자명</th><th>부서</th><th>허용 IP 1</th><th>허용 IP 2</th><th>등록일</th><th>상태</th><th className="col-actions">관리</th>
+                <th>사번</th><th>관리자명</th><th>부서</th><th>허용 IP</th><th>상태</th><th className="col-actions">관리</th>
               </tr>
             </thead>
             <tbody>
@@ -1036,7 +1034,7 @@ function AdminPermissionView({
               ))}
               {!pagedRows.length ? (
                 <tr>
-                  <td colSpan={9}><div className="empty">조회 가능한 관리자 접근 권한이 없습니다.</div></td>
+                  <td colSpan={7}><div className="empty">조회 가능한 관리자 접근 권한이 없습니다.</div></td>
                 </tr>
               ) : null}
             </tbody>
@@ -1050,6 +1048,15 @@ function AdminPermissionView({
         />
       </div>
     </section>
+  );
+}
+
+function PermissionIpStack({ ip1, ip2 }) {
+  return (
+    <div className="admin-access-ip-stack">
+      <span><b>IP 1</b>{ip1 || "-"}</span>
+      <span><b>IP 2</b>{ip2 || "-"}</span>
+    </div>
   );
 }
 
