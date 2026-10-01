@@ -3282,12 +3282,21 @@ table.tbl td.col-check {
 }
 
 .incident-detail__progress-row em {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 96px;
+  height: 30px;
   border-radius: 999px;
   background: rgba(37, 99, 235, 0.15);
   color: #a7c7ff;
-  padding: 2px 7px;
-  font-size: 11px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 800;
   font-style: normal;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -3380,12 +3389,22 @@ table.tbl td.col-check {
 }
 
 .incident-detail__timeline-row em {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 96px;
+  height: 30px;
   border-radius: 999px;
   background: #112b43;
   color: #a9bed3;
-  padding: 2px 7px;
+  padding: 0 10px;
   font-style: normal;
-  font-size: 11px;
+  font-size: 12px;
+  font-weight: 800;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .incident-detail__notification-summary {
@@ -9113,13 +9132,20 @@ table.tbl td.col-check {
 
 .incident-detail__progress-row strong,
 .incident-detail__timeline-row strong {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   justify-self: end;
+  width: 72px;
+  height: 30px;
   border-radius: 999px;
   background: rgba(37, 99, 235, 0.15);
   color: #a7c7ff;
-  padding: 2px 7px;
-  font-size: 11px;
+  padding: 0 10px;
+  text-align: center;
+  font-size: 12px;
   font-weight: 900;
+  line-height: 1;
   white-space: nowrap;
 }
 
