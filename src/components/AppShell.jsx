@@ -67,6 +67,48 @@ const sidebarSections = [
     ],
   },
 ];
+const SIDEBAR_COLLAPSED_STORAGE_KEY = "chainview.sidebar.collapsed.v1";
+const SIDEBAR_OPEN_SECTIONS_STORAGE_KEY = "chainview.sidebar.open-sections.v1";
+
+function readSidebarCollapsed() {
+  try {
+    return window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === "Y";
+  } catch {
+    return false;
+  }
+}
+
+function readSidebarOpenSections() {
+  try {
+    const raw = window.localStorage.getItem(SIDEBAR_OPEN_SECTIONS_STORAGE_KEY);
+    const labels = JSON.parse(raw || "null");
+    if (Array.isArray(labels)) {
+      return new Set(labels.filter((label) => sidebarSections.some((section) => section.label === label)));
+    }
+  } catch {
+    // Fall through to the default section.
+  }
+  return new Set(["모니터링"]);
+}
+
+function saveSidebarCollapsed(isCollapsed) {
+  try {
+    window.localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, isCollapsed ? "Y" : "N");
+  } catch {
+    // Ignore storage failures; the UI state still updates in memory.
+  }
+}
+
+function saveSidebarOpenSections(openSections) {
+  try {
+    window.localStorage.setItem(
+      SIDEBAR_OPEN_SECTIONS_STORAGE_KEY,
+      JSON.stringify([...openSections])
+    );
+  } catch {
+    // Ignore storage failures; the UI state still updates in memory.
+  }
+}
 
 export function AppShell({ activeMenu = "", children, isDark = false }) {
   return (
@@ -224,8 +266,8 @@ function formatTopbarIncidentTime(value) {
 
 function Sidebar({ activeMenu = "", isDark = false }) {
   const { incidents } = usePortalData();
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  const [openSections, setOpenSections] = useState(() => new Set(["모니터링"]));
+  const [isCollapsed, setIsCollapsed] = useState(readSidebarCollapsed);
+  const [openSections, setOpenSections] = useState(readSidebarOpenSections);
   const itemClass = (key) => `lnb__item${activeMenu === key ? " is-active" : ""}`;
   const openIncidentCount = incidents.filter(
     (incident) => incident.incidentStatusCode !== "RESOLVED"
@@ -252,7 +294,13 @@ function Sidebar({ activeMenu = "", isDark = false }) {
         <button
           aria-label={isCollapsed ? "사이드바 펼치기" : "사이드바 접기"}
           className="lnb__toggle"
-          onClick={() => setIsCollapsed((current) => !current)}
+          onClick={() => {
+            setIsCollapsed((current) => {
+              const next = !current;
+              saveSidebarCollapsed(next);
+              return next;
+            });
+          }}
           title={isCollapsed ? "펼치기" : "접기"}
           type="button"
         >
@@ -278,6 +326,7 @@ function Sidebar({ activeMenu = "", isDark = false }) {
                 } else {
                   next.add(section.label);
                 }
+                saveSidebarOpenSections(next);
                 return next;
               });
             }}
