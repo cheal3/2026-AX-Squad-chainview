@@ -996,50 +996,52 @@ function AdminPermissionView({
             <button className="btn btn--primary" onClick={onAdd} type="button">＋ 관리자 추가</button>
           </div>
         </div>
-        <table className="tbl">
-          <thead>
-            <tr>
-              <th className="col-check">
-                <input
-                  checked={isAllChecked}
-                  className="chk"
-                  onChange={(event) => onToggleAll(event.target.checked)}
-                  type="checkbox"
-                />
-              </th>
-              <th>사번</th><th>관리자명</th><th>부서</th><th>허용 IP 1</th><th>허용 IP 2</th><th>등록일</th><th>상태</th><th className="col-actions">관리</th>
-            </tr>
-          </thead>
-          <tbody>
-            {pagedRows.map((row) => (
-              <tr key={row.key}>
-                <td className="col-check">
+        <div className="admin-access-table-wrap">
+          <table className="tbl admin-access-table">
+            <thead>
+              <tr>
+                <th className="col-check">
                   <input
-                    checked={selectedKeys.includes(String(row.key))}
+                    checked={isAllChecked}
                     className="chk"
-                    onChange={(event) => onToggleRow(row.key, event.target.checked)}
+                    onChange={(event) => onToggleAll(event.target.checked)}
                     type="checkbox"
                   />
-                </td>
-                {row.cells.map((cell, index) => <td key={index}>{cell}</td>)}
-                <td className="col-actions">
-                  <div className="row-actions">
-                    <button className="ibtn" onClick={() => onEdit(row)} title="수정" type="button">수정</button>
-                    <button className="ibtn" onClick={() => onStatusToggle(row.record)} title="상태 전환" type="button">
-                      {row.record.status === "허용" ? "차단" : "허용"}
-                    </button>
-                    <button className="ibtn ibtn--danger" onClick={() => onDelete(row)} title="삭제" type="button">삭제</button>
-                  </div>
-                </td>
+                </th>
+                <th>사번</th><th>관리자명</th><th>부서</th><th>허용 IP 1</th><th>허용 IP 2</th><th>등록일</th><th>상태</th><th className="col-actions">관리</th>
               </tr>
-            ))}
-            {!pagedRows.length ? (
-              <tr>
-                <td colSpan={9}><div className="empty">조회 가능한 관리자 접근 권한이 없습니다.</div></td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {pagedRows.map((row) => (
+                <tr key={row.key}>
+                  <td className="col-check">
+                    <input
+                      checked={selectedKeys.includes(String(row.key))}
+                      className="chk"
+                      onChange={(event) => onToggleRow(row.key, event.target.checked)}
+                      type="checkbox"
+                    />
+                  </td>
+                  {row.cells.map((cell, index) => <td key={index}>{cell}</td>)}
+                  <td className="col-actions">
+                    <div className="row-actions">
+                      <button className="ibtn" onClick={() => onEdit(row)} title="수정" type="button">수정</button>
+                      <button className="ibtn" onClick={() => onStatusToggle(row.record)} title="상태 전환" type="button">
+                        {row.record.status === "허용" ? "차단" : "허용"}
+                      </button>
+                      <button className="ibtn ibtn--danger" onClick={() => onDelete(row)} title="삭제" type="button">삭제</button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {!pagedRows.length ? (
+                <tr>
+                  <td colSpan={9}><div className="empty">조회 가능한 관리자 접근 권한이 없습니다.</div></td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
         <Pagination
           page={page}
           selectedCount={selectedCount}
@@ -1130,7 +1132,7 @@ function AdminPermissionModal({ existingRows, mode, onClose, onDelete, onSave, p
             <h4>1. 관리자 검색</h4>
             <p>사번 또는 이름을 입력하여 관리자를 검색하세요.</p>
             <div className="admin-access-modal__search">
-              <div className="search">
+              <div className="admin-access-search-field">
                 <Search size={15} aria-hidden="true" />
                 <input
                   disabled={isEdit}
@@ -1166,8 +1168,20 @@ function AdminPermissionModal({ existingRows, mode, onClose, onDelete, onSave, p
           <div className="admin-access-modal__step">
             <h4>2. 허용 IP 등록</h4>
             <p>선택한 관리자의 허용 IP를 최대 2개까지 등록할 수 있습니다.</p>
-            <label className="form-row"><span>허용 IP 1 *</span><input onChange={(event) => { setIp1(event.target.value); setError(""); }} placeholder="10.110.173.182" value={ip1} /></label>
-            <label className="form-row"><span>허용 IP 2</span><input onChange={(event) => { setIp2(event.target.value); setError(""); }} placeholder="선택 입력" value={ip2} /></label>
+            <label className="admin-access-ip-field">
+              <span>허용 IP 1 *</span>
+              <div className="admin-access-input-shell">
+                <input onChange={(event) => { setIp1(event.target.value); setError(""); }} placeholder="10.110.173.182" value={ip1} />
+                {ip1 ? <button aria-label="허용 IP 1 비우기" onClick={() => { setIp1(""); setError(""); }} type="button">×</button> : null}
+              </div>
+            </label>
+            <label className="admin-access-ip-field">
+              <span>허용 IP 2</span>
+              <div className="admin-access-input-shell">
+                <input onChange={(event) => { setIp2(event.target.value); setError(""); }} placeholder="선택 입력" value={ip2} />
+                {ip2 ? <button aria-label="허용 IP 2 비우기" onClick={() => { setIp2(""); setError(""); }} type="button">×</button> : null}
+              </div>
+            </label>
             {error ? <div className="form-alert" role="alert">{error}</div> : null}
           </div>
         </div>
