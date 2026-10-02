@@ -2082,19 +2082,17 @@ function RecentIncidentList({
 
   return (
     <div className="min-w-0">
-      <div className="grid min-w-0 grid-cols-[minmax(104px,0.86fr)_minmax(160px,1.45fr)_64px] items-center gap-2 px-0.5 pb-2 text-[11px] font-black leading-4 text-slate-500">
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_64px] items-center gap-2 px-0.5 pb-2 text-[11px] font-black leading-4 text-slate-500">
         <span>서비스</span>
-        <span>인시던트</span>
         <span className="text-right">발생</span>
       </div>
       <div className="space-y-[2px]">
         {rows.map((row) => (
           <div
             key={row.key}
-            className="grid min-w-0 grid-cols-[minmax(104px,0.86fr)_minmax(160px,1.45fr)_64px] items-center gap-2 px-0.5 py-[4px] text-[12px] font-medium leading-5 text-slate-600"
+            className="grid min-w-0 grid-cols-[minmax(0,1fr)_64px] items-center gap-2 px-0.5 py-[4px] text-[12px] font-medium leading-5 text-slate-600"
           >
-            <span className="min-w-0 truncate font-semibold text-slate-800" title={row.serviceName}>{row.serviceName}</span>
-            <span className="min-w-0 truncate text-slate-500" title={`${row.code} · ${row.title}`}>{row.title || row.code}</span>
+            <span className="min-w-0 truncate font-semibold text-slate-800" title={`${row.serviceName} · ${row.title || row.code}`}>{row.serviceName}</span>
             <span className="truncate text-right font-medium text-slate-400" title={row.occurredAt}>{row.occurredAt}</span>
           </div>
         ))}
