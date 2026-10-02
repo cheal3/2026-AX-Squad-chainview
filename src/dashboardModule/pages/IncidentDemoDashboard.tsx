@@ -110,15 +110,14 @@ function uniqueLabels(values: string[]) {
 }
 
 type DashboardManagementRow = [string, string, string];
-type DashboardChangeRow = {
-  change: string;
-  detail: string;
+type DashboardRecentIncidentRow = {
+  code: string;
   key: string;
-  service: string;
-  sortAt: string;
-  time: string;
+  occurredAt: string;
+  serviceId?: number;
+  serviceName: string;
+  title: string;
 };
-type DashboardIncidentRow = [string, string, string, string, string, string];
 
 function parseDashboardCardDate(value: unknown) {
   if (!value) return null;
@@ -192,78 +191,49 @@ function buildManagementRows({
   ];
 }
 
-function buildRecentChangeRows(services: ServiceRecord[]): DashboardChangeRow[] {
-  return [...services]
-    .sort((left, right) => String(right.updatedAt || "").localeCompare(String(left.updatedAt || "")))
-    .slice(0, 5)
-    .map((service) => {
-      const statusLabel = service.statusCode
-        ? codeLabels.serviceStatus[service.statusCode] ?? service.statusCode
-        : "";
-      const deploymentLabel = service.deploymentStatusCode
-        ? codeLabels.deploymentStatus[service.deploymentStatusCode] ?? service.deploymentStatusCode
-        : "";
-      return {
-        change: service.updatedAt === service.createdAt ? "서비스 등록" : "서비스 정보 수정",
-        detail: [
-          statusLabel ? `상태 ${statusLabel}` : "",
-          deploymentLabel ? `배포 ${deploymentLabel}` : "",
-          service.updatedBy ? `수정자 ${service.updatedBy}` : "",
-        ].filter(Boolean).join(" · ") || service.categoryPath?.join(" > ") || "변경 상세 미등록",
-        key: `${service.serviceId}-${service.updatedAt}`,
-        service: service.serviceName,
-        sortAt: service.updatedAt,
-        time: relativeDashboardTime(service.updatedAt),
-      };
-    });
-}
-
 function buildRecentIncidentRows({
-  incidentImpacts,
   incidents,
   serviceByCode,
   serviceById,
 }: {
-  incidentImpacts: { incidentId: number }[];
   incidents: IncidentRecord[];
   serviceByCode: Map<string, ServiceRecord>;
   serviceById: Map<number, ServiceRecord>;
-}): DashboardIncidentRow[] {
+}): DashboardRecentIncidentRow[] {
   return [...incidents]
     .sort((left, right) => String(right.startedAt || "").localeCompare(String(left.startedAt || "")))
-    .slice(0, 5)
     .map((incident) => {
-      const serviceName = serviceDisplayName(serviceById, serviceByCode, incident as unknown as Record<string, unknown>);
-      const impactCount = incidentImpacts.filter((impact) => Number(impact.incidentId) === Number(incident.incidentId)).length;
-      const resolved = incident.incidentStatusCode === "RESOLVED";
-      const tone = resolved
-        ? "green"
-        : incident.incidentStatusCode === "IN_PROGRESS"
-          ? "sky"
-          : incident.incidentStatusCode === "MONITORING"
-            ? "orange"
-            : "purple";
-      return [
-        serviceName,
-        incident.externalIncidentCode ?? `INC-${incident.incidentId}`,
-        formatDashboardIncidentStatus(incident.incidentStatusCode),
-        impactCount ? `${impactCount}개` : "-",
-        resolved ? relativeDashboardTime(incident.endedAt) : "미종료",
-        tone,
-      ];
+      const incidentRow = incident as unknown as Record<string, unknown>;
+      const service =
+        serviceById.get(Number(incidentRow.serviceId)) ||
+        serviceById.get(Number(incidentRow.impactedServiceId)) ||
+        serviceByCode.get(String(incidentRow.serviceCode ?? incidentRow.targetCode ?? ""));
+      return {
+        code: incident.externalIncidentCode ?? `INC-${incident.incidentId}`,
+        key: String(incident.incidentId),
+        occurredAt: relativeDashboardTime(incident.startedAt),
+        serviceId: service?.serviceId ?? (Number(incident.serviceId) || undefined),
+        serviceName:
+          service?.serviceName ??
+          serviceDisplayName(serviceById, serviceByCode, incidentRow),
+        title: incident.title || "제목 없는 인시던트",
+      };
     });
 }
 
-function formatDashboardIncidentStatus(statusCode: string) {
-  return (
-    {
-      OPEN: "접수",
-      IN_PROGRESS: "조치중",
-      MONITORING: "모니터링",
-      RESOLVED: "종료",
-      CLOSED: "종료",
-    }[statusCode] ?? statusCode
-  );
+function buildServiceRecentIncidentRows(
+  rows: DashboardRecentIncidentRow[],
+  selectedService?: ServiceRecord
+) {
+  if (!selectedService) return [];
+
+  return rows.filter((row) => {
+    return (
+      Number(row.serviceId) === Number(selectedService.serviceId) ||
+      row.serviceName === selectedService.serviceName ||
+      row.code === selectedService.serviceCode
+    );
+  });
 }
 
 export function IncidentDemoDashboard({
@@ -305,7 +275,6 @@ function DashboardCase({
     deployments,
     groups,
     incidentEvents,
-    incidentImpacts,
     incidents,
     owners,
     relations,
@@ -358,12 +327,8 @@ function DashboardCase({
     [incidents, owners, relations, services]
   );
   const recentIncidentRows = useMemo(
-    () => buildRecentIncidentRows({ incidentImpacts, incidents, serviceByCode, serviceById }),
-    [incidentImpacts, incidents, serviceByCode, serviceById]
-  );
-  const recentChangeRows = useMemo(
-    () => buildRecentChangeRows(services),
-    [services]
+    () => buildRecentIncidentRows({ incidents, serviceByCode, serviceById }),
+    [incidents, serviceByCode, serviceById]
   );
   const [draftFilter, setDraftFilter] = useState<DashboardFilterState>(readDashboardFilter);
   const [appliedFilter, setAppliedFilter] = useState<DashboardFilterState>(readDashboardFilter);
@@ -646,9 +611,9 @@ function DashboardCase({
         />
       </div>
       <BottomPanels
-        changeRows={recentChangeRows}
         incidentRows={recentIncidentRows}
         managementRows={managementRows}
+        selectedService={selectedService}
       />
     </section>
   );
@@ -1136,9 +1101,12 @@ function ServiceInfoPanel({
           <span className="truncate">{serviceName}</span>
         </div>
         <NormalInfo
+          groups={groups}
           incidents={incidents}
+          owners={owners}
           relationDirectionCounts={relationDirectionCounts}
           service={service}
+          users={users}
         />
         <div className="mt-4 grid min-w-0 grid-cols-2 gap-3">
           <button
@@ -1343,22 +1311,29 @@ function StatusBadge() {
 }
 
 function NormalInfo({
+  groups,
   incidents,
+  owners,
   relationDirectionCounts,
   service,
+  users,
 }: {
+  groups: Record<string, unknown>[];
   incidents: IncidentRecord[];
+  owners: ServiceOwnerRecord[];
   relationDirectionCounts: { incoming: number; outgoing: number };
   service?: ServiceRecord;
+  users: Record<string, unknown>[];
 }) {
   const category = service?.categoryPath.join(" > ") ?? "-";
   const serviceCode = service?.serviceCode ?? "-";
   const incomingCount = relationDirectionCounts.incoming;
   const outgoingCount = relationDirectionCounts.outgoing;
-  const relationCount = incomingCount + outgoingCount;
   const recentIncidentCount = serviceIncidents(incidents, service, 30).length;
-  const createdAt = formatDashboardDate(service?.createdAt);
   const description = service?.description || "-";
+  const ownerRows = resolveOwnerRows({ groups, owners, service, users });
+  const departments = [...new Set(ownerRows.map((owner) => owner.groupName).filter(Boolean))].join(", ") || "-";
+  const ownerNames = ownerRows.map((owner) => owner.name).filter(Boolean).join(", ") || "-";
 
   return (
     <dl className="mt-4 grid min-w-0 grid-cols-[110px_minmax(0,1fr)] gap-y-2 text-sm leading-5">
@@ -1370,12 +1345,12 @@ function NormalInfo({
       <dd className="truncate">{incomingCount}개</dd>
       <dt className="font-bold text-slate-700">하위 서비스</dt>
       <dd className="truncate">{outgoingCount}개</dd>
-      <dt className="font-bold text-slate-700">연관 서비스 수</dt>
-      <dd className="truncate">{relationCount}개</dd>
       <dt className="font-bold text-slate-700">인시던트 이력</dt>
       <dd className="truncate">{recentIncidentCount}건 (최근 30일)</dd>
-      <dt className="font-bold text-slate-700">등록일</dt>
-      <dd className="truncate">{createdAt}</dd>
+      <dt className="font-bold text-slate-700">담당부서</dt>
+      <dd className="truncate" title={departments}>{departments}</dd>
+      <dt className="font-bold text-slate-700">담당자</dt>
+      <dd className="truncate" title={ownerNames}>{ownerNames}</dd>
       <dt className="font-bold text-slate-700">설명</dt>
       <dd className="truncate">{description}</dd>
     </dl>
@@ -2050,17 +2025,18 @@ function DarkPanel({ children, title }: { children: ReactNode; title: string }) 
 }
 
 function BottomPanels({
-  changeRows,
   incidentRows,
   managementRows,
+  selectedService,
 }: {
-  changeRows: DashboardChangeRow[];
-  incidentRows: DashboardIncidentRow[];
+  incidentRows: DashboardRecentIncidentRow[];
   managementRows: DashboardManagementRow[];
+  selectedService?: ServiceRecord;
 }) {
   const navigate = useNavigate();
-  const visibleChangeRows = changeRows.slice(0, 5);
-  const visibleIncidentRows = incidentRows.slice(0, 5);
+  const visibleAllIncidentRows = incidentRows.slice(0, 5);
+  const selectedIncidentRows = buildServiceRecentIncidentRows(incidentRows, selectedService).slice(0, 5);
+  const selectedIncidentTitle = `${selectedService?.serviceName ?? "선택 서비스"} 최근 인시던트`;
 
   return (
     <div className="mt-3 grid h-[236px] min-w-0 flex-none grid-cols-[minmax(220px,0.9fr)_minmax(320px,1.1fr)_minmax(480px,1.8fr)] items-stretch gap-2 overflow-hidden">
@@ -2075,55 +2051,54 @@ function BottomPanels({
           />
         ))}
       </Panel>
-      <ReferencePanel title="최근 서비스 변경">
-        {visibleChangeRows.length ? (
-          <div className="space-y-[2px]">
-            {visibleChangeRows.map((row) => (
-              <div
-                key={row.key}
-                className="grid min-w-0 grid-cols-[minmax(112px,1fr)_minmax(104px,1.04fr)_66px] items-center gap-2 px-0.5 py-[5px] text-[13px] leading-5"
-              >
-                <span className="min-w-0 truncate font-semibold text-slate-800" title={row.service}>{row.service}</span>
-                <span className="min-w-0 truncate text-slate-500" title={row.detail || row.change}>{row.detail || row.change}</span>
-                <span className="shrink-0 whitespace-nowrap text-right font-medium text-slate-400">{row.time}</span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <TinyEmpty>변경 이력이 없습니다.</TinyEmpty>
-        )}
+      <ReferencePanel
+        actionLabel="더보기 〉"
+        onAction={() => navigate("/admin-incidents")}
+        title="전체 최근 인시던트"
+      >
+        <RecentIncidentList rows={visibleAllIncidentRows} emptyText="최근 인시던트가 없습니다." />
       </ReferencePanel>
       <ReferencePanel
         actionLabel="더보기 〉"
         onAction={() => navigate("/admin-incidents")}
-        title="최근 인시던트"
+        title={selectedIncidentTitle}
       >
-        {visibleIncidentRows.length ? (
-          <div className="min-w-0">
-            <div className="grid min-w-0 grid-cols-[minmax(132px,1.05fr)_minmax(96px,0.88fr)_72px_82px_76px] items-center gap-2 px-0.5 pb-2 text-[11px] font-black leading-4 text-slate-500">
-              <span>서비스</span>
-              <span>인시던트</span>
-              <span className="text-center">상태</span>
-              <span className="text-center">영향 서비스</span>
-              <span className="text-right">종료</span>
-            </div>
-            <div className="space-y-[2px]">
-              {visibleIncidentRows.map(([service, incident, status, impact, end, tone]) => (
-                <div
-                  key={incident}
-                  className="grid min-w-0 grid-cols-[minmax(132px,1.05fr)_minmax(96px,0.88fr)_72px_82px_76px] items-center gap-2 px-0.5 py-[4px] text-[12px] font-medium leading-5 text-slate-600"
-                >
-                  <span className="min-w-0 truncate font-semibold text-slate-800" title={service}>{service}</span>
-                  <span className="truncate text-slate-500" title={incident}>{incident}</span>
-                  <span className="flex justify-center"><IncidentStatus tone={tone}>{status}</IncidentStatus></span>
-                  <span className="text-center whitespace-nowrap text-slate-500">{impact}</span>
-                  <span className="truncate text-right font-medium text-slate-400" title={end}>{end}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : <TinyEmpty>등록된 인시던트가 없습니다.</TinyEmpty>}
+        <RecentIncidentList rows={selectedIncidentRows} emptyText="최근 인시던트가 없습니다." />
       </ReferencePanel>
+    </div>
+  );
+}
+
+function RecentIncidentList({
+  emptyText,
+  rows,
+}: {
+  emptyText: string;
+  rows: DashboardRecentIncidentRow[];
+}) {
+  if (!rows.length) {
+    return <TinyEmpty>{emptyText}</TinyEmpty>;
+  }
+
+  return (
+    <div className="min-w-0">
+      <div className="grid min-w-0 grid-cols-[minmax(104px,0.86fr)_minmax(160px,1.45fr)_64px] items-center gap-2 px-0.5 pb-2 text-[11px] font-black leading-4 text-slate-500">
+        <span>서비스</span>
+        <span>인시던트</span>
+        <span className="text-right">발생</span>
+      </div>
+      <div className="space-y-[2px]">
+        {rows.map((row) => (
+          <div
+            key={row.key}
+            className="grid min-w-0 grid-cols-[minmax(104px,0.86fr)_minmax(160px,1.45fr)_64px] items-center gap-2 px-0.5 py-[4px] text-[12px] font-medium leading-5 text-slate-600"
+          >
+            <span className="min-w-0 truncate font-semibold text-slate-800" title={row.serviceName}>{row.serviceName}</span>
+            <span className="min-w-0 truncate text-slate-500" title={`${row.code} · ${row.title}`}>{row.title || row.code}</span>
+            <span className="truncate text-right font-medium text-slate-400" title={row.occurredAt}>{row.occurredAt}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -2314,16 +2289,4 @@ function TinyEmpty({ children }: { children: ReactNode }) {
       {children}
     </div>
   );
-}
-
-function IncidentStatus({ children, tone }: { children: ReactNode; tone: string }) {
-  const className =
-    tone === "purple"
-      ? "bg-[#edd8ff] text-[#8b3fd1]"
-      : tone === "green"
-        ? "bg-[#d9f8e8] text-[#008f72]"
-        : tone === "sky"
-          ? "bg-[#dbf1ff] text-[#008ec9]"
-          : "bg-[#ffe8d6] text-[#ff6b00]";
-  return <span className={`inline-flex h-[22px] min-w-[54px] items-center justify-center rounded-full px-3 text-[11px] font-black leading-none ${className}`}>{children}</span>;
 }
