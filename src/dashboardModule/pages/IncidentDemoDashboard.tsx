@@ -112,11 +112,15 @@ function uniqueLabels(values: string[]) {
 type DashboardManagementRow = [string, string, string];
 type DashboardRecentIncidentRow = {
   code: string;
+  endState: string;
+  impact: string;
   key: string;
   occurredAt: string;
   serviceId?: number;
   serviceName: string;
+  status: string;
   title: string;
+  tone: string;
 };
 
 function parseDashboardCardDate(value: unknown) {
@@ -192,10 +196,12 @@ function buildManagementRows({
 }
 
 function buildRecentIncidentRows({
+  incidentImpacts,
   incidents,
   serviceByCode,
   serviceById,
 }: {
+  incidentImpacts: { incidentId: number }[];
   incidents: IncidentRecord[];
   serviceByCode: Map<string, ServiceRecord>;
   serviceById: Map<number, ServiceRecord>;
@@ -208,17 +214,42 @@ function buildRecentIncidentRows({
         serviceById.get(Number(incidentRow.serviceId)) ||
         serviceById.get(Number(incidentRow.impactedServiceId)) ||
         serviceByCode.get(String(incidentRow.serviceCode ?? incidentRow.targetCode ?? ""));
+      const impactCount = incidentImpacts.filter((impact) => Number(impact.incidentId) === Number(incident.incidentId)).length;
+      const resolved = incident.incidentStatusCode === "RESOLVED" || incident.incidentStatusCode === "CLOSED";
+      const tone = resolved
+        ? "green"
+        : incident.incidentStatusCode === "IN_PROGRESS"
+          ? "sky"
+          : incident.incidentStatusCode === "MONITORING"
+            ? "orange"
+            : "purple";
       return {
         code: incident.externalIncidentCode ?? `INC-${incident.incidentId}`,
+        endState: resolved ? "종료" : "미종료",
+        impact: `${impactCount}개`,
         key: String(incident.incidentId),
         occurredAt: relativeDashboardTime(incident.startedAt),
         serviceId: service?.serviceId ?? (Number(incident.serviceId) || undefined),
         serviceName:
           service?.serviceName ??
           serviceDisplayName(serviceById, serviceByCode, incidentRow),
+        status: formatDashboardIncidentStatus(incident.incidentStatusCode),
         title: incident.title || "제목 없는 인시던트",
+        tone,
       };
     });
+}
+
+function formatDashboardIncidentStatus(statusCode: string) {
+  return (
+    {
+      OPEN: "접수",
+      IN_PROGRESS: "조치중",
+      MONITORING: "모니터링",
+      RESOLVED: "종료",
+      CLOSED: "종료",
+    }[statusCode] ?? statusCode
+  );
 }
 
 function buildServiceRecentIncidentRows(
@@ -275,6 +306,7 @@ function DashboardCase({
     deployments,
     groups,
     incidentEvents,
+    incidentImpacts,
     incidents,
     owners,
     relations,
@@ -327,8 +359,8 @@ function DashboardCase({
     [incidents, owners, relations, services]
   );
   const recentIncidentRows = useMemo(
-    () => buildRecentIncidentRows({ incidents, serviceByCode, serviceById }),
-    [incidents, serviceByCode, serviceById]
+    () => buildRecentIncidentRows({ incidentImpacts, incidents, serviceByCode, serviceById }),
+    [incidentImpacts, incidents, serviceByCode, serviceById]
   );
   const [draftFilter, setDraftFilter] = useState<DashboardFilterState>(readDashboardFilter);
   const [appliedFilter, setAppliedFilter] = useState<DashboardFilterState>(readDashboardFilter);
@@ -2082,18 +2114,22 @@ function RecentIncidentList({
 
   return (
     <div className="min-w-0">
-      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_64px] items-center gap-2 px-0.5 pb-2 text-[11px] font-black leading-4 text-slate-500">
+      <div className="grid min-w-0 grid-cols-[minmax(104px,1fr)_62px_76px_64px] items-center gap-2 px-0.5 pb-2 text-[11px] font-black leading-4 text-slate-500">
         <span>서비스</span>
-        <span className="text-right">발생</span>
+        <span className="text-center">상태</span>
+        <span className="text-center">영향 서비스</span>
+        <span className="text-right">종료여부</span>
       </div>
       <div className="space-y-[2px]">
         {rows.map((row) => (
           <div
             key={row.key}
-            className="grid min-w-0 grid-cols-[minmax(0,1fr)_64px] items-center gap-2 px-0.5 py-[4px] text-[12px] font-medium leading-5 text-slate-600"
+            className="grid min-w-0 grid-cols-[minmax(104px,1fr)_62px_76px_64px] items-center gap-2 px-0.5 py-[4px] text-[12px] font-medium leading-5 text-slate-600"
           >
             <span className="min-w-0 truncate font-semibold text-slate-800" title={`${row.serviceName} · ${row.title || row.code}`}>{row.serviceName}</span>
-            <span className="truncate text-right font-medium text-slate-400" title={row.occurredAt}>{row.occurredAt}</span>
+            <span className="flex justify-center"><IncidentStatus tone={row.tone}>{row.status}</IncidentStatus></span>
+            <span className="whitespace-nowrap text-center text-slate-500">{row.impact}</span>
+            <span className="truncate text-right font-medium text-slate-400" title={row.endState}>{row.endState}</span>
           </div>
         ))}
       </div>
@@ -2287,4 +2323,16 @@ function TinyEmpty({ children }: { children: ReactNode }) {
       {children}
     </div>
   );
+}
+
+function IncidentStatus({ children, tone }: { children: ReactNode; tone: string }) {
+  const className =
+    tone === "purple"
+      ? "bg-[#edd8ff] text-[#8b3fd1]"
+      : tone === "green"
+        ? "bg-[#d9f8e8] text-[#008f72]"
+        : tone === "sky"
+          ? "bg-[#dbf1ff] text-[#008ec9]"
+          : "bg-[#ffe8d6] text-[#ff6b00]";
+  return <span className={`inline-flex h-[22px] min-w-[42px] items-center justify-center rounded-full px-2 text-[11px] font-black leading-none ${className}`}>{children}</span>;
 }
