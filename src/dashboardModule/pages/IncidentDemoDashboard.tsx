@@ -30,8 +30,11 @@ import { codeLabels, type IncidentRecord, type ServiceOwnerRecord, type ServiceR
 import { useNavigate } from "react-router-dom";
 
 const DASHBOARD_FILTER_STORAGE_KEY = "chainview.dashboard.service-filter.v1";
+const DASHBOARD_BOTTOM_PANEL_WIDTHS_KEY = "chainview.dashboard.bottom-panel-widths.v1";
 const DEFAULT_CATEGORY_L1 = "공통플랫폼";
 const DEFAULT_CATEGORY_L2 = "SWA 플랫폼";
+const DEFAULT_BOTTOM_PANEL_WIDTHS = [24, 29, 47] as const;
+const MIN_BOTTOM_PANEL_WIDTH = 16;
 
 type DashboardFilterScope = "all" | "mine";
 
@@ -68,6 +71,25 @@ function readDashboardFilter(): DashboardFilterState {
     };
   } catch {
     return DEFAULT_DASHBOARD_FILTER;
+  }
+}
+
+function readBottomPanelWidths() {
+  if (typeof window === "undefined") return [...DEFAULT_BOTTOM_PANEL_WIDTHS];
+
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(DASHBOARD_BOTTOM_PANEL_WIDTHS_KEY) ?? "null");
+    if (!Array.isArray(saved) || saved.length !== 3) {
+      return [...DEFAULT_BOTTOM_PANEL_WIDTHS];
+    }
+    const values = saved.map((value) => Number(value));
+    const total = values.reduce((sum, value) => sum + (Number.isFinite(value) ? value : 0), 0);
+    if (total <= 0 || values.some((value) => !Number.isFinite(value) || value < MIN_BOTTOM_PANEL_WIDTH)) {
+      return [...DEFAULT_BOTTOM_PANEL_WIDTHS];
+    }
+    return values.map((value) => (value / total) * 100);
+  } catch {
+    return [...DEFAULT_BOTTOM_PANEL_WIDTHS];
   }
 }
 
@@ -2066,12 +2088,65 @@ function BottomPanels({
   selectedService?: ServiceRecord;
 }) {
   const navigate = useNavigate();
+  const panelShellRef = useRef<HTMLDivElement | null>(null);
+  const dragStateRef = useRef<{
+    handleIndex: 0 | 1;
+    startX: number;
+    startWidths: number[];
+  } | null>(null);
+  const [panelWidths, setPanelWidths] = useState(readBottomPanelWidths);
   const visibleAllIncidentRows = incidentRows.slice(0, 5);
   const selectedIncidentRows = buildServiceRecentIncidentRows(incidentRows, selectedService).slice(0, 5);
   const selectedIncidentTitle = `${selectedService?.serviceName ?? "선택 서비스"} 최근 인시던트`;
+  const panelGridTemplate = `minmax(220px, ${panelWidths[0]}fr) 10px minmax(320px, ${panelWidths[1]}fr) 10px minmax(420px, ${panelWidths[2]}fr)`;
+  const beginResize = (handleIndex: 0 | 1, event: PointerEvent<HTMLButtonElement>) => {
+    dragStateRef.current = {
+      handleIndex,
+      startX: event.clientX,
+      startWidths: panelWidths,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+  const resizePanels = (event: PointerEvent<HTMLButtonElement>) => {
+    const dragState = dragStateRef.current;
+    const shellWidth = panelShellRef.current?.getBoundingClientRect().width ?? 0;
+    if (!dragState || shellWidth <= 0) return;
+
+    const totalWidth = dragState.startWidths.reduce((sum, width) => sum + width, 0);
+    const deltaWidth = ((event.clientX - dragState.startX) / shellWidth) * totalWidth;
+    const nextWidths = [...dragState.startWidths];
+    const leftIndex = dragState.handleIndex;
+    const rightIndex = dragState.handleIndex + 1;
+    const pairTotal = nextWidths[leftIndex] + nextWidths[rightIndex];
+    const nextLeft = Math.min(
+      pairTotal - MIN_BOTTOM_PANEL_WIDTH,
+      Math.max(MIN_BOTTOM_PANEL_WIDTH, nextWidths[leftIndex] + deltaWidth)
+    );
+    nextWidths[leftIndex] = nextLeft;
+    nextWidths[rightIndex] = pairTotal - nextLeft;
+    setPanelWidths(nextWidths);
+  };
+  const endResize = (event: PointerEvent<HTMLButtonElement>) => {
+    if (!dragStateRef.current) return;
+    dragStateRef.current = null;
+    try {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    } catch {
+      // Pointer capture may already be released by the browser.
+    }
+    window.localStorage.setItem(DASHBOARD_BOTTOM_PANEL_WIDTHS_KEY, JSON.stringify(panelWidths));
+  };
+
+  useEffect(() => {
+    window.localStorage.setItem(DASHBOARD_BOTTOM_PANEL_WIDTHS_KEY, JSON.stringify(panelWidths));
+  }, [panelWidths]);
 
   return (
-    <div className="mt-3 grid h-[236px] min-w-0 flex-none grid-cols-[minmax(220px,0.9fr)_minmax(320px,1.1fr)_minmax(480px,1.8fr)] items-stretch gap-2 overflow-hidden">
+    <div
+      ref={panelShellRef}
+      className="mt-3 grid h-[236px] min-w-0 flex-none items-stretch overflow-hidden"
+      style={{ gridTemplateColumns: panelGridTemplate }}
+    >
       <Panel title="관리 필요 서비스">
         {managementRows.map(([label, value, type]) => (
           <TinyRow
@@ -2083,6 +2158,12 @@ function BottomPanels({
           />
         ))}
       </Panel>
+      <BottomPanelResizeHandle
+        onPointerDown={(event) => beginResize(0, event)}
+        onPointerMove={resizePanels}
+        onPointerUp={endResize}
+        onPointerCancel={endResize}
+      />
       <ReferencePanel
         actionLabel="더보기 〉"
         onAction={() => navigate("/admin-incidents")}
@@ -2090,6 +2171,12 @@ function BottomPanels({
       >
         <RecentIncidentList rows={visibleAllIncidentRows} emptyText="최근 인시던트가 없습니다." />
       </ReferencePanel>
+      <BottomPanelResizeHandle
+        onPointerDown={(event) => beginResize(1, event)}
+        onPointerMove={resizePanels}
+        onPointerUp={endResize}
+        onPointerCancel={endResize}
+      />
       <ReferencePanel
         actionLabel="더보기 〉"
         onAction={() => navigate("/admin-incidents")}
@@ -2098,6 +2185,32 @@ function BottomPanels({
         <RecentIncidentList rows={selectedIncidentRows} emptyText="최근 인시던트가 없습니다." />
       </ReferencePanel>
     </div>
+  );
+}
+
+function BottomPanelResizeHandle({
+  onPointerCancel,
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
+}: {
+  onPointerCancel: (event: PointerEvent<HTMLButtonElement>) => void;
+  onPointerDown: (event: PointerEvent<HTMLButtonElement>) => void;
+  onPointerMove: (event: PointerEvent<HTMLButtonElement>) => void;
+  onPointerUp: (event: PointerEvent<HTMLButtonElement>) => void;
+}) {
+  return (
+    <button
+      aria-label="패널 너비 조절"
+      className="group relative h-full cursor-col-resize touch-none rounded-md bg-transparent outline-none"
+      type="button"
+      onPointerCancel={onPointerCancel}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+    >
+      <span className="absolute inset-y-3 left-1/2 w-px -translate-x-1/2 rounded-full bg-slate-200 transition group-hover:bg-slate-400 group-focus-visible:bg-slate-500" />
+    </button>
   );
 }
 
@@ -2310,9 +2423,9 @@ function TinyRow({
     <div className={`flex min-w-0 items-center justify-between gap-3 ${compact ? "py-0.5 text-xs" : "py-1.5 text-[13px]"} leading-5 text-slate-900`}>
       <div className="flex min-w-0 items-center gap-2">
         <span className={`grid h-[17px] w-[17px] shrink-0 place-items-center rounded-full ${toneClass}`}>{icon}</span>
-        <span className="min-w-0 break-keep font-normal leading-5">{label}</span>
+        <span className="min-w-0 truncate whitespace-nowrap font-normal leading-5" title={label}>{label}</span>
       </div>
-      <span className="shrink-0 font-normal text-slate-950">{value}</span>
+      <span className="shrink-0 whitespace-nowrap font-normal text-slate-950">{value}</span>
     </div>
   );
 }
