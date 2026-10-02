@@ -583,6 +583,7 @@ function DashboardCase({
           onSelectService={handleSelectService}
         />
         <ServiceInfoPanel
+          deployments={deployments}
           infraNode={selectedInfraNode}
           groups={groups}
           incidents={incidents}
@@ -643,11 +644,6 @@ function DashboardCase({
             });
             navigate(`/?incidentId=${createdIncident.incidentId}`);
           }}
-          relationCount={
-            selectedService
-              ? relationCountByServiceId.get(selectedService.serviceId) ?? 0
-              : 0
-          }
           relationDirectionCounts={
             selectedService
               ? relationDirectionCountsByServiceId.get(selectedService.serviceId) ?? { incoming: 0, outgoing: 0 }
@@ -1104,6 +1100,7 @@ function RelationFlowModal({
 }
 
 function ServiceInfoPanel({
+  deployments,
   groups,
   infraNode,
   incidents,
@@ -1112,11 +1109,11 @@ function ServiceInfoPanel({
   onCreateInfraIncident,
   onCreateIncident,
   owners,
-  relationCount,
   relationDirectionCounts,
   service,
   users,
 }: {
+  deployments: Record<string, unknown>[];
   groups: Record<string, unknown>[];
   infraNode?: InfraGraphNodeRecord;
   incidents: IncidentRecord[];
@@ -1125,7 +1122,6 @@ function ServiceInfoPanel({
   onCreateInfraIncident: () => void;
   onCreateIncident: () => void;
   owners: ServiceOwnerRecord[];
-  relationCount: number;
   relationDirectionCounts: { incoming: number; outgoing: number };
   service?: ServiceRecord;
   users: Record<string, unknown>[];
@@ -1186,7 +1182,7 @@ function ServiceInfoPanel({
 
       {isDetailOpen ? (
         <ServiceDetailModal
-          relationCount={relationCount}
+          deployments={deployments}
           relationDirectionCounts={relationDirectionCounts}
           groups={groups}
           incidents={incidents}
@@ -1413,21 +1409,21 @@ function NormalInfo({
 
 function ServiceDetailModal({
   dark = false,
+  deployments,
   groups,
   incidents,
   onClose,
   owners,
-  relationCount,
   relationDirectionCounts,
   service,
   users,
 }: {
   dark?: boolean;
+  deployments: Record<string, unknown>[];
   groups: Record<string, unknown>[];
   incidents: IncidentRecord[];
   onClose: () => void;
   owners: ServiceOwnerRecord[];
-  relationCount: number;
   relationDirectionCounts: { incoming: number; outgoing: number };
   service?: ServiceRecord;
   users: Record<string, unknown>[];
@@ -1435,11 +1431,29 @@ function ServiceDetailModal({
   const backdropHandlers = useSafeBackdropClose(onClose);
   const incomingCount = relationDirectionCounts.incoming;
   const outgoingCount = relationDirectionCounts.outgoing;
-  const totalRelationCount = incomingCount + outgoingCount;
   const ownerRows = resolveOwnerRows({ groups, owners, service, users });
   const ownerNames = ownerRows.map((owner) => `${owner.name} (${owner.responsibility})`).join(", ");
   const ownerGroups = [...new Set(ownerRows.map((owner) => owner.groupName).filter(Boolean))].join(", ");
   const recentIncidentCount = serviceIncidents(incidents, service, 30).length;
+  const serviceDeployments = deployments.filter((deployment) =>
+    service
+      ? Number(deployment.serviceId) === Number(service.serviceId) ||
+        String(deployment.serviceCode ?? "") === service.serviceCode
+      : false
+  );
+  const primaryDeployment = serviceDeployments[0];
+  const serviceStatusLabel = labeledCode(codeLabels.serviceStatus, service?.statusCode);
+  const importanceLabel = labeledCode(codeLabels.importance, service?.importanceCode);
+  const deploymentStatusCode = String(primaryDeployment?.deploymentStatusCode ?? service?.deploymentStatusCode ?? "") || undefined;
+  const deploymentStatusLabel = String(primaryDeployment?.deploymentStatusName ?? "") || labeledCode(codeLabels.deploymentStatus, deploymentStatusCode);
+  const endpointUrl = String(primaryDeployment?.endpointUrl ?? service?.endpointUrl ?? "-");
+  const deploymentPath = String(primaryDeployment?.deployPath ?? service?.deployPath ?? "-");
+  const portInfo = String(primaryDeployment?.portInfo ?? primaryDeployment?.port ?? service?.portInfo ?? "-");
+  const instanceCount =
+    serviceDeployments.reduce((sum, deployment) => sum + (Number(deployment.instanceCount) || 0), 0) ||
+    service?.instanceCount ||
+    serviceDeployments.length ||
+    0;
   const sections = [
     {
       title: "서비스 정보",
@@ -1448,18 +1462,18 @@ function ServiceDetailModal({
         ["서비스명", service?.serviceName ?? "-"],
         ["서비스 분류", service?.categoryPath.join(" > ") ?? "-"],
         ["서비스 유형", labeledCode(codeLabels.serviceType, service?.serviceTypeCode)],
-        ["중요도", labeledCode(codeLabels.importance, service?.importanceCode)],
-        ["상태", labeledCode(codeLabels.serviceStatus, service?.statusCode)],
+        ["중요도", importanceLabel],
+        ["상태", serviceStatusLabel],
       ],
     },
     {
       title: "배포 정보",
       rows: [
-        ["배포 상태", labeledCode(codeLabels.deploymentStatus, service?.deploymentStatusCode)],
-        ["엔드포인트 URL", service?.endpointUrl ?? "-"],
-        ["배포 경로", service?.deployPath ?? "-"],
-        ["포트", service?.portInfo ?? "-"],
-        ["인스턴스 수", service?.instanceCount ? `${service.instanceCount}개` : "-"],
+        ["배포 상태", deploymentStatusLabel],
+        ["엔드포인트 URL", endpointUrl],
+        ["배포 경로", deploymentPath],
+        ["포트", portInfo],
+        ["인스턴스 수", instanceCount ? `${instanceCount}개` : "-"],
       ],
     },
     {
@@ -1467,7 +1481,6 @@ function ServiceDetailModal({
       rows: [
         ["상위 서비스", `${incomingCount}개`],
         ["하위 서비스", `${outgoingCount}개`],
-        ["연관 서비스 수", `${totalRelationCount || relationCount}개`],
         ["인시던트 이력", `${recentIncidentCount}건 (최근 30일)`],
       ],
     },
@@ -1476,8 +1489,6 @@ function ServiceDetailModal({
       rows: [
         ["담당부서", ownerGroups || "-"],
         ["담당자", ownerNames || "-"],
-        ["등록일", formatDashboardDate(service?.createdAt)],
-        ["수정일", formatDashboardDate(service?.updatedAt)],
       ],
     },
   ];
@@ -1517,7 +1528,7 @@ function ServiceDetailModal({
               <p className={`mt-2 break-words text-sm ${dark ? "text-slate-300" : "text-slate-600"}`}>{service?.description || "서비스 설명이 등록되지 않았습니다."}</p>
             </div>
             <span className={`rounded-full px-3 py-1 text-xs font-black ${dark ? "bg-[#0b2135] text-[#4db2ff]" : "bg-blue-50 text-blue-700"}`}>
-              {service?.statusCode ?? "UNKNOWN"}
+              {serviceStatusLabel}
             </span>
           </div>
           <div className="mt-5 grid gap-4 lg:grid-cols-2">
@@ -2254,9 +2265,9 @@ function formatDashboardDate(value?: string) {
   return value ? value.replace("T", " ").slice(0, 16) : "-";
 }
 
-function labeledCode<TCode extends string>(
-  labels: Record<TCode, string>,
-  value?: TCode
+function labeledCode(
+  labels: Record<string, string>,
+  value?: string
 ) {
   return value ? labels[value] ?? value : "-";
 }
