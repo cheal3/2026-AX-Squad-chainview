@@ -2328,11 +2328,11 @@ function TinyEmpty({ children }: { children: ReactNode }) {
 function IncidentStatus({ children, tone }: { children: ReactNode; tone: string }) {
   const className =
     tone === "purple"
-      ? "bg-[#edd8ff] text-[#8b3fd1]"
+      ? "bg-slate-100 text-slate-700 ring-slate-200"
       : tone === "green"
-        ? "bg-[#d9f8e8] text-[#008f72]"
+        ? "bg-emerald-50 text-emerald-700 ring-emerald-100"
         : tone === "sky"
-          ? "bg-[#dbf1ff] text-[#008ec9]"
-          : "bg-[#ffe8d6] text-[#ff6b00]";
-  return <span className={`inline-flex h-[22px] min-w-[42px] items-center justify-center rounded-full px-2 text-[11px] font-black leading-none ${className}`}>{children}</span>;
+          ? "bg-sky-50 text-sky-700 ring-sky-100"
+          : "bg-amber-50 text-amber-700 ring-amber-100";
+  return <span className={`inline-flex h-[22px] w-[54px] items-center justify-center rounded-full px-2 text-[11px] font-black leading-none ring-1 ${className}`}>{children}</span>;
 }
