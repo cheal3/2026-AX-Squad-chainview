@@ -2185,13 +2185,14 @@ function mapIncidentFromRemote(row: RemoteListRecord): IncidentRecord {
     incidentStatusCode: knownRemoteCode(row.incidentStatusCode, codeLabels.incidentStatus, "OPEN"),
     severityCode: knownRemoteCode(row.severityCode, codeLabels.severity, "MAJOR"),
     serviceId: asRemoteNumber(row.serviceId) || undefined,
-    infraNodeId: asRemoteNumber(row.infraNodeId) || undefined,
+    serverId: asRemoteNumber(row.serverId) || undefined,
+    targetCode: asRemoteString(row.targetCode),
+    targetLabel: asRemoteString(row.targetLabel),
+    description: asRemoteString(row.description ?? row.summary),
     startedAt: asRemoteString(row.startedAt ?? row.createdAt),
     endedAt: asRemoteString(row.endedAt),
-    summary: asRemoteString(row.summary ?? row.description),
-    createdBy: asRemoteString(row.createdBy),
-    updatedBy: asRemoteString(row.updatedBy),
     manualRegisteredYn: asRemoteString(row.manualRegisteredYn) === "Y" ? "Y" : "N",
+    registeredBy: asRemoteString(row.registeredBy ?? row.createdBy) || "remote",
   };
 }
 

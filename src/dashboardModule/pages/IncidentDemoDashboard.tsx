@@ -26,7 +26,7 @@ import {
   type InfraGraphNodeRecord,
 } from "./ServiceRelationFlow";
 import { usePortalData } from "../PortalDataStore";
-import { codeLabels, type IncidentRecord, type ServiceOwnerRecord, type ServiceRecord, type ServiceRelationRecord } from "../mockData";
+import { codeLabels, type IncidentImpactRecord, type IncidentRecord, type ServiceOwnerRecord, type ServiceRecord, type ServiceRelationRecord } from "../mockData";
 import { useNavigate } from "react-router-dom";
 
 const DASHBOARD_FILTER_STORAGE_KEY = "chainview.dashboard.service-filter.v1";
@@ -640,6 +640,7 @@ function DashboardCase({
         groups={groups}
         incident={activeIncident}
         incidentEvents={incidentEvents}
+        incidentImpacts={incidentImpacts}
         owners={owners}
         onResolve={async () => {
           if (!window.confirm(`${activeIncident.title} 인시던트를 종료 처리하시겠습니까?`)) {
@@ -1739,6 +1740,7 @@ function IncidentCommandDashboard({
   groups,
   incident,
   incidentEvents,
+  incidentImpacts,
   owners,
   onResolve,
   relations,
@@ -1749,6 +1751,7 @@ function IncidentCommandDashboard({
   groups: Record<string, unknown>[];
   incident: IncidentRecord;
   incidentEvents: Record<string, unknown>[];
+  incidentImpacts: IncidentImpactRecord[];
   owners: Record<string, unknown>[];
   onResolve: () => void;
   relations: ServiceRelationRecord[];
@@ -1769,11 +1772,19 @@ function IncidentCommandDashboard({
     : incident.incidentTypeCode === "SERVER" && incident.serverId
       ? services.filter((service) => service.serverId === incident.serverId)
       : [];
-  const impact = buildIncidentImpactColumns(incidentServices, services, relations);
+  const impact = buildIncidentImpactColumns(
+    incident,
+    incidentServices,
+    services,
+    relations,
+    incidentImpacts
+  );
   const impactedCount =
-    incident.incidentTypeCode === "SERVER"
-      ? impact.affectedServices.length
-      : impact.level1.length;
+    impact.apiImpactsUsed
+      ? impact.level1.length
+      : incident.incidentTypeCode === "SERVER"
+        ? impact.affectedServices.length
+        : impact.level1.length;
   const affectedServicesCount = Math.max(impact.affectedServices.length, impactedCount, 1);
   const channelImpactCount = new Set(
     impact.affectedServices
@@ -1826,7 +1837,7 @@ function IncidentCommandDashboard({
 
   return (
     <section className="flex min-h-full min-w-0 flex-1 flex-col overflow-hidden text-slate-100">
-      <header className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(520px,600px)] gap-3">
+      <header className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(680px,720px)] gap-3">
         <div className="rounded-lg border border-[#1f3549] bg-[#081b2d] px-5 py-4">
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#ff3344]/50 bg-[#ff3344]/10 text-[#ff4d5a]">
@@ -1966,11 +1977,22 @@ function IncidentCommandDashboard({
 }
 
 function buildIncidentImpactColumns(
+  incident: IncidentRecord,
   incidentServices: ServiceRecord[],
   services: ServiceRecord[],
-  relations: ServiceRelationRecord[]
+  relations: ServiceRelationRecord[],
+  incidentImpacts: IncidentImpactRecord[]
 ) {
   const serviceById = new Map(services.map((service) => [service.serviceId, service]));
+  const apiImpactedServices = incidentImpacts
+    .filter((impact) => Number(impact.incidentId) === Number(incident.incidentId))
+    .map((impact) => serviceById.get(Number(impact.impactedServiceId)))
+    .filter((service): service is ServiceRecord => Boolean(service))
+    .filter(
+      (service, index, list) =>
+        list.findIndex((item) => item.serviceId === service.serviceId) === index
+    );
+  const apiImpactsUsed = apiImpactedServices.length > 0;
   const incidentServiceIds = new Set(
     incidentServices.map((service) => service.serviceId)
   );
@@ -1993,7 +2015,8 @@ function buildIncidentImpactColumns(
         !incidentServiceIds.has(service.serviceId) &&
         list.findIndex((item) => item.serviceId === service.serviceId) === index
     );
-  const affectedServices = [...incidentServices, ...level1].filter(
+  const level1Services = apiImpactsUsed ? apiImpactedServices : level1;
+  const affectedServices = [...incidentServices, ...level1Services].filter(
     (service, index, list) =>
       list.findIndex((item) => item.serviceId === service.serviceId) === index
   );
@@ -2007,7 +2030,7 @@ function buildIncidentImpactColumns(
       .filter(Boolean)
   ).size;
 
-  return { affectedServices, businessImpactCount, level1 };
+  return { affectedServices, apiImpactsUsed, businessImpactCount, level1: level1Services };
 }
 
 function buildDashboardIncidentTimeline({

@@ -75,7 +75,7 @@ export async function loadRemotePortalSnapshot(): Promise<RemotePortalSnapshot> 
   );
   const groupsWithMemberCounts = mergeGroupsWithMemberCounts(groupRows, groupMemberRows);
   const incidents = incidentRows.map(mapIncident);
-  const incidentImpacts = loadIncidentImpactsFromRows(incidentRows, incidents);
+  const incidentImpacts = await loadIncidentImpactsFromRows(incidentRows, incidents);
   return {
     servers: serverRows.map(mapServer),
     services: serviceRows.map((service) =>
@@ -127,16 +127,46 @@ async function loadMissingServiceDeploymentDetails(rows: RemoteRecord[]) {
   return detailsByServiceId;
 }
 
-function loadIncidentImpactsFromRows(
+async function loadIncidentImpactsFromRows(
   rows: RemoteRecord[],
   incidents: IncidentRecord[]
 ) {
-  return rows.flatMap((row, index) => {
+  const embeddedImpacts = rows.flatMap((row, index) => {
     const incidentId = incidents[index]?.incidentId ?? asNumber(row.incidentId);
-    return asRecordArray(row.impacts ?? row.incidentImpacts).map((impact) =>
+    const impacts = asRecordArray(row.impacts ?? row.incidentImpacts);
+    return impacts.map((impact) =>
       mapIncidentImpact(incidentId, impact)
     );
   });
+
+  const incidentsWithEmbeddedImpacts = new Set(
+    embeddedImpacts.map((impact) => impact.incidentId)
+  );
+  const needsImpactLoad = incidents.filter(
+    (incident) =>
+      incident.incidentId && !incidentsWithEmbeddedImpacts.has(incident.incidentId)
+  );
+
+  if (!needsImpactLoad.length) {
+    return embeddedImpacts;
+  }
+
+  const settled = await Promise.allSettled(
+    needsImpactLoad.map((incident) =>
+      chainViewApi.incidents.impacts(incident.incidentId)
+    )
+  );
+  const fetchedImpacts = settled.flatMap((result, index) => {
+    if (result.status !== "fulfilled") {
+      return [];
+    }
+    const incidentId = needsImpactLoad[index].incidentId;
+    return asRecordArray(result.value).map((impact) =>
+      mapIncidentImpact(incidentId, impact)
+    );
+  });
+
+  return [...embeddedImpacts, ...fetchedImpacts];
 }
 
 async function safeList(load: () => Promise<unknown>) {
@@ -517,11 +547,14 @@ function mapIncident(row: RemoteRecord): IncidentRecord {
 
   return {
     incidentId: asNumber(row.incidentId),
+    externalIncidentCode: asString(row.externalIncidentCode ?? row.incidentCode),
     incidentTypeCode: asString(row.incidentTypeCode) === "SERVER" ? "SERVER" : "SERVICE",
     serviceId: serviceId || undefined,
     serverId: serverId || undefined,
     incidentStatusCode: statusCode,
     severityCode: knownCode(row.severityCode, codeLabels.severity, "MAJOR"),
+    targetCode: asString(row.targetCode),
+    targetLabel: asString(row.targetLabel),
     title: asString(row.title) || "제목 없는 인시던트",
     description: asString(row.description),
     startedAt: formatDateTime(row.startedAt),
