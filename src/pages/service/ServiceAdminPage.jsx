@@ -198,6 +198,7 @@ function ServiceDetailPage({ service }) {
   const [checkSourceLabel, setCheckSourceLabel] = useState("운영 API 기준");
   const [impactRows, setImpactRows] = useState([]);
   const [impactSourceLabel, setImpactSourceLabel] = useState("샘플 기준");
+  const [editingRelation, setEditingRelation] = useState(null);
   const deploymentInfos = useMemo(
     () => buildServiceDeploymentInfos(service, deployments, servers),
     [deployments, servers, service]
@@ -392,9 +393,17 @@ function ServiceDetailPage({ service }) {
   };
 
   const handleEditRelation = (relation) => {
-    const nextDescription = window.prompt("관계 설명을 입력하세요.", relation.description || "");
-    if (nextDescription === null) return;
-    updateRelation(relation.relationId, { description: nextDescription });
+    setEditingRelation(relation);
+  };
+
+  const handleSaveRelation = (relation, form) => {
+    updateRelation(relation.relationId, {
+      relationTypeCode: form.relationTypeCode,
+      relationStatusCode: form.relationStatusCode,
+      mandatoryYn: form.mandatoryYn,
+      description: form.description.trim(),
+    });
+    setEditingRelation(null);
   };
 
   const handleDeleteRelation = (relation) => {
@@ -450,6 +459,15 @@ function ServiceDetailPage({ service }) {
       {activeTab === "changes" ? <ServiceChangeTab detail={detail} rows={changeRows} sourceLabel={changeSourceLabel} /> : null}
       {activeTab === "impact" ? <ServiceImpactTab detail={detail} rows={impactRows} service={service} sourceLabel={impactSourceLabel} /> : null}
       {activeTab === "incidents" ? <ServiceIncidentTab detail={detail} incidents={serviceIncidents} onCreate={handleCreateIncident} onOpenDetail={handleIncidentDetail} service={service} /> : null}
+      {editingRelation ? (
+        <ServiceRelationEditModal
+          onClose={() => setEditingRelation(null)}
+          onSave={handleSaveRelation}
+          relation={editingRelation}
+          service={service}
+          services={services}
+        />
+      ) : null}
     </div>
   );
 }
@@ -913,6 +931,83 @@ function ServiceRelationTab({ detail, onCreate, onDelete, onEdit, relations }) {
         </tbody>
       </table>
     </section>
+  );
+}
+
+function ServiceRelationEditModal({ onClose, onSave, relation, service, services }) {
+  const [form, setForm] = useState(() => ({
+    relationTypeCode: relation.relationTypeCode || "REST",
+    relationStatusCode: relation.relationStatusCode || "ACTIVE",
+    mandatoryYn: relation.mandatoryYn || "Y",
+    description: relation.description || "",
+  }));
+  const [error, setError] = useState("");
+  const isOutgoing = Number(relation.sourceServiceId) === Number(service.serviceId);
+  const relatedServiceId = isOutgoing ? relation.targetServiceId : relation.sourceServiceId;
+  const relatedService = services.find((item) => Number(item.serviceId) === Number(relatedServiceId));
+  const directionLabel = isOutgoing ? "송신" : "수신";
+  const relationLabel = `${directionLabel} → ${relatedService?.serviceName || relatedService?.serviceCode || "서비스 미지정"} · 관계 #${relation.relationId}`;
+
+  const onChange = (field, value) => {
+    setForm((current) => ({ ...current, [field]: value }));
+    setError("");
+  };
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    if (!form.relationTypeCode || !form.relationStatusCode || !form.description.trim()) {
+      setError("관계 유형, 관계 상태, 설명을 입력해 주세요.");
+      return;
+    }
+    onSave(relation, form);
+  };
+
+  return (
+    <div className="modal-backdrop is-open" onMouseDown={onClose} role="presentation">
+      <form className="modal service-relation-edit-modal" onMouseDown={(event) => event.stopPropagation()} onSubmit={handleSubmit}>
+        <div className="modal__head">
+          <h3>서비스 관계 수정</h3>
+          <button className="close" onClick={onClose} type="button">×</button>
+        </div>
+        <div className="modal__body">
+          <p className="service-relation-edit-modal__meta">{relationLabel}</p>
+          <div className="form-grid">
+            <div className="form-row">
+              <label>관계 유형<span className="req">*</span></label>
+              <select value={form.relationTypeCode} onChange={(event) => onChange("relationTypeCode", event.target.value)}>
+                {Object.entries(codeLabels.relationType || {}).map(([code, label]) => (
+                  <option key={code} value={code}>{label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-row">
+              <label>관계 상태<span className="req">*</span></label>
+              <select value={form.relationStatusCode} onChange={(event) => onChange("relationStatusCode", event.target.value)}>
+                {Object.entries(codeLabels.relationStatus || {}).map(([code, label]) => (
+                  <option key={code} value={code}>{label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-row full">
+              <label>필수 여부</label>
+              <select value={form.mandatoryYn} onChange={(event) => onChange("mandatoryYn", event.target.value)}>
+                <option value="Y">필수</option>
+                <option value="N">선택</option>
+              </select>
+            </div>
+            <div className="form-row full">
+              <label>설명<span className="req">*</span></label>
+              <textarea value={form.description} onChange={(event) => onChange("description", event.target.value)} placeholder="장애 또는 변경 시 영향도 설명" />
+            </div>
+          </div>
+          {error ? <div className="service-relation-edit-modal__error">{error}</div> : null}
+        </div>
+        <div className="modal__foot">
+          <button className="btn" onClick={onClose} type="button">취소</button>
+          <button className="btn btn--primary" type="submit">저장</button>
+        </div>
+      </form>
+    </div>
   );
 }
 

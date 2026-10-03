@@ -5901,6 +5901,23 @@ table.tbl td.col-check {
   font-weight: 700;
 }
 
+.service-relation-edit-modal__meta {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.service-relation-edit-modal__error {
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  background: #fff1f2;
+  padding: 10px 12px;
+  color: #b91c1c;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .service-detail__stack-list,
 .service-detail__owner-list,
 .service-detail__compact-list {
