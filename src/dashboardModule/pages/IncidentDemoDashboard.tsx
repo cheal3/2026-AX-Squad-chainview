@@ -31,8 +31,6 @@ import { useNavigate } from "react-router-dom";
 
 const DASHBOARD_FILTER_STORAGE_KEY = "chainview.dashboard.service-filter.v1";
 const DASHBOARD_BOTTOM_PANEL_WIDTHS_KEY = "chainview.dashboard.bottom-panel-widths.v1";
-const DEFAULT_CATEGORY_L1 = "공통플랫폼";
-const DEFAULT_CATEGORY_L2 = "SWA 플랫폼";
 const DEFAULT_BOTTOM_PANEL_WIDTHS = [24, 29, 47] as const;
 const MIN_BOTTOM_PANEL_WIDTH = 16;
 
@@ -48,8 +46,8 @@ type DashboardFilterState = {
 
 const DEFAULT_DASHBOARD_FILTER: DashboardFilterState = {
   scope: "all",
-  categoryL1: DEFAULT_CATEGORY_L1,
-  categoryL2: DEFAULT_CATEGORY_L2,
+  categoryL1: "",
+  categoryL2: "",
   categoryL3: "",
   serviceId: null,
 };
@@ -129,6 +127,83 @@ function serviceCategoryPath(
 
 function uniqueLabels(values: string[]) {
   return [...new Set(values.filter(Boolean))].sort((a, b) => a.localeCompare(b, "ko"));
+}
+
+function sameDashboardFilter(first: DashboardFilterState, second: DashboardFilterState) {
+  return (
+    first.scope === second.scope &&
+    first.categoryL1 === second.categoryL1 &&
+    first.categoryL2 === second.categoryL2 &&
+    first.categoryL3 === second.categoryL3 &&
+    first.serviceId === second.serviceId
+  );
+}
+
+function normalizeDashboardFilter(
+  filter: DashboardFilterState,
+  services: ServiceRecord[],
+  categoryPathByServiceId: Map<number, string[]>
+): DashboardFilterState {
+  if (!services.length) return filter;
+
+  const next = { ...filter };
+  const hasCategoryValue = (level: number, value: string) =>
+    !value ||
+    services.some((service) => {
+      const path = categoryPathByServiceId.get(service.serviceId) ?? [];
+      return path[level] === value;
+    });
+
+  if (!hasCategoryValue(0, next.categoryL1)) {
+    next.categoryL1 = "";
+    next.categoryL2 = "";
+    next.categoryL3 = "";
+  }
+
+  if (
+    next.categoryL1 &&
+    next.categoryL2 &&
+    !services.some((service) => {
+      const path = categoryPathByServiceId.get(service.serviceId) ?? [];
+      return path[0] === next.categoryL1 && path[1] === next.categoryL2;
+    })
+  ) {
+    next.categoryL2 = "";
+    next.categoryL3 = "";
+  }
+
+  if (
+    next.categoryL1 &&
+    next.categoryL2 &&
+    next.categoryL3 &&
+    !services.some((service) => {
+      const path = categoryPathByServiceId.get(service.serviceId) ?? [];
+      return (
+        path[0] === next.categoryL1 &&
+        path[1] === next.categoryL2 &&
+        path[2] === next.categoryL3
+      );
+    })
+  ) {
+    next.categoryL3 = "";
+  }
+
+  if (
+    next.serviceId &&
+    !services.some((service) => {
+      const path = categoryPathByServiceId.get(service.serviceId) ?? [];
+      return (
+        service.serviceId === next.serviceId &&
+        (!next.categoryL1 || path[0] === next.categoryL1) &&
+        (!next.categoryL2 || path[1] === next.categoryL2) &&
+        (!next.categoryL3 || path[2] === next.categoryL3)
+      );
+    })
+  ) {
+    next.serviceId = null;
+  }
+
+  return next;
 }
 
 type DashboardManagementRow = [string, string, string];
@@ -436,6 +511,32 @@ function DashboardCase({
       ),
     [categoryPathByServiceId, draftFilter.categoryL1, draftFilter.categoryL2, scopedServices]
   );
+
+  useEffect(() => {
+    const normalizedApplied = normalizeDashboardFilter(
+      appliedFilter,
+      services,
+      categoryPathByServiceId
+    );
+    const normalizedDraft = normalizeDashboardFilter(
+      draftFilter,
+      services,
+      categoryPathByServiceId
+    );
+
+    if (!sameDashboardFilter(appliedFilter, normalizedApplied)) {
+      setAppliedFilter(normalizedApplied);
+      window.localStorage.setItem(
+        DASHBOARD_FILTER_STORAGE_KEY,
+        JSON.stringify(normalizedApplied)
+      );
+    }
+
+    if (!sameDashboardFilter(draftFilter, normalizedDraft)) {
+      setDraftFilter(normalizedDraft);
+    }
+  }, [appliedFilter, categoryPathByServiceId, draftFilter, services]);
+
   const filteredServices = useMemo(() => {
     const candidates =
       services;
