@@ -5894,6 +5894,13 @@ table.tbl td.col-check {
   margin-right: 6px;
 }
 
+.service-detail__inline-muted {
+  margin-left: 10px;
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .service-detail__stack-list,
 .service-detail__owner-list,
 .service-detail__compact-list {
