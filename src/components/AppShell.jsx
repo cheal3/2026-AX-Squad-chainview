@@ -39,7 +39,7 @@ const sidebarSections = [
     label: "분석",
     items: [
       { key: "analysis-statistics", icon: "📈", label: "운영 통계", to: "/analysis/statistics" },
-      { key: "analysis-incidents", icon: "🚨", label: "인시던트 관리", to: "/analysis/incidents" },
+      { key: "analysis-incidents", activeKeys: ["incidents"], icon: "🚨", label: "인시던트 관리", to: "/analysis/incidents" },
     ],
   },
   {
@@ -53,7 +53,7 @@ const sidebarSections = [
   {
     label: "담당자",
     items: [
-      { key: "owners", icon: "👨‍💼", label: "담당자 조회", to: "/admin-owners" },
+      { key: "owners", activeKeys: ["owner-management"], icon: "👨‍💼", label: "담당자 조회", to: "/admin-owners" },
       { key: "groups", icon: "📁", label: "그룹 조회", to: "/admin-groups" },
     ],
   },
@@ -268,7 +268,9 @@ function Sidebar({ activeMenu = "", isDark = false }) {
   const { incidents } = usePortalData();
   const [isCollapsed, setIsCollapsed] = useState(readSidebarCollapsed);
   const [openSections, setOpenSections] = useState(readSidebarOpenSections);
-  const itemClass = (key) => `lnb__item${activeMenu === key ? " is-active" : ""}`;
+  const itemMatchesActiveMenu = (item) =>
+    item.key === activeMenu || item.activeKeys?.includes(activeMenu);
+  const itemClass = (item) => `lnb__item${itemMatchesActiveMenu(item) ? " is-active" : ""}`;
   const openIncidentCount = incidents.filter(
     (incident) => incident.incidentStatusCode !== "RESOLVED"
   ).length;
@@ -287,6 +289,27 @@ function Sidebar({ activeMenu = "", isDark = false }) {
       })),
     [openIncidentCount]
   );
+
+  useEffect(() => {
+    if (!activeMenu) {
+      return;
+    }
+
+    const activeSection = sidebarSections.find((section) =>
+      section.items.some((item) => item.key === activeMenu || item.activeKeys?.includes(activeMenu))
+    );
+
+    if (!activeSection || openSections.has(activeSection.label)) {
+      return;
+    }
+
+    setOpenSections((current) => {
+      const next = new Set(current);
+      next.add(activeSection.label);
+      saveSidebarOpenSections(next);
+      return next;
+    });
+  }, [activeMenu, openSections]);
 
   return (
     <aside className={`lnb${isCollapsed ? " is-collapsed" : ""}${isDark ? " is-dark" : ""}`}>
@@ -338,7 +361,7 @@ function Sidebar({ activeMenu = "", isDark = false }) {
           {openSections.has(section.label) ? section.items.map((item) => {
             const Icon = item.icon;
             return (
-              <Link className={itemClass(item.key)} data-key={item.key} key={item.key} title={isCollapsed ? item.label : undefined} to={item.to}>
+              <Link className={itemClass(item)} data-key={item.key} key={item.key} title={isCollapsed ? item.label : undefined} to={item.to}>
                 <span className="lnb__item-icon" aria-hidden="true">
                   {typeof Icon === "string" ? Icon : <Icon size={17} strokeWidth={2.1} />}
                 </span>
