@@ -299,17 +299,21 @@ function Sidebar({ activeMenu = "", isDark = false }) {
       section.items.some((item) => item.key === activeMenu || item.activeKeys?.includes(activeMenu))
     );
 
-    if (!activeSection || openSections.has(activeSection.label)) {
+    if (!activeSection) {
       return;
     }
 
     setOpenSections((current) => {
+      if (current.has(activeSection.label)) {
+        return current;
+      }
+
       const next = new Set(current);
       next.add(activeSection.label);
       saveSidebarOpenSections(next);
       return next;
     });
-  }, [activeMenu, openSections]);
+  }, [activeMenu]);
 
   return (
     <aside className={`lnb${isCollapsed ? " is-collapsed" : ""}${isDark ? " is-dark" : ""}`}>
