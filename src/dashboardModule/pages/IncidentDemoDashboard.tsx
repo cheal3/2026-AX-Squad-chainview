@@ -1785,11 +1785,10 @@ function IncidentCommandDashboard({
       : incident.incidentTypeCode === "SERVER"
         ? impact.affectedServices.length
         : impact.level1.length;
-  const channelImpactCount = new Set(
-    impact.impactedServices
-      .map((service) => service.categoryPath?.[0] || service.categoryPath?.[1] || "")
-      .filter(Boolean)
-  ).size;
+  const impactedInfraCount = countImpactedInfraNodes(
+    impact.affectedServices,
+    deployments
+  );
   const incidentTitle = incident.title || `${rootService?.serviceName ?? "서비스"} 장애 발생`;
   const incidentTargetTypeLabel =
     incident.incidentTypeCode === "SERVER" ? "인프라" : "서비스";
@@ -1863,10 +1862,9 @@ function IncidentCommandDashboard({
       </header>
 
       <div className="mt-3 grid min-w-0 grid-cols-[repeat(auto-fit,minmax(190px,1fr))] gap-3">
-        <DarkMetric icon={<AlertTriangle size={23} />} label={`장애 ${incidentTargetTypeLabel}`} value="1" delta="1" tone="red" />
-        <DarkMetric icon={<Users size={23} />} label="영향 서비스" value={String(impactedCount)} delta={String(impactedCount)} tone="amber" />
-        <DarkMetric icon={<BriefcaseBusiness size={23} />} label="영향 업무" value={String(impact.businessImpactCount)} delta={String(impact.businessImpactCount)} tone="amber" />
-        <DarkMetric icon={<Globe2 size={23} />} label="영향 채널" value={String(channelImpactCount)} delta={String(channelImpactCount)} tone="purple" />
+        <DarkMetric icon={<AlertTriangle size={23} />} label="장애 노드" value="1" delta="1" tone="red" />
+        <DarkMetric icon={<Users size={23} />} label="영향받은 서비스" value={String(impactedCount)} delta={String(impactedCount)} tone="amber" />
+        <DarkMetric icon={<Server size={23} />} label="영향받은 인프라" value={String(impactedInfraCount)} delta={String(impactedInfraCount)} tone="purple" />
       </div>
 
       <div className="mt-3 grid min-h-[500px] min-w-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(280px,320px)] gap-3">
@@ -2036,6 +2034,66 @@ function buildIncidentImpactColumns(
     impactedServices: level1Services,
     level1: level1Services,
   };
+}
+
+function countImpactedInfraNodes(
+  impactedServices: ServiceRecord[],
+  deployments: Record<string, unknown>[]
+) {
+  const impactedServiceIds = new Set(
+    impactedServices.map((service) => Number(service.serviceId)).filter(Boolean)
+  );
+  const impactedServiceCodes = new Set(
+    impactedServices.map((service) => service.serviceCode).filter(Boolean)
+  );
+  const infraKeys = new Set<string>();
+  const serviceIdsWithDeployments = new Set<number>();
+
+  deployments.forEach((deployment) => {
+    const serviceId = Number(deployment.serviceId);
+    const serviceCode = String(deployment.serviceCode ?? "");
+    if (
+      (!serviceId || !impactedServiceIds.has(serviceId)) &&
+      (!serviceCode || !impactedServiceCodes.has(serviceCode))
+    ) {
+      return;
+    }
+
+    if (serviceId) {
+      serviceIdsWithDeployments.add(serviceId);
+    }
+
+    const keyParts = [
+      deployment.infraNodeId,
+      deployment.serverId,
+      deployment.deploymentServerId,
+      deployment.infraServerId,
+      deployment.infraNodeCode,
+      deployment.infraNodeName,
+      deployment.nodeCode,
+      deployment.nodeName,
+      deployment.serverName,
+      deployment.hostName,
+      deployment.hostname,
+      deployment.ipAddress,
+      deployment.ip,
+      deployment.deploymentKey,
+    ]
+      .map((value) => String(value ?? "").trim())
+      .filter(Boolean);
+
+    if (keyParts.length) {
+      infraKeys.add(keyParts[0].toUpperCase());
+    }
+  });
+
+  impactedServices.forEach((service) => {
+    if (service.serverId && !serviceIdsWithDeployments.has(service.serviceId)) {
+      infraKeys.add(`SERVER:${service.serverId}`);
+    }
+  });
+
+  return infraKeys.size;
 }
 
 function buildDashboardIncidentTimeline({

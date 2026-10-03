@@ -1106,6 +1106,10 @@ export function ServiceRelationFlow({
       });
     }
 
+    if (!infraIncident && activeIncidentImpactServiceIds.size > 0) {
+      return directIds;
+    }
+
     const scopedIds = new Set(directIds);
     relations.forEach((relation) => {
       if (relation.relationStatusCode !== "ACTIVE") {
