@@ -1785,10 +1785,19 @@ function IncidentCommandDashboard({
       : incident.incidentTypeCode === "SERVER"
         ? impact.affectedServices.length
         : impact.level1.length;
-  const [graphCounts, setGraphCounts] = useState({ infraNodes: 0, serviceNodes: 0 });
+  const [graphCounts, setGraphCounts] = useState({
+    connectedInfraNodes: 0,
+    infraNodes: 0,
+    serviceNodes: 0,
+  });
   const handleGraphCountsChange = useCallback(
-    (nextCounts: { infraNodes: number; serviceNodes: number }) => {
+    (nextCounts: {
+      connectedInfraNodes: number;
+      infraNodes: number;
+      serviceNodes: number;
+    }) => {
       setGraphCounts((current) =>
+        current.connectedInfraNodes === nextCounts.connectedInfraNodes &&
         current.infraNodes === nextCounts.infraNodes &&
         current.serviceNodes === nextCounts.serviceNodes
           ? current
@@ -1797,6 +1806,19 @@ function IncidentCommandDashboard({
     },
     []
   );
+  useEffect(() => {
+    if (
+      graphCounts.infraNodes > 0 &&
+      graphCounts.connectedInfraNodes < graphCounts.infraNodes
+    ) {
+      console.warn("[ChainView] Incident graph has unconnected infra nodes", {
+        connectedInfraNodes: graphCounts.connectedInfraNodes,
+        infraNodes: graphCounts.infraNodes,
+        incidentId: incident.incidentId,
+      });
+    }
+  }, [graphCounts.connectedInfraNodes, graphCounts.infraNodes, incident.incidentId]);
+  const displayedServiceCount = graphCounts.serviceNodes || impactedCount;
   const impactedInfraCount = graphCounts.infraNodes;
   const incidentTitle = incident.title || `${rootService?.serviceName ?? "서비스"} 장애 발생`;
   const incidentTargetTypeLabel =
@@ -1813,11 +1835,11 @@ function IncidentCommandDashboard({
   const timelineEvents = useMemo(
     () =>
       buildDashboardIncidentTimeline({
-        affectedServiceCount: impactedCount,
+        affectedServiceCount: displayedServiceCount,
         incident,
         incidentEvents,
       }),
-    [impactedCount, incident, incidentEvents]
+    [displayedServiceCount, incident, incidentEvents]
   );
   const ownerRows = useMemo(
     () => resolveOwnerRows({ groups, owners: owners as ServiceOwnerRecord[], service: rootService, users }),
@@ -1872,7 +1894,7 @@ function IncidentCommandDashboard({
 
       <div className="mt-3 grid min-w-0 grid-cols-[repeat(auto-fit,minmax(190px,1fr))] gap-3">
         <DarkMetric icon={<AlertTriangle size={23} />} label="장애 노드" value="1" delta="1" tone="red" />
-        <DarkMetric icon={<Users size={23} />} label="영향받은 서비스" value={String(impactedCount)} delta={String(impactedCount)} tone="amber" />
+        <DarkMetric icon={<Users size={23} />} label="영향받은 서비스" value={String(displayedServiceCount)} delta={String(displayedServiceCount)} tone="amber" />
         <DarkMetric icon={<Server size={23} />} label="영향받은 인프라" value={String(impactedInfraCount)} delta={String(impactedInfraCount)} tone="purple" />
       </div>
 
@@ -1927,7 +1949,7 @@ function IncidentCommandDashboard({
         <IncidentSelectedPanel
           incident={incident}
           rootService={rootService}
-          impactedCount={impactedCount}
+          impactedCount={displayedServiceCount}
           deployments={serviceDeployments}
           onResolve={onResolve}
         />

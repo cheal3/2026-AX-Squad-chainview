@@ -413,7 +413,11 @@ export function ServiceRelationFlow({
   initialServiceId?: number;
   legendPlacement?: RelationLegendPlacement;
   modeTogglePlacement?: GraphModeTogglePlacement;
-  onGraphCountsChange?: (counts: { infraNodes: number; serviceNodes: number }) => void;
+  onGraphCountsChange?: (counts: {
+    connectedInfraNodes: number;
+    infraNodes: number;
+    serviceNodes: number;
+  }) => void;
   onSelectInfraNode?: (node?: InfraGraphNodeRecord) => void;
   onSelectService?: (serviceId: number) => void;
   preserveDetailPanelStateOnSelect?: boolean;
@@ -2545,6 +2549,34 @@ export function ServiceRelationFlow({
     visibleServiceIds,
   ]);
 
+  useEffect(() => {
+    if (!incidentMode) {
+      return;
+    }
+
+    const connectedInfraNodeIds = new Set<string>();
+    edges.forEach((edge) => {
+      if (edge.source.startsWith("infra-")) {
+        connectedInfraNodeIds.add(edge.source);
+      }
+      if (edge.target.startsWith("infra-")) {
+        connectedInfraNodeIds.add(edge.target);
+      }
+    });
+
+    onGraphCountsChange?.({
+      connectedInfraNodes: connectedInfraNodeIds.size,
+      infraNodes: topologyNodes.length,
+      serviceNodes: serviceNodes.length,
+    });
+  }, [
+    edges,
+    incidentMode,
+    onGraphCountsChange,
+    serviceNodes.length,
+    topologyNodes.length,
+  ]);
+
   const nodes = useMemo<Node<GraphNodeData>[]>(
     () => {
       if (graphViewMode === "service") {
@@ -2559,16 +2591,6 @@ export function ServiceRelationFlow({
     },
     [graphViewMode, laneNodes, serviceNodes, topologyNodes]
   );
-  useEffect(() => {
-    if (!incidentMode) {
-      return;
-    }
-
-    onGraphCountsChange?.({
-      infraNodes: topologyNodes.length,
-      serviceNodes: serviceNodes.length,
-    });
-  }, [incidentMode, onGraphCountsChange, serviceNodes.length, topologyNodes.length]);
   const graphContentSignature = useMemo(
     () =>
       nodes
