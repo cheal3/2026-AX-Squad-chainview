@@ -5901,14 +5901,16 @@ table.tbl td.col-check {
   font-weight: 700;
 }
 
-.service-relation-edit-modal__meta {
+.service-relation-edit-modal__meta,
+.service-owner-edit-modal__meta {
   margin: 0;
   color: #64748b;
   font-size: 13px;
   font-weight: 700;
 }
 
-.service-relation-edit-modal__error {
+.service-relation-edit-modal__error,
+.service-owner-edit-modal__error {
   border: 1px solid #fecaca;
   border-radius: 6px;
   background: #fff1f2;
@@ -6057,6 +6059,22 @@ table.tbl td.col-check {
   gap: 14px;
 }
 
+.service-detail__owners-stack {
+  display: grid;
+  gap: 14px;
+}
+
+.service-detail__owner-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid #edf2f7;
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: #fff;
+}
+
 .service-detail__owner-avatar {
   width: 40px;
   height: 40px;
@@ -6069,10 +6087,34 @@ table.tbl td.col-check {
   font-weight: 800;
 }
 
+.service-detail__owner-card > div:nth-child(2) {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.service-detail__owner-card strong,
+.service-detail__owner-meta {
+  min-width: 0;
+}
+
+.service-detail__owner-card strong {
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.service-detail__owner-card span,
+.service-detail__owner-card small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .service-detail__owner-meta {
   display: grid;
   gap: 2px;
-  min-width: 0;
 }
 
 .service-detail__owner-meta strong {
@@ -6090,6 +6132,23 @@ table.tbl td.col-check {
 }
 
 .service-detail__owner-actions button {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: #64748b;
+  padding: 0;
+}
+
+.service-detail__contact-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.service-detail__contact-actions button {
   width: 30px;
   height: 30px;
   display: grid;

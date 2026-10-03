@@ -177,9 +177,11 @@ function ServiceDetailPage({ service }) {
   const navigate = useNavigate();
   const location = useLocation();
   const {
+    createOwner,
     deleteOwner,
     deleteTechStack,
     deployments,
+    groups,
     incidents,
     owners,
     relations,
@@ -190,6 +192,7 @@ function ServiceDetailPage({ service }) {
     services,
     techStacks,
     updateTechStack,
+    users,
   } = usePortalData();
   const activeTab = new URLSearchParams(location.search).get("tab") || "overview";
   const [changeRows, setChangeRows] = useState([]);
@@ -199,6 +202,7 @@ function ServiceDetailPage({ service }) {
   const [impactRows, setImpactRows] = useState([]);
   const [impactSourceLabel, setImpactSourceLabel] = useState("샘플 기준");
   const [editingRelation, setEditingRelation] = useState(null);
+  const [ownerModal, setOwnerModal] = useState(null);
   const deploymentInfos = useMemo(
     () => buildServiceDeploymentInfos(service, deployments, servers),
     [deployments, servers, service]
@@ -372,18 +376,35 @@ function ServiceDetailPage({ service }) {
   };
 
   const handleEditOwner = (owner) => {
-    const nextResponsibility = window.prompt("책임 유형을 입력하세요. (MAIN/SUB/ALERT)", owner.responsibilityCode || "MAIN");
-    if (!nextResponsibility) return;
-    updateOwner(owner.serviceOwnerId, {
-      ...owner,
-      groupName: owner.ownerTypeCode === "GROUP" ? owner.ownerName : "",
-      userName: owner.ownerTypeCode === "USER" ? owner.ownerName : "",
-      responsibilityCode: nextResponsibility.trim().toUpperCase(),
-    });
+    setOwnerModal({ mode: "edit", owner });
   };
 
   const handleCreateOwner = () => {
-    navigate(`/admin-owner-management?serviceId=${service.serviceId}&serviceCode=${encodeURIComponent(service.serviceCode)}`);
+    setOwnerModal({ mode: "create", owner: null });
+  };
+
+  const handleSaveOwner = (mode, owner, form) => {
+    const group = groups.find((item) => String(item.groupId) === String(form.groupId));
+    const user = users.find((item) => String(item.userId) === String(form.userId));
+    const payload = {
+      serviceId: service.serviceId,
+      serviceCode: service.serviceCode,
+      ownerTypeCode: form.ownerTypeCode,
+      groupId: form.ownerTypeCode === "GROUP" ? Number(form.groupId) || null : null,
+      groupName: form.ownerTypeCode === "GROUP" ? group?.groupName : "",
+      userId: form.ownerTypeCode === "USER" ? Number(form.userId) || null : null,
+      userName: form.ownerTypeCode === "USER" ? user?.userName : "",
+      responsibilityCode: form.responsibilityCode,
+      startDate: owner?.startDate || "",
+      endDate: owner?.endDate || "",
+    };
+
+    if (mode === "edit") {
+      updateOwner(owner.serviceOwnerId, payload);
+    } else {
+      createOwner(payload);
+    }
+    setOwnerModal(null);
   };
 
   const handleDeleteOwner = (owner) => {
@@ -466,6 +487,18 @@ function ServiceDetailPage({ service }) {
           relation={editingRelation}
           service={service}
           services={services}
+        />
+      ) : null}
+      {ownerModal ? (
+        <ServiceOwnerEditModal
+          groups={groups}
+          mode={ownerModal.mode}
+          onClose={() => setOwnerModal(null)}
+          onSave={handleSaveOwner}
+          owner={ownerModal.owner}
+          owners={serviceOwners}
+          service={service}
+          users={users}
         />
       ) : null}
     </div>
@@ -708,49 +741,194 @@ function ServiceOwnersTab({ detail, onCreate, onDelete, onEdit, owners }) {
         record: null,
       }));
   return (
-    <section className="service-detail__panel">
-      <div className="service-detail__section-head">
-        <div>
-          <h2>담당자/조직</h2>
-          <p>서비스 담당자 및 담당 그룹</p>
+    <div className="service-detail__owners-stack">
+      <section className="service-detail__panel">
+        <div className="service-detail__section-head">
+          <div>
+            <h2>담당자 정보</h2>
+            <p>주담당자/담당그룹/알림 담당을 분리해 확인</p>
+          </div>
         </div>
-        <button className="btn btn--ghost btn--sm" onClick={onCreate} type="button"><Plus size={14} /> 담당자 추가</button>
-      </div>
-      <table className="tbl service-detail__full-table">
-        <thead>
-          <tr>
-            <th>담당 유형</th>
-            <th>담당자/조직</th>
-            <th>부서</th>
-            <th>역할</th>
-            <th>전화</th>
-            <th>메일</th>
-            <th>책임 유형</th>
-            <th className="col-actions">액션</th>
-          </tr>
-        </thead>
-        <tbody>
+        <div className="service-detail__owner-list">
           {ownerRows.map((owner) => (
-            <tr key={owner.key}>
-              <td><span className="tag">{owner.type}</span></td>
-              <td><strong>{owner.name}</strong></td>
-              <td>{owner.department}</td>
-              <td>{owner.role}</td>
-              <td>{owner.phone}</td>
-              <td>{owner.email}</td>
-              <td><span className="pill pill--ok">{owner.responsibility}</span></td>
-              <td className="col-actions">
-                <div className="service-detail__text-actions">
-                  <button className="service-detail__text-action-button" disabled={!owner.record} onClick={() => onEdit(owner.record)} type="button"><Pencil size={14} /> 수정</button>
-                  <button className="service-detail__text-action-button is-danger" disabled={!owner.record} onClick={() => onDelete(owner.record)} type="button"><Trash2 size={14} /> 삭제</button>
-                </div>
-              </td>
-            </tr>
+            <article className="service-detail__owner-card" key={`summary-${owner.key}`}>
+              <span className="service-detail__owner-avatar">{owner.type === "그룹" ? "공" : "인"}</span>
+              <div>
+                <strong>{owner.name}</strong>
+                <span>{owner.responsibility}</span>
+                <small>{owner.type} · {owner.department}</small>
+              </div>
+              <div className="service-detail__contact-actions">
+                <button type="button" title="메시지"><MessageCircle size={14} /></button>
+                <button type="button" title="전화"><Phone size={14} /></button>
+                <button type="button" title="메일"><Mail size={14} /></button>
+              </div>
+            </article>
           ))}
-          {!ownerRows.length ? <tr><td colSpan={8}><div className="empty">등록된 담당자 정보가 없습니다.</div></td></tr> : null}
-        </tbody>
-      </table>
-    </section>
+          {!ownerRows.length ? <div className="empty">등록된 담당자 정보가 없습니다.</div> : null}
+        </div>
+      </section>
+
+      <section className="service-detail__panel">
+        <div className="service-detail__section-head">
+          <div>
+            <h2>담당자/조직</h2>
+            <p>서비스 담당자 및 담당 그룹</p>
+          </div>
+          <button className="btn btn--ghost btn--sm" onClick={onCreate} type="button"><Plus size={14} /> 담당자 추가</button>
+        </div>
+        <table className="tbl service-detail__full-table service-detail__owner-table">
+          <thead>
+            <tr>
+              <th>담당 유형</th>
+              <th>담당자/조직</th>
+              <th>부서</th>
+              <th>역할</th>
+              <th>전화</th>
+              <th>메일</th>
+              <th>책임 유형</th>
+              <th className="col-actions">액션</th>
+            </tr>
+          </thead>
+          <tbody>
+            {ownerRows.map((owner) => (
+              <tr key={owner.key}>
+                <td><span className="tag">{owner.type}</span></td>
+                <td><strong>{owner.name}</strong></td>
+                <td>{owner.department}</td>
+                <td>{owner.role}</td>
+                <td>{owner.phone}</td>
+                <td>{owner.email}</td>
+                <td><span className="pill pill--ok">{owner.responsibility}</span></td>
+                <td className="col-actions">
+                  <div className="service-detail__text-actions">
+                    <button className="service-detail__text-action-button" disabled={!owner.record} onClick={() => onEdit(owner.record)} type="button"><Pencil size={14} /> 수정</button>
+                    <button className="service-detail__text-action-button is-danger" disabled={!owner.record} onClick={() => onDelete(owner.record)} type="button"><Trash2 size={14} /> 삭제</button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {!ownerRows.length ? <tr><td colSpan={8}><div className="empty">등록된 담당자 정보가 없습니다.</div></td></tr> : null}
+          </tbody>
+        </table>
+      </section>
+    </div>
+  );
+}
+
+function ServiceOwnerEditModal({ groups, mode, onClose, onSave, owner, owners, service, users }) {
+  const matchedGroupId = owner?.groupId ?? groups.find((group) => group.groupName === owner?.ownerName)?.groupId;
+  const matchedUserId = owner?.userId ?? users.find((user) => user.userName === owner?.ownerName)?.userId;
+  const [form, setForm] = useState(() => ({
+    ownerTypeCode: owner?.ownerTypeCode || "GROUP",
+    groupId: String(matchedGroupId ?? groups[0]?.groupId ?? ""),
+    userId: String(matchedUserId ?? users[0]?.userId ?? ""),
+    responsibilityCode: owner?.responsibilityCode || "MAIN",
+  }));
+  const [error, setError] = useState("");
+  const isEdit = mode === "edit";
+  const updateField = (field, value) => {
+    setError("");
+    setForm((current) => {
+      if (field === "ownerTypeCode") {
+        return {
+          ...current,
+          ownerTypeCode: value,
+          groupId: value === "GROUP" ? current.groupId || String(groups[0]?.groupId ?? "") : "",
+          userId: value === "USER" ? current.userId || String(users[0]?.userId ?? "") : "",
+        };
+      }
+      return { ...current, [field]: value };
+    });
+  };
+  const selectedOwnerKey = form.ownerTypeCode === "GROUP" ? form.groupId : form.userId;
+  const modalTitle = isEdit ? "담당자-그룹 수정" : "담당자-그룹 등록";
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    if (!isEdit && (!form.ownerTypeCode || !selectedOwnerKey)) {
+      setError("담당 유형과 담당자/그룹을 선택해 주세요.");
+      return;
+    }
+
+    const duplicate = owners.some((item) => {
+      if (isEdit && item.serviceOwnerId === owner?.serviceOwnerId) return false;
+      if (item.ownerTypeCode !== form.ownerTypeCode) return false;
+      return form.ownerTypeCode === "GROUP"
+        ? String(item.groupId) === String(form.groupId)
+        : String(item.userId) === String(form.userId);
+    });
+
+    if (duplicate) {
+      setError("이미 등록된 담당자는 중복 등록할 수 없습니다.");
+      return;
+    }
+
+    onSave(mode, owner, form);
+  };
+
+  return (
+    <div className="modal-backdrop is-open" onMouseDown={onClose} role="presentation">
+      <form className="modal service-owner-edit-modal" onMouseDown={(event) => event.stopPropagation()} onSubmit={handleSubmit}>
+        <div className="modal__head">
+          <h3>{modalTitle}</h3>
+          <button className="close" onClick={onClose} type="button">×</button>
+        </div>
+        <div className="modal__body">
+          <p className="service-owner-edit-modal__meta">
+            {service.serviceCode} {service.serviceName}
+          </p>
+          <div className="form-grid">
+            {!isEdit ? (
+              <>
+                <div className="form-row full">
+                  <label>담당 유형<span className="req">*</span></label>
+                  <select value={form.ownerTypeCode} onChange={(event) => updateField("ownerTypeCode", event.target.value)}>
+                    <option value="GROUP">그룹</option>
+                    <option value="USER">사용자</option>
+                  </select>
+                </div>
+                <div className="form-row full">
+                  <label>담당자/그룹<span className="req">*</span></label>
+                  {form.ownerTypeCode === "GROUP" ? (
+                    <select value={form.groupId} onChange={(event) => updateField("groupId", event.target.value)}>
+                      <option value="">선택하세요</option>
+                      {groups.map((group) => <option key={group.groupId} value={group.groupId}>{group.groupName}</option>)}
+                    </select>
+                  ) : (
+                    <select value={form.userId} onChange={(event) => updateField("userId", event.target.value)}>
+                      <option value="">선택하세요</option>
+                      {users.map((user) => <option key={user.userId} value={user.userId}>{user.userName}{user.orgName ? ` · ${user.orgName}` : ""}</option>)}
+                    </select>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="form-row full">
+                <label>담당자/그룹</label>
+                <div className="readonly-field">
+                  <code>{ownerTypeLabel(owner.ownerTypeCode)}</code>
+                  {owner.ownerName || "-"}
+                </div>
+              </div>
+            )}
+            <div className="form-row full">
+              <label>책임 유형</label>
+              <select value={form.responsibilityCode} onChange={(event) => updateField("responsibilityCode", event.target.value)}>
+                {Object.entries(codeLabels.responsibilityType || {}).map(([code, label]) => (
+                  <option key={code} value={code}>{label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          {error ? <div className="service-owner-edit-modal__error">{error}</div> : null}
+        </div>
+        <div className="modal__foot">
+          <button className="btn" onClick={onClose} type="button">취소</button>
+          <button className="btn btn--primary" type="submit">{isEdit ? "저장" : "등록"}</button>
+        </div>
+      </form>
+    </div>
   );
 }
 
