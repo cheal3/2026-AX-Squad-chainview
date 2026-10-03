@@ -1785,9 +1785,8 @@ function IncidentCommandDashboard({
       : incident.incidentTypeCode === "SERVER"
         ? impact.affectedServices.length
         : impact.level1.length;
-  const affectedServicesCount = Math.max(impact.affectedServices.length, impactedCount, 1);
   const channelImpactCount = new Set(
-    impact.affectedServices
+    impact.impactedServices
       .map((service) => service.categoryPath?.[0] || service.categoryPath?.[1] || "")
       .filter(Boolean)
   ).size;
@@ -1865,9 +1864,9 @@ function IncidentCommandDashboard({
 
       <div className="mt-3 grid min-w-0 grid-cols-[repeat(auto-fit,minmax(190px,1fr))] gap-3">
         <DarkMetric icon={<AlertTriangle size={23} />} label={`장애 ${incidentTargetTypeLabel}`} value="1" delta="1" tone="red" />
-        <DarkMetric icon={<Users size={23} />} label="영향 서비스" value={String(affectedServicesCount)} delta={String(affectedServicesCount)} tone="amber" />
+        <DarkMetric icon={<Users size={23} />} label="영향 서비스" value={String(impactedCount)} delta={String(impactedCount)} tone="amber" />
         <DarkMetric icon={<BriefcaseBusiness size={23} />} label="영향 업무" value={String(impact.businessImpactCount)} delta={String(impact.businessImpactCount)} tone="amber" />
-        <DarkMetric icon={<Globe2 size={23} />} label="영향 채널" value={String(Math.max(channelImpactCount, 1))} delta={String(Math.max(channelImpactCount, 1))} tone="purple" />
+        <DarkMetric icon={<Globe2 size={23} />} label="영향 채널" value={String(channelImpactCount)} delta={String(channelImpactCount)} tone="purple" />
       </div>
 
       <div className="mt-3 grid min-h-[500px] min-w-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(280px,320px)] gap-3">
@@ -2021,7 +2020,7 @@ function buildIncidentImpactColumns(
       list.findIndex((item) => item.serviceId === service.serviceId) === index
   );
   const businessImpactCount = new Set(
-    affectedServices
+    level1Services
       .map(
         (service) =>
           service.categoryPath[service.categoryPath.length - 1] ??
@@ -2030,7 +2029,13 @@ function buildIncidentImpactColumns(
       .filter(Boolean)
   ).size;
 
-  return { affectedServices, apiImpactsUsed, businessImpactCount, level1: level1Services };
+  return {
+    affectedServices,
+    apiImpactsUsed,
+    businessImpactCount,
+    impactedServices: level1Services,
+    level1: level1Services,
+  };
 }
 
 function buildDashboardIncidentTimeline({
