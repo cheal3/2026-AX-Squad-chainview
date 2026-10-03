@@ -657,6 +657,7 @@ function DashboardCase({
           }
         }}
         relations={portalData.relations}
+        servers={servers}
         services={portalData.services}
         users={users}
       />
@@ -1744,6 +1745,7 @@ function IncidentCommandDashboard({
   owners,
   onResolve,
   relations,
+  servers,
   services,
   users,
 }: {
@@ -1755,6 +1757,7 @@ function IncidentCommandDashboard({
   owners: Record<string, unknown>[];
   onResolve: () => void;
   relations: ServiceRelationRecord[];
+  servers: ServerRecord[];
   services: ServiceRecord[];
   users: Record<string, unknown>[];
 }) {
@@ -1787,7 +1790,8 @@ function IncidentCommandDashboard({
         : impact.level1.length;
   const impactedInfraCount = countImpactedInfraNodes(
     impact.affectedServices,
-    deployments
+    deployments,
+    servers
   );
   const incidentTitle = incident.title || `${rootService?.serviceName ?? "서비스"} 장애 발생`;
   const incidentTargetTypeLabel =
@@ -2038,7 +2042,8 @@ function buildIncidentImpactColumns(
 
 function countImpactedInfraNodes(
   impactedServices: ServiceRecord[],
-  deployments: Record<string, unknown>[]
+  deployments: Record<string, unknown>[],
+  servers: ServerRecord[]
 ) {
   const impactedServiceIds = new Set(
     impactedServices.map((service) => Number(service.serviceId)).filter(Boolean)
@@ -2048,48 +2053,78 @@ function countImpactedInfraNodes(
   );
   const infraKeys = new Set<string>();
   const serviceIdsWithDeployments = new Set<number>();
+  const serviceIdByCode = new Map(
+    impactedServices.map((service) => [service.serviceCode, service.serviceId])
+  );
+  const serverById = new Map(servers.map((server) => [server.serverId, server]));
+  const normalize = (value: unknown) => String(value ?? "").trim().toUpperCase();
+  const infraKeyForServer = (server?: ServerRecord, fallback?: unknown) => {
+    if (!server) {
+      const fallbackText = normalize(fallback);
+      return fallbackText ? `SERVER:${fallbackText}` : "";
+    }
+    return String(
+      server.infraNodeId ||
+        server.infraNodeCode ||
+        server.infraNodeName ||
+        server.hostName ||
+        server.serverName ||
+        server.serverId
+    ).toUpperCase();
+  };
 
   deployments.forEach((deployment) => {
     const serviceId = Number(deployment.serviceId);
-    const serviceCode = String(deployment.serviceCode ?? "");
-    if (
-      (!serviceId || !impactedServiceIds.has(serviceId)) &&
-      (!serviceCode || !impactedServiceCodes.has(serviceCode))
-    ) {
+    if (!serviceId || !impactedServiceIds.has(serviceId)) {
       return;
     }
 
-    if (serviceId) {
-      serviceIdsWithDeployments.add(serviceId);
-    }
+    serviceIdsWithDeployments.add(serviceId);
 
-    const keyParts = [
-      deployment.infraNodeId,
-      deployment.serverId,
-      deployment.deploymentServerId,
-      deployment.infraServerId,
-      deployment.infraNodeCode,
-      deployment.infraNodeName,
-      deployment.nodeCode,
-      deployment.nodeName,
-      deployment.serverName,
-      deployment.hostName,
-      deployment.hostname,
-      deployment.ipAddress,
-      deployment.ip,
-      deployment.deploymentKey,
-    ]
-      .map((value) => String(value ?? "").trim())
-      .filter(Boolean);
+    const deploymentServerId = Number(
+      deployment.serverId ?? deployment.deploymentServerId ?? deployment.infraServerId
+    );
+    const keyParts = deploymentServerId
+      ? [infraKeyForServer(serverById.get(deploymentServerId), deploymentServerId)]
+      : [
+          deployment.infraNodeId,
+          deployment.infraNodeCode,
+          deployment.infraNodeName,
+          deployment.nodeCode,
+          deployment.nodeName,
+          deployment.serverName,
+          deployment.hostName,
+          deployment.hostname,
+          deployment.ipAddress,
+          deployment.ip,
+          deployment.deploymentKey,
+        ]
+          .map(normalize)
+          .filter(Boolean);
 
     if (keyParts.length) {
-      infraKeys.add(keyParts[0].toUpperCase());
+      infraKeys.add(keyParts[0]);
     }
+  });
+
+  servers.forEach((server) => {
+    const serverServiceIds = [
+      ...(server.serviceIds ?? []),
+      ...(server.serviceCodes ?? [])
+        .map((serviceCode) => serviceIdByCode.get(serviceCode))
+        .filter((serviceId): serviceId is number => Boolean(serviceId)),
+    ];
+
+    if (!serverServiceIds.some((serviceId) => impactedServiceIds.has(serviceId))) {
+      return;
+    }
+
+    infraKeys.add(infraKeyForServer(server));
   });
 
   impactedServices.forEach((service) => {
     if (service.serverId && !serviceIdsWithDeployments.has(service.serviceId)) {
-      infraKeys.add(`SERVER:${service.serverId}`);
+      infraKeys.add(infraKeyForServer(serverById.get(service.serverId), service.serverId));
     }
   });
 
