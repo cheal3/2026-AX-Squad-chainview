@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode } from "react";
 import {
   AlertTriangle,
   Bell,
@@ -657,7 +657,6 @@ function DashboardCase({
           }
         }}
         relations={portalData.relations}
-        servers={servers}
         services={portalData.services}
         users={users}
       />
@@ -1745,7 +1744,6 @@ function IncidentCommandDashboard({
   owners,
   onResolve,
   relations,
-  servers,
   services,
   users,
 }: {
@@ -1757,7 +1755,6 @@ function IncidentCommandDashboard({
   owners: Record<string, unknown>[];
   onResolve: () => void;
   relations: ServiceRelationRecord[];
-  servers: ServerRecord[];
   services: ServiceRecord[];
   users: Record<string, unknown>[];
 }) {
@@ -1788,11 +1785,19 @@ function IncidentCommandDashboard({
       : incident.incidentTypeCode === "SERVER"
         ? impact.affectedServices.length
         : impact.level1.length;
-  const impactedInfraCount = countImpactedInfraNodes(
-    impact.affectedServices,
-    deployments,
-    servers
+  const [graphCounts, setGraphCounts] = useState({ infraNodes: 0, serviceNodes: 0 });
+  const handleGraphCountsChange = useCallback(
+    (nextCounts: { infraNodes: number; serviceNodes: number }) => {
+      setGraphCounts((current) =>
+        current.infraNodes === nextCounts.infraNodes &&
+        current.serviceNodes === nextCounts.serviceNodes
+          ? current
+          : nextCounts
+      );
+    },
+    []
   );
+  const impactedInfraCount = graphCounts.infraNodes;
   const incidentTitle = incident.title || `${rootService?.serviceName ?? "서비스"} 장애 발생`;
   const incidentTargetTypeLabel =
     incident.incidentTypeCode === "SERVER" ? "인프라" : "서비스";
@@ -1900,6 +1905,7 @@ function IncidentCommandDashboard({
               incident={incident}
               initialRelationDepth={1}
               initialServiceId={rootService?.serviceId ?? incidentServices[0]?.serviceId}
+              onGraphCountsChange={handleGraphCountsChange}
             />
           </div>
         </section>
@@ -2038,97 +2044,6 @@ function buildIncidentImpactColumns(
     impactedServices: level1Services,
     level1: level1Services,
   };
-}
-
-function countImpactedInfraNodes(
-  impactedServices: ServiceRecord[],
-  deployments: Record<string, unknown>[],
-  servers: ServerRecord[]
-) {
-  const impactedServiceIds = new Set(
-    impactedServices.map((service) => Number(service.serviceId)).filter(Boolean)
-  );
-  const impactedServiceCodes = new Set(
-    impactedServices.map((service) => service.serviceCode).filter(Boolean)
-  );
-  const infraKeys = new Set<string>();
-  const serviceIdsWithDeployments = new Set<number>();
-  const serviceIdByCode = new Map(
-    impactedServices.map((service) => [service.serviceCode, service.serviceId])
-  );
-  const serverById = new Map(servers.map((server) => [server.serverId, server]));
-  const normalize = (value: unknown) => String(value ?? "").trim().toUpperCase();
-  const infraKeyForServer = (server?: ServerRecord, fallback?: unknown) => {
-    if (!server) {
-      const fallbackText = normalize(fallback);
-      return fallbackText ? `SERVER:${fallbackText}` : "";
-    }
-    return String(
-      server.infraNodeId ||
-        server.infraNodeCode ||
-        server.infraNodeName ||
-        server.hostName ||
-        server.serverName ||
-        server.serverId
-    ).toUpperCase();
-  };
-
-  deployments.forEach((deployment) => {
-    const serviceId = Number(deployment.serviceId);
-    if (!serviceId || !impactedServiceIds.has(serviceId)) {
-      return;
-    }
-
-    serviceIdsWithDeployments.add(serviceId);
-
-    const deploymentServerId = Number(
-      deployment.serverId ?? deployment.deploymentServerId ?? deployment.infraServerId
-    );
-    const keyParts = deploymentServerId
-      ? [infraKeyForServer(serverById.get(deploymentServerId), deploymentServerId)]
-      : [
-          deployment.infraNodeId,
-          deployment.infraNodeCode,
-          deployment.infraNodeName,
-          deployment.nodeCode,
-          deployment.nodeName,
-          deployment.serverName,
-          deployment.hostName,
-          deployment.hostname,
-          deployment.ipAddress,
-          deployment.ip,
-          deployment.deploymentKey,
-        ]
-          .map(normalize)
-          .filter(Boolean);
-
-    if (keyParts.length) {
-      infraKeys.add(keyParts[0]);
-    }
-  });
-
-  servers.forEach((server) => {
-    const serverServiceIds = [
-      ...(server.serviceIds ?? []),
-      ...(server.serviceCodes ?? [])
-        .map((serviceCode) => serviceIdByCode.get(serviceCode))
-        .filter((serviceId): serviceId is number => Boolean(serviceId)),
-    ];
-
-    if (!serverServiceIds.some((serviceId) => impactedServiceIds.has(serviceId))) {
-      return;
-    }
-
-    infraKeys.add(infraKeyForServer(server));
-  });
-
-  impactedServices.forEach((service) => {
-    if (service.serverId && !serviceIdsWithDeployments.has(service.serviceId)) {
-      infraKeys.add(infraKeyForServer(serverById.get(service.serverId), service.serverId));
-    }
-  });
-
-  return infraKeys.size;
 }
 
 function buildDashboardIncidentTimeline({

@@ -386,6 +386,7 @@ export function ServiceRelationFlow({
   initialServiceId,
   legendPlacement = "bottom-right",
   modeTogglePlacement = "top-right",
+  onGraphCountsChange,
   onSelectInfraNode,
   onSelectService,
   preserveDetailPanelStateOnSelect = false,
@@ -412,6 +413,7 @@ export function ServiceRelationFlow({
   initialServiceId?: number;
   legendPlacement?: RelationLegendPlacement;
   modeTogglePlacement?: GraphModeTogglePlacement;
+  onGraphCountsChange?: (counts: { infraNodes: number; serviceNodes: number }) => void;
   onSelectInfraNode?: (node?: InfraGraphNodeRecord) => void;
   onSelectService?: (serviceId: number) => void;
   preserveDetailPanelStateOnSelect?: boolean;
@@ -2557,6 +2559,16 @@ export function ServiceRelationFlow({
     },
     [graphViewMode, laneNodes, serviceNodes, topologyNodes]
   );
+  useEffect(() => {
+    if (!incidentMode) {
+      return;
+    }
+
+    onGraphCountsChange?.({
+      infraNodes: topologyNodes.length,
+      serviceNodes: serviceNodes.length,
+    });
+  }, [incidentMode, onGraphCountsChange, serviceNodes.length, topologyNodes.length]);
   const graphContentSignature = useMemo(
     () =>
       nodes
